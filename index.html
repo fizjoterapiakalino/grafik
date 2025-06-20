@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interaktywny Grafik Zmian</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="dateTimeHeader" class="date-time-header">
+    <div class="banner-left-content"> <img src="logo.png" alt="Logo Kalinowa" class="banner-logo">
+        <span class="banner-title">Grafik Kalinowa</span>
+    </div>
+    <div id="dateTimeText" class="date-time-text"></div>
+    <button id="undoButton" class="undo-button" disabled>Cofnij (Ctrl+Z)</button>
+</div>
+    
+    <div class="container">
+        <table id="mainScheduleTable">
+            <thead>
+                <tr id="tableHeaderRow">
+                    <th>Godzina</th>
+                    </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
+
+    <div id="contextMenu" class="context-menu">
+        <ul>
+            <li id="addBreakOption">Dodaj przerwę</li>
+            <li id="removeBreakOption">Usuń przerwę</li>
+            <li id="clearCellOption">Wyczyść</li>
+            <li id="addPatientOption">Dodaj pacjenta</li>
+            <li id="massagOption">Masaż</li>
+        </ul>
+    </div>
+
+    <div id="saveConfirmation" class="save-confirmation">Zapisano!</div>
+
+    <script src="script.js"></script>
+</body>
+</html>

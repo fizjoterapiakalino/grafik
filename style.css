@@ -1,0 +1,281 @@
+/* Styl CSS */
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background-color: #f4f4f4;
+    font-size: 0.9em; /* Zmniejszenie ogólnej czcionki */
+}
+
+.date-time-header {
+    background-color: #ADD8E6; /* Jasnoniebieski kolor */
+    color: #333;
+    padding: 10px;
+    text-align: center;
+    font-size: 1.2em;
+    margin-bottom: 20px;
+    border-radius: 8px; /* Zaokrąglone rogi */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+
+    /* Zmiany dla rozmieszczenia przycisku Cofnij */
+    display: flex; /* Użyj flexboxa */
+    justify-content: space-between; /* Rozłóż elementy na krańcach */
+    align-items: center; /* Wyśrodkuj w pionie */
+    padding-right: 20px; /* Dodatkowy padding, żeby przycisk nie był zbyt blisko krawędzi */
+    padding-left: 20px; /* Dodatkowy padding */
+}
+
+/* Nowe style dla logo i napisu "Grafik Kalinowa" */
+.banner-left-content {
+    display: flex; /* Użyj flexboxa, aby logo i tekst były w jednej linii */
+    align-items: center; /* Wyśrodkuj w pionie */
+    gap: 10px; /* Odstęp między logo a tekstem */
+}
+
+.banner-logo {
+    height: 40px; /* Dostosuj rozmiar logo do potrzeb */
+    width: auto;
+}
+
+.banner-title {
+    font-size: 1.5em; /* Większa czcionka dla tytułu */
+    font-weight: bold;
+    color: #333; /* Kolor tekstu */
+}
+
+/* Styl dla tekstu daty i godziny w headerze */
+.date-time-text {
+    flex-grow: 1; /* Pozwól tekstowi zająć dostępną przestrzeń */
+    text-align: center; /* Wyśrodkuj tekst */
+}
+
+.container {
+    overflow-x: auto; /* Umożliwia przewijanie tabeli na małych ekranach */
+    margin-bottom: 20px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    border-radius: 8px; /* Zaokrąglone rogi tabeli */
+    min-width: 900px; /* Minimalna szerokość tabeli, aby nie była zbyt wąska */
+    overflow: hidden; /* Ważne dla zaokrąglonych rogów z border-collapse */
+}
+
+th, td {
+    padding: 7px; /* Zmniejszenie paddingu dla mniejszej wysokości komórek */
+    border: 1px solid #999; /* Ciemniejsza ramka dla lepszego kontrastu */
+    text-align: center; /* Wyśrodkowanie tekstu w komórkach */
+    white-space: nowrap; /* Zapobiega łamaniu wiersza w nagłówkach i godzinach */
+    outline: none; /* Usuń domyślny outline przeglądarki */
+}
+
+th {
+    background-color: #4CAF50; /* Jasny odcień zieleni */
+    color: white;
+    cursor: pointer; /* Aby zasugerować możliwość edycji nagłówka */
+    position: sticky; /* Przyklejanie nagłówków przy przewijaniu */
+    top: 0;
+    z-index: 10;
+}
+
+th:nth-child(even) {
+    background-color: #45a049; /* Nieco ciemniejszy odcień zieleni dla co drugiego nagłówka */
+}
+
+th:first-child {
+    background-color: #6c757d; /* Szary kolor dla nagłówka "Godzina" */
+    left: 0;
+    z-index: 11; /* Wyższy z-index dla nagłówka "Godzina", aby był zawsze widoczny */
+    width: 55px; /* ZMNIEJSZONA SZEROKOŚĆ KOLUMNY */
+}
+
+/* Domyślny stan dla edytowalnych komórek - nie są od razu contenteditable */
+td.editable-cell {
+    background-color: #e0e0e0; /* Szare tło dla pustych komórek */
+    cursor: pointer; /* Kursor wskazujący na klikalność */
+}
+
+/* Białe tło dla komórek z zawartością (przed edycją) */
+td.editable-cell:not(:empty) {
+    background-color: #ffffff;
+}
+
+/* Styl dla komórek w trybie edycji */
+td[contenteditable="true"] {
+    background-color: #ffffff; /* Zawsze białe podczas edycji */
+    cursor: text;
+}
+
+td:first-child {
+    background-color: #f2f2f2;
+    font-weight: bold;
+    text-align: center; /* Godziny wyśrodkowane */
+    position: sticky; /* Przyklejanie pierwszej kolumny przy przewijaniu */
+    left: 0;
+    z-index: 9;
+    width: 55px; /* ZMNIEJSZONA SZEROKOŚĆ KOLUMNY */
+}
+
+/* Ramka dla aktywnej komórki (żółta ramka) */
+td.active-cell, th.active-cell {
+    outline: 2px solid #FFD700; /* Żółta ramka dla aktywnej komórki */
+    border-radius: 4px;
+}
+
+/* Podświetlenie dla aktualnej godziny - PEŁNE ŻÓŁTE DLA AKTUALNEJ GODZINY */
+td.current-time-highlight {
+    background-color: #FFFF00 !important; /* Pełne żółte dla aktualnej godziny */
+    font-weight: bold;
+}
+
+/* Styl dla komórki "Przerwa" */
+.break-cell {
+    background-color: #000 !important; /* Czarne tło */
+    color: #FF0000 !important; /* Czerwony tekst */
+    font-weight: bold;
+    text-align: center;
+    cursor: default !important;
+    contenteditable: false; /* Upewnij się, że nie jest edytowalna */
+}
+
+/* Styl dla menu kontekstowego */
+.context-menu {
+    display: none;
+    position: absolute;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    z-index: 1000;
+}
+
+.context-menu ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.context-menu ul li {
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.context-menu ul li:hover {
+    background-color: #f2f2f2;
+}
+
+/* Styl dla wizualnego feedbacku Drag & Drop */
+.is-dragging {
+    opacity: 0.4;
+    border: 2px dashed #000; /* Dodaj przerywaną ramkę */
+}
+
+.drag-over-target {
+    background-color: #d1ffd1 !important; /* Jasnozielone tło dla miejsca docelowego */
+    border: 2px dashed #4CAF50;
+}
+
+/* Styl dla komunikatu "Zapisano!" */
+.save-confirmation {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+    z-index: 2000;
+    font-size: 1em;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.save-confirmation.show {
+    opacity: 1;
+}
+
+/* Styl dla przycisku Cofnij */
+.undo-button {
+    background-color: #007bff;
+    color: white;
+    padding: 8px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.9em;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: background-color 0.2s ease;
+}
+
+.undo-button:hover {
+    background-color: #0056b3;
+}
+
+.undo-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+/* Nowy styl dla tekstu 'Masaż' (różowy) */
+.massage-text {
+    color: hotpink; /* Różowy kolor */
+    font-weight: bold;
+}
+/* ... (istniejące style) ... */
+
+/* ... (istniejące style) ... */
+
+/* Styl dla komórek podzielonych na dwie części */
+td.split-cell {
+    display: flex;
+    flex-direction: row; /* Zmieniono z 'column' na 'row' dla podziału poziomego */
+    height: 100%; /* Upewnij się, że komórka ma wystarczającą wysokość */
+    padding: 0; /* Zeruj padding komórki, aby divy mogły przejąć go */
+    box-sizing: border-box; /* padding nie powiększy elementu */
+}
+
+/* Styl dla pojedynczej części w podzielonej komórce */
+td.split-cell > div {
+    flex: 1; /* Każda część zajmuje równą przestrzeń */
+    height: 100%; /* Ważne, aby divy rozciągały się na całą wysokość */
+    padding: 7px; /* Przywróć padding dla wewnętrznych divów */
+    box-sizing: border-box;
+    text-align: center;
+    overflow-wrap: break-word; /* Pozwól tekstowi na zawijanie w podzielonych komórkach */
+    word-wrap: break-word; /* Działa w starszych przeglądarkach */
+    white-space: normal; /* Nadpisz 'nowrap' dla tych divów, aby tekst się zawijał */
+}
+
+td.split-cell > div:first-child {
+    border-right: 1px solid #999; /* Zmieniono z 'border-bottom' na 'border-right' */
+    border-bottom: none; /* Upewnij się, że stara ramka nie została */
+}
+
+/* Styl dla aktywnej części (przy edycji) */
+td.split-cell > div[contenteditable="true"]:focus {
+    outline: 2px solid #FFD700; /* Żółta ramka dla aktywnej części */
+}
+
+/* Usuń outline dla samej komórki, gdy jej wewnętrzny div jest aktywny */
+td.split-cell.active-cell {
+    outline: none;
+}
+
+/* Zadbaj o to, aby komórka z zawartością nadal miała białe tło */
+td.editable-cell:not(:empty), td.split-cell {
+    background-color: #ffffff;
+}
+
+/* Upewnij się, że standardowe komórki nadal mają 'nowrap' */
+th, td:not(.split-cell) {
+    white-space: nowrap; /* Zapobiega łamaniu wiersza w nagłówkach i standardowych komórkach */
+}
+
+/* Styl dla tekstu 'Masaż' w podzielonych komórkach */
+td.split-cell > div.massage-text {
+    color: hotpink;
+    font-weight: bold;
+}
