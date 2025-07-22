@@ -1,4 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // --- SELEKTORY I ZMIENNE GLOBALNE ---
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzu0mPeOZvjxnTJmvELkRdYMqFjxnhJHUdHbYJHojO06m9im_eoqQOQ3UzKtdgK8VPq6Q/exec';
+
     const loadingOverlay = document.getElementById('loadingOverlay');
     const leavesTableBody = document.getElementById('leavesTableBody');
     const leavesHeaderRow = document.getElementById('leavesHeaderRow');
@@ -20,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
     ];
 
+    // --- FUNKCJE KALENDARZA ---
     const generateCalendar = (year, month) => {
         calendarGrid.innerHTML = `
             <div class="day-name">Pon</div><div class="day-name">Wto</div><div class="day-name">Śro</div>
@@ -98,16 +102,23 @@ document.addEventListener('DOMContentLoaded', () => {
         return Array.from(days);
     };
 
+    // --- LOGIKA POBIERANIA DANYCH I GENEROWANIA TABELI ---
     const getEmployeeNames = async () => {
         try {
-            const doc = await db.collection("appData").doc("employees").get();
-            if (doc.exists) {
-                return doc.data().names || [];
+            const response = await fetch(WEB_APP_URL);
+            if (!response.ok) throw new Error(`Błąd HTTP: ${response.status}`);
+            const savedData = await response.json();
+            if (savedData && savedData.employeeHeaders && Object.keys(savedData.employeeHeaders).length > 0) {
+                return Object.values(savedData.employeeHeaders);
             }
-            return [];
+            throw new Error('Brak zapisanych nagłówków pracowników.');
         } catch (error) {
-            console.error("Błąd pobierania pracowników:", error);
-            return [];
+            console.error('Nie udało się pobrać nazwisk pracowników:', error);
+            let fallbackNames = [];
+            for (let i = 0; i < 13; i++) {
+                fallbackNames.push(`Pracownik ${i + 1}`);
+            }
+            return fallbackNames;
         }
     };
 
@@ -134,55 +145,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 monthTd.classList.add('day-cell');
                 monthTd.dataset.employee = name;
                 monthTd.dataset.month = monthIndex;
-                monthTd.setAttribute('contenteditable', 'false');
+                monthTd.setAttribute('contenteditable', 'false'); // Wyłączamy domyślną edycję
                 tr.appendChild(monthTd);
             });
             leavesTableBody.appendChild(tr);
         });
     };
 
-    const saveLeavesData = async () => {
-        const leavesData = {};
-        document.querySelectorAll('#leavesTableBody tr').forEach(row => {
-            const employeeName = row.cells[0].textContent;
-            leavesData[employeeName] = {};
-            Array.from(row.cells).slice(1).forEach(cell => {
-                if (cell.textContent.trim() !== '') {
-                    leavesData[employeeName][cell.dataset.month] = cell.textContent.trim();
-                }
-            });
-        });
-
-        try {
-            await db.collection("appData").doc("leaves").set(leavesData);
-            console.log("Dane urlopów zapisane!");
-        } catch (error) {
-            console.error('Błąd zapisu urlopów:', error);
-        }
-    };
-
-    const loadLeavesData = async () => {
-        try {
-            const doc = await db.collection("appData").doc("leaves").get();
-            if (doc.exists) {
-                const leavesData = doc.data();
-                document.querySelectorAll('#leavesTableBody tr').forEach(row => {
-                    const employeeName = row.cells[0].textContent;
-                    if (leavesData[employeeName]) {
-                        Array.from(row.cells).slice(1).forEach(cell => {
-                            const monthIndex = cell.dataset.month;
-                            if (leavesData[employeeName][monthIndex]) {
-                                cell.textContent = leavesData[employeeName][monthIndex];
-                            }
-                        });
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('Błąd wczytywania urlopów:', error);
-        }
-    };
-
+    // --- EVENT LISTENERS ---
     leavesTableBody.addEventListener('click', (event) => {
         if (event.target.classList.contains('day-cell')) {
             openModal(event.target);
@@ -222,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
     confirmBtn.addEventListener('click', () => {
         if (activeCell) {
             activeCell.textContent = formatDaysToString(selectedDays);
-            saveLeavesData();
+            saveLeavesData(); // Wywołaj funkcję zapisu
         }
         closeModal();
     });
@@ -233,11 +203,43 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.target === modal) closeModal();
     });
 
+    // --- FUNKCJE ZAPISU I WCZYTYWANIA DANYCH URLOPÓW (DO IMPLEMENTACJI) ---
+
+    const saveLeavesData = async () => {
+        console.log("Rozpoczynanie zapisu danych o urlopach..."); // Tymczasowy log
+        // Ta funkcja jest szkieletem - wymaga implementacji logiki do zbierania
+        // danych z tabeli i wysyłania ich do Google Apps Script.
+        // Przykład:
+        /*
+        const leavesData = {};
+        document.querySelectorAll('#leavesTableBody tr').forEach(row => {
+            const employeeName = row.cells[0].textContent;
+            leavesData[employeeName] = {};
+            Array.from(row.cells).slice(1).forEach(cell => {
+                if (cell.textContent.trim() !== '') {
+                    leavesData[employeeName][cell.dataset.month] = cell.textContent.trim();
+                }
+            });
+        });
+
+        try {
+            // UWAGA: Potrzebny będzie dedykowany endpoint lub parametr w URL
+            const response = await fetch(WEB_APP_URL + '?action=saveLeaves', {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(leavesData)
+            });
+            console.log("Dane urlopów zapisane!");
+        } catch (error) {
+            console.error('Błąd zapisu urlopów:', error);
+        }
+        */
+    };
+
     const initializePage = async () => {
         generateTableHeaders();
         const employeeNames = await getEmployeeNames();
         generateTableRows(employeeNames);
-        await loadLeavesData();
     };
 
     const hideLoadingOverlay = () => {
@@ -247,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (loadingOverlay.parentNode) {
                     loadingOverlay.parentNode.removeChild(loadingOverlay);
                 }
-            }, 300);
+            }, 300); // Czas musi pasować do transition w CSS
         }
     };
 

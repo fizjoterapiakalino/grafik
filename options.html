@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opcje - Kalinowa</title>
+    <link rel="icon" href="logo.png" type="image/png">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loader"></div>
+        <p>Wczytywanie...</p>
+    </div>
+
+    <div id="appHeader" class="app-header">
+        <div class="banner-left-content">
+            <img src="logo.png" alt="Logo Kalinowa" class="banner-logo">
+            <span class="banner-title">Grafik Kalinowa</span>
+        </div>
+        <div id="dateTimeText" class="date-time-text"></div>
+        <div class="header-right-menu">
+            <a href="schedule.html" class="menu-item">Grafik</a>
+            <a href="leaves.html" class="menu-item">Urlopy</a>
+            <a href="options.html" class="menu-item active settings-icon" title="Opcje"> <i class="fas fa-cog"></i>
+            </a>
+            </div>
+    </div>
+
+    <div class="content-area">
+        <h1>Opcje Aplikacji</h1>
+        <p>Tutaj możesz skonfigurować różne ustawienia aplikacji.</p>
+        <h2>Zarządzanie Pracownikami</h2>
+        <div class="employee-management">
+            <p>Dodaj nowego pracownika do grafiku:</p>
+            <input type="text" id="newEmployeeName" placeholder="Imię i nazwisko nowego pracownika">
+            <button id="addEmployeeButton">Dodaj pracownika</button>
+            <div id="employeeList">
+                </div>
+        </div>
+
+        <h2>Inne Ustawienia</h2>
+        <ul>
+            <li>Ustawienia godzin pracy (np. zmiana startHour/endHour).</li>
+            <li>Zarządzanie typami usług/masaży.</li>
+            <li>Archiwizacja danych.</li>
+        </ul>
+        </div>
+<script src="shared.js"></script>
+<script src="options.js"></script>
+
+    </body>
+</html>
