@@ -11,23 +11,22 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     firebase.auth().onAuthStateChanged(user => {
-        loadSchedule(!!user); // Przekaż true jeśli user jest zalogowany, false wpp.
+        loadSchedule(!!user);
     });
 
     function renderTable(scheduleData, isUserLoggedIn) {
         // 1. Czyszczenie tabeli
-        tableHead.innerHTML = '<th>Godzina</th>'; // Reset nagłówka
+        tableHead.innerHTML = '<th>Godzina</th>';
         tableBody.innerHTML = '';
 
-        // 2. Wyciągnięcie i posortowanie terapeutów z pierwszego rekordu
+        // 2. Wyciągnięcie terapeutów z pierwszego prawidłowego rekordu
         const firstRow = scheduleData.length > 0 ? scheduleData[0] : null;
-        if (!firstRow) {
-            tableHead.innerHTML += '<th>Brak danych w bazie. Uruchom init-db.html.</th>';
+        if (!firstRow || !firstRow.slots) { // Dodatkowy, bezpieczny warunek
+            tableHead.innerHTML += '<th>Brak prawidłowych danych w bazie. Uruchom init-db.html.</th>';
             return;
         }
         
-        // Klucze obiektu 'slots' to nasi terapeuci
-        therapists = Object.keys(firstRow.slots).sort(); 
+        therapists = Object.keys(firstRow.slots).sort();
         therapists.forEach(therapist => {
             const th = document.createElement('th');
             th.textContent = therapist;
@@ -36,22 +35,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // 3. Renderowanie wierszy z danymi
         scheduleData.forEach(rowData => {
+            // Upewnij się, że ten wiersz również ma dane w prawidłowym formacie
+            if (!rowData.slots) return;
+
             const row = document.createElement('tr');
             row.dataset.time = rowData.time;
 
-            // Komórka z godziną
             const timeCell = document.createElement('td');
             timeCell.textContent = rowData.time;
             timeCell.classList.add('time-cell');
             row.appendChild(timeCell);
 
-            // Komórki dla każdego terapeuty
             therapists.forEach(therapist => {
                 const cell = document.createElement('td');
                 const slotData = rowData.slots[therapist] || { text: '', type: 'normal' };
                 
                 cell.textContent = slotData.text;
-                cell.className = `slot-cell type-${slotData.type}`; // np. type-przerwa
+                cell.className = `slot-cell type-${slotData.type}`;
                 cell.dataset.therapist = therapist;
 
                 if (isUserLoggedIn) {
@@ -69,7 +69,11 @@ document.addEventListener('DOMContentLoaded', function () {
     function loadSchedule(isUserLoggedIn) {
         toggleLoading(true);
         db.collection('schedules').orderBy('time').onSnapshot(snapshot => {
-            const scheduleData = snapshot.docs.map(doc => doc.data());
+            // FILTRUJEMY DANE: Bierzemy tylko te dokumenty, które mają pole 'slots'
+            const scheduleData = snapshot.docs
+                .map(doc => doc.data())
+                .filter(data => data.slots); 
+
             renderTable(scheduleData, isUserLoggedIn);
             toggleLoading(false);
         }, error => {
@@ -81,15 +85,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function handleCellUpdate(time, therapist, newText) {
         const docRef = db.collection('schedules').doc(time);
-        
-        // Używamy notacji z kropką do aktualizacji zagnieżdżonego pola
         const updateKey = `slots.${therapist}.text`;
 
-        docRef.update({
-            [updateKey]: newText
-        }).catch(error => {
-            console.error("Błąd aktualizacji komórki: ", error);
-            // Opcjonalnie: przywróć starą wartość lub pokaż błąd
-        });
+        docRef.update({ [updateKey]: newText })
+            .catch(error => {
+                console.error("Błąd aktualizacji komórki: ", error);
+            });
     }
 });
