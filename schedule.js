@@ -1,52 +1,51 @@
 document.addEventListener('DOMContentLoaded', function () {
     const mainScheduleTable = document.getElementById('mainScheduleTable');
     const tableBody = mainScheduleTable.querySelector('tbody');
-    const loadingOverlay = document.getElementById('loadingOverlay');
 
-    function toggleLoading(show) {
-        if (loadingOverlay) loadingOverlay.style.display = show ? 'flex' : 'none';
-    }
+    // Usunięto zależność od logowania, ładujemy dane od razu.
+    loadSchedule();
 
-    // Nasłuchuj zmian w stanie uwierzytelnienia
-    firebase.auth().onAuthStateChanged(user => {
-        // Niezależnie od tego czy użytkownik jest zalogowany, próbujemy załadować harmonogram.
-        // Uprawnienia do edycji będą sprawdzane w miejscu edycji.
-        loadSchedule(!!user);
-    });
+    function loadSchedule() {
+        window.toggleLoadingOverlay(true); // Pokaż "Wczytywanie..."
 
-    function loadSchedule(isUserLoggedIn) {
-        toggleLoading(true);
         db.collection('schedules').orderBy('time').onSnapshot(snapshot => {
-            tableBody.innerHTML = ''; // Wyczyść tabelę przed dodaniem nowych danych
+            tableBody.innerHTML = ''; // Wyczyść tabelę przed każdym odświeżeniem
+
             if (snapshot.empty) {
-                tableBody.innerHTML = '<tr><td colspan="2">Brak danych w harmonogramie. Dodaj pierwszy wpis w konsoli Firebase.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="2">Brak wpisów w harmonogramie. Dodaj pierwszy w konsoli Firebase.</td></tr>';
             } else {
                 snapshot.forEach(doc => {
                     const entry = doc.data();
                     const row = document.createElement('tr');
                     
-                    row.innerHTML = `
-                        <td class="time-cell">${entry.time}</td>
-                        <td class="patient-cell">${entry.patient}</td>
-                    `;
+                    const timeCell = document.createElement('td');
+                    timeCell.textContent = entry.time;
+                    row.appendChild(timeCell);
 
-                    if (isUserLoggedIn) {
-                        const patientCell = row.querySelector('.patient-cell');
-                        patientCell.contentEditable = true;
-                        patientCell.addEventListener('blur', (e) => {
-                            // Zapisz zmiany gdy komórka straci fokus
-                            db.collection('schedules').doc(doc.id).update({ patient: e.target.textContent })
-                                .catch(err => console.error("Błąd zapisu:", err));
-                        });
-                    }
+                    const patientCell = document.createElement('td');
+                    patientCell.textContent = entry.patient;
+                    
+                    // Komórka jest ZAWSZE edytowalna
+                    patientCell.contentEditable = true;
+                    patientCell.dataset.docId = doc.id; // Zapisz ID dokumentu
+
+                    patientCell.addEventListener('blur', (e) => {
+                        const documentId = e.target.dataset.docId;
+                        const newText = e.target.textContent;
+                        // Zapisz zmiany w bazie
+                        db.collection('schedules').doc(documentId).update({ patient: newText })
+                            .catch(err => console.error("Błąd zapisu:", err));
+                    });
+                    
+                    row.appendChild(patientCell);
                     tableBody.appendChild(row);
                 });
             }
-            toggleLoading(false);
+            window.toggleLoadingOverlay(false); // Ukryj "Wczytywanie..."
         }, error => {
             console.error("Błąd ładowania danych: ", error);
-            tableBody.innerHTML = `<tr><td colspan="2">Błąd ładowania: ${error.message}</td></tr>`;
-            toggleLoading(false);
+            tableBody.innerHTML = `<tr><td colspan="2">Błąd ładowania: ${error.message}. Sprawdź reguły bazy danych.</td></tr>`;
+            window.toggleLoadingOverlay(false);
         });
     }
 });
