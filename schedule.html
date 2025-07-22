@@ -21,28 +21,24 @@
         </div>
         <div id="dateTimeText" class="date-time-text"></div>
         <div class="header-right-menu">
-            <!-- Przywrócone pełne menu nawigacyjne -->
             <a href="schedule.html" class="menu-item active">Grafik</a>
             <a href="leaves.html" class="menu-item">Urlopy</a>
             <a href="options.html" class="menu-item settings-icon" title="Opcje">
                 <i class="fas fa-cog"></i>
             </a>
-            <!-- Przycisk logowania zostanie dodany tutaj przez shared.js -->
         </div>
     </div>
 
     <div class="container">
         <table id="mainScheduleTable">
             <thead>
-                <!-- Nagłówek (terapeuci) będzie generowany dynamicznie przez schedule.js -->
                 <tr id="tableHeaderRow"></tr>
             </thead>
             <tbody>
-                <!-- Wiersze (godziny) będą generowane dynamicznie przez schedule.js -->
             </tbody>
         </table>
 
-        <!-- Przywrócone menu kontekstowe i paski narzędzi -->
+        <!-- Menu kontekstowe i paski narzędzi -->
         <div id="actionToolbar" class="action-toolbar">
             <ul>
                 <li id="toolbarSplitCell"><i class="fas fa-users"></i><span>Podziel komórkę</span></li>
@@ -71,7 +67,7 @@
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <!-- Usunięto firebase-auth.js, bo nie jest już potrzebne -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="firebase-config.js"></script>
     <script src="shared.js"></script>
