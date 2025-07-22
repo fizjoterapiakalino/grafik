@@ -21,58 +21,25 @@
         </div>
         <div id="dateTimeText" class="date-time-text"></div>
         <div class="header-right-menu">
-            <div class="search-container">
-                <input type="text" id="searchInput" class="search-input" placeholder="Szukaj...">
-                <button id="clearSearchButton" class="clear-search-btn" style="display: none;">&times;</button>
-            </div>
-            <button id="undoButton" class="undo-button" title="Cofnij (Ctrl+Z)" disabled><i class="fas fa-undo"></i></button>
-            <a href="schedule.html" class="menu-item active">Grafik</a><a href="leaves.html" class="menu-item">Urlopy</a>
-            <a href="options.html" class="menu-item settings-icon" title="Opcje">
-                <i class="fas fa-cog"></i>
-            </a>
+             <!-- Przycisk logowania/wylogowania zostanie dodany przez shared.js -->
         </div>
     </div>
 
     <div class="container">
         <table id="mainScheduleTable">
             <thead>
-                <!-- Nagłówek będzie generowany dynamicznie przez schedule.js -->
-                <tr id="tableHeaderRow">
+                <tr>
+                    <th>Godzina</th>
+                    <th>Pacjent</th>
                 </tr>
             </thead>
             <tbody>
-                <!-- Wiersze będą generowane dynamicznie przez schedule.js -->
+                <!-- Dane zostaną wczytane dynamicznie przez schedule.js -->
             </tbody>
         </table>
-
-        <div id="actionToolbar" class="action-toolbar">
-            <ul>
-                <li id="toolbarSplitCell"><i class="fas fa-users"></i><span>Podziel komórkę</span></li>
-                <li id="toolbarAddBreak"><i class="fas fa-coffee"></i><span>Dodaj przerwę</span></li>
-                <li id="toolbarMassage"><i class="fas fa-hand-paper"></i><span>Oznacz jako Masaż</span></li>
-                <li id="toolbarPnf"><i class="fas fa-brain"></i><span>Oznacz jako PNF</span></li>
-                <li id="toolbarClear"><i class="fas fa-trash-alt"></i><span>Wyczyść komórkę</span></li>
-                <li id="toolbarRemoveBreak" style="display: none;"><i class="fas fa-backspace"></i><span>Usuń przerwę</span></li>
-            </ul>
-        </div>
     </div>
 
-    <div id="cellSettingsIcon" class="cell-settings-icon" title="Opcje komórki">
-        <i class="fas fa-ellipsis-h"></i>
-    </div>
-
-    <div id="contextMenu" class="action-toolbar">
-        <ul>
-            <li id="addPatientOption"><i class="fas fa-users"></i><span>Podziel komórę</span></li>
-            <li id="addBreakOption"><i class="fas fa-coffee"></i><span>Dodaj przerwę</span></li>
-            <li id="massagOption"><i class="fas fa-hand-paper"></i><span>Oznacz jako Masaż</span></li>
-            <li id="pnfOption"><i class="fas fa-brain"></i><span>Oznacz jako PNF</span></li>
-            <li id="clearCellOption"><i class="fas fa-trash-alt"></i><span>Wyczyść komórkę</span></li>
-            <li id="removeBreakOption" style="display: none;"><i class="fas fa-backspace"></i><span>Usuń przerwę</span></li>
-        </ul>
-    </div>
-
-    <div id="saveConfirmation" class="save-confirmation">Zapisano!</div>
+    <!-- Usunięto zbędne paski narzędzi i menu kontekstowe dla uproszczenia -->
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
