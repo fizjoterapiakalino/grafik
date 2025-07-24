@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const nextMonthBtn = document.getElementById('nextMonthBtn');
     const confirmBtn = document.getElementById('confirmSelectionBtn');
     const cancelBtn = document.getElementById('cancelSelectionBtn');
+    const searchInput = document.getElementById('searchInput');
+    const clearSearchBtn = document.getElementById('clearSearch');
 
     let activeCell = null;
     let currentDate = new Date();
@@ -152,6 +154,49 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    const filterAndHighlightTable = (searchTerm) => {
+        const rows = leavesTableBody.querySelectorAll('tr');
+        const regex = new RegExp(searchTerm, 'gi'); // 'gi' dla globalnego i ignorującego wielkość liter
+
+        rows.forEach(row => {
+            const employeeNameCell = row.querySelector('.employee-name-cell');
+            const dayCells = row.querySelectorAll('.day-cell');
+            let rowMatches = false;
+
+            // Usuń poprzednie podświetlenia
+            row.querySelectorAll('.search-highlight').forEach(span => {
+                span.outerHTML = span.innerHTML; // Przywróć oryginalny tekst
+            });
+
+            // Sprawdź nazwę pracownika
+            let originalEmployeeName = employeeNameCell.textContent;
+            if (searchTerm && regex.test(originalEmployeeName)) {
+                employeeNameCell.innerHTML = originalEmployeeName.replace(regex, `<span class="search-highlight">$&</span>`);
+                rowMatches = true;
+            } else {
+                employeeNameCell.textContent = originalEmployeeName; // Przywróć oryginalny tekst
+            }
+
+
+            // Sprawdź komórki z dniami urlopów
+            dayCells.forEach(cell => {
+                let originalCellContent = cell.textContent;
+                if (searchTerm && regex.test(originalCellContent)) {
+                    cell.innerHTML = originalCellContent.replace(regex, `<span class="search-highlight">$&</span>`);
+                    rowMatches = true;
+                } else {
+                    cell.textContent = originalCellContent; // Przywróć oryginalny tekst
+                }
+            });
+
+            if (searchTerm === '' || rowMatches) {
+                row.style.display = ''; // Pokaż wiersz
+            } else {
+                row.style.display = 'none'; // Ukryj wiersz
+            }
+        });
+    };
+
     // --- EVENT LISTENERS ---
     leavesTableBody.addEventListener('click', (event) => {
         if (event.target.classList.contains('day-cell')) {
@@ -201,6 +246,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     modal.addEventListener('click', (event) => {
         if (event.target === modal) closeModal();
+    });
+
+    // --- EVENT LISTENERS DLA WYSZUKIWANIA ---
+    searchInput.addEventListener('input', (event) => {
+        const searchTerm = event.target.value.trim();
+        filterAndHighlightTable(searchTerm);
+        if (searchTerm.length > 0) {
+            clearSearchBtn.style.display = 'block';
+        } else {
+            clearSearchBtn.style.display = 'none';
+        }
+    });
+
+    clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        clearSearchBtn.style.display = 'none';
+        filterAndHighlightTable(''); // Pokaż wszystkie wiersze i usuń podświetlenia
     });
 
     // --- FUNKCJE ZAPISU I WCZYTYWANIA DANYCH URLOPÓW (DO IMPLEMENTACJI) ---

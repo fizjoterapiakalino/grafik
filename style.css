@@ -10,6 +10,8 @@ body {
     margin: 0 20px 20px 20px;
 }
 
+/* --- USUNIĘTO: Stara nawigacja .navbar --- */
+
 /* --- Nagłówek Aplikacji --- */
 .app-header {
     background-color: #ADD8E6;
@@ -48,20 +50,57 @@ body {
     align-items: center;
     gap: 15px;
 }
-.menu-item {
-    color: #333;
-    text-decoration: none;
-    font-weight: bold;
-    padding: 5px 10px;
-    border-radius: 5px;
-    transition: background-color 0.3s ease;
+
+/* --- NOWE: Hamburger Menu --- */
+.hamburger-menu {
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 50%;
+    transition: background-color 0.3s;
+    font-size: 1.4em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
-.menu-item:hover, .menu-item.active {
+.hamburger-menu:hover, .hamburger-menu.active {
     background-color: rgba(0, 0, 0, 0.1);
 }
-.settings-icon i {
-    font-size: 1.5em;
+.nav-panel {
+    position: fixed;
+    top: 0;
+    right: -280px; /* Start off-screen */
+    width: 250px;
+    height: 100%;
+    background-color: #333;
+    box-shadow: -2px 0 5px rgba(0,0,0,0.5);
+    transition: right 0.3s ease-in-out;
+    z-index: 9999;
+    padding-top: 60px;
 }
+.nav-panel.visible {
+    right: 0; /* Slide in */
+}
+.nav-panel ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.nav-panel a {
+    display: block;
+    padding: 15px 25px;
+    color: white;
+    text-decoration: none;
+    font-size: 1.2em;
+    border-bottom: 1px solid #444;
+    transition: background-color 0.3s;
+}
+.nav-panel a:hover {
+    background-color: #555;
+}
+.nav-panel a.active {
+    background-color: #4CAF50;
+}
+
 
 /* --- Przyciski --- */
 .undo-button {
@@ -74,7 +113,6 @@ body {
     font-size: 0.9em;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     transition: background-color 0.2s ease;
-    margin-right: 10px;
 }
 .undo-button:disabled {
     background-color: #cccccc;
@@ -90,7 +128,6 @@ body {
     height: 100vh;
     background-color: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px); /* Dla Safari */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -99,28 +136,24 @@ body {
     transition: opacity 0.3s ease-in-out;
     opacity: 1;
 }
-
 .loading-overlay.hidden {
     opacity: 0;
-    pointer-events: none; /* Umożliwia klikanie "pod" ukrytą warstwą */
+    pointer-events: none;
 }
-
 .loading-overlay .loader {
     border: 8px solid #f3f3f3;
-    border-top: 8px solid #4CAF50; /* Używam koloru pasującego do motywu */
+    border-top: 8px solid #4CAF50;
     border-radius: 50%;
     width: 60px;
     height: 60px;
     animation: spin 1s linear infinite;
 }
-
 .loading-overlay p {
     margin-top: 20px;
     font-size: 1.5em;
     color: #333;
     font-weight: bold;
 }
-
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
@@ -139,8 +172,8 @@ body {
     padding: 7px;
     border: 1px solid #999;
     text-align: center;
-    white-space: normal;       /* Pozwala na zawijanie tekstu w komórkach */
-    overflow-wrap: break-word; /* Umożliwia łamanie długich słów, które się nie mieszczą */
+    white-space: normal;
+    overflow-wrap: break-word;
     outline: none;
 }
 #mainScheduleTable thead th {
@@ -150,7 +183,7 @@ body {
     position: sticky;
     top: 60px; 
     z-index: 10;
-    white-space: nowrap;       /* Zapobiega łamaniu się nagłówków pracowników */
+    white-space: nowrap;
 }
 #mainScheduleTable thead th:nth-child(even) {
     background-color: #45a049;
@@ -167,7 +200,7 @@ body {
     position: sticky;
     left: 0;
     z-index: 9;
-    white-space: nowrap;       /* Zapobiega łamaniu się godzin */
+    white-space: nowrap;
     width: 55px;
 }
 #mainScheduleTable td.editable-cell {
@@ -177,9 +210,19 @@ body {
 #mainScheduleTable td.split-cell, #mainScheduleTable td.editable-cell:not(:empty) {
     background-color: #ffffff;
 }
-#mainScheduleTable td.active-cell, #mainScheduleTable th.active-cell {
+#mainScheduleTable td.active-cell, 
+#mainScheduleTable th.active-cell, 
+#mainScheduleTable div.active-cell {
     outline: 2px solid #FFD700;
+    box-shadow: inset 0 0 0 2px #FFD700;
 }
+#mainScheduleTable td[contenteditable="true"],
+#mainScheduleTable th[contenteditable="true"],
+#mainScheduleTable div[contenteditable="true"] {
+    background-color: #ffffff;
+    box-shadow: inset 0 0 0 2px #007bff;
+}
+
 
 /* --- Tabela URLOPÓW (leaves.html) --- */
 .leaves-table {
@@ -320,55 +363,32 @@ body {
     background-color: #dc3545;
     color: white;
 }
-/* ========================================================= */
-/* PRZYWRÓCONE STYLE DLA GRAFIKU */
-/* ========================================================= */
 
 /* --- Style dla przeciągania i upuszczania --- */
 .is-dragging {
     opacity: 0.4;
     border: 2px dashed #000;
 }
-
 .drag-over-target {
     background-color: #d1ffd1 !important;
     border: 2px dashed #4CAF50;
 }
 
-/* --- Potwierdzenie zapisu --- */
-.save-confirmation {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: #4CAF50;
-    color: white;
-    padding: 10px 20px;
-    border-radius: 5px;
-    opacity: 0;
-    transition: opacity 0.5s ease-in-out;
-    z-index: 2000;
-}
-
-.save-confirmation.show {
-    opacity: 1;
-}
-
 /* --- Specjalne style komórek grafiku --- */
 .break-cell {
-    background-color: #000 !important;
-    color: #FF0000 !important;
+    background-color: #6c757d !important;
+    color: #fff !important;
     font-weight: bold;
     text-align: center;
     cursor: default !important;
 }
 
-.pnf-text, td.split-cell > div.pnf-text {
-    color: #007bff; /* Niebieski dla PNF */
+.pnf-text, td.split-cell > div.pnf-text > span {
+    color: #007bff;
     font-weight: bold;
 }
 
-.massage-text, td.split-cell > div.massage-text {
+.massage-text, td.split-cell > div.massage-text > span {
     color: hotpink;
     font-weight: bold;
 }
@@ -381,7 +401,7 @@ td.split-cell {
 
 td.split-cell > div {
     flex: 1;
-     display: flex; /* Umożliwia wyśrodkowanie ikony i tekstu */
+    display: flex;
     align-items: center;
     justify-content: center;
     padding: 7px;
@@ -395,16 +415,8 @@ td.split-cell > div:first-child {
     border-right: 1px solid #999;
 }
 
-.cell-icon {
-    margin-right: 5px;
-    font-size: 0.9em;
-    /* Zapobiega dziedziczeniu koloru z .massage-text lub .pnf-text */
-    color: #555;
-}
-
 .duplicate-highlight {
-    background-color: #ffeb3b !important; /* Jaskrawy żółty dla duplikatów */
-    box-shadow: inset 0 0 0 2px #cddc39; /* Dodatkowa wewnętrzna ramka dla lepszej widoczności */
+    background-color: #ffeb3b !important;
 }
 
 td.current-time-highlight {
@@ -412,15 +424,10 @@ td.current-time-highlight {
     font-weight: bold;
 }
 
-#mainScheduleTable td[contenteditable="true"],
-#mainScheduleTable div[contenteditable="true"]:focus {
-    background-color: #ffffff;
-    outline: 2px solid #FFD700;
-}
-
 /* --- Pole wyszukiwania --- */
 .search-input {
     padding: 5px 8px;
+    padding-left: 30px; /* Dodaj miejsce na ikonę lupy */
     border: 1px solid #ccc;
     border-radius: 4px;
     font-size: 0.9em;
@@ -437,6 +444,11 @@ td.current-time-highlight {
     position: relative;
     display: flex;
     align-items: center;
+}
+.search-icon {
+    position: absolute;
+    left: 8px;
+    color: #888;
 }
 .clear-search-btn {
     position: absolute;
@@ -455,14 +467,14 @@ td.current-time-highlight {
     color: #333;
 }
 .search-highlight {
-    background-color: #a2f2a2; /* Jasny zielony do podświetlania */
+    background-color: #a2f2a2;
     border-radius: 2px;
 }
 
-/* --- Pasek narzędzi akcji --- */
-.action-toolbar {
+/* --- Menu Kontekstowe --- */
+.context-menu {
     position: absolute;
-    display: none; /* Domyślnie ukryty */
+    display: none;
     background-color: #fff;
     border: 1px solid #ddd;
     padding: 5px 0;
@@ -471,23 +483,20 @@ td.current-time-highlight {
     z-index: 1100;
     transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
     opacity: 0;
-    transform: translateY(10px); /* Animacja "z dołu do góry" */
+    transform: scale(0.95);
     min-width: 200px;
 }
-
-.action-toolbar.visible {
+.context-menu.visible {
     display: block;
     opacity: 1;
-    transform: translateY(0);
+    transform: scale(1);
 }
-
-.action-toolbar ul {
+.context-menu ul {
     list-style: none;
     margin: 0;
     padding: 0;
 }
-
-.action-toolbar li {
+.context-menu li {
     display: flex;
     align-items: center;
     padding: 8px 15px;
@@ -496,37 +505,38 @@ td.current-time-highlight {
     color: #333;
     font-size: 0.95em;
 }
-
-.action-toolbar li:hover {
+.context-menu li:hover {
     background-color: #f2f2f2;
 }
-
-.action-toolbar li i {
+.context-menu li i {
     margin-right: 12px;
     width: 1.2em;
     text-align: center;
     color: #555;
 }
 
-/* --- Ikona opcji komórki --- */
-.cell-settings-icon {
-    position: absolute;
-    width: 24px;
-    height: 24px;
-    background-color: #333;
-    color: white;
-    border-radius: 50%;
-    display: none; /* Domyślnie ukryta */
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    z-index: 1050; /* Poniżej paska narzędzi, ale nad komórkami */
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    transition: transform 0.2s, background-color 0.2s;
-    font-size: 0.8em;
+/* --- Kontener i style dla powiadomień "Toast" --- */
+#toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
 }
-
-.cell-settings-icon:hover {
-    transform: scale(1.1);
-    background-color: #555;
+.toast {
+    background-color: #333;
+    color: #fff;
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin-top: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    opacity: 0;
+    transform: translateX(100%);
+    transition: opacity 0.5s, transform 0.5s;
+}
+.toast.show {
+    opacity: 1;
+    transform: translateX(0);
 }

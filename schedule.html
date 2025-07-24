@@ -14,6 +14,8 @@
         <p>Wczytywanie...</p>
     </div>
 
+    <div id="toast-container"></div>
+
     <div id="appHeader" class="app-header">
         <div class="banner-left-content">
             <img src="logo.png" alt="Logo Kalinowa" class="banner-logo">
@@ -22,14 +24,11 @@
         <div id="dateTimeText" class="date-time-text"></div>
         <div class="header-right-menu">
             <div class="search-container">
+                <i class="fas fa-search search-icon"></i>
                 <input type="text" id="searchInput" class="search-input" placeholder="Szukaj...">
-                <button id="clearSearchButton" class="clear-search-btn" style="display: none;">&times;</button>
+                <button id="clearSearchButton" class="clear-search-btn" style="display: none;"><i class="fas fa-times"></i></button>
             </div>
             <button id="undoButton" class="undo-button" title="Cofnij (Ctrl+Z)" disabled><i class="fas fa-undo"></i></button>
-            <a href="schedule.html" class="menu-item active">Grafik</a><a href="leaves.html" class="menu-item">Urlopy</a>
-            <a href="options.html" class="menu-item settings-icon" title="Opcje">
-                <i class="fas fa-cog"></i>
-            </a>
         </div>
     </div>
 
@@ -44,34 +43,17 @@
             </tbody>
         </table>
 
-        <div id="actionToolbar" class="action-toolbar">
+        <div id="contextMenu" class="context-menu">
             <ul>
-                <li id="toolbarSplitCell"><i class="fas fa-users"></i><span>Podziel komórkę</span></li>
-                <li id="toolbarAddBreak"><i class="fas fa-coffee"></i><span>Dodaj przerwę</span></li>
-                <li id="toolbarMassage"><i class="fas fa-hand-paper"></i><span>Oznacz jako Masaż</span></li>
-                <li id="toolbarPnf"><i class="fas fa-brain"></i><span>Oznacz jako PNF</span></li>
-                <li id="toolbarClear"><i class="fas fa-trash-alt"></i><span>Wyczyść komórkę</span></li>
-                <li id="toolbarRemoveBreak" style="display: none;"><i class="fas fa-backspace"></i><span>Usuń przerwę</span></li>
+                <li id="contextSplitCell"><i class="fas fa-users"></i><span>Podziel komórkę</span></li>
+                <li id="contextAddBreak"><i class="fas fa-coffee"></i><span>Dodaj przerwę</span></li>
+                <li id="contextMassage"><i class="fas fa-hand-paper"></i><span>Oznacz jako Masaż</span></li>
+                <li id="contextPnf"><i class="fas fa-brain"></i><span>Oznacz jako PNF</span></li>
+                <li id="contextClear"><i class="fas fa-trash-alt"></i><span>Wyczyść komórkę</span></li>
+                <li id="contextRemoveBreak" style="display: none;"><i class="fas fa-backspace"></i><span>Usuń przerwę</span></li>
             </ul>
         </div>
     </div>
-
-    <div id="cellSettingsIcon" class="cell-settings-icon" title="Opcje komórki">
-        <i class="fas fa-ellipsis-h"></i>
-    </div>
-
-    <div id="contextMenu" class="action-toolbar">
-        <ul>
-            <li id="addPatientOption"><i class="fas fa-users"></i><span>Podziel komórkę</span></li>
-            <li id="addBreakOption"><i class="fas fa-coffee"></i><span>Dodaj przerwę</span></li>
-            <li id="massagOption"><i class="fas fa-hand-paper"></i><span>Oznacz jako Masaż</span></li>
-            <li id="pnfOption"><i class="fas fa-brain"></i><span>Oznacz jako PNF</span></li>
-            <li id="clearCellOption"><i class="fas fa-trash-alt"></i><span>Wyczyść komórkę</span></li>
-            <li id="removeBreakOption" style="display: none;"><i class="fas fa-backspace"></i><span>Usuń przerwę</span></li>
-        </ul>
-    </div>
-
-    <div id="saveConfirmation" class="save-confirmation">Zapisano!</div>
 
 <script src="shared.js"></script>
 <script src="schedule.js"></script>
