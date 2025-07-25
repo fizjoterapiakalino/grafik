@@ -3,15 +3,7 @@ const SHEET_NAME = 'DATA';
 const DATA_KEY = 'grafikKalinowaData';
 const ALLOWED_ORIGIN = 'https://fizjoterapiakalino.github.io';
 
-// Helper functions to manage CORS headers
-function withSuccessHeader(textOutput) {
-  return textOutput.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
-}
-
-function withErrorHeader(textOutput) {
-  return textOutput.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
-}
-
+// Handle GET requests
 function doGet(e) {
   const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
   const dataRange = sheet.getDataRange();
@@ -25,12 +17,12 @@ function doGet(e) {
     }
   }
 
-  const textOutput = ContentService.createTextOutput(scheduleData)
-    .setMimeType(ContentService.MimeType.JSON);
-    
-  return withSuccessHeader(textOutput);
+  return ContentService.createTextOutput(scheduleData)
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
 }
 
+// Handle POST requests
 function doPost(e) {
   try {
     const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
@@ -58,12 +50,20 @@ function doPost(e) {
     const successResponse = ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Data saved.' }))
       .setMimeType(ContentService.MimeType.JSON);
       
-    return withSuccessHeader(successResponse);
+    return successResponse.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
 
   } catch (error) {
     const errorResponse = ContentService.createTextOutput(JSON.stringify({ status: 'error', message: error.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
       
-    return withErrorHeader(errorResponse);
+    return errorResponse.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
   }
+}
+
+// Handle pre-flight OPTIONS requests for CORS
+function doOptions(e) {
+  return ContentService.createTextOutput()
+    .setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
+    .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    .setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
