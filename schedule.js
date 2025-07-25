@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwFmKwfTjJIZF6zLWBLVUWcGEAbT6SEruKSNWnSqA3r9aiIloK0vQRI6x--arti3dFXWg/exec';
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwHmugqmuBrRcTHvoN3QfnJONpZ2vsHDWwETiN4IEoxpoEhfL6RafcXVkdesvin7n7o6A/exec';
 
     const loadingOverlay = document.getElementById('loadingOverlay');
     const mainTable = document.getElementById('mainScheduleTable');

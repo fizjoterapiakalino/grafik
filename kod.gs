@@ -3,6 +3,15 @@ const SHEET_NAME = 'DATA';
 const DATA_KEY = 'grafikKalinowaData';
 const ALLOWED_ORIGIN = 'https://fizjoterapiakalino.github.io';
 
+// Helper functions to manage CORS headers
+function withSuccessHeader(textOutput) {
+  return textOutput.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+}
+
+function withErrorHeader(textOutput) {
+  return textOutput.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+}
+
 function doGet(e) {
   const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
   const dataRange = sheet.getDataRange();
@@ -16,9 +25,10 @@ function doGet(e) {
     }
   }
 
-  return ContentService.createTextOutput(scheduleData)
-    .setMimeType(ContentService.MimeType.JSON)
-    .withSuccessHeader();
+  const textOutput = ContentService.createTextOutput(scheduleData)
+    .setMimeType(ContentService.MimeType.JSON);
+    
+  return withSuccessHeader(textOutput);
 }
 
 function doPost(e) {
@@ -45,24 +55,15 @@ function doPost(e) {
       sheet.appendRow([DATA_KEY, newScheduleData]);
     }
 
-    return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Data saved.' }))
-      .setMimeType(ContentService.MimeType.JSON)
-      .withSuccessHeader();
+    const successResponse = ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Data saved.' }))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+    return withSuccessHeader(successResponse);
 
   } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: error.toString() }))
-      .setMimeType(ContentService.MimeType.JSON)
-      .withErrorHeader();
+    const errorResponse = ContentService.createTextOutput(JSON.stringify({ status: 'error', message: error.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+    return withErrorHeader(errorResponse);
   }
-}
-
-// Helper functions to manage CORS headers
-function withSuccessHeader(textOutput) {
-  textOutput.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
-  return textOutput;
-}
-
-function withErrorHeader(textOutput) {
-  textOutput.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
-  return textOutput;
 }
