@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- SELEKTORY I ZMIENNE GLOBALNE ---
-    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzu0mPeOZvjxnTJmvELkRdYMqFjxnhJHUdHbYJHojO06m9im_eoqQOQ3UzKtdgK8VPq6Q/exec';
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzn_qTN6KjplFUBD6oWV9VvvNrtG_FmQ7cbd77Jre4HdAdb8TfGchdnDIg4vtfjlrFN4w/exec';
 
     const loadingOverlay = document.getElementById('loadingOverlay');
     const leavesTableBody = document.getElementById('leavesTableBody');
