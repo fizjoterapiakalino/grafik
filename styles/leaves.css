@@ -1,0 +1,54 @@
+/* Style dla tabeli urlopów (leaves.html) */
+
+.leaves-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 900px;
+    background-color: #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    border-radius: 8px;
+}
+.leaves-table th, .leaves-table td {
+    border: 1px solid #999;
+    padding: 10px;
+    text-align: center;
+    white-space: nowrap;
+    outline: none;
+}
+.leaves-table thead th {
+    background-color: #4CAF50;
+    color: white;
+    position: sticky;
+    top: 60px;
+    z-index: 10;
+}
+.leaves-table thead th:nth-child(even) {
+    background-color: #45a049;
+}
+.leaves-table thead th:first-child {
+    background-color: #6c757d;
+    left: 0;
+    z-index: 11;
+    width: 150px;
+}
+.leaves-table .employee-name-cell {
+    font-weight: bold;
+    text-align: left;
+    background-color: #f2f2f2;
+    position: sticky;
+    left: 0;
+    z-index: 9;
+}
+.leaves-table .day-cell {
+    background-color: #e0e0e0;
+    cursor: pointer;
+    min-width: 120px;
+}
+.leaves-table .day-cell:not(:empty) {
+    background-color: #ffffff;
+}
+.leaves-table .on-leave {
+    background-color: #ffc107 !important;
+    color: #333;
+    font-weight: bold;
+}

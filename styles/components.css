@@ -1,0 +1,209 @@
+/* Style dla reużywalnych komponentów UI */
+
+/* --- Przyciski --- */
+.undo-button {
+    background-color: #007bff;
+    color: white;
+    padding: 8px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.9em;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: background-color 0.2s ease;
+}
+.undo-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+.action-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-left: 10px;
+}
+.confirm-btn {
+    background-color: #28a745;
+    color: white;
+}
+.cancel-btn {
+    background-color: #dc3545;
+    color: white;
+}
+
+
+/* --- Kalendarz Modal --- */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+.modal-content {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    width: 320px;
+}
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.calendar-header h2 {
+    margin: 0;
+    font-size: 1.2em;
+}
+.nav-btn {
+    background: none;
+    border: 1px solid #ccc;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    font-weight: bold;
+}
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+}
+.day-name, .day-cell-calendar {
+    text-align: center;
+    padding: 5px;
+}
+.day-name {
+    font-weight: bold;
+    color: #666;
+}
+.day-cell-calendar {
+    cursor: pointer;
+    border-radius: 50%;
+    transition: background-color 0.2s, color 0.2s;
+}
+.day-cell-calendar:hover {
+    background-color: #f0f0f0;
+}
+.day-cell-calendar.selected {
+    background-color: #007bff;
+    color: white;
+}
+.day-cell-calendar.empty {
+    cursor: default;
+    background-color: transparent !important;
+}
+.modal-actions {
+    margin-top: 20px;
+    text-align: right;
+}
+
+
+/* --- Style dla przeciągania i upuszczania --- */
+.is-dragging {
+    opacity: 0.4;
+    border: 2px dashed #000;
+}
+.drag-over-target {
+    background-color: #d1ffd1 !important;
+    border: 2px dashed #4CAF50;
+}
+
+
+/* --- Pole wyszukiwania --- */
+.search-input {
+    padding: 5px 8px;
+    padding-left: 30px; /* Dodaj miejsce na ikonę lupy */
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.9em;
+    width: 150px;
+    transition: width 0.3s ease-in-out, box-shadow 0.2s;
+}
+.search-input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,.25);
+    width: 200px;
+}
+.search-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.search-icon {
+    position: absolute;
+    left: 8px;
+    color: #888;
+}
+.clear-search-btn {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2em;
+    color: #888;
+    padding: 0 5px;
+    line-height: 1;
+}
+.clear-search-btn:hover {
+    color: #333;
+}
+.search-highlight {
+    background-color: #a2f2a2;
+    border-radius: 2px;
+}
+
+
+/* --- Menu Kontekstowe --- */
+.context-menu {
+    position: absolute;
+    display: none;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    padding: 5px 0;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1100;
+    transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
+    opacity: 0;
+    transform: scale(0.95);
+    min-width: 200px;
+}
+.context-menu.visible {
+    display: block;
+    opacity: 1;
+    transform: scale(1);
+}
+.context-menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.context-menu li {
+    display: flex;
+    align-items: center;
+    padding: 8px 15px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    color: #333;
+    font-size: 0.95em;
+}
+.context-menu li:hover {
+    background-color: #f2f2f2;
+}
+.context-menu li i {
+    margin-right: 12px;
+    width: 1.2em;
+    text-align: center;
+    color: #555;
+}

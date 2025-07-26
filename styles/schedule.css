@@ -1,0 +1,114 @@
+/* Style dla tabeli grafiku (schedule.html) */
+
+#mainScheduleTable {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    min-width: 900px;
+}
+#mainScheduleTable th, #mainScheduleTable td {
+    padding: 7px;
+    border: 1px solid #999;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: break-word;
+    outline: none;
+}
+#mainScheduleTable thead th {
+    background-color: #4CAF50;
+    color: white;
+    cursor: pointer;
+    position: sticky;
+    top: 60px;
+    z-index: 10;
+    white-space: nowrap;
+}
+#mainScheduleTable thead th:nth-child(even) {
+    background-color: #45a049;
+}
+#mainScheduleTable thead th:first-child {
+    background-color: #6c757d;
+    left: 0;
+    z-index: 11;
+    width: 55px;
+}
+#mainScheduleTable tbody td:first-child {
+    background-color: #f2f2f2;
+    font-weight: bold;
+    position: sticky;
+    left: 0;
+    z-index: 9;
+    white-space: nowrap;
+    width: 55px;
+}
+#mainScheduleTable td.editable-cell {
+    background-color: #e0e0e0;
+    cursor: pointer;
+}
+#mainScheduleTable td.split-cell, #mainScheduleTable td.editable-cell:not(:empty) {
+    background-color: #ffffff;
+}
+#mainScheduleTable td.active-cell,
+#mainScheduleTable th.active-cell,
+#mainScheduleTable div.active-cell {
+    outline: 2px solid #FFD700;
+    box-shadow: inset 0 0 0 2px #FFD700;
+}
+#mainScheduleTable td[contenteditable="true"],
+#mainScheduleTable th[contenteditable="true"],
+#mainScheduleTable div[contenteditable="true"] {
+    background-color: #ffffff;
+    box-shadow: inset 0 0 0 2px #007bff;
+}
+
+/* --- Specjalne style komórek grafiku --- */
+.break-cell {
+    background-color: #6c757d !important;
+    color: #fff !important;
+    font-weight: bold;
+    text-align: center;
+    cursor: default !important;
+}
+
+.pnf-text, td.split-cell > div.pnf-text > span {
+    color: #007bff;
+    font-weight: bold;
+}
+
+.massage-text, td.split-cell > div.massage-text > span {
+    color: hotpink;
+    font-weight: bold;
+}
+
+td.split-cell {
+    display: flex;
+    flex-direction: row;
+    padding: 0;
+}
+
+td.split-cell > div {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px;
+    text-align: center;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    white-space: normal;
+}
+
+td.split-cell > div:first-child {
+    border-right: 1px solid #999;
+}
+
+.duplicate-highlight {
+    background-color: #ffeb3b !important;
+}
+
+td.current-time-highlight {
+    background-color: #FFFF00 !important;
+    font-weight: bold;
+}
