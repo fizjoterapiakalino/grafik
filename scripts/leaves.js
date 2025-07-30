@@ -1,7 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- SELEKTORY I ZMIENNE GLOBALNE ---
-    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzn_qTN6KjplFUBD6oWV9VvvNrtG_FmQ7cbd77Jre4HdAdb8TfGchdnDIg4vtfjlrFN4w/exec';
-
     const loadingOverlay = document.getElementById('loadingOverlay');
     const leavesTableBody = document.getElementById('leavesTableBody');
     const leavesHeaderRow = document.getElementById('leavesHeaderRow');
@@ -19,11 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentDate = new Date();
     let selectedDays = [];
     let lastSelectedDay = null;
-
-    const months = [
-        'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
-        'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
-    ];
 
     // --- FUNKCJE KALENDARZA ---
     const generateCalendar = (year, month) => {
@@ -265,6 +258,25 @@ document.addEventListener('DOMContentLoaded', () => {
         filterAndHighlightTable(''); // Pokaż wszystkie wiersze i usuń podświetlenia
     });
 
+    // Add event listener for delete key
+    document.addEventListener('keydown', (event) => {
+        // Check if a day cell is currently focused or active for editing
+        // (though contenteditable is false, we might still have a concept of an 'active' cell)
+        // For now, let's assume the modal being open implies an interaction with a cell.
+        // A more robust solution would track focus if cells were contenteditable or had tabindex.
+
+        // A simpler approach: if the modal is NOT open, and a TD is focused, clear it.
+        // This requires making the TDs focusable.
+        // Let's add tabindex="0" to the day cells when they are generated.
+
+        // If the target of the keydown is a .day-cell and the key is Delete or Backspace
+        if (event.target.classList.contains('day-cell') && (event.key === 'Delete' || event.key === 'Backspace')) {
+            event.preventDefault(); // Prevent default browser behavior (like navigating back)
+            event.target.textContent = ''; // Clear the cell content
+            saveLeavesData(); // Save the change
+        }
+    });
+
     // --- FUNKCJE ZAPISU I WCZYTYWANIA DANYCH URLOPÓW (DO IMPLEMENTACJI) ---
 
     const saveLeavesData = async () => {
@@ -302,6 +314,10 @@ document.addEventListener('DOMContentLoaded', () => {
         generateTableHeaders();
         const employeeNames = await getEmployeeNames();
         generateTableRows(employeeNames);
+        // Add tabindex to day cells after generating rows
+        document.querySelectorAll('.day-cell').forEach(cell => {
+            cell.setAttribute('tabindex', '0');
+        });
     };
 
     const hideLoadingOverlay = () => {

@@ -27,15 +27,15 @@
         <div id="dateTimeText" class="date-time-text"></div>
         <div class="header-right-menu">
             <!-- Hamburger menu will be inserted here by shared.js -->
+            <div class="search-container">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" id="searchInput" class="search-input" placeholder="Szukaj...">
+                <i class="fas fa-times clear-icon" id="clearSearch" style="display: none;"></i>
+            </div>
         </div>
     </div>
 
     <div class="container">
-        <div class="search-container">
-            <i class="fas fa-search search-icon"></i>
-            <input type="text" id="searchInput" class="search-input" placeholder="Szukaj...">
-            <i class="fas fa-times clear-icon" id="clearSearch" style="display: none;"></i>
-        </div>
         <table id="leavesTable" class="leaves-table">
             <thead>
                 <tr id="leavesHeaderRow">
@@ -69,7 +69,8 @@
         </div>
     </div>
 
-    <script src="shared.js"></script>
-    <script src="leaves.js"></script>
+    <script src="scripts/common.js"></script>
+    <script src="scripts/shared.js"></script>
+    <script src="scripts/leaves.js"></script>
 </body>
 </html>

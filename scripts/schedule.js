@@ -1,6 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzn_qTN6KjplFUBD6oWV9VvvNrtG_FmQ7cbd77Jre4HdAdb8TfGchdnDIg4vtfjlrFN4w/exec';
-
     const loadingOverlay = document.getElementById('loadingOverlay');
     const mainTable = document.getElementById('mainScheduleTable');
     const tableHeaderRow = document.getElementById('tableHeaderRow');
@@ -90,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const searchAndHighlight = (searchTerm) => {
         const allCells = document.querySelectorAll('th.editable-header, td.editable-cell');
-        const regex = searchTerm ? new RegExp(searchTerm.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi') : null;
+        const regex = searchTerm ? new RegExp(searchTerm.replace(/[-\/\^$*+?.()|[\]{}]/g, '\$&'), 'gi') : null;
 
         const highlightElement = (element) => {
             // Najpierw usuń stare podświetlenia
@@ -145,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             clearDuplicateHighlights();
         }
-        
+
         activeCell = cell;
 
         if (activeCell) {
@@ -219,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Re-apply state from data to restore icons/styles if needed
             const parentCell = element.closest('td');
             parentCell.innerHTML = ''; // Clear it first
-            
+
             if (newText.includes('/')) {
                 const parts = newText.split('/', 2);
                 applyCellDataToDom(parentCell, { isSplit: true, content1: parts[0], content2: parts[1] });
@@ -247,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const state = getCurrentTableStateForCell(parentCell);
             applyCellDataToDom(parentCell, state);
         }
-        
+
         highlightDuplicates(getElementText(element));
         refreshRowHeight(element);
     };
@@ -415,7 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isPnf: cell.dataset.isPnf === 'true'
         };
     };
-    
+
     const getCurrentTableState = () => {
         const state = { employeeHeaders: {}, scheduleCells: {} };
         document.querySelectorAll('th[data-employee-index]').forEach(th => {
@@ -477,7 +475,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const updateUndoRedoButtons = () => {
         undoButton.disabled = undoStack.length <= 1;
     };
-    
+
     // Event Listeners
     mainTable.addEventListener('click', (event) => {
         const target = event.target.closest('td.editable-cell, th.editable-header, div[tabindex="0"]');
@@ -510,7 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
             contextSplitCell.style.display = isBreak ? 'none' : 'flex';
             contextMassage.style.display = isBreak ? 'none' : 'flex';
             contextPnf.style.display = isBreak ? 'none' : 'flex';
-            
+
             contextMenu.classList.add('visible');
             contextMenu.style.left = `${event.pageX}px`;
             contextMenu.style.top = `${event.pageY}px`;
@@ -551,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         contextMenu.classList.remove('visible');
     });
-    
+
     contextClear.addEventListener('click', () => {
         if (currentCell) {
             pushStateToUndoStack();
@@ -580,14 +578,14 @@ document.addEventListener('DOMContentLoaded', () => {
          if (currentCell) {
             pushStateToUndoStack();
             let state = getCurrentTableStateForCell(currentCell);
-            
+
             // This is a simplified toggle, assumes toggling the whole cell
             state[dataAttribute] = !state[dataAttribute];
             if (state.isSplit) {
                 state[`${dataAttribute}1`] = state[dataAttribute];
                 state[`${dataAttribute}2`] = state[dataAttribute];
             }
-            
+
             applyCellDataToDom(currentCell, state);
             saveSchedule();
             refreshRowHeight(currentCell);
@@ -632,7 +630,7 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         const dropTargetCell = event.target.closest('td.editable-cell');
         document.querySelectorAll('.drag-over-target').forEach(el => el.classList.remove('drag-over-target'));
-        
+
         if (dropTargetCell && !dropTargetCell.classList.contains('break-cell') && draggedCell && draggedCell !== dropTargetCell) {
             pushStateToUndoStack();
             const draggedData = JSON.parse(event.dataTransfer.getData('application/json'));
@@ -640,7 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             applyCellDataToDom(dropTargetCell, draggedData);
             applyCellDataToDom(draggedCell, targetData);
-            
+
             saveSchedule();
             refreshRowHeight(draggedCell);
             refreshRowHeight(dropTargetCell);
@@ -652,7 +650,7 @@ document.addEventListener('DOMContentLoaded', () => {
         draggedCell = null;
         document.querySelectorAll('.drag-over-target').forEach(el => el.classList.remove('drag-over-target'));
     });
-    
+
     // Keyboard Navigation
     document.addEventListener('keydown', (event) => {
          if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
@@ -679,15 +677,29 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return;
         }
-        
+
         if (!activeCell) return;
+
+        // Handle Delete and Backspace to clear cell
+        if (event.key === 'Delete' || event.key === 'Backspace') {
+            event.preventDefault();
+            const cellToClear = activeCell.closest('td.editable-cell');
+            if (cellToClear) {
+                pushStateToUndoStack();
+                applyCellDataToDom(cellToClear, { content: '' }); // Clear the cell
+                saveSchedule();
+                refreshRowHeight(cellToClear);
+                window.showToast('Wyczyszczono komórkę');
+            }
+            return;
+        }
 
         if (event.key === 'Enter') {
             event.preventDefault();
             enterEditMode(activeCell);
             return;
         }
-        
+
         if (event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
             event.preventDefault();
             enterEditMode(activeCell, true, event.key);
