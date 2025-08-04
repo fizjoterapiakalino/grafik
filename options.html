@@ -32,9 +32,42 @@
 
     <div class="content-area container">
         <h1>Opcje Aplikacji</h1>
-        <p>Ta sekcja jest w trakcie przygotowania.</p>
+
+        <section class="employee-management-section">
+            <h2>Zarządzaj pracownikami</h2>
+            <div class="add-employee-form">
+                <input type="text" id="newEmployeeName" placeholder="Imię i nazwisko pracownika">
+                <button id="addEmployeeBtn" class="btn btn-primary">Dodaj pracownika</button>
+            </div>
+            <div class="employee-management-container">
+                <div class="employee-list-container">
+                    <ul id="employeeList" class="employee-list">
+                        <!-- Lista pracowników będzie generowana dynamicznie tutaj -->
+                    </ul>
+                </div>
+                <div id="employeeDetailsContainer" class="employee-details-container">
+                    <p>Wybierz pracownika z listy, aby zobaczyć szczegóły i opcje edycji.</p>
+                    <!-- Szczegóły pracownika i opcje edycji będą ładowane tutaj -->
+                </div>
+            </div>
+        </section>
     </div>
 
+    <!-- Modal do potwierdzenia usunięcia -->
+    <div id="confirmDeleteModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <p id="confirmDeleteText"></p>
+            <div class="modal-actions">
+                <button id="confirmDeleteBtn" class="btn btn-danger">Usuń</button>
+                <button id="cancelDeleteBtn" class="btn btn-secondary">Anuluj</button>
+            </div>
+        </div>
+    </div>
+
+<script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
+<script src="scripts/firebase-config.js"></script>
 <script src="scripts/common.js"></script>
 <script src="scripts/shared.js"></script>
 <script src="scripts/options.js"></script>

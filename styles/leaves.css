@@ -43,6 +43,7 @@
     background-color: #e0e0e0;
     cursor: pointer;
     min-width: 120px;
+    position: relative; /* Potrzebne do pozycjonowania ikony kalendarza */
 }
 .leaves-table .day-cell:not(:empty) {
     background-color: #ffffff;
@@ -51,4 +52,29 @@
     background-color: #ffc107 !important;
     color: #333;
     font-weight: bold;
+}
+
+/* Style dla aktywnej komórki i ikony kalendarza */
+.leaves-table .active-cell {
+    box-shadow: inset 0 0 0 2px #007bff;
+    background-color: #e9f5ff !important;
+}
+
+.calendar-icon {
+    position: absolute;
+    top: 50%;
+    right: 5px;
+    transform: translateY(-50%);
+    font-size: 1.2em;
+    color: #666;
+    cursor: pointer;
+    display: none; /* Domyślnie ukryta */
+}
+
+.active-cell .calendar-icon {
+    display: block; /* Widoczna tylko w aktywnej komórce */
+}
+
+.calendar-icon:hover {
+    color: #007bff;
 }

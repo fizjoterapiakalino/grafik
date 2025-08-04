@@ -21,9 +21,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const navLinks = [
-            { href: 'schedule.html', text: 'Grafik' },
-            { href: 'leaves.html', text: 'Urlopy' },
-            { href: 'options.html', text: 'Opcje' }
+            { href: 'schedule.html', text: 'Grafik', icon: 'fas fa-calendar-alt' },
+            { href: 'leaves.html', text: 'Urlopy', icon: 'fas fa-plane-departure' },
+            { href: 'options.html', text: 'Opcje', icon: 'fas fa-cogs' }
         ];
         const currentPage = window.location.pathname.split('/').pop();
 
@@ -41,7 +41,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const li = document.createElement('li');
             const a = document.createElement('a');
             a.href = link.href;
-            a.textContent = link.text;
+            
+            const icon = document.createElement('i');
+            icon.className = link.icon;
+            a.appendChild(icon);
+            
+            const textSpan = document.createElement('span');
+            textSpan.textContent = ' ' + link.text; // Dodaj spację przed tekstem
+            a.appendChild(textSpan);
+
             if (currentPage === link.href) {
                 a.classList.add('active');
             }
@@ -49,6 +57,12 @@ document.addEventListener('DOMContentLoaded', () => {
             ul.appendChild(li);
         });
         navPanel.appendChild(ul);
+
+        // Add footer information to the navigation panel
+        const footerInfo = document.createElement('div');
+        footerInfo.className = 'footer-info';
+        footerInfo.innerHTML = '<p>&copy; 2025 Fizjoterapia Kalinowa. Wszelkie prawa zastrzeżone.</p>'; // You can customize this text
+        navPanel.appendChild(footerInfo);
 
         // Add hamburger icon to the header, and panel to the body
         headerRightMenu.appendChild(hamburger);

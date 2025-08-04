@@ -1,13 +1,22 @@
 /* Globalne style aplikacji */
+html, body {
+    height: 100%; /* Upewnij się, że html i body zajmują całą wysokość okna */
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden; /* Zapobiegaj poziomemu przewijaniu */
+}
+
 body {
     font-family: Arial, sans-serif;
-    margin: 0;
     background-color: #f4f4f4;
+    display: flex;
+    flex-direction: column; /* Umożliwia przypięcie stopki do dołu body, jeśli byłaby poza nav-panel */
 }
 
 .container {
     padding-top: 20px;
     margin: 0 20px 20px 20px;
+    flex-grow: 1; /* Pozwól kontenerowi rosnąć i zajmować dostępną przestrzeń */
 }
 
 /* --- Ekran ładowania --- */
@@ -74,4 +83,63 @@ body {
 .toast.show {
     opacity: 1;
     transform: translateX(0);
+}
+
+/* Style dla panelu nawigacyjnego (hamburger menu) */
+.nav-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 280px; /* Szerokość panelu */
+    height: 100vh; /* Pełna wysokość widoku */
+    background-color: #333; /* Tło panelu */
+    transform: translateX(100%); /* Domyślnie ukryty poza ekranem */
+    transition: transform 0.3s ease-in-out;
+    z-index: 1000;
+    box-shadow: -2px 0 5px rgba(0,0,0,0.2); /* Cień dla efektu wysuwania */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* Rozmieść elementy, aby stopka była na dole */
+    padding-top: 0;
+    padding-bottom: 40px; /* Zwiększono padding na dole, aby zapewnić więcej miejsca dla stopki */
+    box-sizing: border-box;
+}
+
+.nav-panel.visible {
+    transform: translateX(0); /* Pokaż panel */
+}
+
+.nav-panel ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1; /* Pozwól liście linków rosnąć */
+    overflow-y: auto; /* Dodaj przewijanie, jeśli linków jest dużo */
+}
+
+.nav-panel li a {
+    display: block;
+    padding: 15px 20px;
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 1.1em;
+    border-bottom: 1px solid #444;
+    transition: background-color 0.2s;
+}
+
+.nav-panel li a:hover,
+.nav-panel li a.active {
+    background-color: #555;
+}
+
+.nav-panel .footer-info {
+    padding: 15px;
+    text-align: center;
+    color: #ffffff;
+    font-size: 1em; /* Zwiększono rozmiar czcionki dla lepszej widoczności */
+    border-top: 1px solid #666;
+    box-sizing: border-box;
+    margin-top: auto;
+    flex-shrink: 0;
+    background-color: #222;
 }

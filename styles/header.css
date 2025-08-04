@@ -63,6 +63,9 @@
     transition: right 0.3s ease-in-out;
     z-index: 9999;
     padding-top: 60px;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 50px; /* Dodatkowe miejsce na stopkę */
 }
 .nav-panel.visible {
     right: 0; /* Slide in */
@@ -71,6 +74,8 @@
     list-style: none;
     padding: 0;
     margin: 0;
+    flex-grow: 1; /* Pozwala na rozciąganie listy */
+    overflow-y: auto; /* Włącza przewijanie, jeśli lista jest za długa */
 }
 .nav-panel a {
     display: block;
