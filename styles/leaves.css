@@ -78,3 +78,190 @@
 .calendar-icon:hover {
     color: #007bff;
 }
+
+/* Nowe style dla modala z dwoma kalendarzami */
+.modal-content.wide {
+    max-width: 900px;
+    width: 95%;
+}
+
+.calendars-container {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    width: 100%;
+}
+
+.calendar-wrapper {
+    flex: 1;
+}
+
+.calendar-wrapper h2 {
+    text-align: center;
+    font-size: 1.2em;
+    margin-bottom: 10px;
+}
+
+.calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+.calendar-header .nav-btn {
+    background: none;
+    border: none;
+    font-size: 1.8em;
+    cursor: pointer;
+    color: #333;
+    padding: 0 15px;
+}
+
+.calendar-header .nav-btn:hover {
+    color: #007bff;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+}
+
+.day-cell-calendar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+    position: relative;
+}
+
+.day-name {
+    font-weight: bold;
+    text-align: center;
+    color: #666;
+    font-size: 0.9em;
+}
+
+.day-cell-calendar:not(.other-month):hover {
+    background-color: #e9f5ff;
+}
+
+.day-cell-calendar.other-month {
+    color: #ccc;
+    cursor: default;
+}
+
+.day-cell-calendar.today {
+    font-weight: bold;
+    border: 1px solid #007bff;
+}
+
+.day-cell-calendar.selected {
+    background-color: #007bff;
+    color: white;
+}
+
+.day-cell-calendar.in-range {
+    background-color: #d0eaff;
+    color: #333;
+    border-radius: 0;
+}
+
+.day-cell-calendar.start-date {
+    background-color: #007bff;
+    color: white;
+    border-top-left-radius: 50%;
+    border-bottom-left-radius: 50%;
+}
+
+.day-cell-calendar.end-date {
+    background-color: #007bff;
+    color: white;
+    border-top-right-radius: 50%;
+    border-bottom-right-radius: 50%;
+}
+
+.day-cell-calendar.start-date.end-date {
+    border-radius: 50%;
+}
+
+.calendar-selection-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    margin-top: 15px;
+    font-size: 0.9em;
+}
+
+.selection-preview-container p {
+    margin: 0 10px 0 0;
+}
+
+.selection-mode-info kbd {
+    background-color: #e9ecef;
+    padding: 2px 5px;
+    border-radius: 3px;
+    border: 1px solid #ccc;
+    font-family: monospace;
+}
+
+/* Style dla bloków urlopowych w tabeli */
+.leave-block {
+    padding: 2px 5px;
+    margin-bottom: 2px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    white-space: normal;
+    text-align: left;
+    color: #000000;
+}
+
+.leave-block .arrow {
+    font-weight: bold;
+}
+
+/* Style dla menu kontekstowego */
+.context-menu {
+    position: absolute;
+    z-index: 1000;
+    display: none; /* Domyślnie ukryte */
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    padding: 5px 0;
+}
+
+.context-menu.visible {
+    display: block;
+}
+
+.context-menu ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.context-menu li {
+    padding: 8px 15px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    font-size: 0.9em;
+}
+
+.context-menu li:hover {
+    background-color: #f2f2f2;
+}
+
+.context-menu li i {
+    margin-right: 10px;
+    color: #555;
+}

@@ -51,13 +51,11 @@
     background-color: #ffffff;
 }
 #mainScheduleTable td.active-cell,
-#mainScheduleTable th.active-cell,
 #mainScheduleTable div.active-cell {
     outline: 2px solid #FFD700;
     box-shadow: inset 0 0 0 2px #FFD700;
 }
 #mainScheduleTable td[contenteditable="true"],
-#mainScheduleTable th[contenteditable="true"],
 #mainScheduleTable div[contenteditable="true"] {
     background-color: #ffffff;
     box-shadow: inset 0 0 0 2px #007bff;
@@ -111,4 +109,57 @@ td.split-cell > div:first-child {
 td.current-time-highlight {
     background-color: #FFFF00 !important;
     font-weight: bold;
+}
+
+/* --- Modal Styles --- */
+.modal {
+    display: none; 
+    position: fixed; 
+    z-index: 1000; 
+    left: 0;
+    top: 0;
+    width: 100%; 
+    height: 100%; 
+    overflow: auto; 
+    background-color: rgba(0,0,0,0.5); 
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto; 
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%; 
+    max-width: 500px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
+}
+
+.modal-buttons {
+    margin-top: 20px;
+}
+
+.modal-buttons button {
+    padding: 10px 20px;
+    margin: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+#moveEntryBtn {
+    background-color: #4CAF50;
+    color: white;
+}
+
+#addAnywayBtn {
+    background-color: #008CBA;
+    color: white;
+}
+
+#cancelBtn {
+    background-color: #f44336;
+    color: white;
 }
