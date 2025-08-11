@@ -111,6 +111,28 @@ td.current-time-highlight {
     font-weight: bold;
 }
 
+.treatment-end-marker {
+    position: relative;
+}
+
+.treatment-end-marker::after {
+    content: "\f0f3"; /* Ikona dzwonka z Font Awesome */
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    color: #dc3545;
+    font-size: 0.8em;
+    animation: bell-ring 2s ease-in-out infinite;
+}
+
+@keyframes bell-ring {
+    0%, 50%, 100% { transform: rotate(0); }
+    5%, 15%, 25%, 35%, 45% { transform: rotate(13deg); }
+    10%, 20%, 30%, 40% { transform: rotate(-13deg); }
+}
+
 /* --- Modal Styles --- */
 .modal {
     display: none; 

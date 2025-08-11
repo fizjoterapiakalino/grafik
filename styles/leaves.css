@@ -1,125 +1,162 @@
-/* Style dla tabeli urlopów (leaves.html) */
+/* Główny kontener dla widoku urlopów */
+.leaves-view-container {
+    padding: 20px;
+    background-color: #f9f9f9;
+}
 
-.leaves-table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 900px;
-    background-color: #fff;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    border-radius: 8px;
+/* Styl dla zakładek przełączających widok */
+.view-tabs {
+    border-bottom: 2px solid #ccc;
+    margin-bottom: 20px;
 }
-.leaves-table th, .leaves-table td {
-    border: 1px solid #999;
-    padding: 10px;
-    text-align: center;
-    white-space: nowrap;
-    outline: none;
-}
-.leaves-table thead th {
-    background-color: #4CAF50;
-    color: white;
-    position: sticky;
-    top: 60px;
-    z-index: 10;
-}
-.leaves-table thead th:nth-child(even) {
-    background-color: #45a049;
-}
-.leaves-table thead th:first-child {
-    background-color: #6c757d;
-    left: 0;
-    z-index: 11;
-    width: 150px;
-}
-.leaves-table .employee-name-cell {
-    font-weight: bold;
-    text-align: left;
-    background-color: #f2f2f2;
-    position: sticky;
-    left: 0;
-    z-index: 9;
-}
-.leaves-table .day-cell {
-    background-color: #e0e0e0;
+
+.tab-btn {
+    padding: 10px 20px;
     cursor: pointer;
-    min-width: 120px;
-    position: relative; /* Potrzebne do pozycjonowania ikony kalendarza */
-}
-.leaves-table .day-cell:not(:empty) {
-    background-color: #ffffff;
-}
-.leaves-table .on-leave {
-    background-color: #ffc107 !important;
-    color: #333;
-    font-weight: bold;
+    border: none;
+    background-color: transparent;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px; /* Unosi przycisk, aby jego dolna krawędź nachodziła na krawędź kontenera */
+    font-size: 1em;
+    color: #555;
+    transition: color 0.2s, border-color 0.2s;
 }
 
-/* Style dla aktywnej komórki i ikony kalendarza */
-.leaves-table .active-cell {
-    box-shadow: inset 0 0 0 2px #007bff;
-    background-color: #e9f5ff !important;
-}
-
-.calendar-icon {
-    position: absolute;
-    top: 50%;
-    right: 5px;
-    transform: translateY(-50%);
-    font-size: 1.2em;
-    color: #666;
-    cursor: pointer;
-    display: none; /* Domyślnie ukryta */
-}
-
-.active-cell .calendar-icon {
-    display: block; /* Widoczna tylko w aktywnej komórce */
-}
-
-.calendar-icon:hover {
+.tab-btn:hover {
     color: #007bff;
 }
 
-/* Nowe style dla modala z dwoma kalendarzami */
-.modal-content.wide {
-    max-width: 900px;
-    width: 95%;
+.tab-btn.active {
+    font-weight: bold;
+    color: #007bff;
+    border-bottom: 2px solid #007bff;
 }
 
-.calendars-container {
-    display: flex;
-    justify-content: space-between;
-    gap: 20px;
+/* Tabela urlopów i podsumowania */
+.leaves-table, .summary-table {
     width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    background-color: #fff;
 }
 
-.calendar-wrapper {
-    flex: 1;
+.leaves-table th, .summary-table th {
+    background-color: #4CAF50; /* Główny kolor nagłówka */
+    color: white;
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 600;
+    border: 1px solid #ddd;
 }
 
-.calendar-wrapper h2 {
+.leaves-table th:first-child, .summary-table th:first-child {
+    background-color: #6c757d; /* Kolor dla pierwszej kolumny */
+}
+
+.leaves-table td, .summary-table td {
+    padding: 12px 15px;
+    border: 1px solid #ddd;
     text-align: center;
-    font-size: 1.2em;
-    margin-bottom: 10px;
+}
+
+.leaves-table tbody tr:hover, .summary-table tbody tr:hover {
+    background-color: #f1f1f1;
+}
+
+.employee-name-cell {
+    font-weight: bold;
+    position: sticky;
+    left: 0;
+    background-color: #f2f2f2;
+    z-index: 1;
+}
+
+.day-cell {
+    min-width: 100px;
+    /* Usunięto stałą wysokość (height: 60px) */
+    cursor: pointer;
+    vertical-align: top;
+    padding: 5px;
+}
+
+.leave-block {
+    background-color: #ffab91;
+    color: #333;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.arrow {
+    font-weight: bold;
+}
+
+/* Modal kalendarza */
+#calendarModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    width: 90%;
+    max-width: 500px; /* Domyślna maksymalna szerokość dla standardowych modali */
+}
+
+/* Specjalna, szersza wersja dla modala z kalendarzem, używamy ID dla większej specyficzności */
+#calendarModal .modal-content.wide {
+    max-width: 950px;
 }
 
 .calendar-header {
     display: flex;
-    align-items: center;
     justify-content: space-between;
+    align-items: center;
     margin-bottom: 15px;
+    overflow: hidden; /* Ukrywa wysuwające się kalendarze */
 }
 
-.calendar-header .nav-btn {
-    background: none;
-    border: none;
-    font-size: 1.8em;
-    cursor: pointer;
-    color: #333;
-    padding: 0 15px;
+.calendars-container {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    flex: 1;
+    transition: transform 0.3s ease-in-out; /* Animacja przejścia */
 }
 
-.calendar-header .nav-btn:hover {
-    color: #007bff;
+/* Klasy do animacji */
+.slide-out-left {
+    transform: translateX(-100%);
+}
+.slide-out-right {
+    transform: translateX(100%);
+}
+.slide-in-from-left {
+    transform: translateX(-100%);
+}
+.slide-in-from-right {
+    transform: translateX(100%);
+}
+
+.calendar-wrapper {
+    flex: 1;
+    box-sizing: border-box;
 }
 
 .calendar-grid {
@@ -128,36 +165,24 @@
     gap: 5px;
 }
 
+.day-name, .day-cell-calendar {
+    text-align: center;
+    padding: 8px;
+    border-radius: 4px;
+}
+
 .day-cell-calendar {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 40px;
-    border-radius: 50%;
     cursor: pointer;
     transition: background-color 0.2s, color 0.2s;
-    position: relative;
 }
 
-.day-name {
-    font-weight: bold;
-    text-align: center;
-    color: #666;
-    font-size: 0.9em;
-}
-
-.day-cell-calendar:not(.other-month):hover {
-    background-color: #e9f5ff;
+.day-cell-calendar:hover {
+    background-color: #e9ecef;
 }
 
 .day-cell-calendar.other-month {
     color: #ccc;
     cursor: default;
-}
-
-.day-cell-calendar.today {
-    font-weight: bold;
-    border: 1px solid #007bff;
 }
 
 .day-cell-calendar.selected {
@@ -166,102 +191,137 @@
 }
 
 .day-cell-calendar.in-range {
-    background-color: #d0eaff;
-    color: #333;
+    background-color: #a0cfff;
+    color: white;
     border-radius: 0;
 }
 
 .day-cell-calendar.start-date {
-    background-color: #007bff;
-    color: white;
-    border-top-left-radius: 50%;
-    border-bottom-left-radius: 50%;
+    border-top-left-radius: 20px;
+    border-bottom-left-radius: 20px;
 }
 
 .day-cell-calendar.end-date {
-    background-color: #007bff;
-    color: white;
-    border-top-right-radius: 50%;
-    border-bottom-right-radius: 50%;
+    border-top-right-radius: 20px;
+    border-bottom-right-radius: 20px;
 }
 
-.day-cell-calendar.start-date.end-date {
-    border-radius: 50%;
+.selection-preview {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+    text-align: center;
 }
 
-.calendar-selection-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-    background-color: #f8f9fa;
-    border-radius: 4px;
+.selection-mode-info {
+    text-align: center;
     margin-top: 15px;
-    font-size: 0.9em;
-}
-
-.selection-preview-container p {
-    margin: 0 10px 0 0;
+    color: #6c757d;
 }
 
 .selection-mode-info kbd {
-    background-color: #e9ecef;
-    padding: 2px 5px;
-    border-radius: 3px;
-    border: 1px solid #ccc;
-    font-family: monospace;
-}
-
-/* Style dla bloków urlopowych w tabeli */
-.leave-block {
-    padding: 2px 5px;
-    margin-bottom: 2px;
+    display: inline-block;
+    padding: 3px 8px;
+    font-family: "Consolas", "Monaco", monospace;
+    font-size: 0.9em;
+    color: #212529;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
     border-radius: 4px;
-    font-size: 0.85em;
-    white-space: normal;
-    text-align: left;
-    color: #000000;
+    box-shadow: 0 2px 0 #ced4da;
+    position: relative;
+    top: -1px;
 }
 
-.leave-block .arrow {
-    font-weight: bold;
+.modal-actions {
+    margin-top: 20px;
+    text-align: right;
 }
 
-/* Style dla menu kontekstowego */
-.context-menu {
+/* Kontekstowe menu */
+#contextMenu {
     position: absolute;
-    z-index: 1000;
-    display: none; /* Domyślnie ukryte */
-    background-color: #fff;
+    display: none;
+    background-color: white;
     border: 1px solid #ccc;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.15);
     border-radius: 5px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    z-index: 1001;
     padding: 5px 0;
 }
 
-.context-menu.visible {
+#contextMenu.visible {
     display: block;
 }
 
-.context-menu ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.context-menu li {
+.context-menu-item {
     padding: 8px 15px;
     cursor: pointer;
     display: flex;
     align-items: center;
+    gap: 10px;
+}
+
+.context-menu-item:hover {
+    background-color: #f0f0f0;
+}
+
+/* Nowe style dla płynnego przewijania kalendarza */
+.calendar-slider-viewport {
+    flex: 1;
+    overflow: hidden; /* Ukrywa kalendarze, które są poza widokiem */
+}
+
+.calendar-slider {
+    display: flex;
+    position: relative;
+    width: 200%; /* Domyślnie miejsce na dwa kalendarze */
+    left: 0;
+    transition: transform 0.4s ease-in-out; /* Definiuje animację przesuwania */
+}
+
+.calendar-wrapper {
+    width: 25%; /* Każdy z 4 potencjalnych kalendarzy (2 widoczne, 2 do animacji) zajmuje 1/4 */
+    box-sizing: border-box;
+}
+
+/* Klasa pomocnicza do wyłączania animacji podczas resetowania pozycji */
+.calendar-slider.no-transition {
+    transition: none;
+}
+
+/* Legenda typów urlopów */
+.leaves-legend {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: center;
+}
+
+.leaves-legend h4 {
+    margin: 0;
+    margin-right: 10px;
+    font-weight: 600;
+    font-size: 1em;
+    color: #495057;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-size: 0.9em;
 }
 
-.context-menu li:hover {
-    background-color: #f2f2f2;
-}
-
-.context-menu li i {
-    margin-right: 10px;
-    color: #555;
+.legend-color-box {
+    width: 16px;
+    height: 16px;
+    border: 1px solid rgba(0,0,0,0.2);
+    border-radius: 4px;
+    display: inline-block;
 }

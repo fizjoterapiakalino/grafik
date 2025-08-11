@@ -49,7 +49,6 @@
     padding: 20px;
     border-radius: 12px; /* Zwiększony promień */
     box-shadow: 0 8px 25px rgba(0,0,0,0.15); /* Subtelniejszy cień */
-    width: 350px; /* Nieco szerszy */
     transition: transform 0.3s ease-out;
 }
 .calendar-header {
@@ -213,47 +212,36 @@
     border-radius: 2px;
 }
 
-
-/* --- Menu Kontekstowe --- */
-.context-menu {
-    position: absolute;
-    display: none;
-    background-color: #fff;
-    border: 1px solid #ddd;
-    padding: 5px 0;
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    z-index: 1100;
-    transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
-    opacity: 0;
-    transform: scale(0.95);
-    min-width: 200px;
-}
-.context-menu.visible {
-    display: block;
-    opacity: 1;
-    transform: scale(1);
-}
-.context-menu ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-.context-menu li {
-    display: flex;
-    align-items: center;
-    padding: 8px 15px;
-    cursor: pointer;
-    transition: background-color 0.2s;
+/* --- Modal Informacji o Pacjencie --- */
+.modal-title {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 1.5em;
     color: #333;
-    font-size: 0.95em;
-}
-.context-menu li:hover {
-    background-color: #f2f2f2;
-}
-.context-menu li i {
-    margin-right: 12px;
-    width: 1.2em;
     text-align: center;
+}
+
+.modal-body .form-group {
+    margin-bottom: 15px;
+}
+
+.modal-body label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
     color: #555;
+}
+
+.modal-body input[type="text"],
+.modal-body input[type="date"] {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.modal-body input[readonly] {
+    background-color: #f2f2f2;
+    cursor: not-allowed;
 }

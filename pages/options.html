@@ -1,0 +1,50 @@
+<h1>Opcje Aplikacji</h1>
+
+<div class="options-container">
+    <!-- Panel lewy: Lista pracowników -->
+    <div class="employee-list-panel">
+        <h2>Zarządzaj pracownikami</h2>
+        <div class="search-container">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" id="employeeSearchInput" class="search-input" placeholder="Wyszukaj pracownika...">
+        </div>
+        <div id="employeeListContainer" class="employee-list-container">
+            <!-- Lista pracowników zostanie wstrzyknięta tutaj przez JS -->
+        </div>
+        <button id="addEmployeeBtn" class="add-employee-button">
+            <i class="fas fa-plus"></i> Dodaj nowego pracownika
+        </button>
+    </div>
+
+    <!-- Panel prawy: Szczegóły i edycja -->
+    <div class="employee-details-panel">
+        <div id="detailsPlaceholder" class="details-placeholder">
+            <i class="fas fa-arrow-left"></i>
+            <p>Wybierz pracownika z listy, aby zobaczyć szczegóły i opcje edycji.</p>
+        </div>
+
+        <div id="detailsEditForm" class="details-edit-form" style="display: none;">
+            <h3>Edytuj dane pracownika</h3>
+            <div class="form-group">
+                <label for="employeeNameInput">Imię i nazwisko</label>
+                <input type="text" id="employeeNameInput">
+            </div>
+            <div class="form-group">
+                <label for="leaveEntitlementInput">Urlop należny w roku:</label>
+                <input type="number" id="leaveEntitlementInput" min="0" value="26">
+            </div>
+            <div class="form-group">
+                <label for="carriedOverLeaveInput">Urlop zaległy (z poprz. roku):</label>
+                <input type="number" id="carriedOverLeaveInput" min="0" value="0">
+            </div>
+            <div class="form-actions">
+                <button id="saveEmployeeBtn" class="action-btn confirm-btn">
+                    <i class="fas fa-save"></i> Zapisz zmiany
+                </button>
+                <button id="deleteEmployeeBtn" class="action-btn cancel-btn">
+                    <i class="fas fa-trash-alt"></i> Usuń pracownika
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

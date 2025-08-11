@@ -1,0 +1,65 @@
+<div class="view-tabs">
+    <button id="monthlyViewBtn" class="tab-btn active">Widok Miesięczny</button>
+    <button id="summaryViewBtn" class="tab-btn">Podsumowanie Roczne</button>
+    <button id="careViewBtn" class="tab-btn">Opieka</button>
+</div>
+
+<table id="leavesTable" class="leaves-table">
+    <thead>
+        <tr id="leavesHeaderRow">
+        </tr>
+    </thead>
+    <tbody id="leavesTableBody">
+    </tbody>
+</table>
+
+<div id="careViewContainer" style="display: none;">
+</div>
+
+<div id="leavesLegend" class="leaves-legend"></div>
+
+<div id="contextMenu" class="context-menu">
+    <ul>
+        <li id="contextOpenCalendar"><i class="fas fa-calendar-alt"></i><span>Otwórz kalendarz</span></li>
+        <li id="contextClearCell" class="danger"><i class="fas fa-times"></i><span>Wyczyść komórkę</span></li>
+    </ul>
+</div>
+
+<div id="calendarModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content wide">
+        <div class="calendar-header">
+            <button id="prevMonthBtn" class="nav-btn"><i class="fas fa-chevron-left"></i></button>
+            <div class="calendars-container">
+                <div class="calendar-slider-viewport">
+                    <div class="calendar-slider">
+                    </div>
+                </div>
+            </div>
+            <button id="nextMonthBtn" class="nav-btn"><i class="fas fa-chevron-right"></i></button>
+        </div>
+        <div class="calendar-selection-info">
+            <div class="selection-preview-container">
+                <p><strong>Start:</strong> <span id="startDatePreview">-</span></p>
+                <p><strong>Koniec:</strong> <span id="endDatePreview">-</span></p>
+            </div>
+            <p><strong>Zaplanowano dni:</strong> <span id="workdaysCounter">0</span></p>
+        </div>
+        <div class="selection-mode-info">
+            <p><kbd>Ctrl</kbd> + klik, aby zaznaczyć pojedyncze dni.</p>
+        </div>
+        <div class="leave-type-selector">
+            <label for="leaveTypeSelect">Typ urlopu:</label>
+            <select id="leaveTypeSelect">
+                <option value="vacation" selected>Wypoczynkowy</option>
+                <option value="child_care_art_188">Opieka nad dzieckiem (art. 188 kp)</option>
+                <option value="sick_child_care">Opieka nad chorym dzieckiem (zasiłek)</option>
+                <option value="family_member_care">Opieka nad innym chorym członkiem rodziny (zasiłek)</option>
+            </select>
+        </div>
+        <div class="modal-actions">
+            <button id="clearSelectionBtn" class="action-btn">Wyczyść</button>
+            <button id="confirmSelectionBtn" class="action-btn confirm-btn">Zatwierdź</button>
+            <button id="cancelSelectionBtn" class="action-btn cancel-btn">Anuluj</button>
+        </div>
+    </div>
+</div>

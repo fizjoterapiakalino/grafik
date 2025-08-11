@@ -1,19 +1,11 @@
-document.addEventListener('DOMContentLoaded', () => {
+const Options = (() => {
     // --- SELEKTORY ELEMENTÓW DOM ---
-    const loadingOverlay = document.getElementById('loadingOverlay');
-    const employeeListContainer = document.getElementById('employeeListContainer');
-    const employeeSearchInput = document.getElementById('employeeSearchInput');
-    const addEmployeeBtn = document.getElementById('addEmployeeBtn');
-    
-    const detailsPlaceholder = document.getElementById('detailsPlaceholder');
-    const detailsEditForm = document.getElementById('detailsEditForm');
-    const employeeNameInput = document.getElementById('employeeNameInput');
-    const saveEmployeeBtn = document.getElementById('saveEmployeeBtn');
-    const deleteEmployeeBtn = document.getElementById('deleteEmployeeBtn');
+    let loadingOverlay, employeeListContainer, employeeSearchInput, addEmployeeBtn,
+        detailsPlaceholder, detailsEditForm, employeeNameInput, leaveEntitlementInput,
+        carriedOverLeaveInput, saveEmployeeBtn, deleteEmployeeBtn;
 
     // --- ZMIENNE STANU APLIKACJI ---
-    let allEmployees = {}; // Przechowuje obiekt { index: name }
-    let selectedEmployee = null; // Przechowuje { index, name } aktywnego pracownika
+    let selectedEmployeeIndex = null;
 
     // --- FUNKCJE POMOCNICZE ---
     const showLoading = (show) => {
@@ -23,11 +15,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const resetDetailsPanel = () => {
-        selectedEmployee = null;
+        selectedEmployeeIndex = null;
         detailsPlaceholder.style.display = 'flex';
         detailsEditForm.style.display = 'none';
         
-        // Usuń podświetlenie z listy
         const activeItem = document.querySelector('.employee-list-item.active');
         if (activeItem) {
             activeItem.classList.remove('active');
@@ -36,42 +27,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- RENDEROWANIE I OBSŁUGA LISTY PRACOWNIKÓW ---
     const renderEmployeeList = () => {
+        const employees = EmployeeManager.getAll();
         employeeListContainer.innerHTML = '';
-        if (Object.keys(allEmployees).length === 0) {
+        if (Object.keys(employees).length === 0) {
             employeeListContainer.innerHTML = '<p class="empty-list-info">Brak pracowników. Dodaj pierwszego!</p>';
             return;
         }
 
-        // Sortowanie pracowników po indeksie dla spójnej kolejności
-        const sortedEmployees = Object.entries(allEmployees)
-            .map(([index, name]) => ({ index: parseInt(index, 10), name }))
+        const sortedEmployees = Object.entries(employees)
+            .map(([index, data]) => ({ index: parseInt(index, 10), name: data.name }))
             .sort((a, b) => a.index - b.index);
 
         sortedEmployees.forEach(({ index, name }) => {
-            if (!name) return; // Nie wyświetlaj "usuniętych" pracowników
+            if (!name) return;
 
             const item = document.createElement('div');
             item.className = 'employee-list-item';
             item.dataset.employeeIndex = index;
             item.innerHTML = `<i class="fas fa-user"></i> <span>${name}</span>`;
 
-            item.addEventListener('click', () => handleEmployeeSelect({ index, name }));
+            item.addEventListener('click', () => handleEmployeeSelect(index));
             employeeListContainer.appendChild(item);
         });
     };
 
-    const handleEmployeeSelect = ({ index, name }) => {
-        selectedEmployee = { index, name };
+    const handleEmployeeSelect = (index) => {
+        selectedEmployeeIndex = index;
+        const employee = EmployeeManager.getById(index);
+        if (!employee) return;
 
-        // Podświetl aktywny element na liście
         document.querySelectorAll('.employee-list-item').forEach(item => {
             item.classList.toggle('active', item.dataset.employeeIndex == index);
         });
 
-        // Wyświetl panel edycji
         detailsPlaceholder.style.display = 'none';
         detailsEditForm.style.display = 'block';
-        employeeNameInput.value = name;
+        employeeNameInput.value = employee.name;
+        leaveEntitlementInput.value = employee.leaveEntitlement || 26;
+        carriedOverLeaveInput.value = employee.carriedOverLeave || 0;
     };
     
     const filterEmployees = () => {
@@ -83,187 +76,208 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- LOGIKA INTERAKCJI Z FIREBASE ---
-    const fetchEmployees = async () => {
-        showLoading(true);
-        try {
-            const docRef = db.collection("schedules").doc("mainSchedule");
-            const doc = await docRef.get();
-            if (doc.exists && doc.data().employeeHeaders) {
-                allEmployees = doc.data().employeeHeaders;
-            } else {
-                allEmployees = {};
-            }
-            renderEmployeeList();
-        } catch (error) {
-            console.error("Błąd podczas wczytywania pracowników:", error);
-            window.showToast("Błąd wczytywania pracowników!", 5000);
-        } finally {
-            showLoading(false);
-        }
-    };
-
     const handleAddEmployee = async () => {
         const name = prompt("Wpisz imię i nazwisko nowego pracownika:");
         if (!name || name.trim() === '') {
             window.showToast("Anulowano. Nazwa nie może być pusta.", 3000);
             return;
         }
+        const entitlement = parseInt(prompt("Podaj wymiar urlopu (np. 26):", "26"), 10);
+        if (isNaN(entitlement)) {
+            window.showToast("Anulowano. Wymiar urlopu musi być liczbą.", 3000);
+            return;
+        }
 
         showLoading(true);
         try {
-            // Znajdź najwyższy istniejący indeks, aby dodać nowego na końcu
+            const allEmployees = EmployeeManager.getAll();
             const highestIndex = Object.keys(allEmployees).reduce((max, index) => Math.max(max, parseInt(index, 10)), -1);
             const newIndex = highestIndex + 1;
 
-            const updatedHeaders = { ...allEmployees, [newIndex]: name.trim() };
+            const newEmployee = {
+                name: name.trim(),
+                leaveEntitlement: entitlement,
+                carriedOverLeave: 0
+            };
 
             await db.collection("schedules").doc("mainSchedule").update({
-                employeeHeaders: updatedHeaders
+                [`employees.${newIndex}`]: newEmployee
             });
 
-            allEmployees = updatedHeaders;
+            await EmployeeManager.load();
             renderEmployeeList();
             window.showToast("Pracownik dodany pomyślnie!", 2000);
         } catch (error) {
             console.error("Błąd podczas dodawania pracownika:", error);
-            window.showToast("Wystąpił błąd przy dodawaniu.", 5000);
+            window.showToast("Wystąpił błąd podczas dodawania pracownika. Spróbuj ponownie.", 5000);
         } finally {
             showLoading(false);
         }
     };
 
     const handleSaveEmployee = async () => {
-        if (!selectedEmployee) {
+        if (selectedEmployeeIndex === null) {
             window.showToast("Nie wybrano pracownika.", 3000);
             return;
         }
 
+        const oldEmployee = EmployeeManager.getById(selectedEmployeeIndex);
         const newName = employeeNameInput.value.trim();
-        if (newName === '' || newName === selectedEmployee.name) {
-            window.showToast("Nazwa jest pusta lub nie została zmieniona.", 3000);
+        const newEntitlement = parseInt(leaveEntitlementInput.value, 10);
+        const newCarriedOver = parseInt(carriedOverLeaveInput.value, 10);
+
+        if (newName === '') {
+            window.showToast("Nazwa pracownika nie może być pusta.", 3000);
+            return;
+        }
+        if (isNaN(newEntitlement) || isNaN(newCarriedOver)) {
+            window.showToast("Wartości urlopu muszą być poprawnymi liczbami.", 3000);
             return;
         }
 
-        showLoading(true);
-        const oldName = selectedEmployee.name;
-        const employeeIndex = selectedEmployee.index;
+        const updatedEmployee = {
+            name: newName,
+            leaveEntitlement: newEntitlement,
+            carriedOverLeave: newCarriedOver
+        };
 
+        showLoading(true);
         try {
-            // Transakcja, aby zapewnić spójność danych
             await db.runTransaction(async (transaction) => {
                 const scheduleRef = db.collection("schedules").doc("mainSchedule");
-                const leavesRef = db.collection("leaves").doc("mainLeaves");
-
-                // --- FAZA ODCZYTU ---
-                // Najpierw wykonujemy wszystkie operacje odczytu
-                const leavesDoc = await transaction.get(leavesRef);
                 
-                // --- FAZA ZAPISU ---
-                // Teraz wykonujemy wszystkie operacje zapisu
-                
-                // 1. Zaktualizuj nagłówek w grafiku
                 transaction.update(scheduleRef, {
-                    [`employeeHeaders.${employeeIndex}`]: newName
+                    [`employees.${selectedEmployeeIndex}`]: updatedEmployee
                 });
 
-                // 2. Zaktualizuj dane w urlopach (zmiana nazwy klucza)
-                if (leavesDoc.exists && leavesDoc.data().leavesData?.[oldName]) {
-                    const leavesData = leavesDoc.data().leavesData;
-                    const employeeLeaveData = leavesData[oldName];
-                    delete leavesData[oldName];
-                    leavesData[newName] = employeeLeaveData;
-                    transaction.update(leavesRef, { leavesData });
+                // Jeśli nazwa się zmieniła, zaktualizuj klucze w urlopach
+                if (oldEmployee.name !== newName) {
+                    const leavesRef = db.collection("leaves").doc("mainLeaves");
+                    const leavesDoc = await transaction.get(leavesRef);
+                    if (leavesDoc.exists && leavesDoc.data()[oldEmployee.name]) {
+                        const leavesData = leavesDoc.data();
+                        const employeeLeaveData = leavesData[oldEmployee.name];
+                        delete leavesData[oldEmployee.name];
+                        leavesData[newName] = employeeLeaveData;
+                        transaction.set(leavesRef, leavesData);
+                    }
                 }
             });
 
-            // Zaktualizuj stan lokalny i UI
-            allEmployees[employeeIndex] = newName;
+            await EmployeeManager.load();
             renderEmployeeList();
-            handleEmployeeSelect({ index: employeeIndex, name: newName }); // Odśwież panel edycji
+            handleEmployeeSelect(selectedEmployeeIndex);
             window.showToast("Dane pracownika zaktualizowane.", 2000);
 
         } catch (error) {
-            console.error("Błąd podczas zapisywania zmian:", error);
-            window.showToast("Wystąpił błąd przy zapisie.", 5000);
+            console.error("Błąd podczas zapisywania zmian pracownika:", error);
+            window.showToast("Wystąpił błąd podczas zapisu. Spróbuj ponownie.", 5000);
         } finally {
             showLoading(false);
         }
     };
     
     const handleDeleteEmployee = async () => {
-        if (!selectedEmployee) {
+        if (selectedEmployeeIndex === null) {
             window.showToast("Nie wybrano pracownika.", 3000);
             return;
         }
-
-        const confirmation = confirm(`Czy na pewno chcesz usunąć pracownika "${selectedEmployee.name}"?\n\nUWAGA: Ta operacja usunie również wszystkie powiązane z nim dane w grafiku i urlopach. Zmiany są nieodwracalne!`);
+        
+        const employee = EmployeeManager.getById(selectedEmployeeIndex);
+        const confirmation = confirm(`Czy na pewno chcesz usunąć pracownika "${employee.name}"?\n\nUWAGA: Ta operacja usunie również wszystkie powiązane z nim dane w grafiku i urlopach. Zmiany są nieodwracalne!`);
 
         if (!confirmation) return;
 
         showLoading(true);
-        const { index: employeeIndex, name: employeeName } = selectedEmployee;
-
         try {
+            // Używamy firebase.firestore.FieldValue.delete() do usunięcia pola z obiektu
+            const FieldValue = firebase.firestore.FieldValue;
+
             await db.runTransaction(async (transaction) => {
                 const scheduleRef = db.collection("schedules").doc("mainSchedule");
                 const leavesRef = db.collection("leaves").doc("mainLeaves");
 
                 // --- FAZA ODCZYTU ---
-                // Najpierw wykonujemy wszystkie operacje odczytu
+                // Najpierw odczytujemy wszystkie potrzebne dokumenty.
                 const scheduleDoc = await transaction.get(scheduleRef);
                 const leavesDoc = await transaction.get(leavesRef);
-                
-                // --- FAZA ZAPISU ---
-                // Teraz wykonujemy wszystkie operacje zapisu
-                const scheduleData = scheduleDoc.data();
 
-                // 1. Usuń pracownika z nagłówków (ustaw na null dla zachowania indeksów)
-                scheduleData.employeeHeaders[employeeIndex] = null; 
+                // --- FAZA ZAPISU ---
+                // Teraz, gdy mamy dane, wykonujemy wszystkie operacje zapisu.
+
+                // 1. Usuń pracownika z obiektu 'employees'
+                transaction.update(scheduleRef, {
+                    [`employees.${selectedEmployeeIndex}`]: FieldValue.delete()
+                });
 
                 // 2. Wyczyść dane tego pracownika z grafiku
-                if (scheduleData.scheduleCells) {
+                const scheduleData = scheduleDoc.data();
+                if (scheduleData && scheduleData.scheduleCells) {
                     Object.keys(scheduleData.scheduleCells).forEach(time => {
-                        if (scheduleData.scheduleCells[time]?.[employeeIndex]) {
-                            delete scheduleData.scheduleCells[time][employeeIndex];
+                        if (scheduleData.scheduleCells[time]?.[selectedEmployeeIndex]) {
+                            transaction.update(scheduleRef, {
+                                [`scheduleCells.${time}.${selectedEmployeeIndex}`]: FieldValue.delete()
+                            });
                         }
                     });
                 }
-                
-                transaction.set(scheduleRef, scheduleData); // Użyj set, aby nadpisać całość
 
                 // 3. Usuń dane z urlopów
-                if (leavesDoc.exists && leavesDoc.data().leavesData?.[employeeName]) {
-                    const leavesData = leavesDoc.data().leavesData;
-                    delete leavesData[employeeName];
-                    transaction.update(leavesRef, { leavesData });
+                if (leavesDoc.exists && leavesDoc.data()[employee.name]) {
+                    transaction.update(leavesRef, {
+                        [employee.name]: FieldValue.delete()
+                    });
                 }
             });
 
-            // Zaktualizuj stan lokalny i UI
-            delete allEmployees[employeeIndex];
+            await EmployeeManager.load();
             renderEmployeeList();
             resetDetailsPanel();
             window.showToast("Pracownik usunięty pomyślnie.", 2000);
 
         } catch (error) {
             console.error("Błąd podczas usuwania pracownika:", error);
-            window.showToast("Wystąpił błąd podczas usuwania.", 5000);
+            window.showToast("Wystąpił błąd podczas usuwania pracownika. Spróbuj ponownie.", 5000);
         } finally {
             showLoading(false);
         }
     };
 
     // --- INICJALIZACJA I NASŁUCHIWANIE ZDARZEŃ ---
-    const initializePage = () => {
-        resetDetailsPanel();
-        fetchEmployees();
+    const init = async () => {
+        // Query for elements only when the page is initialized
+        loadingOverlay = document.getElementById('loadingOverlay');
+        employeeListContainer = document.getElementById('employeeListContainer');
+        employeeSearchInput = document.getElementById('employeeSearchInput');
+        addEmployeeBtn = document.getElementById('addEmployeeBtn');
+        detailsPlaceholder = document.getElementById('detailsPlaceholder');
+        detailsEditForm = document.getElementById('detailsEditForm');
+        employeeNameInput = document.getElementById('employeeNameInput');
+        leaveEntitlementInput = document.getElementById('leaveEntitlementInput');
+        carriedOverLeaveInput = document.getElementById('carriedOverLeaveInput');
+        saveEmployeeBtn = document.getElementById('saveEmployeeBtn');
+        deleteEmployeeBtn = document.getElementById('deleteEmployeeBtn');
 
-        // Event Listeners
+        resetDetailsPanel();
+        showLoading(true);
+        try {
+            await EmployeeManager.load();
+            renderEmployeeList();
+        } catch (error) {
+            console.error("Błąd inicjalizacji strony opcji:", error);
+            window.showToast("Wystąpił krytyczny błąd inicjalizacji. Odśwież stronę.", 5000);
+        } finally {
+            showLoading(false);
+        }
+
+        // Attach event listeners
         employeeSearchInput.addEventListener('input', filterEmployees);
         addEmployeeBtn.addEventListener('click', handleAddEmployee);
         saveEmployeeBtn.addEventListener('click', handleSaveEmployee);
         deleteEmployeeBtn.addEventListener('click', handleDeleteEmployee);
     };
 
-    initializePage();
-});
+    return {
+        init
+    };
+})();
