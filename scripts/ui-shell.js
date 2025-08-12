@@ -7,7 +7,7 @@ const UIShell = (() => {
         }
 
         appRoot.innerHTML = `
-            <div id="loadingOverlay" class="loading-overlay">
+            <div id="loadingOverlay" class="loading-overlay hidden">
                 <div class="loader"></div>
                 <p>Wczytywanie...</p>
             </div>
@@ -25,6 +25,7 @@ const UIShell = (() => {
                         <button id="clearSearchButton" class="clear-search-btn" style="display: none;"><i class="fas fa-times"></i></button>
                     </div>
                     <button id="undoButton" class="undo-button" title="Cofnij (Ctrl+Z)" disabled><i class="fas fa-undo"></i></button>
+                    <button id="logoutBtn" style="display: none;" class="action-btn cancel-btn">Wyloguj</button>
                     <!-- Hamburger menu will be inserted here by shared.js -->
                 </div>
             </div>
@@ -57,8 +58,47 @@ const UIShell = (() => {
         }
     };
 
+    const updateUserState = (user) => {
+        const logoutBtn = document.getElementById('logoutBtn');
+        const headerRightMenu = document.querySelector('.header-right-menu'); // Znajdź główny kontener menu
+        
+        if (user) {
+            // Pokaż przycisk, jeśli nie istnieje, dodaj go
+            if (!logoutBtn) {
+                const btn = document.createElement('button');
+                btn.id = 'logoutBtn';
+                btn.className = 'action-btn cancel-btn';
+                btn.textContent = 'Wyloguj';
+                btn.onclick = () => firebase.auth().signOut();
+                headerRightMenu.appendChild(btn);
+            } else {
+                logoutBtn.style.display = 'block';
+            }
+        } else {
+            // Ukryj przycisk
+            if (logoutBtn) logoutBtn.style.display = 'none';
+        }
+    };
+
+    const showLoading = () => {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) {
+            overlay.classList.remove('hidden');
+        }
+    };
+
+    const hideLoading = () => {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) {
+            overlay.classList.add('hidden');
+        }
+    };
+
     return {
         render,
         loadPage,
+        updateUserState, // Eksportuj nową metodę
+        showLoading,
+        hideLoading
     };
 })();

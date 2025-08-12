@@ -143,3 +143,91 @@ body {
     flex-shrink: 0;
     background-color: #222;
 }
+
+/* --- Style strony logowania --- */
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #f0f2f5;
+}
+
+.login-box {
+    background: white;
+    padding: 40px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 550px; /* Zwiększono szerokość */
+}
+
+.login-box h2 {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #333;
+}
+
+.login-content {
+    display: flex;
+    align-items: center;
+    gap: 40px; /* Odstęp między logo a formularzem */
+}
+
+.login-logo {
+    width: 100px; /* Zwiększono logo */
+    height: auto;
+    flex-shrink: 0;
+}
+
+.login-form {
+    width: 100%;
+}
+
+.form-group {
+    margin-bottom: 20px; /* Zwiększono odstęp */
+    text-align: left;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #555;
+    font-weight: bold;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end; /* Przycisk po prawej */
+    margin-top: 20px;
+}
+
+.login-btn {
+    padding: 12px 25px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s;
+}
+
+.login-btn:hover {
+    background-color: #45a049;
+}
+
+.login-error {
+    color: #D8000C;
+    margin-top: 15px;
+    min-height: 1.2em;
+    text-align: left;
+}

@@ -139,6 +139,15 @@ const Shared = (() => {
         setInterval(updateDateTimeHeader, 1000);
         updateDateTimeHeader();
         setupGlobalEventListeners();
+
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => {
+                firebase.auth().signOut().then(() => {
+                    window.location.hash = '#login'; // Przekieruj po wylogowaniu
+                });
+            });
+        }
     };
 
     return {

@@ -30,7 +30,8 @@ const Router = (() => {
                     console.error('Options module not found.');
                 }
             }
-        }
+        },
+        'login': { page: 'login', init: Login.init } // Dodaj nową trasę
     };
 
     const init = () => {
@@ -41,14 +42,32 @@ const Router = (() => {
 
     const navigate = () => {
         const pageName = window.location.hash.substring(1) || 'schedule';
-        const route = routes[pageName];
+        UIShell.showLoading(); // Pokaż loader na początku nawigacji
 
-        if (route) {
-            UIShell.loadPage(route.page, route.init);
-        } else {
-            // Fallback to schedule page if route is not found
-            window.location.hash = 'schedule';
-        }
+        firebase.auth().onAuthStateChanged(user => {
+            UIShell.updateUserState(user); // Zaktualizuj UI (np. przycisk wyloguj)
+            const appHeader = document.getElementById('appHeader');
+
+            if (user) {
+                // Użytkownik jest zalogowany
+                if(appHeader) appHeader.style.display = 'flex'; // Pokaż header
+                if (pageName === 'login') {
+                    window.location.hash = '#schedule';
+                } else {
+                    const route = routes[pageName] || routes['schedule'];
+                    UIShell.loadPage(route.page, route.init).finally(() => UIShell.hideLoading());
+                }
+            } else {
+                // Użytkownik nie jest zalogowany
+                if (pageName !== 'login') {
+                    window.location.hash = '#login';
+                } else {
+                    // Na stronie logowania chowamy header i loader
+                    if(appHeader) appHeader.style.display = 'none';
+                    UIShell.loadPage(routes.login.page, routes.login.init).finally(() => UIShell.hideLoading());
+                }
+            }
+        });
     };
 
     return {
