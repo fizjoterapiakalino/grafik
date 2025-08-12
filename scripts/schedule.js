@@ -92,9 +92,16 @@ const Schedule = (() => {
                         cellState = { isSplit: true, content1: parts[0], content2: parts[1] };
                     } else if (cellState.isSplit) {
                         const isFirstDiv = element === parentCell.querySelector('div:first-child');
-                        if (isFirstDiv) cellState.content1 = newText;
-                        else cellState.content2 = newText;
-                        if (!cellState.content1 && !cellState.content2) cellState = {};
+                        if (isFirstDiv) {
+                            cellState.content1 = newText;
+                        } else {
+                            cellState.content2 = newText;
+                        }
+                        // Jeśli obie części są puste, usuń isSplit i wyczyść cellState
+                        if (!cellState.content1 && !cellState.content2) {
+                            delete cellState.isSplit;
+                            cellState = {}; // Resetuj cellState do pustego obiektu
+                        }
                     } else {
                         cellState = { content: newText };
                     }
@@ -206,12 +213,13 @@ const Schedule = (() => {
                     isPnf: cell.dataset.isPnf === 'true'
                 };
             },
-            openPatientInfoModal(cell) {
-                const patientName = ScheduleUI.getElementText(cell);
+            openPatientInfoModal(element) {
+                const patientName = ScheduleUI.getElementText(element);
                 if (!patientName) {
                     window.showToast("Brak pacjenta w tej komórce.", 3000);
                     return;
                 }
+
                 const modal = document.getElementById('patientInfoModal');
                 const patientNameInput = document.getElementById('patientName');
                 const startDateInput = document.getElementById('treatmentStartDate');
@@ -219,15 +227,35 @@ const Schedule = (() => {
                 const endDateInput = document.getElementById('treatmentEndDate');
                 const saveModalBtn = document.getElementById('savePatientInfoModal');
                 const closeModalBtn = document.getElementById('closePatientInfoModal');
-                const time = cell.dataset.time;
-                const employeeIndex = cell.dataset.employeeIndex;
+
+                const parentCell = element.closest('td');
+                const time = parentCell.dataset.time;
+                const employeeIndex = parentCell.dataset.employeeIndex;
                 const cellState = appState.scheduleCells[time]?.[employeeIndex] || {};
+
+                const isSplitPart = element.tagName === 'DIV';
+                const partIndex = isSplitPart ? (element === parentCell.querySelector('div:first-child') ? 1 : 2) : null;
+
                 patientNameInput.value = patientName;
-                startDateInput.value = cellState.treatmentStartDate || new Date().toISOString().split('T')[0];
-                extensionDaysInput.value = cellState.treatmentExtensionDays || 0;
+
+                let treatmentData = {};
+                if (isSplitPart) {
+                    const dataKey = `treatmentData${partIndex}`;
+                    treatmentData = cellState[dataKey] || {};
+                } else {
+                    treatmentData = {
+                        startDate: cellState.treatmentStartDate,
+                        extensionDays: cellState.treatmentExtensionDays
+                    };
+                }
+
+                startDateInput.value = treatmentData.startDate || new Date().toISOString().split('T')[0];
+                extensionDaysInput.value = treatmentData.extensionDays || 0;
+
                 const calculateEndDate = (startDate, extensionDays) => {
+                    if (!startDate) return '';
                     let endDate = new Date(startDate);
-                    let totalDays = 15 + parseInt(extensionDays, 10);
+                    let totalDays = 15 + parseInt(extensionDays || 0, 10);
                     let daysAdded = 0;
                     while (daysAdded < totalDays) {
                         endDate.setDate(endDate.getDate() + 1);
@@ -238,26 +266,46 @@ const Schedule = (() => {
                     }
                     return endDate.toISOString().split('T')[0];
                 };
+
                 const updateEndDate = () => {
                     endDateInput.value = calculateEndDate(startDateInput.value, extensionDaysInput.value);
                 };
+
                 updateEndDate();
-                startDateInput.addEventListener('change', updateEndDate);
-                extensionDaysInput.addEventListener('input', updateEndDate);
+
+                const changeHandler = () => updateEndDate();
+                const inputHandler = () => updateEndDate();
+
+                startDateInput.addEventListener('change', changeHandler);
+                extensionDaysInput.addEventListener('input', inputHandler);
+
                 const closeModal = () => {
-                    startDateInput.removeEventListener('change', updateEndDate);
-                    extensionDaysInput.removeEventListener('input', updateEndDate);
+                    startDateInput.removeEventListener('change', changeHandler);
+                    extensionDaysInput.removeEventListener('input', inputHandler);
                     modal.style.display = 'none';
                 };
+
                 saveModalBtn.onclick = () => {
-                    updateCellState(cell, state => {
-                        state.treatmentStartDate = startDateInput.value;
-                        state.treatmentExtensionDays = parseInt(extensionDaysInput.value, 10);
-                        state.treatmentEndDate = endDateInput.value;
+                    updateCellState(parentCell, state => {
+                        const newTreatmentData = {
+                            startDate: startDateInput.value,
+                            extensionDays: parseInt(extensionDaysInput.value, 10),
+                            endDate: endDateInput.value
+                        };
+
+                        if (isSplitPart) {
+                            const dataKey = `treatmentData${partIndex}`;
+                            state[dataKey] = newTreatmentData;
+                        } else {
+                            state.treatmentStartDate = newTreatmentData.startDate;
+                            state.treatmentExtensionDays = newTreatmentData.extensionDays;
+                            state.treatmentEndDate = newTreatmentData.endDate;
+                        }
                     });
                     window.showToast("Zapisano daty zabiegów.");
                     closeModal();
                 };
+
                 closeModalBtn.onclick = closeModal;
                 modal.onclick = (event) => {
                     if (event.target === modal) {

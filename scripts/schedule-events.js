@@ -284,7 +284,7 @@ const ScheduleEvents = (() => {
 
         // Context Menu
         const contextMenuItems = [
-            { id: 'contextPatientInfo', class: 'info', condition: cell => !cell.classList.contains('break-cell') && _dependencies.ui.getElementText(cell).trim() !== '', action: cell => _dependencies.openPatientInfoModal(cell) },
+            { id: 'contextPatientInfo', class: 'info', condition: cell => !cell.classList.contains('break-cell') && _dependencies.ui.getElementText(cell).trim() !== '', action: (cell, event) => _dependencies.openPatientInfoModal(event.target.closest('div[tabindex="0"]') || event.target.closest('td.editable-cell')) },
             { id: 'contextAddBreak', action: cell => _dependencies.updateCellState(cell, state => { state.isBreak = true; window.showToast('Dodano przerwę'); }) },
             { id: 'contextRemoveBreak', class: 'danger', condition: cell => cell.classList.contains('break-cell'), action: cell => _dependencies.updateCellState(cell, state => { delete state.isBreak; window.showToast('Usunięto przerwę'); }) },
             { id: 'contextClear', class: 'danger', action: cell => _dependencies.updateCellState(cell, state => { Object.keys(state).forEach(key => delete state[key]); window.showToast('Wyczyszczono komórkę'); }) },

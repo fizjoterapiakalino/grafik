@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const target = event.target.closest(targetSelector);
             if (target) {
                 event.preventDefault();
+                contextMenu.contextEvent = event; // Store the original event
                 currentTarget = target;
 
                 // Update item visibility based on conditions
@@ -24,8 +25,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                contextMenu.style.left = `${event.pageX}px`;
-                contextMenu.style.top = `${event.pageY}px`;
+                const { clientX: mouseX, clientY: mouseY } = event;
+                const { innerWidth: windowWidth, innerHeight: windowHeight } = window;
+                const menuWidth = contextMenu.offsetWidth;
+                const menuHeight = contextMenu.offsetHeight;
+
+                let x = mouseX;
+                let y = mouseY;
+
+                if (mouseX + menuWidth > windowWidth) {
+                    x = windowWidth - menuWidth - 5; // 5px buffer
+                }
+
+                if (mouseY + menuHeight > windowHeight) {
+                    y = windowHeight - menuHeight - 5; // 5px buffer
+                }
+
+                contextMenu.style.left = `${x}px`;
+                contextMenu.style.top = `${y}px`;
                 contextMenu.classList.add('visible');
             }
         });
@@ -43,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (element) {
                 element.addEventListener('click', () => {
                     if (currentTarget && item.action) {
-                        item.action(currentTarget);
+                        item.action(currentTarget, contextMenu.contextEvent);
                     }
                     contextMenu.classList.remove('visible');
                 });
