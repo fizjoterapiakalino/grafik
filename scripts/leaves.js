@@ -5,6 +5,20 @@ const Leaves = (() => {
 
     let currentYear = new Date().getUTCFullYear();
 
+    // --- Nazwane funkcje obsługi zdarzeń ---
+    const _handleAppSearch = (e) => {
+        const { searchTerm } = e.detail;
+        const lowerCaseSearchTerm = searchTerm.toLowerCase();
+        document.querySelectorAll('#leavesTableBody tr').forEach(row => {
+            row.style.display = row.dataset.employee.toLowerCase().includes(lowerCaseSearchTerm) ? '' : 'none';
+        });
+    };
+
+    const _handleTableDblClick = (event) => {
+        const targetCell = event.target.closest('.day-cell');
+        openCalendarForCell(targetCell);
+    };
+
     // --- FUNKCJE POMOCNICZE UTC ---
     const toUTCDate = (dateString) => {
         const [year, month, day] = dateString.split('-').map(Number);
@@ -15,6 +29,7 @@ const Leaves = (() => {
 
     const generateLegend = () => {
         const legendContainer = document.getElementById('leavesLegend');
+        if (!legendContainer) return;
         legendContainer.innerHTML = '<h4>Legenda:</h4>';
         const leaveTypeSelect = document.getElementById('leaveTypeSelect');
         
@@ -66,6 +81,19 @@ const Leaves = (() => {
         }
     };
 
+    const destroy = () => {
+        monthlyViewBtn.removeEventListener('click', showMonthlyView);
+        summaryViewBtn.removeEventListener('click', showSummaryView);
+        careViewBtn.removeEventListener('click', showCareView);
+        leavesTableBody.removeEventListener('dblclick', _handleTableDblClick);
+        document.removeEventListener('app:search', _handleAppSearch);
+
+        if (window.destroyContextMenu) {
+            window.destroyContextMenu('contextMenu');
+        }
+        console.log("Leaves module destroyed");
+    };
+
     const openCalendarForCell = async (cell) => {
         if (!cell) return;
         const employeeName = cell.closest('tr').dataset.employee;
@@ -88,19 +116,8 @@ const Leaves = (() => {
         monthlyViewBtn.addEventListener('click', showMonthlyView);
         summaryViewBtn.addEventListener('click', showSummaryView);
         careViewBtn.addEventListener('click', showCareView);
-        
-        leavesTableBody.addEventListener('dblclick', (event) => {
-            const targetCell = event.target.closest('.day-cell');
-            openCalendarForCell(targetCell);
-        });
-
-        document.addEventListener('app:search', (e) => {
-            const { searchTerm } = e.detail;
-            const lowerCaseSearchTerm = searchTerm.toLowerCase();
-            document.querySelectorAll('#leavesTableBody tr').forEach(row => {
-                row.style.display = row.dataset.employee.toLowerCase().includes(lowerCaseSearchTerm) ? '' : 'none';
-            });
-        });
+        leavesTableBody.addEventListener('dblclick', _handleTableDblClick);
+        document.addEventListener('app:search', _handleAppSearch);
     };
 
     const showMonthlyView = async () => {
@@ -256,6 +273,7 @@ const Leaves = (() => {
     };
 
     return {
-        init
+        init,
+        destroy
     };
 })();

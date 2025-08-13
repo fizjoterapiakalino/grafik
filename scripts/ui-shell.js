@@ -25,7 +25,6 @@ const UIShell = (() => {
                         <button id="clearSearchButton" class="clear-search-btn" style="display: none;"><i class="fas fa-times"></i></button>
                     </div>
                     <button id="undoButton" class="undo-button" title="Cofnij (Ctrl+Z)" disabled><i class="fas fa-undo"></i></button>
-                    <button id="logoutBtn" style="display: none;" class="action-btn cancel-btn">Wyloguj</button>
                     <!-- Hamburger menu will be inserted here by shared.js -->
                 </div>
             </div>
@@ -59,24 +58,9 @@ const UIShell = (() => {
     };
 
     const updateUserState = (user) => {
-        const logoutBtn = document.getElementById('logoutBtn');
-        const headerRightMenu = document.querySelector('.header-right-menu'); // Znajdź główny kontener menu
-        
-        if (user) {
-            // Pokaż przycisk, jeśli nie istnieje, dodaj go
-            if (!logoutBtn) {
-                const btn = document.createElement('button');
-                btn.id = 'logoutBtn';
-                btn.className = 'action-btn cancel-btn';
-                btn.textContent = 'Wyloguj';
-                btn.onclick = () => firebase.auth().signOut();
-                headerRightMenu.appendChild(btn);
-            } else {
-                logoutBtn.style.display = 'block';
-            }
-        } else {
-            // Ukryj przycisk
-            if (logoutBtn) logoutBtn.style.display = 'none';
+        const logoutBtnContainer = document.getElementById('logoutBtnContainer');
+        if (logoutBtnContainer) {
+            logoutBtnContainer.style.display = user ? 'block' : 'none';
         }
     };
 

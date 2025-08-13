@@ -1,13 +1,61 @@
-// scripts/schedule-events.js
-
 const ScheduleEvents = (() => {
     let _dependencies = {};
-    
-    let mainTable, searchInput, clearSearchButton;
-
-    let draggedCell = null;
+    let mainTable;
     let activeCell = null;
+    let draggedCell = null;
 
+    // --- Nazwane funkcje obsługi zdarzeń ---
+
+    const _handleMainTableClick = (event) => {
+        const target = event.target.closest('td.editable-cell, div[tabindex="0"]');
+        if (target) {
+            if (activeCell === target && target.getAttribute('contenteditable') === 'true') return;
+            if (activeCell && activeCell.getAttribute('contenteditable') === 'true') _dependencies.exitEditMode(activeCell);
+            setActiveCell(target);
+        } else {
+            if (activeCell && activeCell.getAttribute('contenteditable') === 'true') _dependencies.exitEditMode(activeCell);
+            setActiveCell(null);
+        }
+    };
+
+    const _handleMainTableDblClick = (event) => {
+        const target = event.target.closest('td.editable-cell, div[tabindex="0"]');
+        if (target) _dependencies.enterEditMode(target);
+    };
+
+    const _handleDocumentClick = (event) => {
+        if (!event.target.closest('.active-cell') && !event.target.closest('#contextMenu')) {
+            if (activeCell && activeCell.getAttribute('contenteditable') === 'true') {
+                _dependencies.exitEditMode(activeCell);
+            }
+            setActiveCell(null);
+        }
+    };
+    
+    const _handleDragLeave = (event) => {
+        const target = event.target.closest('.drag-over-target');
+        if(target) target.classList.remove('drag-over-target');
+    };
+
+    const _handleAppSearch = (e) => {
+        const { searchTerm } = e.detail;
+        const searchAndHighlight = (term, tableSelector, cellSelector) => {
+            const table = document.querySelector(tableSelector);
+            if (!table) return;
+            table.querySelectorAll(cellSelector).forEach(cell => {
+                const cellText = cell.textContent.toLowerCase();
+                if (term && cellText.includes(term.toLowerCase())) {
+                    cell.classList.add('search-highlight');
+                } else {
+                    cell.classList.remove('search-highlight');
+                }
+            });
+        };
+        searchAndHighlight(searchTerm, '#mainScheduleTable', 'td.editable-cell, th');
+    };
+
+    // (reszta nazwanych funkcji, które już istnieją, jak _handleKeyDown, _handleDragStart, etc.)
+    // ... (istniejący kod od clearDuplicateHighlights do _handleKeyDown) ...
     const clearDuplicateHighlights = () => {
         document.querySelectorAll('.duplicate-highlight').forEach(el => {
             el.classList.remove('duplicate-highlight');
@@ -219,70 +267,24 @@ const ScheduleEvents = (() => {
         }
     };
 
+
     const initialize = (deps) => {
         _dependencies = deps;
-
-        // Initialize DOM elements here
         mainTable = document.getElementById('mainScheduleTable');
-        searchInput = document.getElementById('searchInput');
-        clearSearchButton = document.getElementById('clearSearchButton');
 
-        mainTable.addEventListener('click', (event) => {
-            const target = event.target.closest('td.editable-cell, div[tabindex="0"]');
-            if (target) {
-                if (activeCell === target && target.getAttribute('contenteditable') === 'true') return;
-                if (activeCell && activeCell.getAttribute('contenteditable') === 'true') _dependencies.exitEditMode(activeCell);
-                setActiveCell(target);
-            } else {
-                if (activeCell && activeCell.getAttribute('contenteditable') === 'true') _dependencies.exitEditMode(activeCell);
-                setActiveCell(null);
-            }
-        });
+        mainTable.addEventListener('click', _handleMainTableClick);
+        mainTable.addEventListener('dblclick', _handleMainTableDblClick);
+        document.addEventListener('click', _handleDocumentClick);
 
-        mainTable.addEventListener('dblclick', (event) => {
-            const target = event.target.closest('td.editable-cell, div[tabindex="0"]');
-            if (target) _dependencies.enterEditMode(target);
-        });
-
-        document.addEventListener('click', (event) => {
-            if (!event.target.closest('.active-cell')) {
-                 if (activeCell && activeCell.getAttribute('contenteditable') === 'true') {
-                    _dependencies.exitEditMode(activeCell);
-                }
-                setActiveCell(null);
-            }
-        });
-
-        // Drag and Drop events
         mainTable.addEventListener('dragstart', _handleDragStart);
         mainTable.addEventListener('dragover', _handleDragOver);
-        mainTable.addEventListener('dragleave', (event) => event.target.closest('.drag-over-target')?.classList.remove('drag-over-target'));
+        mainTable.addEventListener('dragleave', _handleDragLeave);
         mainTable.addEventListener('drop', _handleDrop);
         mainTable.addEventListener('dragend', _handleDragEnd);
         
-        // Keyboard events
         document.addEventListener('keydown', _handleKeyDown);
+        document.addEventListener('app:search', _handleAppSearch);
 
-        // Search events
-        document.addEventListener('app:search', (e) => {
-            const { searchTerm } = e.detail;
-            // A simple search and highlight function needs to be defined or available in scope
-            const searchAndHighlight = (term, tableSelector, cellSelector) => {
-                const table = document.querySelector(tableSelector);
-                if (!table) return;
-                table.querySelectorAll(cellSelector).forEach(cell => {
-                    const cellText = cell.textContent.toLowerCase();
-                    if (term && cellText.includes(term.toLowerCase())) {
-                        cell.classList.add('search-highlight');
-                    } else {
-                        cell.classList.remove('search-highlight');
-                    }
-                });
-            };
-            searchAndHighlight(searchTerm, '#mainScheduleTable', 'td.editable-cell, th');
-        });
-
-        // Context Menu
         const contextMenuItems = [
             { id: 'contextPatientInfo', class: 'info', condition: cell => !cell.classList.contains('break-cell') && _dependencies.ui.getElementText(cell).trim() !== '', action: (cell, event) => _dependencies.openPatientInfoModal(event.target.closest('div[tabindex="0"]') || event.target.closest('td.editable-cell')) },
             { id: 'contextAddBreak', action: cell => _dependencies.updateCellState(cell, state => { state.isBreak = true; window.showToast('Dodano przerwę'); }) },
@@ -295,7 +297,30 @@ const ScheduleEvents = (() => {
         window.initializeContextMenu('contextMenu', 'td.editable-cell', contextMenuItems);
     };
 
+    const destroy = () => {
+        if (mainTable) {
+            mainTable.removeEventListener('click', _handleMainTableClick);
+            mainTable.removeEventListener('dblclick', _handleMainTableDblClick);
+            mainTable.removeEventListener('dragstart', _handleDragStart);
+            mainTable.removeEventListener('dragover', _handleDragOver);
+            mainTable.removeEventListener('dragleave', _handleDragLeave);
+            mainTable.removeEventListener('drop', _handleDrop);
+            mainTable.removeEventListener('dragend', _handleDragEnd);
+        }
+        document.removeEventListener('click', _handleDocumentClick);
+        document.removeEventListener('keydown', _handleKeyDown);
+        document.removeEventListener('app:search', _handleAppSearch);
+        
+        if (window.destroyContextMenu) {
+            window.destroyContextMenu('contextMenu');
+        }
+        
+        activeCell = null;
+        console.log("ScheduleEvents destroyed");
+    };
+
     return {
-        initialize
+        initialize,
+        destroy
     };
 })();

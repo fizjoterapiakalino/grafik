@@ -277,7 +277,16 @@ const Options = (() => {
         deleteEmployeeBtn.addEventListener('click', handleDeleteEmployee);
     };
 
+    const destroy = () => {
+        employeeSearchInput.removeEventListener('input', filterEmployees);
+        addEmployeeBtn.removeEventListener('click', handleAddEmployee);
+        saveEmployeeBtn.removeEventListener('click', handleSaveEmployee);
+        deleteEmployeeBtn.removeEventListener('click', handleDeleteEmployee);
+        console.log("Options module destroyed");
+    };
+
     return {
-        init
+        init,
+        destroy
     };
 })();

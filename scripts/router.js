@@ -5,27 +5,33 @@ const Router = (() => {
             page: 'schedule',
             init: () => {
                 if (typeof Schedule !== 'undefined') Schedule.init();
-            }
+            },
+            getModule: () => (typeof Schedule !== 'undefined' ? Schedule : null)
         },
         'leaves': {
             page: 'leaves',
             init: () => {
                 if (typeof Leaves !== 'undefined') Leaves.init();
-            }
+            },
+            getModule: () => (typeof Leaves !== 'undefined' ? Leaves : null)
         },
         'options': {
             page: 'options',
             init: () => {
                 if (typeof Options !== 'undefined') Options.init();
-            }
+            },
+            getModule: () => (typeof Options !== 'undefined' ? Options : null)
         },
-        'login': { 
-            page: 'login', 
+        'login': {
+            page: 'login',
             init: () => {
                 if (typeof Login !== 'undefined') Login.init();
-            } 
+            },
+            getModule: () => (typeof Login !== 'undefined' ? Login : null)
         }
     };
+
+    let activeModule = null;
 
     let currentUser = null; // Zmienna przechowująca aktualny stan zalogowania
 
@@ -69,6 +75,14 @@ const Router = (() => {
             }
             if (appHeader) appHeader.style.display = 'flex';
             const route = routes[targetPage] || routes['schedule'];
+
+            // Sprawdź, czy istnieje aktywny moduł i czy ma metodę destroy
+            if (activeModule && typeof activeModule.destroy === 'function') {
+                activeModule.destroy();
+            }
+    
+            // Ustaw nowy aktywny moduł i załaduj stronę
+            activeModule = route.getModule ? route.getModule() : null;
             UIShell.loadPage(route.page, route.init).finally(UIShell.hideLoading);
 
         } else {
@@ -80,6 +94,11 @@ const Router = (() => {
                 UIShell.hideLoading();
                 return;
             }
+
+            if (activeModule && typeof activeModule.destroy === 'function') {
+                activeModule.destroy();
+            }
+            activeModule = routes.login.getModule ? routes.login.getModule() : null;
             UIShell.loadPage(routes.login.page, routes.login.init).finally(UIShell.hideLoading);
         }
     };

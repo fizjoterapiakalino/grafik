@@ -38,6 +38,16 @@ const EmployeeManager = (() => {
         getLeaveInfoById: (id) => ({
             entitlement: _employees[id]?.leaveEntitlement || 0,
             carriedOver: _employees[id]?.carriedOverLeave || 0
-        })
+        }),
+        // Zwraca pracownika i jego indeks na podstawie UID
+        getEmployeeByUid: (uid) => {
+            if (!uid) return null;
+            for (const id in _employees) {
+                if (_employees[id].uid === uid) {
+                    return { id, ..._employees[id] };
+                }
+            }
+            return null;
+        }
     };
 })();

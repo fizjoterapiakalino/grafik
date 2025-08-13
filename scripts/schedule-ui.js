@@ -95,20 +95,39 @@ const ScheduleUI = (() => {
     const renderTable = () => {
         const tableHeaderRow = document.getElementById('tableHeaderRow');
         const tbody = document.getElementById('mainScheduleTable').querySelector('tbody');
-        const employees = EmployeeManager.getAll();
+        const mainTable = document.getElementById('mainScheduleTable');
         tableHeaderRow.innerHTML = '<th>Godz.</th>';
-        const employeeIndices = Object.keys(employees).sort((a, b) => parseInt(a) - parseInt(b));
+        tbody.innerHTML = '';
+
+        let employeeIndices = [];
+        let isSingleUserView = false;
+
+        const currentUser = firebase.auth().currentUser;
+        if (currentUser) {
+            const employee = EmployeeManager.getEmployeeByUid(currentUser.uid);
+            if (employee) {
+                employeeIndices.push(employee.id);
+                isSingleUserView = true;
+            }
+        }
+
+        if (!isSingleUserView) {
+            const allEmployees = EmployeeManager.getAll();
+            employeeIndices = Object.keys(allEmployees).sort((a, b) => parseInt(a) - parseInt(b));
+        }
+        
+        mainTable.classList.toggle('single-user-view', isSingleUserView);
 
         for (const i of employeeIndices) {
             const th = document.createElement('th');
-            const headerText = employees[i]?.name || `Pracownik ${parseInt(i) + 1}`;
+            const employeeData = EmployeeManager.getById(i);
+            const headerText = employeeData?.name || `Pracownik ${parseInt(i) + 1}`;
             th.textContent = capitalizeFirstLetter(headerText);
             th.setAttribute('data-employee-index', i);
             th.setAttribute('tabindex', '0');
             tableHeaderRow.appendChild(th);
         }
 
-        tbody.innerHTML = '';
         for (let hour = AppConfig.schedule.startHour; hour <= AppConfig.schedule.endHour; hour++) {
             for (let minute = 0; minute < 60; minute += 30) {
                 if (hour === AppConfig.schedule.endHour && minute === 30) continue;

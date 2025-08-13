@@ -249,7 +249,11 @@ const Schedule = (() => {
                     };
                 }
 
-                startDateInput.value = treatmentData.startDate || new Date().toISOString().split('T')[0];
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                startDateInput.value = treatmentData.startDate || `${year}-${month}-${day}`;
                 extensionDaysInput.value = treatmentData.extensionDays || 0;
 
                 const calculateEndDate = (startDate, extensionDays) => {
@@ -365,7 +369,16 @@ const Schedule = (() => {
         }
     };
 
+    const destroy = () => {
+        if (typeof ScheduleEvents.destroy === 'function') {
+            ScheduleEvents.destroy();
+        }
+        // Jeśli ScheduleUI też dodaje globalne listenery, dodaj i tu destroy
+        console.log("Schedule module destroyed");
+    };
+
     return {
-        init
+        init,
+        destroy // Eksportuj metodę
     };
 })();

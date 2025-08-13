@@ -50,6 +50,17 @@ const Shared = (() => {
             });
             navPanel.appendChild(ul);
 
+            // Add logout button
+            const logoutLi = document.createElement('li');
+            logoutLi.id = 'logoutBtnContainer';
+            logoutLi.style.display = 'none'; // Initially hidden
+            const logoutA = document.createElement('a');
+            logoutA.href = '#';
+            logoutA.id = 'logoutBtn';
+            logoutA.innerHTML = '<i class="fas fa-sign-out-alt"></i> <span>Wyloguj</span>';
+            logoutLi.appendChild(logoutA);
+            ul.appendChild(logoutLi);
+
             const footerInfo = document.createElement('div');
             footerInfo.className = 'footer-info';
             footerInfo.innerHTML = '<p>&copy; 2025 Fizjoterapia Kalinowa. Wszelkie prawa zastrzeżone.</p>';
