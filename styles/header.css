@@ -92,3 +92,14 @@
 .nav-panel a.active {
     background-color: #4CAF50;
 }
+
+/* --- Widok dla zalogowanego użytkownika --- */
+.app-header.user-view .date-time-text,
+.app-header.user-view .search-container,
+.app-header.user-view .undo-button {
+    display: none;
+}
+
+.app-header.user-view .banner-title {
+    font-size: 1.2em; /* Zmniejszenie czcionki dla lepszego dopasowania */
+}

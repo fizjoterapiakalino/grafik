@@ -22,11 +22,15 @@ const EmployeeManager = (() => {
         }
     };
 
+    let _isLoaded = false; // Flaga do śledzenia stanu załadowania
+
     // Publiczne API modułu
     return {
-        // Inicjalizuje moduł, pobierając dane
+        // Inicjalizuje moduł, pobierając dane (tylko raz)
         load: async function() {
+            if (_isLoaded) return; // Nie ładuj ponownie, jeśli dane już są
             await _fetchFromDB();
+            _isLoaded = true;
         },
         // Zwraca wszystkich pracowników
         getAll: () => _employees,

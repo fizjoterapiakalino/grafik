@@ -35,11 +35,11 @@ const UIShell = (() => {
         Shared.initialize();
     };
 
-    const loadPage = async (pageName, callback) => {
+    const loadPage = async (pageName) => { // Usunięto callback
         const pageContent = document.getElementById('page-content');
         if (!pageContent) {
             console.error('Fatal error: #page-content element not found.');
-            return;
+            return Promise.reject('Page content container not found');
         }
 
         try {
@@ -48,19 +48,46 @@ const UIShell = (() => {
                 throw new Error(`Could not load page: ${pageName}`);
             }
             pageContent.innerHTML = await response.text();
-            if (callback) {
-                callback();
-            }
         } catch (error) {
             console.error(`Failed to load page content for ${pageName}:`, error);
             pageContent.innerHTML = `<div class="error-page"><h1>Wystąpił błąd</h1><p>Nie można załadować strony. Spróbuj ponownie później.</p></div>`;
+            return Promise.reject(error);
         }
     };
 
     const updateUserState = (user) => {
+        const appHeader = document.getElementById('appHeader');
+        const bannerTitle = document.querySelector('.banner-title');
         const logoutBtnContainer = document.getElementById('logoutBtnContainer');
-        if (logoutBtnContainer) {
-            logoutBtnContainer.style.display = user ? 'block' : 'none';
+
+        if (user) {
+            // Użytkownik zalogowany
+            const employee = EmployeeManager.getEmployeeByUid(user.uid);
+            if (employee) {
+                // Użytkownik jest powiązany z pracownikiem -> widok uproszczony
+                appHeader.classList.add('user-view');
+                if (bannerTitle) {
+                    bannerTitle.textContent = `Grafik Kalinowa - ${employee.name.split(' ')[0]}`;
+                }
+            } else {
+                // Użytkownik nie jest pracownikiem (np. admin) -> widok pełny
+                appHeader.classList.remove('user-view');
+                if (bannerTitle) {
+                    bannerTitle.textContent = 'Grafik Kalinowa';
+                }
+            }
+            if (logoutBtnContainer) {
+                logoutBtnContainer.style.display = 'block';
+            }
+        } else {
+            // Użytkownik wylogowany
+            appHeader.classList.remove('user-view');
+            if (bannerTitle) {
+                bannerTitle.textContent = 'Grafik Kalinowa';
+            }
+            if (logoutBtnContainer) {
+                logoutBtnContainer.style.display = 'none';
+            }
         }
     };
 

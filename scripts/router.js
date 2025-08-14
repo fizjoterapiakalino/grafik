@@ -36,70 +36,76 @@ const Router = (() => {
     let currentUser = null; // Zmienna przechowująca aktualny stan zalogowania
 
     const init = () => {
-        UIShell.render(); // Renderuj szkielet UI na samym początku
-        window.addEventListener('hashchange', navigate); // Nasłuchuj na zmiany w URL
-
-        // Ustaw listener stanu autentykacji TYLKO RAZ
+        UIShell.render();
+        window.addEventListener('hashchange', navigate);
+        
+        // Ustaw listener, który wywoła nawigację po każdej zmianie stanu autentykacji
         firebase.auth().onAuthStateChanged(user => {
-            const wasLoggedIn = !!currentUser;
             currentUser = user;
-            UIShell.updateUserState(user);
-            
-            // Uruchom nawigację tylko jeśli stan logowania się zmienił lub przy pierwszym ładowaniu
-            if (user && !wasLoggedIn) {
-                // Użytkownik właśnie się zalogował, przenieś go do grafiku
-                window.location.hash = '#schedule';
-            } else if (!user && wasLoggedIn) {
-                // Użytkownik właśnie się wylogował
-                window.location.hash = '#login';
-            } else {
-                // Stan się nie zmienił (np. odświeżenie strony), nawiguj normalnie
-                navigate();
-            }
+            navigate();
         });
     };
 
-    const navigate = () => {
-        const pageName = window.location.hash.substring(1);
-        const appHeader = document.getElementById('appHeader');
-        
+    const navigate = async () => {
         UIShell.showLoading();
 
+        // 1. Zniszcz stary moduł, jeśli istnieje
+        if (activeModule && typeof activeModule.destroy === 'function') {
+            activeModule.destroy();
+            activeModule = null;
+        }
+
+        // 2. Ustal, dokąd nawigować
+        const pageName = window.location.hash.substring(1);
+        let targetPage;
+
         if (currentUser) {
-            // Użytkownik ZALOGOWANY
-            const targetPage = pageName || 'schedule'; // Domyślna strona po zalogowaniu
-            if (targetPage === 'login') {
-                window.location.hash = '#schedule'; // Przekieruj, jeśli zalogowany wejdzie na /login
-                UIShell.hideLoading();
-                return;
-            }
-            if (appHeader) appHeader.style.display = 'flex';
-            const route = routes[targetPage] || routes['schedule'];
-
-            // Sprawdź, czy istnieje aktywny moduł i czy ma metodę destroy
-            if (activeModule && typeof activeModule.destroy === 'function') {
-                activeModule.destroy();
-            }
-    
-            // Ustaw nowy aktywny moduł i załaduj stronę
-            activeModule = route.getModule ? route.getModule() : null;
-            UIShell.loadPage(route.page, route.init).finally(UIShell.hideLoading);
-
+            // Użytkownik ZALOGOWANY: domyślnie idzie do grafiku, chyba że hash mówi inaczej
+            targetPage = pageName === 'login' || !pageName ? 'schedule' : pageName;
         } else {
-            // Użytkownik NIEZALOGOWANY
-            if (appHeader) appHeader.style.display = 'none';
-            // Każda próba wejścia na inną stronę niż /login przekierowuje na /login
-            if (pageName !== 'login') {
-                window.location.hash = '#login';
-                UIShell.hideLoading();
-                return;
+            // Użytkownik NIEZALOGOWANY: zawsze idzie do logowania
+            targetPage = 'login';
+        }
+        
+        // Ustaw hash, jeśli jest inny niż cel - to ujednolica URL
+        if (pageName !== targetPage) {
+            // Użyj replaceState, aby uniknąć tworzenia nowej pozycji w historii i pętli nawigacji
+            history.replaceState(null, '', '#' + targetPage);
+        }
+
+        const route = routes[targetPage];
+        if (!route) {
+            console.error(`No route found for ${targetPage}`);
+            UIShell.hideLoading();
+            return;
+        }
+
+        try {
+            // 3. Załaduj dane, jeśli są potrzebne
+            if (currentUser) {
+                await EmployeeManager.load();
             }
 
-            if (activeModule && typeof activeModule.destroy === 'function') {
-                activeModule.destroy();
+            // 4. Zaktualizuj ogólny UI (np. nagłówek)
+            UIShell.updateUserState(currentUser);
+            const appHeader = document.getElementById('appHeader');
+            if (appHeader) {
+                appHeader.style.display = currentUser ? 'flex' : 'none';
             }
-            activeModule = routes.login.getModule ? routes.login.getModule() : null;
-            UIShell.loadPage(routes.login.page, routes.login.init).finally(UIShell.hideLoading);
+
+            // 5. Załaduj HTML nowej strony
+            await UIShell.loadPage(route.page);
+
+            // 6. Zainicjuj nowy moduł (teraz, gdy DOM jest gotowy)
+            if (route.init) {
+                route.init();
+            }
+            activeModule = route.getModule ? route.getModule() : null;
+
+        } catch (error) {
+            console.error("Navigation error:", error);
+        } finally {
+            UIShell.hideLoading();
         }
     };
 

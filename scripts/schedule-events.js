@@ -272,6 +272,11 @@ const ScheduleEvents = (() => {
         _dependencies = deps;
         mainTable = document.getElementById('mainScheduleTable');
 
+        if (!mainTable) {
+            console.error("ScheduleEvents.initialize: mainScheduleTable not found. Aborting initialization.");
+            return;
+        }
+
         mainTable.addEventListener('click', _handleMainTableClick);
         mainTable.addEventListener('dblclick', _handleMainTableDblClick);
         document.addEventListener('click', _handleDocumentClick);
