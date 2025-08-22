@@ -50,6 +50,8 @@
     border-radius: 12px; /* Zwiększony promień */
     box-shadow: 0 8px 25px rgba(0,0,0,0.15); /* Subtelniejszy cień */
     transition: transform 0.3s ease-out;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 .calendar-header {
     display: flex;

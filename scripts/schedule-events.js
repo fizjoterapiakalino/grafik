@@ -241,10 +241,20 @@ const ScheduleEvents = (() => {
             event.preventDefault();
             const cellToClear = activeCell.closest('td.editable-cell');
             if (cellToClear) {
+                const time = cellToClear.dataset.time;
+                const employeeIndex = cellToClear.dataset.employeeIndex;
                 _dependencies.updateCellState(cellToClear, state => {
                     Object.keys(state).forEach(key => delete state[key]);
                     window.showToast('Wyczyszczono komórkę');
                 });
+                const newCell = document.querySelector(`td[data-time="${time}"][data-employee-index="${employeeIndex}"]`);
+                if (newCell) {
+                    const focusTarget = newCell.querySelector('div[tabindex="0"]') || newCell;
+                    setActiveCell(focusTarget);
+                    focusTarget.focus();
+                } else {
+                    setActiveCell(null);
+                }
             }
             return;
         }

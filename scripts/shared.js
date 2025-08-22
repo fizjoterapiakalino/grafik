@@ -21,6 +21,7 @@ const Shared = (() => {
             const navLinks = [
                 { href: '#schedule', text: 'Grafik', icon: 'fas fa-calendar-alt' },
                 { href: '#leaves', text: 'Urlopy', icon: 'fas fa-plane-departure' },
+                { href: '#changes', text: 'Harmonogram zmian', icon: 'fas fa-exchange-alt' },
                 { href: '#options', text: 'Opcje', icon: 'fas fa-cogs' }
             ];
             
@@ -165,3 +166,29 @@ const Shared = (() => {
         initialize
     };
 })();
+
+window.setSaveStatus = (status) => {
+    const statusElement = document.getElementById('saveStatus');
+    if (!statusElement) return;
+
+    statusElement.classList.remove('saving', 'saved', 'error');
+    statusElement.style.display = 'block';
+
+    switch (status) {
+        case 'saving':
+            statusElement.classList.add('saving');
+            statusElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Zapisywanie...';
+            break;
+        case 'saved':
+            statusElement.classList.add('saved');
+            statusElement.innerHTML = '<i class="fas fa-check-circle"></i> Zapisano';
+            setTimeout(() => {
+                statusElement.style.display = 'none';
+            }, 2000);
+            break;
+        case 'error':
+            statusElement.classList.add('error');
+            statusElement.innerHTML = '<i class="fas fa-exclamation-circle"></i> Błąd zapisu';
+            break;
+    }
+};

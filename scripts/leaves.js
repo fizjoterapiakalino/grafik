@@ -4,6 +4,7 @@ const Leaves = (() => {
         monthlyViewBtn, summaryViewBtn, careViewBtn, monthlyViewContainer, careViewContainer;
 
     let currentYear = new Date().getUTCFullYear();
+    let activeCell = null;
 
     // --- Nazwane funkcje obsługi zdarzeń ---
     const _handleAppSearch = (e) => {
@@ -17,6 +18,80 @@ const Leaves = (() => {
     const _handleTableDblClick = (event) => {
         const targetCell = event.target.closest('.day-cell');
         openCalendarForCell(targetCell);
+    };
+
+    const _handleTableClick = (event) => {
+        const target = event.target.closest('.day-cell');
+        if (target) {
+            setActiveCell(target);
+        } else {
+            setActiveCell(null);
+        }
+    };
+
+    const setActiveCell = (cell) => {
+        if (activeCell) {
+            activeCell.classList.remove('active-cell');
+        }
+        activeCell = cell;
+        if (activeCell) {
+            activeCell.classList.add('active-cell');
+            activeCell.focus();
+        }
+    };
+
+    const _handleArrowNavigation = (key) => {
+        if (!activeCell) return;
+
+        let nextElement = null;
+        const currentRow = activeCell.closest('tr');
+        const currentIndexInRow = Array.from(currentRow.cells).indexOf(activeCell);
+
+        switch (key) {
+            case 'ArrowRight':
+                nextElement = currentRow.cells[currentIndexInRow + 1];
+                break;
+            case 'ArrowLeft':
+                if (currentIndexInRow > 1) { // Blokada przed przejściem na komórkę z nazwą pracownika
+                    nextElement = currentRow.cells[currentIndexInRow - 1];
+                }
+                break;
+            case 'ArrowDown':
+                const nextRow = currentRow.nextElementSibling;
+                if (nextRow) {
+                    nextElement = nextRow.cells[currentIndexInRow];
+                }
+                break;
+            case 'ArrowUp':
+                const prevRow = currentRow.previousElementSibling;
+                if (prevRow) {
+                    nextElement = prevRow.cells[currentIndexInRow];
+                }
+                break;
+        }
+
+        if (nextElement && nextElement.classList.contains('day-cell')) {
+            setActiveCell(nextElement);
+        }
+    };
+
+    const _handleKeyDown = (event) => {
+        if (!activeCell) return;
+
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault();
+            _handleArrowNavigation(event.key);
+        }
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            openCalendarForCell(activeCell);
+        }
+
+        if (event.key === 'Delete' || event.key === 'Backspace') {
+            event.preventDefault();
+            clearCellLeaves(activeCell);
+        }
     };
 
     // --- FUNKCJE POMOCNICZE UTC ---
@@ -86,11 +161,14 @@ const Leaves = (() => {
         summaryViewBtn.removeEventListener('click', showSummaryView);
         careViewBtn.removeEventListener('click', showCareView);
         leavesTableBody.removeEventListener('dblclick', _handleTableDblClick);
+        leavesTableBody.removeEventListener('click', _handleTableClick);
+        document.removeEventListener('keydown', _handleKeyDown);
         document.removeEventListener('app:search', _handleAppSearch);
 
         if (window.destroyContextMenu) {
             window.destroyContextMenu('contextMenu');
         }
+        activeCell = null;
         console.log("Leaves module destroyed");
     };
 
@@ -117,6 +195,8 @@ const Leaves = (() => {
         summaryViewBtn.addEventListener('click', showSummaryView);
         careViewBtn.addEventListener('click', showCareView);
         leavesTableBody.addEventListener('dblclick', _handleTableDblClick);
+        leavesTableBody.addEventListener('click', _handleTableClick);
+        document.addEventListener('keydown', _handleKeyDown);
         document.addEventListener('app:search', _handleAppSearch);
     };
 

@@ -5,30 +5,52 @@ const Schedule = (() => {
     let undoManager;
     let loadingOverlay;
     let undoButton;
+    let unsubscribeSchedule;
+    let isSaving = false;
+    let saveQueue = null;
 
-    const loadSchedule = async () => {
-        try {
-            const docRef = db.collection(AppConfig.firestore.collections.schedules).doc(AppConfig.firestore.docs.mainSchedule);
-            const doc = await docRef.get();
-            if (doc.exists) {
-                const savedData = doc.data();
-                appState.scheduleCells = savedData.scheduleCells || {};
-            } else {
-                console.log("No schedule found, creating a new one.");
+    const listenForScheduleChanges = () => {
+        const docRef = db.collection(AppConfig.firestore.collections.schedules).doc(AppConfig.firestore.docs.mainSchedule);
+        unsubscribeSchedule = docRef.onSnapshot(
+            (doc) => {
+                if (doc.exists) {
+                    const savedData = doc.data();
+                    appState.scheduleCells = savedData.scheduleCells || {};
+                    ScheduleUI.render(); 
+                } else {
+                    console.log("No schedule found, creating a new one.");
+                }
+            },
+            (error) => {
+                console.error('Error listening to schedule changes:', error);
+                window.showToast('Błąd synchronizacji grafiku. Odśwież stronę.', 5000);
             }
-        } catch (error) {
-            console.error('Error loading schedule from Firestore:', error);
-            window.showToast('Błąd podczas ładowania grafiku. Spróbuj ponownie.', 5000);
-        }
+        );
     };
 
     const saveSchedule = async () => {
+        if (isSaving) {
+            saveQueue = { ...appState };
+            return;
+        }
+
+        isSaving = true;
+        window.setSaveStatus('saving');
+
         try {
             await db.collection(AppConfig.firestore.collections.schedules).doc(AppConfig.firestore.docs.mainSchedule).set(appState, { merge: true });
-            window.showToast('Grafik zapisany pomyślnie.', 2000);
+            window.setSaveStatus('saved');
+            isSaving = false;
+
+            if (saveQueue) {
+                appState = saveQueue;
+                saveQueue = null;
+                await saveSchedule();
+            }
         } catch (error) {
             console.error('Error saving schedule to Firestore:', error);
-            window.showToast('Wystąpił błąd podczas zapisu grafiku. Spróbuj ponownie.', 5000);
+            window.setSaveStatus('error');
+            isSaving = false;
         }
     };
 
@@ -87,9 +109,13 @@ const Schedule = (() => {
                     if (!appState.scheduleCells[time]) appState.scheduleCells[time] = {};
                     if (!appState.scheduleCells[time][employeeIndex]) appState.scheduleCells[time][employeeIndex] = {};
                     let cellState = appState.scheduleCells[time][employeeIndex];
+
+                    // Sprawdź, czy pacjent istnieje GDZIEKOLWIEK w grafiku
+                    const patientExists = this.findDuplicateEntry(newText, null, null);
+
                     if (newText.includes('/')) {
                         const parts = newText.split('/', 2);
-                        cellState = { isSplit: true, content1: parts[0], content2: parts[1] };
+                        cellState = { ...cellState, isSplit: true, content1: parts[0], content2: parts[1] };
                     } else if (cellState.isSplit) {
                         const isFirstDiv = element === parentCell.querySelector('div:first-child');
                         if (isFirstDiv) {
@@ -97,14 +123,22 @@ const Schedule = (() => {
                         } else {
                             cellState.content2 = newText;
                         }
-                        // Jeśli obie części są puste, usuń isSplit i wyczyść cellState
                         if (!cellState.content1 && !cellState.content2) {
                             delete cellState.isSplit;
-                            cellState = {}; // Resetuj cellState do pustego obiektu
                         }
                     } else {
-                        cellState = { content: newText };
+                        cellState.content = newText;
                     }
+
+                    // Jeśli pacjent nie istnieje i komórka nie ma jeszcze daty, ustaw ją
+                    if (!patientExists && !cellState.treatmentStartDate) {
+                        const today = new Date();
+                        const year = today.getFullYear();
+                        const month = String(today.getMonth() + 1).padStart(2, '0');
+                        const day = String(today.getDate()).padStart(2, '0');
+                        cellState.treatmentStartDate = `${year}-${month}-${day}`;
+                    }
+
                     appState.scheduleCells[time][employeeIndex] = cellState;
                     renderAndSave();
                     undoManager.pushState(getCurrentTableState());
@@ -248,12 +282,8 @@ const Schedule = (() => {
                         extensionDays: cellState.treatmentExtensionDays
                     };
                 }
-
-                const today = new Date();
-                const year = today.getFullYear();
-                const month = String(today.getMonth() + 1).padStart(2, '0');
-                const day = String(today.getDate()).padStart(2, '0');
-                startDateInput.value = treatmentData.startDate || `${year}-${month}-${day}`;
+                
+                startDateInput.value = treatmentData.startDate || '';
                 extensionDaysInput.value = treatmentData.extensionDays || 0;
 
                 const calculateEndDate = (startDate, extensionDays) => {
@@ -318,6 +348,11 @@ const Schedule = (() => {
                 };
                 modal.style.display = 'flex';
             },
+            openEmployeeSelectionModal(cell) {
+                console.log("openEmployeeSelectionModal called with cell:", cell);
+                // TODO: Implement employee selection modal for schedule
+                window.showToast("Funkcja wyboru pracownika nie jest jeszcze zaimplementowana.");
+            },
             toggleSpecialStyle(cell, dataAttribute) {
                 updateCellState(cell, state => {
                     state[dataAttribute] = !state[dataAttribute];
@@ -340,7 +375,6 @@ const Schedule = (() => {
         if (loadingOverlay) loadingOverlay.style.display = 'flex';
         try {
             await EmployeeManager.load();
-            await loadSchedule();
             
             ScheduleUI.initialize(appState);
             ScheduleEvents.initialize({
@@ -354,12 +388,14 @@ const Schedule = (() => {
                 enterEditMode: mainController.enterEditMode.bind(mainController),
                 getCurrentTableStateForCell: mainController.getCurrentTableStateForCell.bind(mainController),
                 openPatientInfoModal: mainController.openPatientInfoModal.bind(mainController),
+                openEmployeeSelectionModal: mainController.openEmployeeSelectionModal.bind(mainController),
                 toggleSpecialStyle: mainController.toggleSpecialStyle.bind(mainController),
                 undoLastAction: mainController.undoLastAction.bind(mainController)
             });
 
-            ScheduleUI.render();
             undoManager.initialize(getCurrentTableState());
+
+            listenForScheduleChanges();
 
         } catch (error) {
             console.error("Błąd inicjalizacji strony harmonogramu:", error);
@@ -372,6 +408,9 @@ const Schedule = (() => {
     const destroy = () => {
         if (typeof ScheduleEvents.destroy === 'function') {
             ScheduleEvents.destroy();
+        }
+        if (typeof unsubscribeSchedule === 'function') {
+            unsubscribeSchedule();
         }
         // Jeśli ScheduleUI też dodaje globalne listenery, dodaj i tu destroy
         console.log("Schedule module destroyed");

@@ -15,6 +15,13 @@ const Router = (() => {
             },
             getModule: () => (typeof Leaves !== 'undefined' ? Leaves : null)
         },
+        'changes': {
+            page: 'changes',
+            init: () => {
+                if (typeof Changes !== 'undefined') Changes.init();
+            },
+            getModule: () => (typeof Changes !== 'undefined' ? Changes : null)
+        },
         'options': {
             page: 'options',
             init: () => {

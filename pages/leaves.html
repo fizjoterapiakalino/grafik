@@ -27,39 +27,43 @@
 
 <div id="calendarModal" class="modal-overlay" style="display: none;">
     <div class="modal-content wide">
-        <div class="calendar-header">
-            <button id="prevMonthBtn" class="nav-btn"><i class="fas fa-chevron-left"></i></button>
-            <div class="calendars-container">
-                <div class="calendar-slider-viewport">
-                    <div class="calendar-slider">
+        <div class="calendar-scroll-area">
+            <div class="calendar-header">
+                <button id="prevMonthBtn" class="nav-btn"><i class="fas fa-chevron-left"></i></button>
+                <div class="calendars-container">
+                    <div class="calendar-slider-viewport">
+                        <div class="calendar-slider">
+                        </div>
                     </div>
                 </div>
+                <button id="nextMonthBtn" class="nav-btn"><i class="fas fa-chevron-right"></i></button>
             </div>
-            <button id="nextMonthBtn" class="nav-btn"><i class="fas fa-chevron-right"></i></button>
         </div>
-        <div class="calendar-selection-info">
-            <div class="selection-preview-container">
-                <p><strong>Start:</strong> <span id="startDatePreview">-</span></p>
-                <p><strong>Koniec:</strong> <span id="endDatePreview">-</span></p>
+        <div class="modal-footer">
+            <div class="calendar-selection-info">
+                <div class="selection-preview-container">
+                    <p><strong>Start:</strong> <span id="startDatePreview">-</span></p>
+                    <p><strong>Koniec:</strong> <span id="endDatePreview">-</span></p>
+                </div>
+                <p><strong>Zaplanowano dni:</strong> <span id="workdaysCounter">0</span></p>
             </div>
-            <p><strong>Zaplanowano dni:</strong> <span id="workdaysCounter">0</span></p>
-        </div>
-        <div class="selection-mode-info">
-            <p><kbd>Ctrl</kbd> + klik, aby zaznaczyć pojedyncze dni.</p>
-        </div>
-        <div class="leave-type-selector">
-            <label for="leaveTypeSelect">Typ urlopu:</label>
-            <select id="leaveTypeSelect">
-                <option value="vacation" selected>Wypoczynkowy</option>
-                <option value="child_care_art_188">Opieka nad dzieckiem (art. 188 kp)</option>
-                <option value="sick_child_care">Opieka nad chorym dzieckiem (zasiłek)</option>
-                <option value="family_member_care">Opieka nad innym chorym członkiem rodziny (zasiłek)</option>
-            </select>
-        </div>
-        <div class="modal-actions">
-            <button id="clearSelectionBtn" class="action-btn">Wyczyść</button>
-            <button id="confirmSelectionBtn" class="action-btn confirm-btn">Zatwierdź</button>
-            <button id="cancelSelectionBtn" class="action-btn cancel-btn">Anuluj</button>
+            <div class="selection-mode-info">
+                <p><kbd>Ctrl</kbd> + klik, aby zaznaczyć pojedyncze dni.</p>
+            </div>
+            <div class="leave-type-selector">
+                <label for="leaveTypeSelect">Typ urlopu:</label>
+                <select id="leaveTypeSelect">
+                    <option value="vacation" selected>Wypoczynkowy</option>
+                    <option value="child_care_art_188">Opieka nad dzieckiem (art. 188 kp)</option>
+                    <option value="sick_child_care">Opieka nad chorym dzieckiem (zasiłek)</option>
+                    <option value="family_member_care">Opieka nad innym chorym członkiem rodziny (zasiłek)</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button id="clearSelectionBtn" class="action-btn">Wyczyść</button>
+                <button id="confirmSelectionBtn" class="action-btn confirm-btn">Zatwierdź</button>
+                <button id="cancelSelectionBtn" class="action-btn cancel-btn">Anuluj</button>
+            </div>
         </div>
     </div>
 </div>

@@ -25,6 +25,7 @@ const UIShell = (() => {
                         <button id="clearSearchButton" class="clear-search-btn" style="display: none;"><i class="fas fa-times"></i></button>
                     </div>
                     <button id="undoButton" class="undo-button" title="Cofnij (Ctrl+Z)" disabled><i class="fas fa-undo"></i></button>
+                    <div id="saveStatus" class="save-status"></div>
                     <!-- Hamburger menu will be inserted here by shared.js -->
                 </div>
             </div>

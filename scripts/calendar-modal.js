@@ -6,7 +6,6 @@ const CalendarModal = (() => {
 
     let currentEmployee = null;
     let currentYear = new Date().getUTCFullYear();
-    let leftCalendarDate = new Date(Date.UTC(currentYear, new Date().getUTCMonth(), 1));
     
     let selectionStartDate = null;
     let hoverEndDate = null;
@@ -91,69 +90,16 @@ const CalendarModal = (() => {
 
     const generateInitialCalendars = () => {
         calendarSlider.innerHTML = '';
-        const currentMonthDate = new Date(leftCalendarDate);
-        const nextMonthDate = new Date(leftCalendarDate);
-        nextMonthDate.setUTCMonth(nextMonthDate.getUTCMonth() + 1);
-        calendarSlider.appendChild(createCalendar(currentMonthDate.getUTCFullYear(), currentMonthDate.getUTCMonth()));
-        calendarSlider.appendChild(createCalendar(nextMonthDate.getUTCFullYear(), nextMonthDate.getUTCMonth()));
+        calendarSlider.style.display = 'grid';
+        calendarSlider.style.gridTemplateColumns = 'repeat(3, 1fr)';
+        calendarSlider.style.gap = '20px';
         calendarSlider.style.width = '100%';
-        calendarSlider.style.transform = 'translateX(0)';
+        calendarSlider.style.transform = 'none';
+
+        for (let i = 0; i < 12; i++) {
+            calendarSlider.appendChild(createCalendar(currentYear, i));
+        }
         updateAllDayCells();
-    };
-
-    const handleNextMonth = () => {
-        if (isAnimating) return;
-        isAnimating = true;
-        prevMonthBtn.disabled = true;
-        nextMonthBtn.disabled = true;
-        leftCalendarDate.setUTCMonth(leftCalendarDate.getUTCMonth() + 1);
-        const nextMonthDate = new Date(leftCalendarDate);
-        nextMonthDate.setUTCMonth(nextMonthDate.getUTCMonth() + 1);
-        const newCalendar = createCalendar(nextMonthDate.getUTCFullYear(), nextMonthDate.getUTCMonth());
-        calendarSlider.appendChild(newCalendar);
-        calendarSlider.style.transform = 'translateX(-50%)';
-        const onTransitionEnd = () => {
-            calendarSlider.removeEventListener('transitionend', onTransitionEnd);
-            calendarSlider.classList.add('no-transition');
-            calendarSlider.removeChild(calendarSlider.firstElementChild);
-            calendarSlider.style.transform = 'translateX(0)';
-            updateAllDayCells();
-            void calendarSlider.offsetWidth;
-            calendarSlider.classList.remove('no-transition');
-            isAnimating = false;
-            prevMonthBtn.disabled = false;
-            nextMonthBtn.disabled = false;
-        };
-        calendarSlider.addEventListener('transitionend', onTransitionEnd);
-    };
-
-    const handlePrevMonth = () => {
-        if (isAnimating) return;
-        isAnimating = true;
-        prevMonthBtn.disabled = true;
-        nextMonthBtn.disabled = true;
-        leftCalendarDate.setUTCMonth(leftCalendarDate.getUTCMonth() - 1);
-        const newMonthDate = new Date(leftCalendarDate);
-        const newCalendar = createCalendar(newMonthDate.getUTCFullYear(), newMonthDate.getUTCMonth());
-        calendarSlider.insertBefore(newCalendar, calendarSlider.firstElementChild);
-        calendarSlider.classList.add('no-transition');
-        calendarSlider.style.transform = 'translateX(-50%)';
-        void calendarSlider.offsetWidth;
-        calendarSlider.classList.remove('no-transition');
-        calendarSlider.style.transform = 'translateX(0)';
-        const onTransitionEnd = () => {
-            calendarSlider.removeEventListener('transitionend', onTransitionEnd);
-            calendarSlider.classList.add('no-transition');
-            calendarSlider.removeChild(calendarSlider.lastElementChild);
-            calendarSlider.style.transform = 'translateX(0)';
-            updateAllDayCells();
-            void calendarSlider.offsetWidth;
-            calendarSlider.classList.remove('no-transition');
-            isAnimating = false;
-            prevMonthBtn.disabled = false;
-            nextMonthBtn.disabled = false;
-        };
-        calendarSlider.addEventListener('transitionend', onTransitionEnd);
     };
 
     const updateAllDayCells = () => {
@@ -268,8 +214,6 @@ const CalendarModal = (() => {
     };
 
     const setupEventListeners = () => {
-        prevMonthBtn.addEventListener('click', handlePrevMonth);
-        nextMonthBtn.addEventListener('click', handleNextMonth);
         calendarSlider.addEventListener('click', handleDayClick);
         calendarSlider.addEventListener('mouseover', handleDayMouseOver);
         confirmBtn.addEventListener('click', confirmSelection);
@@ -304,8 +248,11 @@ const CalendarModal = (() => {
 
     const open = (employeeName, existingLeaves, monthIndex) => {
         currentEmployee = employeeName;
-        // Ustawienie widoku kalendarza na podstawie klikniętego miesiąca
-        leftCalendarDate = new Date(Date.UTC(currentYear, monthIndex, 1));
+        currentYear = new Date().getUTCFullYear();
+        
+        if(prevMonthBtn) prevMonthBtn.style.display = 'none';
+        if(nextMonthBtn) nextMonthBtn.style.display = 'none';
+
         resetSelection();
         loadEmployeeLeavesForModal(existingLeaves);
         modal.style.display = 'flex';
