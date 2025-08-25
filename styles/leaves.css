@@ -127,7 +127,7 @@
 
 /* Specjalna, szersza wersja dla modala z kalendarzem, używamy ID dla większej specyficzności */
 #calendarModal .modal-content.wide {
-    max-width: 950px;
+    max-width: 1050px;
     display: flex;
     flex-direction: column;
     height: 90vh; /* Ograniczenie wysokości modalu */
@@ -208,12 +208,13 @@
 }
 
 .day-cell-calendar.selected {
-    background-color: #007bff;
+    /* Kolor tła jest teraz ustawiany dynamicznie przez JS */
     color: white;
 }
 
 .day-cell-calendar.in-range {
-    background-color: #a0cfff;
+    /* Kolor tła jest teraz ustawiany dynamicznie przez JS */
+    opacity: 0.7; /* Lekka przezroczystość dla dni w zakresie */
     color: white;
     border-radius: 0;
 }
@@ -236,7 +237,7 @@
 }
 
 .selection-mode-info {
-    text-align: center;
+    text-align: right;
     margin-top: 15px;
     color: #6c757d;
 }

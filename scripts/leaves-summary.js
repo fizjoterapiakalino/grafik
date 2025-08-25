@@ -43,9 +43,10 @@ const LeavesSummary = (() => {
         // Przetwórz dane i wygeneruj wiersze
         for (const employeeId in employees) {
             const employee = employees[employeeId];
-            if (!employee || !employee.name) continue;
+            const employeeDisplayName = employee.displayName || employee.name;
+            if (!employee || !employeeDisplayName) continue;
 
-            const employeeLeaves = allLeavesData[employee.name] || [];
+            const employeeLeaves = allLeavesData[employeeDisplayName] || [];
             
             const entitlement = employee.leaveEntitlement || 0;
             const carriedOver = employee.carriedOverLeave || 0;
@@ -71,7 +72,7 @@ const LeavesSummary = (() => {
 
             const row = tableBody.insertRow();
             row.innerHTML = `
-                <td>${employee.name}</td>
+                <td>${employeeDisplayName}</td>
                 <td>${entitlement}</td>
                 <td>${carriedOver}</td>
                 <td><strong>${total}</strong></td>

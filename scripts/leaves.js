@@ -250,7 +250,7 @@ const Leaves = (() => {
 
     const generateTableRows = (employees) => {
         leavesTableBody.innerHTML = '';
-        const sortedEmployeeNames = Object.values(employees).map(emp => emp.name).filter(Boolean).sort();
+        const sortedEmployeeNames = Object.values(employees).map(emp => emp.displayName || emp.name).filter(Boolean).sort();
         sortedEmployeeNames.forEach(name => {
             const tr = document.createElement('tr');
             tr.dataset.employee = name;

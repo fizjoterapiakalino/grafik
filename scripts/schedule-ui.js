@@ -121,7 +121,7 @@ const ScheduleUI = (() => {
         for (const i of employeeIndices) {
             const th = document.createElement('th');
             const employeeData = EmployeeManager.getById(i);
-            const headerText = employeeData?.name || `Pracownik ${parseInt(i) + 1}`;
+            const headerText = employeeData?.displayName || employeeData?.name || `Pracownik ${parseInt(i) + 1}`;
             th.textContent = capitalizeFirstLetter(headerText);
             th.setAttribute('data-employee-index', i);
             th.setAttribute('tabindex', '0');

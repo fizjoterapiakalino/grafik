@@ -111,15 +111,30 @@ const CalendarModal = (() => {
     const updateDayCellSelection = (dayCell) => {
         const dateString = dayCell.dataset.date;
         dayCell.className = 'day-cell-calendar';
+        dayCell.style.backgroundColor = '';
+        dayCell.style.color = '';
+
         let startStr = selectionStartDate;
         let endStr = hoverEndDate;
         if (startStr && endStr && startStr > endStr) [startStr, endStr] = [endStr, startStr];
+
         const isInRange = isRangeSelectionActive && startStr && endStr && dateString >= startStr && dateString <= endStr;
-        if (singleSelectedDays.has(dateString) || isInRange) {
+        const isSelected = singleSelectedDays.has(dateString);
+
+        if (isSelected || isInRange) {
+            const leaveType = dateToTypeMap.get(dateString) || leaveTypeSelect.value;
+            const color = AppConfig.leaves.leaveTypeColors[leaveType] || AppConfig.leaves.leaveTypeColors.default;
+
             dayCell.classList.add('selected');
-            const isStartDate = dateString === startStr || (singleSelectedDays.has(dateString) && !singleSelectedDays.has(toDateString(new Date(toUTCDate(dateString).getTime() - 86400000))));
-            const isEndDate = dateString === endStr || (singleSelectedDays.has(dateString) && !singleSelectedDays.has(toDateString(new Date(toUTCDate(dateString).getTime() + 86400000))));
-            if (isInRange && dateString !== startStr && dateString !== endStr) dayCell.classList.add('in-range');
+            dayCell.style.backgroundColor = color;
+            dayCell.style.color = 'white';
+
+            const isStartDate = dateString === startStr || (isSelected && !singleSelectedDays.has(toDateString(new Date(toUTCDate(dateString).getTime() - 86400000))));
+            const isEndDate = dateString === endStr || (isSelected && !singleSelectedDays.has(toDateString(new Date(toUTCDate(dateString).getTime() + 86400000))));
+
+            if (isInRange && dateString !== startStr && dateString !== endStr) {
+                dayCell.classList.add('in-range');
+            }
             if (isStartDate) dayCell.classList.add('start-date');
             if (isEndDate) dayCell.classList.add('end-date');
         }
@@ -129,6 +144,23 @@ const CalendarModal = (() => {
         const target = event.target.closest('.day-cell-calendar');
         if (!target || !target.dataset.date) return;
         const clickedDate = target.dataset.date;
+    
+        // Walidacja dla opieki nad zdrowym dzieckiem (art. 188)
+        if (leaveTypeSelect.value === 'child_care_art_188') {
+            const selectedArt188Days = Array.from(singleSelectedDays).filter(date => {
+                const type = dateToTypeMap.get(date);
+                return type === 'child_care_art_188' || !type; // Uwzględnij nowo wybrane i już istniejące
+            });
+    
+            // Sprawdź, czy próbujemy dodać dzień, który już jest na liście
+            const isAddingNewDay = !singleSelectedDays.has(clickedDate);
+    
+            if (selectedArt188Days.length >= 2 && isAddingNewDay) {
+                window.showToast('Wykorzystano maksymalną liczbę 2 dni opieki nad zdrowym dzieckiem.', 3000, 'error');
+                return; // Zablokuj dodanie kolejnego dnia
+            }
+        }
+    
         if (event.ctrlKey || event.metaKey) {
             isRangeSelectionActive = false;
             selectionStartDate = null;
@@ -147,6 +179,27 @@ const CalendarModal = (() => {
                 if (start > end) [start, end] = [end, start];
                 const startDate = toUTCDate(start);
                 const endDate = toUTCDate(end);
+    
+                // Ponowna walidacja dla zaznaczenia zakresu
+                if (leaveTypeSelect.value === 'child_care_art_188') {
+                    let tempDayCount = 0;
+                    for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
+                        if (!singleSelectedDays.has(toDateString(d))) {
+                            tempDayCount++;
+                        }
+                    }
+                    const totalDaysAfterAdd = Array.from(singleSelectedDays).filter(d => dateToTypeMap.get(d) === 'child_care_art_188' || !dateToTypeMap.has(d)).length + tempDayCount;
+                    if (totalDaysAfterAdd > 2) {
+                        window.showToast('Przekroczono limit 2 dni opieki nad zdrowym dzieckiem w zaznaczonym zakresie.', 4000, 'error');
+                        // Resetuj zaznaczenie zakresu, aby uniknąć nieprawidłowego stanu
+                        isRangeSelectionActive = false;
+                        selectionStartDate = null;
+                        hoverEndDate = null;
+                        updateAllDayCells();
+                        return;
+                    }
+                }
+    
                 for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
                     singleSelectedDays.add(toDateString(d));
                 }

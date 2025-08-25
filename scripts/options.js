@@ -1,7 +1,8 @@
 const Options = (() => {
     // --- SELEKTORY ELEMENTÓW DOM ---
     let loadingOverlay, employeeListContainer, employeeSearchInput, addEmployeeBtn,
-        detailsPlaceholder, detailsEditForm, employeeNameInput, leaveEntitlementInput,
+        detailsPlaceholder, detailsEditForm, employeeFirstNameInput, employeeLastNameInput,
+        employeeDisplayNameInput, leaveEntitlementInput,
         carriedOverLeaveInput, saveEmployeeBtn, deleteEmployeeBtn;
 
     // --- ZMIENNE STANU APLIKACJI ---
@@ -35,7 +36,7 @@ const Options = (() => {
         }
 
         const sortedEmployees = Object.entries(employees)
-            .map(([index, data]) => ({ index: parseInt(index, 10), name: data.name }))
+            .map(([index, data]) => ({ index: parseInt(index, 10), name: data.displayName || data.name }))
             .sort((a, b) => a.index - b.index);
 
         sortedEmployees.forEach(({ index, name }) => {
@@ -62,7 +63,9 @@ const Options = (() => {
 
         detailsPlaceholder.style.display = 'none';
         detailsEditForm.style.display = 'block';
-        employeeNameInput.value = employee.name;
+        employeeFirstNameInput.value = employee.firstName || '';
+        employeeLastNameInput.value = employee.lastName || '';
+        employeeDisplayNameInput.value = employee.displayName || employee.name;
         leaveEntitlementInput.value = employee.leaveEntitlement || 26;
         carriedOverLeaveInput.value = employee.carriedOverLeave || 0;
     };
@@ -77,9 +80,10 @@ const Options = (() => {
 
     // --- LOGIKA INTERAKCJI Z FIREBASE ---
     const handleAddEmployee = async () => {
-        const name = prompt("Wpisz imię i nazwisko nowego pracownika:");
-        if (!name || name.trim() === '') {
-            window.showToast("Anulowano. Nazwa nie może być pusta.", 3000);
+        // Zastąpione przez formularz, ale zostawiam logikę dodawania na razie
+        const displayName = prompt("Wpisz nazwę wyświetlaną nowego pracownika:");
+        if (!displayName || displayName.trim() === '') {
+            window.showToast("Anulowano. Nazwa wyświetlana nie może być pusta.", 3000);
             return;
         }
         const entitlement = parseInt(prompt("Podaj wymiar urlopu (np. 26):", "26"), 10);
@@ -95,7 +99,9 @@ const Options = (() => {
             const newIndex = highestIndex + 1;
 
             const newEmployee = {
-                name: name.trim(),
+                displayName: displayName.trim(),
+                firstName: '',
+                lastName: '',
                 leaveEntitlement: entitlement,
                 carriedOverLeave: 0
             };
@@ -122,12 +128,14 @@ const Options = (() => {
         }
 
         const oldEmployee = EmployeeManager.getById(selectedEmployeeIndex);
-        const newName = employeeNameInput.value.trim();
+        const newFirstName = employeeFirstNameInput.value.trim();
+        const newLastName = employeeLastNameInput.value.trim();
+        const newDisplayName = employeeDisplayNameInput.value.trim();
         const newEntitlement = parseInt(leaveEntitlementInput.value, 10);
         const newCarriedOver = parseInt(carriedOverLeaveInput.value, 10);
 
-        if (newName === '') {
-            window.showToast("Nazwa pracownika nie może być pusta.", 3000);
+        if (newDisplayName === '') {
+            window.showToast("Nazwa wyświetlana nie może być pusta.", 3000);
             return;
         }
         if (isNaN(newEntitlement) || isNaN(newCarriedOver)) {
@@ -136,7 +144,9 @@ const Options = (() => {
         }
 
         const updatedEmployee = {
-            name: newName,
+            firstName: newFirstName,
+            lastName: newLastName,
+            displayName: newDisplayName,
             leaveEntitlement: newEntitlement,
             carriedOverLeave: newCarriedOver
         };
@@ -151,14 +161,16 @@ const Options = (() => {
                 });
 
                 // Jeśli nazwa się zmieniła, zaktualizuj klucze w urlopach
-                if (oldEmployee.name !== newName) {
+                // Logika migracji nazwy w urlopach
+                const oldNameKey = oldEmployee.displayName || oldEmployee.name;
+                if (oldNameKey !== newDisplayName) {
                     const leavesRef = db.collection("leaves").doc("mainLeaves");
                     const leavesDoc = await transaction.get(leavesRef);
-                    if (leavesDoc.exists && leavesDoc.data()[oldEmployee.name]) {
+                    if (leavesDoc.exists && leavesDoc.data()[oldNameKey]) {
                         const leavesData = leavesDoc.data();
-                        const employeeLeaveData = leavesData[oldEmployee.name];
-                        delete leavesData[oldEmployee.name];
-                        leavesData[newName] = employeeLeaveData;
+                        const employeeLeaveData = leavesData[oldNameKey];
+                        delete leavesData[oldNameKey];
+                        leavesData[newDisplayName] = employeeLeaveData;
                         transaction.set(leavesRef, leavesData);
                     }
                 }
@@ -252,7 +264,9 @@ const Options = (() => {
         addEmployeeBtn = document.getElementById('addEmployeeBtn');
         detailsPlaceholder = document.getElementById('detailsPlaceholder');
         detailsEditForm = document.getElementById('detailsEditForm');
-        employeeNameInput = document.getElementById('employeeNameInput');
+        employeeFirstNameInput = document.getElementById('employeeFirstNameInput');
+        employeeLastNameInput = document.getElementById('employeeLastNameInput');
+        employeeDisplayNameInput = document.getElementById('employeeDisplayNameInput');
         leaveEntitlementInput = document.getElementById('leaveEntitlementInput');
         carriedOverLeaveInput = document.getElementById('carriedOverLeaveInput');
         saveEmployeeBtn = document.getElementById('saveEmployeeBtn');

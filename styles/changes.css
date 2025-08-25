@@ -47,6 +47,17 @@
     gap: 10px;
 }
 
+#employeeSelectionModal .employee-list-item.disabled-employee {
+    background-color: #e9ecef;
+    color: #6c757d;
+    cursor: not-allowed;
+    border-color: #ced4da;
+}
+
+#employeeSelectionModal .employee-list-item.disabled-employee:hover {
+    background-color: #e9ecef;
+}
+
 #employeeSelectionModal .employee-list-item {
     padding: 10px;
     border: 1px solid #ddd;
@@ -65,3 +76,4 @@
     border-color: #007bff;
     font-weight: bold;
 }
+

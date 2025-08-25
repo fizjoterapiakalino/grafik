@@ -103,6 +103,12 @@ const Router = (() => {
             // 5. Załaduj HTML nowej strony
             await UIShell.loadPage(route.page);
 
+            // Zarządzanie widocznością przycisku drukowania
+            const printButton = document.getElementById('printChangesTable');
+            if (printButton) {
+                printButton.style.display = targetPage === 'changes' ? 'block' : 'none';
+            }
+
             // 6. Zainicjuj nowy moduł (teraz, gdy DOM jest gotowy)
             if (route.init) {
                 route.init();

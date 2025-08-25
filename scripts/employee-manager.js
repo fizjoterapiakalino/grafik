@@ -37,7 +37,20 @@ const EmployeeManager = (() => {
         // Zwraca konkretnego pracownika po jego indeksie/kluczu
         getById: (id) => _employees[id] || null,
         // Zwraca tylko imię i nazwisko pracownika
-        getNameById: (id) => _employees[id]?.name || `Pracownik ${id}`,
+        getNameById: (id) => _employees[id]?.displayName || _employees[id]?.name || `Pracownik ${id}`,
+        getFullNameById: (id) => {
+            const employee = _employees[id];
+            if (!employee) return `Nieznany Pracownik ${id}`;
+            const firstName = employee.firstName || '';
+            const lastName = employee.lastName || '';
+            const fullName = `${firstName} ${lastName}`.trim();
+            return fullName === '' ? (employee.displayName || `Pracownik ${id}`) : fullName;
+        },
+        getLastNameById: (id) => {
+            const employee = _employees[id];
+            if (!employee) return `Nieznany ${id}`;
+            return employee.lastName || '';
+        },
         // Zwraca informacje urlopowe
         getLeaveInfoById: (id) => ({
             entitlement: _employees[id]?.leaveEntitlement || 0,
