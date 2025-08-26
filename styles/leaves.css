@@ -127,7 +127,7 @@
 
 /* Specjalna, szersza wersja dla modala z kalendarzem, używamy ID dla większej specyficzności */
 #calendarModal .modal-content.wide {
-    max-width: 1050px;
+    max-width: 1200px;
     display: flex;
     flex-direction: column;
     height: 90vh; /* Ograniczenie wysokości modalu */
@@ -313,25 +313,46 @@
     transition: none;
 }
 
-/* Legenda typów urlopów */
-.leaves-legend {
-    margin-top: 20px;
-    padding: 15px;
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 5px;
+/* Kontener filtra i legendy */
+.leaves-filter-container {
     display: flex;
     flex-wrap: wrap;
     gap: 20px;
     align-items: center;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    margin-bottom: 15px;
 }
 
-.leaves-legend h4 {
-    margin: 0;
+.leaves-filter-container strong {
     margin-right: 10px;
     font-weight: 600;
     font-size: 1em;
     color: #495057;
+}
+
+#clearFiltersBtn {
+    padding: 8px 15px;
+    background-color: #dc3545; /* Czerwony kolor dla przycisku "Wyczyść" */
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background-color 0.2s ease;
+}
+
+#clearFiltersBtn:hover {
+    background-color: #c82333;
+}
+
+.leaves-legend { /* Teraz legenda jest częścią filtra */
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: center;
 }
 
 .legend-item {
@@ -339,6 +360,7 @@
     align-items: center;
     gap: 8px;
     font-size: 0.9em;
+    cursor: pointer;
 }
 
 .legend-color-box {
@@ -347,4 +369,8 @@
     border: 1px solid rgba(0,0,0,0.2);
     border-radius: 4px;
     display: inline-block;
+}
+
+.filter-checkbox {
+    margin-right: 5px;
 }

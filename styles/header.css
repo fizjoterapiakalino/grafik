@@ -128,11 +128,28 @@
     right: 0;
 }
 
+.nav-panel .user-info {
+    padding: 15px 25px 10px;
+    color: #aaa;
+    font-size: 0.9em;
+    border-bottom: 1px solid #444;
+    margin-bottom: 10px;
+}
+
 .nav-panel ul {
     list-style: none;
-    padding: 20px 0;
+    padding: 0;
     margin: 0;
     flex-grow: 1;
+    overflow-y: auto;
+}
+
+.nav-panel li {
+    border-bottom: 1px solid #444; /* Linia pod każdym elementem listy */
+}
+
+.nav-panel li:last-of-type {
+    border-bottom: none; /* Brak linii pod ostatnim elementem */
 }
 
 .nav-panel li a {
@@ -141,11 +158,19 @@
     color: #f0f0f0;
     text-decoration: none;
     font-size: 1.1em;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, border-left-color 0.2s; /* Dodaj transition dla border-left-color */
+    border-left: 5px solid transparent; /* Niewidoczne obramowanie po lewej */
 }
 
 .nav-panel li a:hover, .nav-panel li a.active {
     background-color: #444;
+    border-left-color: #007bff; /* Niebieskie obramowanie po najechaniu/aktywnym */
+}
+
+/* Specjalny styl dla przycisku wylogowania */
+.nav-panel li#logoutBtnContainer a:hover {
+    background-color: #dc3545; /* Czerwone tło po najechaniu */
+    border-left-color: #dc3545; /* Czerwone obramowanie po najechaniu */
 }
 
 .nav-panel li a i {
@@ -160,6 +185,8 @@
     font-size: 0.8em;
     color: #888;
     border-top: 1px solid #444;
+    margin-top: auto; /* Przypnij stopkę do dołu */
+    background-color: #222; /* Ciemniejsze tło dla stopki */
 }
 
 /* Responsive Design */

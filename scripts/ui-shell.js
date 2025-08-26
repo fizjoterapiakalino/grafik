@@ -69,7 +69,7 @@ const UIShell = (() => {
                 // Użytkownik jest powiązany z pracownikiem -> widok uproszczony
                 appHeader.classList.add('user-view');
                 if (bannerTitle) {
-                    bannerTitle.textContent = `Grafik Kalinowa - ${employee.name.split(' ')[0]}`;
+                    bannerTitle.textContent = `Grafik Kalinowa - ${EmployeeManager.getNameById(employee.id)}`;
                 }
             } else {
                 // Użytkownik nie jest pracownikiem (np. admin) -> widok pełny
@@ -81,6 +81,7 @@ const UIShell = (() => {
             if (logoutBtnContainer) {
                 logoutBtnContainer.style.display = 'block';
             }
+            Shared.updateUserInfo(employee ? employee.name : 'Admin'); // Aktualizuj informację o użytkowniku
         } else {
             // Użytkownik wylogowany
             appHeader.classList.remove('user-view');
@@ -90,6 +91,7 @@ const UIShell = (() => {
             if (logoutBtnContainer) {
                 logoutBtnContainer.style.display = 'none';
             }
+            Shared.updateUserInfo('Gość'); // Resetuj informację o użytkowniku
         }
     };
 

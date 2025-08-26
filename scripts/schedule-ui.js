@@ -147,6 +147,34 @@ const ScheduleUI = (() => {
             }
         }
         refreshAllRowHeights();
+
+        // Usuń ewentualny stary interwał, aby uniknąć duplikatów
+        if (window.currentTimeInterval) {
+            clearInterval(window.currentTimeInterval);
+        }
+
+        // Ustaw nowy interwał, który będzie aktualizował podświetlenie
+        window.currentTimeInterval = setInterval(() => {
+            const now = new Date();
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+            const roundedMinutes = minutes < 30 ? '00' : '30';
+            const timeString = `${hours}:${roundedMinutes}`;
+
+            // Usuń podświetlenie ze wszystkich wierszy
+            document.querySelectorAll('#mainScheduleTable tbody tr.current-time-row').forEach(row => {
+                row.classList.remove('current-time-row');
+            });
+
+            // Znajdź i podświetl nowy, właściwy wiersz
+            const allTimeCells = document.querySelectorAll('#mainScheduleTable tbody td:first-child');
+            for (const cell of allTimeCells) {
+                if (cell.textContent.trim() === timeString) {
+                    cell.parentElement.classList.add('current-time-row');
+                    break;
+                }
+            }
+        }, 60000); // Uruchamiaj co minutę
     };
 
     return {

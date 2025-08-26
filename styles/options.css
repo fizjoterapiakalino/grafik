@@ -155,3 +155,36 @@
         padding-left: 0;
     }
 }
+
+/* Style dla modala potwierdzenia usunięcia */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1050;
+}
+
+.modal-content {
+    background-color: #fff;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    width: 90%;
+    max-width: 500px;
+}
+
+.modal-title {
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.modal-actions {
+    margin-top: 20px;
+    text-align: right;
+}

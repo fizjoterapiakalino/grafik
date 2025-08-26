@@ -190,69 +190,73 @@ const Options = (() => {
     };
     
     const handleDeleteEmployee = async () => {
-        if (selectedEmployeeIndex === null) {
-            window.showToast("Nie wybrano pracownika.", 3000);
-            return;
-        }
-        
+        if (selectedEmployeeIndex === null) return;
+
         const employee = EmployeeManager.getById(selectedEmployeeIndex);
-        const confirmation = confirm(`Czy na pewno chcesz usunąć pracownika "${employee.name}"?\n\nUWAGA: Ta operacja usunie również wszystkie powiązane z nim dane w grafiku i urlopach. Zmiany są nieodwracalne!`);
+        const modal = document.getElementById('deleteConfirmationModal');
+        const employeeNameSpan = document.getElementById('employeeNameToDelete');
+        const confirmationInput = document.getElementById('deleteConfirmationInput');
+        const confirmBtn = document.getElementById('confirmDeleteBtn');
+        const cancelBtn = document.getElementById('cancelDeleteBtn');
 
-        if (!confirmation) return;
+        employeeNameSpan.textContent = employee.displayName || employee.name;
+        modal.style.display = 'flex';
 
-        showLoading(true);
-        try {
-            // Używamy firebase.firestore.FieldValue.delete() do usunięcia pola z obiektu
-            const FieldValue = firebase.firestore.FieldValue;
+        const employeeName = employee.displayName || employee.name;
 
-            await db.runTransaction(async (transaction) => {
-                const scheduleRef = db.collection("schedules").doc("mainSchedule");
-                const leavesRef = db.collection("leaves").doc("mainLeaves");
+        const onConfirm = async () => {
+            closeModal();
+            showLoading(true);
+            try {
+                const FieldValue = firebase.firestore.FieldValue;
+                await db.runTransaction(async (transaction) => {
+                    const scheduleRef = db.collection("schedules").doc("mainSchedule");
+                    const leavesRef = db.collection("leaves").doc("mainLeaves");
+                    const scheduleDoc = await transaction.get(scheduleRef);
+                    const leavesDoc = await transaction.get(leavesRef);
 
-                // --- FAZA ODCZYTU ---
-                // Najpierw odczytujemy wszystkie potrzebne dokumenty.
-                const scheduleDoc = await transaction.get(scheduleRef);
-                const leavesDoc = await transaction.get(leavesRef);
-
-                // --- FAZA ZAPISU ---
-                // Teraz, gdy mamy dane, wykonujemy wszystkie operacje zapisu.
-
-                // 1. Usuń pracownika z obiektu 'employees'
-                transaction.update(scheduleRef, {
-                    [`employees.${selectedEmployeeIndex}`]: FieldValue.delete()
+                    transaction.update(scheduleRef, { [`employees.${selectedEmployeeIndex}`]: FieldValue.delete() });
+                    const scheduleData = scheduleDoc.data();
+                    if (scheduleData && scheduleData.scheduleCells) {
+                        Object.keys(scheduleData.scheduleCells).forEach(time => {
+                            if (scheduleData.scheduleCells[time]?.[selectedEmployeeIndex]) {
+                                transaction.update(scheduleRef, { [`scheduleCells.${time}.${selectedEmployeeIndex}`]: FieldValue.delete() });
+                            }
+                        });
+                    }
+                    if (leavesDoc.exists && leavesDoc.data()[employeeName]) {
+                        transaction.update(leavesRef, { [employeeName]: FieldValue.delete() });
+                    }
                 });
 
-                // 2. Wyczyść dane tego pracownika z grafiku
-                const scheduleData = scheduleDoc.data();
-                if (scheduleData && scheduleData.scheduleCells) {
-                    Object.keys(scheduleData.scheduleCells).forEach(time => {
-                        if (scheduleData.scheduleCells[time]?.[selectedEmployeeIndex]) {
-                            transaction.update(scheduleRef, {
-                                [`scheduleCells.${time}.${selectedEmployeeIndex}`]: FieldValue.delete()
-                            });
-                        }
-                    });
-                }
+                await EmployeeManager.load(); // Wymuś ponowne załadowanie danych
+                renderEmployeeList();
+                resetDetailsPanel();
+                window.showToast("Pracownik usunięty pomyślnie.", 2000);
+            } catch (error) {
+                console.error("Błąd podczas usuwania pracownika:", error);
+                window.showToast("Wystąpił błąd. Spróbuj ponownie.", 5000);
+            } finally {
+                showLoading(false);
+            }
+        };
 
-                // 3. Usuń dane z urlopów
-                if (leavesDoc.exists && leavesDoc.data()[employee.name]) {
-                    transaction.update(leavesRef, {
-                        [employee.name]: FieldValue.delete()
-                    });
-                }
-            });
+        const onInput = () => {
+            confirmBtn.disabled = confirmationInput.value.trim() !== employeeName;
+        };
 
-            await EmployeeManager.load();
-            renderEmployeeList();
-            resetDetailsPanel();
-            window.showToast("Pracownik usunięty pomyślnie.", 2000);
-
-        } catch (error) {
-            console.error("Błąd podczas usuwania pracownika:", error);
-            window.showToast("Wystąpił błąd podczas usuwania pracownika. Spróbuj ponownie.", 5000);
-        } finally {
-            showLoading(false);
-        }
+        const closeModal = () => {
+            modal.style.display = 'none';
+            confirmationInput.value = '';
+            confirmBtn.disabled = true;
+            confirmBtn.removeEventListener('click', onConfirm);
+            cancelBtn.removeEventListener('click', closeModal);
+            confirmationInput.removeEventListener('input', onInput);
+        };
+        
+        confirmBtn.addEventListener('click', onConfirm);
+        cancelBtn.addEventListener('click', closeModal);
+        confirmationInput.addEventListener('input', onInput);
     };
 
     // --- INICJALIZACJA I NASŁUCHIWANIE ZDARZEŃ ---

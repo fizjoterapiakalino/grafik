@@ -91,7 +91,7 @@ const CalendarModal = (() => {
     const generateInitialCalendars = () => {
         calendarSlider.innerHTML = '';
         calendarSlider.style.display = 'grid';
-        calendarSlider.style.gridTemplateColumns = 'repeat(3, 1fr)';
+        calendarSlider.style.gridTemplateColumns = 'repeat(4, 1fr)';
         calendarSlider.style.gap = '20px';
         calendarSlider.style.width = '100%';
         calendarSlider.style.transform = 'none';

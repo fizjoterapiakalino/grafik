@@ -218,3 +218,8 @@ td.current-time-highlight {
         margin: 30% auto;
     }
 }
+
+#mainScheduleTable tbody tr.current-time-row > td {
+    background-color: #fffde7 !important; /* Jasnożółte tło */
+    font-weight: bold;
+}
