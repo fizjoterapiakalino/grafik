@@ -223,3 +223,29 @@ td.current-time-highlight {
     background-color: #fffde7 !important; /* Jasnożółte tło */
     font-weight: bold;
 }
+
+/* --- Style dla globalnego tooltipa pracownika --- */
+#globalEmployeeTooltip {
+    display: none;
+    position: absolute;
+    background-color: #333;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 9999; /* Ustaw bardzo wysoki z-index, aby był nad wszystkimi elementami */
+    font-size: 0.9em;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    pointer-events: none; /* Zapobiega blokowaniu zdarzeń myszy pod tooltipem */
+}
+
+#globalEmployeeTooltip p {
+    margin: 0;
+    padding: 2px 0;
+}
+
+#globalEmployeeTooltip .employee-number-tooltip {
+    font-size: 1.1em; /* Większa czcionka */
+    font-weight: bold; /* Pogrubiona czcionka */
+    color: #FFD700; /* Kolor dla wyróżnienia */
+}

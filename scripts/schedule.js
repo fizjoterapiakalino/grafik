@@ -99,18 +99,22 @@ const Schedule = (() => {
                 const time = parentCell.dataset.time;
                 const duplicate = this.findDuplicateEntry(newText, time, employeeIndex);
                 const updateSchedule = (isMove = false) => {
-                    if (isMove && duplicate) {
-                        const oldCellState = appState.scheduleCells[duplicate.time][duplicate.employeeIndex];
-                        if (oldCellState.content?.toLowerCase() === newText.toLowerCase()) delete oldCellState.content;
-                        if (oldCellState.content1?.toLowerCase() === newText.toLowerCase()) delete oldCellState.content1;
-                        if (oldCellState.content2?.toLowerCase() === newText.toLowerCase()) delete oldCellState.content2;
-                        if (oldCellState.isSplit && !oldCellState.content1 && !oldCellState.content2) delete oldCellState.isSplit;
-                    }
+                    undoManager.pushState(getCurrentTableState()); // Przenieś pushState na początek, aby objąć całą operację
+
                     if (!appState.scheduleCells[time]) appState.scheduleCells[time] = {};
                     if (!appState.scheduleCells[time][employeeIndex]) appState.scheduleCells[time][employeeIndex] = {};
                     let cellState = appState.scheduleCells[time][employeeIndex];
 
-                    // Sprawdź, czy pacjent istnieje GDZIEKOLWIEK w grafiku
+                    if (isMove && duplicate) {
+                        // Przenieś cały stan z duplikatu do bieżącej komórki
+                        const oldCellState = appState.scheduleCells[duplicate.time][duplicate.employeeIndex];
+                        cellState = { ...oldCellState }; // Kopiuj stan starej komórki do nowej
+                        
+                        // Wyczyść starą komórkę
+                        appState.scheduleCells[duplicate.time][duplicate.employeeIndex] = {};
+                    }
+
+                    // Sprawdź, czy pacjent istnieje GDZIEKOLWIEK w grafiku (po ewentualnym przeniesieniu)
                     const patientExists = this.findDuplicateEntry(newText, null, null);
 
                     if (newText.includes('/')) {

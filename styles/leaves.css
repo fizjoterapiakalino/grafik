@@ -363,14 +363,30 @@
     cursor: pointer;
 }
 
-.legend-color-box {
-    width: 16px;
-    height: 16px;
-    border: 1px solid rgba(0,0,0,0.2);
-    border-radius: 4px;
+.leaves-filter-container .legend-color-box {
     display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    vertical-align: middle;
+    margin-right: 5px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.2s ease-in-out;
 }
 
-.filter-checkbox {
-    margin-right: 5px;
+.leaves-filter-container .filter-checkbox:checked + .legend-color-box {
+    border-color: #333;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.2);
+}
+
+.leaves-filter-container .legend-color-box:hover {
+    opacity: 0.8;
+}
+
+.leaves-filter-container .filter-checkbox {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
 }

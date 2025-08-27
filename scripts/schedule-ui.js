@@ -2,9 +2,45 @@
 
 const ScheduleUI = (() => {
     let _appState = null;
+    let _employeeTooltip = null; // Globalny element tooltipa
+
+    const _createEmployeeTooltip = () => {
+        if (document.getElementById('globalEmployeeTooltip')) {
+            _employeeTooltip = document.getElementById('globalEmployeeTooltip');
+            return;
+        }
+
+        _employeeTooltip = document.createElement('div');
+        _employeeTooltip.id = 'globalEmployeeTooltip';
+        _employeeTooltip.classList.add('employee-tooltip');
+        document.body.appendChild(_employeeTooltip);
+    };
+
+    const _showEmployeeTooltip = (event) => {
+        const th = event.currentTarget;
+        const fullName = th.dataset.fullName;
+        const employeeNumber = th.dataset.employeeNumber;
+
+        let tooltipContent = `<p>${fullName}</p>`;
+        if (employeeNumber) {
+            tooltipContent += `<p class="employee-number-tooltip">Numer: <strong>${employeeNumber}</strong></p>`;
+        }
+        _employeeTooltip.innerHTML = tooltipContent;
+
+        const rect = th.getBoundingClientRect();
+        _employeeTooltip.style.left = `${rect.left + rect.width / 2}px`;
+        _employeeTooltip.style.top = `${rect.top - _employeeTooltip.offsetHeight - 10}px`; // 10px odstępu od góry nagłówka
+        _employeeTooltip.style.transform = 'translateX(-50%)';
+        _employeeTooltip.style.display = 'block';
+    };
+
+    const _hideEmployeeTooltip = () => {
+        _employeeTooltip.style.display = 'none';
+    };
 
     const initialize = (appState) => {
         _appState = appState;
+        _createEmployeeTooltip(); // Utwórz globalny tooltip przy inicjalizacji
     };
 
     const getElementText = (element) => {
@@ -121,11 +157,21 @@ const ScheduleUI = (() => {
         for (const i of employeeIndices) {
             const th = document.createElement('th');
             const employeeData = EmployeeManager.getById(i);
-            const headerText = employeeData?.displayName || employeeData?.name || `Pracownik ${parseInt(i) + 1}`;
-            th.textContent = capitalizeFirstLetter(headerText);
+            const displayName = employeeData?.displayName || employeeData?.name || `Pracownik ${parseInt(i) + 1}`;
+            const fullName = EmployeeManager.getFullNameById(i);
+            const employeeNumber = employeeData?.employeeNumber || '';
+
             th.setAttribute('data-employee-index', i);
             th.setAttribute('tabindex', '0');
+            th.classList.add('employee-header'); // Dodaj klasę dla identyfikacji
+            th.innerHTML = `<span>${capitalizeFirstLetter(displayName)}</span>`;
+            th.dataset.fullName = fullName;
+            th.dataset.employeeNumber = employeeNumber;
             tableHeaderRow.appendChild(th);
+
+            // Dodaj event listenery dla nowego podejścia do tooltipa
+            th.addEventListener('mouseover', _showEmployeeTooltip);
+            th.addEventListener('mouseout', _hideEmployeeTooltip);
         }
 
         for (let hour = AppConfig.schedule.startHour; hour <= AppConfig.schedule.endHour; hour++) {

@@ -118,7 +118,8 @@ const Changes = (() => {
                     const leaveStart = new Date(leave.startDate);
                     const leaveEnd = new Date(leave.endDate);
 
-                    if (leaveEnd >= today && !(leaveEnd < periodStart || leaveStart > periodEnd)) {
+                    // Uwzględnij tylko urlopy wypoczynkowe i wszystkie daty
+                    if (leave.type === 'vacation' && !(leaveEnd < periodStart || leaveStart > periodEnd)) {
                         const employeeId = Object.keys(allLeavesData).find(key => allLeavesData[key] === employeeLeaves);
                         const lastName = EmployeeManager.getLastNameById(employeeId);
                         leavesHtml += `${lastName}<br>`;
@@ -126,6 +127,11 @@ const Changes = (() => {
                 });
             }
             leavesCell.innerHTML = leavesHtml;
+
+            // Dodaj klasę 'past-period' jeśli okres jest w przeszłości
+            if (periodEnd < today) {
+                row.classList.add('past-period');
+            }
         });
     };
 

@@ -77,3 +77,7 @@
     font-weight: bold;
 }
 
+/* Styl dla wierszy reprezentujących przeszłe okresy */
+.changes-table tbody tr.past-period td {
+    color: #a0a0a0; /* Wyszarzony tekst */
+}

@@ -19,6 +19,14 @@ const UIShell = (() => {
                 </div>
                 <div id="dateTimeText" class="date-time-text"></div>
                 <div class="header-right-menu">
+                    <div id="scheduleActionButtons" class="schedule-action-buttons">
+                        <button id="btnPatientInfo" class="action-icon-btn" title="Informacje o pacjencie"><i class="fas fa-user-circle"></i></button>
+                        <button id="btnSplitCell" class="action-icon-btn" title="Podziel komórkę"><i class="fas fa-users"></i></button>
+                        <button id="btnAddBreak" class="action-icon-btn" title="Dodaj przerwę"><i class="fas fa-coffee"></i></button>
+                        <button id="btnMassage" class="action-icon-btn" title="Oznacz jako Masaż"><i class="fas fa-hand-paper"></i></button>
+                        <button id="btnPnf" class="action-icon-btn" title="Oznacz jako PNF"><i class="fas fa-brain"></i></button>
+                        <button id="btnClearCell" class="action-icon-btn danger" title="Wyczyść komórkę"><i class="fas fa-trash-alt"></i></button>
+                    </div>
                     <div class="search-container">
                         <i class="fas fa-search search-icon"></i>
                         <input type="text" id="searchInput" class="search-input" placeholder="Szukaj...">
@@ -50,6 +58,14 @@ const UIShell = (() => {
                 throw new Error(`Could not load page: ${pageName}`);
             }
             pageContent.innerHTML = await response.text();
+            const scheduleActionButtons = document.getElementById('scheduleActionButtons');
+            if (scheduleActionButtons) {
+                if (pageName === 'schedule') {
+                    scheduleActionButtons.style.display = 'flex'; // Pokaż przyciski dla strony schedule
+                } else {
+                    scheduleActionButtons.style.display = 'none'; // Ukryj dla innych stron
+                }
+            }
         } catch (error) {
             console.error(`Failed to load page content for ${pageName}:`, error);
             pageContent.innerHTML = `<div class="error-page"><h1>Wystąpił błąd</h1><p>Nie można załadować strony. Spróbuj ponownie później.</p></div>`;

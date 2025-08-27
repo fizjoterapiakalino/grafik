@@ -2,7 +2,7 @@ const Options = (() => {
     // --- SELEKTORY ELEMENTÓW DOM ---
     let loadingOverlay, employeeListContainer, employeeSearchInput, addEmployeeBtn,
         detailsPlaceholder, detailsEditForm, employeeFirstNameInput, employeeLastNameInput,
-        employeeDisplayNameInput, leaveEntitlementInput,
+        employeeDisplayNameInput, employeeNumberInput, leaveEntitlementInput,
         carriedOverLeaveInput, saveEmployeeBtn, deleteEmployeeBtn;
 
     // --- ZMIENNE STANU APLIKACJI ---
@@ -66,6 +66,7 @@ const Options = (() => {
         employeeFirstNameInput.value = employee.firstName || '';
         employeeLastNameInput.value = employee.lastName || '';
         employeeDisplayNameInput.value = employee.displayName || employee.name;
+        employeeNumberInput.value = employee.employeeNumber || ''; // Nowe pole
         leaveEntitlementInput.value = employee.leaveEntitlement || 26;
         carriedOverLeaveInput.value = employee.carriedOverLeave || 0;
     };
@@ -102,6 +103,7 @@ const Options = (() => {
                 displayName: displayName.trim(),
                 firstName: '',
                 lastName: '',
+                employeeNumber: '', // Domyślna wartość dla nowego pracownika
                 leaveEntitlement: entitlement,
                 carriedOverLeave: 0
             };
@@ -131,6 +133,7 @@ const Options = (() => {
         const newFirstName = employeeFirstNameInput.value.trim();
         const newLastName = employeeLastNameInput.value.trim();
         const newDisplayName = employeeDisplayNameInput.value.trim();
+        const newEmployeeNumber = employeeNumberInput.value.trim(); // Nowe pole
         const newEntitlement = parseInt(leaveEntitlementInput.value, 10);
         const newCarriedOver = parseInt(carriedOverLeaveInput.value, 10);
 
@@ -147,6 +150,7 @@ const Options = (() => {
             firstName: newFirstName,
             lastName: newLastName,
             displayName: newDisplayName,
+            employeeNumber: newEmployeeNumber, // Nowe pole
             leaveEntitlement: newEntitlement,
             carriedOverLeave: newCarriedOver
         };
@@ -271,6 +275,7 @@ const Options = (() => {
         employeeFirstNameInput = document.getElementById('employeeFirstNameInput');
         employeeLastNameInput = document.getElementById('employeeLastNameInput');
         employeeDisplayNameInput = document.getElementById('employeeDisplayNameInput');
+        employeeNumberInput = document.getElementById('employeeNumberInput'); // Nowe pole
         leaveEntitlementInput = document.getElementById('leaveEntitlementInput');
         carriedOverLeaveInput = document.getElementById('carriedOverLeaveInput');
         saveEmployeeBtn = document.getElementById('saveEmployeeBtn');

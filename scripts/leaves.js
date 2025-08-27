@@ -113,12 +113,11 @@ const Leaves = (() => {
         legendContainer.innerHTML = '<strong>Filtruj wg typu:</strong>';
         const leaveTypeSelect = document.getElementById('leaveTypeSelect');
         
-        // Jeśli activeFilters jest puste, zainicjuj je wszystkimi typami urlopów tylko przy pierwszym ładowaniu
-        if (activeFilters.size === 0 && !sessionStorage.getItem('filtersInitialized')) {
+        // Jeśli activeFilters jest puste, zainicjuj je wszystkimi typami urlopów
+        if (activeFilters.size === 0) {
             Array.from(leaveTypeSelect.options).forEach(option => {
                 activeFilters.add(option.value);
             });
-            sessionStorage.setItem('filtersInitialized', 'true');
         }
 
         legendContainer.innerHTML = '<strong>Filtruj wg typu:</strong>'; // Wyczyść kontener przed ponownym generowaniem

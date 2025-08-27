@@ -95,6 +95,12 @@ const ScheduleEvents = (() => {
         
         activeCell = cell;
 
+        // Dezaktywuj wszystkie przyciski akcji
+        document.querySelectorAll('.schedule-action-buttons .action-icon-btn').forEach(btn => {
+            btn.classList.remove('active');
+            btn.disabled = true;
+        });
+
         if (activeCell) {
             activeCell.classList.add('active-cell');
             if (activeCell.tagName === 'DIV') {
@@ -102,6 +108,20 @@ const ScheduleEvents = (() => {
             }
             activeCell.focus();
             highlightDuplicates(_dependencies.ui.getElementText(activeCell));
+
+            // Aktywuj przyciski, gdy komórka jest zaznaczona
+            document.querySelectorAll('.schedule-action-buttons .action-icon-btn').forEach(btn => {
+                btn.classList.add('active');
+                btn.disabled = false;
+            });
+
+            // Specyficzne warunki aktywacji dla niektórych przycisków
+            const patientInfoBtn = document.getElementById('btnPatientInfo');
+            if (patientInfoBtn) {
+                const hasPatientInfo = !activeCell.classList.contains('break-cell') && _dependencies.ui.getElementText(activeCell).trim() !== '';
+                patientInfoBtn.classList.toggle('active', hasPatientInfo);
+                patientInfoBtn.disabled = !hasPatientInfo;
+            }
         }
     };
 
@@ -302,14 +322,67 @@ const ScheduleEvents = (() => {
 
         const contextMenuItems = [
             { id: 'contextPatientInfo', class: 'info', condition: cell => !cell.classList.contains('break-cell') && _dependencies.ui.getElementText(cell).trim() !== '', action: (cell, event) => _dependencies.openPatientInfoModal(event.target.closest('div[tabindex="0"]') || event.target.closest('td.editable-cell')) },
-            { id: 'contextAddBreak', action: cell => _dependencies.updateCellState(cell, state => { state.isBreak = true; window.showToast('Dodano przerwę'); }) },
-            { id: 'contextRemoveBreak', class: 'danger', condition: cell => cell.classList.contains('break-cell'), action: cell => _dependencies.updateCellState(cell, state => { delete state.isBreak; window.showToast('Usunięto przerwę'); }) },
+            { id: 'contextAddBreak', action: cell => {
+                if (_dependencies.ui.getElementText(cell).trim() !== '') {
+                    window.showToast('Nie można dodać przerwy do zajętej komórki. Najpierw wyczyść komórkę.', 3000);
+                    return;
+                }
+                _dependencies.updateCellState(cell, state => { state.isBreak = true; window.showToast('Dodano przerwę'); });
+            }},
             { id: 'contextClear', class: 'danger', action: cell => _dependencies.updateCellState(cell, state => { Object.keys(state).forEach(key => delete state[key]); window.showToast('Wyczyszczono komórkę'); }) },
             { id: 'contextSplitCell', action: cell => _dependencies.updateCellState(cell, state => { state.content1 = state.content || ''; state.content2 = ''; delete state.content; state.isSplit = true; window.showToast('Podzielono komórkę'); }) },
             { id: 'contextMassage', action: cell => _dependencies.toggleSpecialStyle(cell, 'isMassage') },
             { id: 'contextPnf', action: cell => _dependencies.toggleSpecialStyle(cell, 'isPnf') }
         ];
         window.initializeContextMenu('contextMenu', 'td.editable-cell', contextMenuItems);
+
+        // Obsługa kliknięć dla nowych przycisków akcji
+        document.getElementById('btnPatientInfo')?.addEventListener('click', () => {
+            if (activeCell && !activeCell.classList.contains('break-cell') && _dependencies.ui.getElementText(activeCell).trim() !== '') {
+                _dependencies.openPatientInfoModal(activeCell);
+            } else {
+                window.showToast('Wybierz komórkę z pacjentem, aby wyświetlić informacje.', 3000);
+            }
+        });
+        document.getElementById('btnSplitCell')?.addEventListener('click', () => {
+            if (activeCell) {
+                _dependencies.updateCellState(activeCell, state => { state.content1 = state.content || ''; state.content2 = ''; delete state.content; state.isSplit = true; window.showToast('Podzielono komórkę'); });
+            } else {
+                window.showToast('Wybierz komórkę do podzielenia.', 3000);
+            }
+        });
+        document.getElementById('btnAddBreak')?.addEventListener('click', () => {
+            if (activeCell) {
+                if (_dependencies.ui.getElementText(activeCell).trim() !== '') {
+                    window.showToast('Nie można dodać przerwy do zajętej komórki. Najpierw wyczyść komórkę.', 3000);
+                    return;
+                }
+                _dependencies.updateCellState(activeCell, state => { state.isBreak = true; window.showToast('Dodano przerwę'); });
+            } else {
+                window.showToast('Wybierz komórkę, aby dodać przerwę.', 3000);
+            }
+        });
+        document.getElementById('btnMassage')?.addEventListener('click', () => {
+            if (activeCell) {
+                _dependencies.toggleSpecialStyle(activeCell, 'isMassage');
+            } else {
+                window.showToast('Wybierz komórkę, aby oznaczyć jako Masaż.', 3000);
+            }
+        });
+        document.getElementById('btnPnf')?.addEventListener('click', () => {
+            if (activeCell) {
+                _dependencies.toggleSpecialStyle(activeCell, 'isPnf');
+            } else {
+                window.showToast('Wybierz komórkę, aby oznaczyć jako PNF.', 3000);
+            }
+        });
+        document.getElementById('btnClearCell')?.addEventListener('click', () => {
+            if (activeCell) {
+                _dependencies.updateCellState(activeCell, state => { Object.keys(state).forEach(key => delete state[key]); window.showToast('Wyczyszczono komórkę'); });
+            } else {
+                window.showToast('Wybierz komórkę do wyczyszczenia.', 3000);
+            }
+        });
     };
 
     const destroy = () => {
