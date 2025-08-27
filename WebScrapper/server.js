@@ -1,6 +1,6 @@
 const express = require('express');
-const puppeteer = require('puppeteer-core'); // Changed from 'puppeteer'
-const chromium = require('@sparticuz/chromium'); // Added this line
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -9,10 +9,9 @@ let pdfLinks = []; // Przechowuje pobrane linki do PDF
 // Funkcja do logowania i pobierania linków
 async function scrapePdfLinks() {
   console.log('Rozpoczynam scraping...');
-  let browser = null; // Initialize browser to null
+  let browser = null;
 
   try {
-    // Updated puppeteer.launch configuration
     browser = await puppeteer.launch({
         args: chromium.args,
         defaultViewport: chromium.defaultViewport,
@@ -22,26 +21,23 @@ async function scrapePdfLinks() {
     });
 
     const page = await browser.newPage();
+
+    // --- KLUCZOWA ZMIANA JEST TUTAJ ---
+    // Ustawiamy dane logowania, których Puppeteer użyje automatycznie
+    await page.authenticate({
+        username: process.env.LOGIN_USERNAME,
+        password: process.env.LOGIN_PASSWORD,
+    });
+
+    // Teraz przechodzimy na stronę. Puppeteer sam obsłuży okno logowania.
     await page.goto(process.env.TARGET_URL, { waitUntil: 'networkidle2' });
 
-    // Logowanie
-    // TODO: Uzupełnij selektory pól logowania i przycisku
-    await page.type('#username', process.env.LOGIN_USERNAME);
-    await page.type('#password', process.env.LOGIN_PASSWORD);
-    await page.click('#loginButton'); // Przykładowy selektor przycisku logowania
-
-    await page.waitForNavigation({ waitUntil: 'networkidle2' });
-
-    // Sprawdź, czy logowanie się powiodło
-    const currentUrl = page.url();
-    if (currentUrl.includes('login.html')) { // Zmień na faktyczny URL po zalogowaniu
-      console.error('Logowanie nieudane. Sprawdź dane logowania i URL.');
-      return; // Stop execution if login fails
-    }
+    // Nie potrzebujemy już page.type() i page.click() do logowania.
 
     // Pobieranie linków do PDF
-    // TODO: Uzupełnij selektor dla linków do PDF
+    // TODO: Upewnij się, że selektor 'a[href$=".pdf"]' jest poprawny dla strony po zalogowaniu.
     const links = await page.evaluate(() => {
+      // Upewniamy się, że linki są pełnymi adresami URL
       const anchors = Array.from(document.querySelectorAll('a[href$=".pdf"]'));
       return anchors.map(a => a.href);
     });
