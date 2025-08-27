@@ -4,14 +4,14 @@
   "description": "Web scraper for zla-chrzanow.pl/private, hosted on Glitch, to provide PDF links via API.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "postinstall": "npx puppeteer browsers install chrome"
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@sparticuz/chromium": "^123.0.1",
     "express": "^4.17.1",
-    "puppeteer": "^22.0.0"
+    "puppeteer-core": "^22.10.0"
   }
 }

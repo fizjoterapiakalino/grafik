@@ -1,5 +1,6 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core'); // Changed from 'puppeteer'
+const chromium = require('@sparticuz/chromium'); // Added this line
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -8,13 +9,19 @@ let pdfLinks = []; // Przechowuje pobrane linki do PDF
 // Funkcja do logowania i pobierania linków
 async function scrapePdfLinks() {
   console.log('Rozpoczynam scraping...');
-  const browser = await puppeteer.launch({
-    headless: true, // Ustaw na 'new' lub 'false' dla trybu bezgłowego
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
-  const page = await browser.newPage();
+  let browser = null; // Initialize browser to null
 
   try {
+    // Updated puppeteer.launch configuration
+    browser = await puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
+        ignoreHTTPSErrors: true,
+    });
+
+    const page = await browser.newPage();
     await page.goto(process.env.TARGET_URL, { waitUntil: 'networkidle2' });
 
     // Logowanie
@@ -29,8 +36,7 @@ async function scrapePdfLinks() {
     const currentUrl = page.url();
     if (currentUrl.includes('login.html')) { // Zmień na faktyczny URL po zalogowaniu
       console.error('Logowanie nieudane. Sprawdź dane logowania i URL.');
-      await browser.close();
-      return;
+      return; // Stop execution if login fails
     }
 
     // Pobieranie linków do PDF
@@ -46,7 +52,9 @@ async function scrapePdfLinks() {
   } catch (error) {
     console.error('Błąd podczas scrapingu:', error);
   } finally {
-    await browser.close();
+    if (browser !== null) {
+      await browser.close();
+    }
   }
 }
 
@@ -60,6 +68,5 @@ scrapePdfLinks();
 setInterval(scrapePdfLinks, 60 * 60 * 1000); // Co godzinę
 
 app.listen(port, () => {
-  console.log(`Serwer Glitch działa na porcie ${port}`);
-  console.log('Odwiedź swój projekt Glitch, aby zobaczyć działanie.');
+  console.log(`Serwer działa na porcie ${port}`);
 });
