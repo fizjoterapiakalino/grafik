@@ -1,8 +1,11 @@
 const express = require('express');
 const puppeteer = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
+const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3000;
+
+app.use(cors());
 
 let pdfLinks = []; // Przechowuje pobrane linki do PDF
 
