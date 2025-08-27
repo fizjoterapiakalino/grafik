@@ -1,0 +1,16 @@
+{
+  "name": "webscrapper-glitch",
+  "version": "1.0.0",
+  "description": "Web scraper for zla-chrzanow.pl/private, hosted on Glitch, to provide PDF links via API.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.17.1",
+    "puppeteer": "^22.0.0"
+  }
+}
