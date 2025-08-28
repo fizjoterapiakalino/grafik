@@ -359,10 +359,12 @@ const Schedule = (() => {
             },
             toggleSpecialStyle(cell, dataAttribute) {
                 updateCellState(cell, state => {
-                    state[dataAttribute] = !state[dataAttribute];
-                     if (state.isSplit) {
-                        state[`${dataAttribute}1`] = state[dataAttribute];
-                        state[`${dataAttribute}2`] = state[dataAttribute];
+                    // Jeśli to jest komórka dzielona, zastosuj styl do obu części
+                    if (state.isSplit) {
+                        state[`${dataAttribute}1`] = !state[`${dataAttribute}1`];
+                        state[`${dataAttribute}2`] = !state[`${dataAttribute}2`];
+                    } else {
+                        state[dataAttribute] = !state[dataAttribute];
                     }
                     window.showToast('Zmieniono styl');
                 });

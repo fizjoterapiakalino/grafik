@@ -60,9 +60,10 @@ const ScheduleUI = (() => {
 
     const applyCellDataToDom = (cell, cellObj) => {
         cell.className = 'editable-cell';
-        cell.innerHTML = '';
-        delete cell.dataset.isMassage;
-        delete cell.dataset.isPnf;
+            cell.innerHTML = '';
+            delete cell.dataset.isMassage;
+            delete cell.dataset.isPnf;
+            delete cell.dataset.isEveryOtherDay; // Usuń stary atrybut
 
         if (cell.tagName === 'TH') {
              cell.textContent = cellObj.content || '';
@@ -86,13 +87,17 @@ const ScheduleUI = (() => {
                     div.classList.add('pnf-text');
                     div.dataset.isPnf = 'true';
                 }
+                if (cellObj.isEveryOtherDay) { // Dodaj obsługę dla isEveryOtherDay
+                    div.classList.add('every-other-day-text');
+                    div.dataset.isEveryOtherDay = 'true';
+                }
                 div.innerHTML = htmlContent;
                 return div;
             };
             cell.classList.add('split-cell');
             cell.style.backgroundColor = AppConfig.schedule.contentCellColor;
-            cell.appendChild(createPart(cellObj.content1, cellObj.isMassage1, cellObj.isPnf1));
-            cell.appendChild(createPart(cellObj.content2, cellObj.isMassage2, cellObj.isPnf2));
+            cell.appendChild(createPart(cellObj.content1, cellObj.isMassage1, cellObj.isPnf1, cellObj.isEveryOtherDay1)); // Przekaż isEveryOtherDay1
+            cell.appendChild(createPart(cellObj.content2, cellObj.isMassage2, cellObj.isPnf2, cellObj.isEveryOtherDay2)); // Przekaż isEveryOtherDay2
         } else {
             let htmlContent = `<span>${capitalizeFirstLetter(cellObj.content || '')}</span>`;
             if (cellObj.isMassage) {
@@ -102,6 +107,10 @@ const ScheduleUI = (() => {
              if (cellObj.isPnf) {
                 cell.classList.add('pnf-text');
                 cell.dataset.isPnf = 'true';
+            }
+            if (cellObj.isEveryOtherDay) { // Dodaj obsługę dla isEveryOtherDay
+                cell.classList.add('every-other-day-text');
+                cell.dataset.isEveryOtherDay = 'true';
             }
             cell.innerHTML = htmlContent;
             cell.style.backgroundColor = (getElementText(cell).trim() !== '') ? AppConfig.schedule.contentCellColor : AppConfig.schedule.defaultCellColor;

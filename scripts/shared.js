@@ -22,6 +22,7 @@ const Shared = (() => {
                 { href: '#schedule', text: 'Grafik', icon: 'fas fa-calendar-alt' },
                 { href: '#leaves', text: 'Urlopy', icon: 'fas fa-plane-departure' },
                 { href: '#changes', text: 'Harmonogram zmian', icon: 'fas fa-exchange-alt' },
+                { href: '#scrapped-pdfs', text: 'ISO', icon: 'fas fa-file-pdf', id: 'navLinkIso' }, // Dodano ID
                 { href: '#options', text: 'Opcje', icon: 'fas fa-cogs' }
             ];
             
@@ -54,6 +55,11 @@ const Shared = (() => {
 
                 li.appendChild(a);
                 ul.appendChild(li);
+
+                // Dodaj ID do elementu <a> dla linku ISO
+                if (link.id) {
+                    a.id = link.id;
+                }
 
                 // Ukryj menu po kliknięciu linku
                 a.addEventListener('click', () => {
@@ -192,9 +198,25 @@ const Shared = (() => {
         }
     };
 
+    const setIsoLinkActive = (isActive) => {
+        const isoLink = document.getElementById('navLinkIso');
+        if (isoLink) {
+            if (isActive) {
+                isoLink.classList.remove('disabled');
+                isoLink.style.pointerEvents = 'auto'; // Przywróć interaktywność
+                isoLink.style.opacity = '1'; // Przywróć normalną przezroczystość
+            } else {
+                isoLink.classList.add('disabled');
+                isoLink.style.pointerEvents = 'none'; // Wyłącz interaktywność
+                isoLink.style.opacity = '0.5'; // Ustaw ciemniejszy wygląd
+            }
+        }
+    };
+
     return {
         initialize,
-        updateUserInfo // Eksportuj nową metodę
+        updateUserInfo,
+        setIsoLinkActive // Eksportuj nową metodę
     };
 })();
 

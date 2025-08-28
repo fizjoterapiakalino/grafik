@@ -63,7 +63,7 @@
 
 /* --- Specjalne style komórek grafiku --- */
 .break-cell {
-    background-color: #6c757d !important;
+    background-color: #6c757d !important; /* Przywrócono szary kolor */
     color: #fff !important;
     font-weight: bold;
     text-align: center;
@@ -78,6 +78,114 @@
 .massage-text, td.split-cell > div.massage-text > span {
     color: hotpink;
     font-weight: bold;
+}
+
+.every-other-day-text, td.split-cell > div.every-other-day-text > span {
+    color: #8A2BE2; /* Fioletowy kolor dla "co 2 dni" */
+    font-weight: bold;
+}
+
+/* --- Style dla legendy --- */
+.schedule-legend {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    width: 100%; /* Rozciągnij na całą szerokość */
+    box-sizing: border-box; /* Uwzględnij padding i border w szerokości */
+    display: flex; /* Użyj flexboxa dla kontenera legendy */
+    align-items: center; /* Wyrównaj elementy w pionie */
+    flex-wrap: wrap; /* Pozwól na zawijanie */
+    gap: 15px; /* Odstępy między nagłówkiem a listą */
+}
+
+.schedule-legend h3 {
+    margin: 0; /* Usuń marginesy, aby nie wpływały na układ flexboxa */
+    color: #333;
+    font-size: 1.1em;
+    white-space: nowrap; /* Zapobiegaj zawijaniu nagłówka */
+}
+
+.schedule-legend ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex; /* Użyj flexboxa */
+    flex-wrap: wrap; /* Pozwól na zawijanie */
+    gap: 15px; /* Odstępy między elementami legendy */
+}
+
+.schedule-legend li {
+    display: flex;
+    align-items: center;
+    /* margin-bottom: 8px; */ /* Usunięto, bo gap to obsłuży */
+    font-size: 0.95em;
+    color: #555;
+}
+
+/* .schedule-legend li:last-child {
+    margin-bottom: 0;
+} */ /* Usunięto, bo gap to obsłuży */
+
+.legend-color {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    margin-right: 10px;
+    border: 1px solid #ccc;
+}
+
+.massage-color {
+    background-color: hotpink;
+}
+
+.pnf-color {
+    background-color: #007bff;
+}
+
+.every-other-day-color {
+    background-color: #8A2BE2;
+}
+
+.break-color {
+    background-color: #6c757d; /* Szary kolor dla przerwy w legendzie */
+}
+
+/* --- Style dla ikon akcji w nagłówku po najechaniu kursorem (gdy są aktywne) --- */
+.schedule-action-buttons .action-icon-btn.active:hover {
+    background-color: rgba(0, 0, 0, 0.1); /* Lekkie przyciemnienie */
+}
+
+#btnPatientInfo.active:hover i {
+    color: #007bff; /* Niebieski kolor dla ikony informacji o pacjencie */
+}
+
+#btnMassage.active:hover i {
+    color: hotpink;
+}
+
+#btnPnf.active:hover i {
+    color: #007bff;
+}
+
+#btnEveryOtherDay.active:hover i {
+    color: #8A2BE2;
+}
+
+#btnAddBreak.active:hover i {
+    color: #6c757d; /* Szary dla przerwy */
+}
+
+/* Zmiana koloru dla przerwy */
+.break-cell {
+    background-color: #6c757d !important; /* Przywrócono szary kolor dla przerwy */
+    color: #fff !important;
+    font-weight: bold;
+    text-align: center;
+    cursor: default !important;
 }
 
 td.split-cell {

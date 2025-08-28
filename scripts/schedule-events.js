@@ -332,7 +332,8 @@ const ScheduleEvents = (() => {
             { id: 'contextClear', class: 'danger', action: cell => _dependencies.updateCellState(cell, state => { Object.keys(state).forEach(key => delete state[key]); window.showToast('Wyczyszczono komórkę'); }) },
             { id: 'contextSplitCell', action: cell => _dependencies.updateCellState(cell, state => { state.content1 = state.content || ''; state.content2 = ''; delete state.content; state.isSplit = true; window.showToast('Podzielono komórkę'); }) },
             { id: 'contextMassage', action: cell => _dependencies.toggleSpecialStyle(cell, 'isMassage') },
-            { id: 'contextPnf', action: cell => _dependencies.toggleSpecialStyle(cell, 'isPnf') }
+            { id: 'contextPnf', action: cell => _dependencies.toggleSpecialStyle(cell, 'isPnf') },
+            { id: 'contextEveryOtherDay', action: cell => _dependencies.toggleSpecialStyle(cell, 'isEveryOtherDay') } // Nowa opcja
         ];
         window.initializeContextMenu('contextMenu', 'td.editable-cell', contextMenuItems);
 
@@ -374,6 +375,13 @@ const ScheduleEvents = (() => {
                 _dependencies.toggleSpecialStyle(activeCell, 'isPnf');
             } else {
                 window.showToast('Wybierz komórkę, aby oznaczyć jako PNF.', 3000);
+            }
+        });
+        document.getElementById('btnEveryOtherDay')?.addEventListener('click', () => { // Obsługa nowego przycisku
+            if (activeCell) {
+                _dependencies.toggleSpecialStyle(activeCell, 'isEveryOtherDay');
+            } else {
+                window.showToast('Wybierz komórkę, aby oznaczyć jako Co 2 Dni.', 3000);
             }
         });
         document.getElementById('btnClearCell')?.addEventListener('click', () => {

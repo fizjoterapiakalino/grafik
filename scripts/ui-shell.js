@@ -19,12 +19,14 @@ const UIShell = (() => {
                 </div>
                 <div id="dateTimeText" class="date-time-text"></div>
                 <div class="header-right-menu">
+                    <div id="saveStatus" class="save-status"></div> <!-- Przeniesiony saveStatus na początek -->
                     <div id="scheduleActionButtons" class="schedule-action-buttons">
                         <button id="btnPatientInfo" class="action-icon-btn" title="Informacje o pacjencie"><i class="fas fa-user-circle"></i></button>
                         <button id="btnSplitCell" class="action-icon-btn" title="Podziel komórkę"><i class="fas fa-users"></i></button>
                         <button id="btnAddBreak" class="action-icon-btn" title="Dodaj przerwę"><i class="fas fa-coffee"></i></button>
                         <button id="btnMassage" class="action-icon-btn" title="Oznacz jako Masaż"><i class="fas fa-hand-paper"></i></button>
                         <button id="btnPnf" class="action-icon-btn" title="Oznacz jako PNF"><i class="fas fa-brain"></i></button>
+                        <button id="btnEveryOtherDay" class="action-icon-btn" title="Oznacz jako Co 2 Dni"><i class="fas fa-calendar-alt"></i></button> <!-- Nowy przycisk -->
                         <button id="btnClearCell" class="action-icon-btn danger" title="Wyczyść komórkę"><i class="fas fa-trash-alt"></i></button>
                     </div>
                     <div class="search-container">
@@ -34,7 +36,6 @@ const UIShell = (() => {
                     </div>
                     <button id="undoButton" class="undo-button" title="Cofnij (Ctrl+Z)" disabled><i class="fas fa-undo"></i></button>
                     <button id="printChangesTable" class="action-btn" title="Drukuj Grafik"><i class="fas fa-print"></i></button>
-                    <div id="saveStatus" class="save-status"></div>
                     <!-- Hamburger menu will be inserted here by shared.js -->
                 </div>
             </div>
