@@ -8,9 +8,15 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 
 let pdfLinks = []; // Przechowuje pobrane linki do PDF
+let isScraping = false; // Nowa zmienna do śledzenia statusu scrapingu
 
 // Funkcja do logowania i pobierania linków
 async function scrapePdfLinks() {
+  if (isScraping) {
+    console.log('Scraping jest już w toku. Pomijam nowe żądanie.');
+    return;
+  }
+  isScraping = true;
   console.log('Rozpoczynam scraping...');
   let browser = null;
 
@@ -54,12 +60,22 @@ async function scrapePdfLinks() {
     if (browser !== null) {
       await browser.close();
     }
+    isScraping = false; // Zakończono scraping
   }
 }
 
 // Endpoint API do zwracania linków PDF
 app.get('/api/pdfs', (req, res) => {
-  res.json(pdfLinks);
+  res.json({ links: pdfLinks, isScraping: isScraping });
+});
+
+// Nowy endpoint do ręcznego wywołania scrapingu
+app.post('/api/scrape', async (req, res) => {
+  if (isScraping) {
+    return res.status(202).json({ message: 'Scraping już w toku.', isScraping: true });
+  }
+  scrapePdfLinks(); // Uruchom scraping w tle
+  res.status(200).json({ message: 'Scraping rozpoczęty.', isScraping: true });
 });
 
 // Uruchom scraping przy starcie serwera i co jakiś czas
