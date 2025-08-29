@@ -31,29 +31,30 @@ async function scrapePdfLinks() {
 
     await page.goto(process.env.TARGET_URL, { waitUntil: 'networkidle2' });
 
-    // --- ULEPSZONA LOGIKA SCRAPOWANIA ---
+    // --- PRECYZYJNA LOGIKA SCRAPOWANIA BAZUJĄCA NA ŹRÓDLE HTML ---
     const documents = await page.evaluate(() => {
         const results = [];
-        // Znajdź wszystkie wiersze tabeli
-        const rows = Array.from(document.querySelectorAll('tr')); 
+        // Znajdź wszystkie znaczniki <b>, które mogą być datą
+        const allBoldElements = document.querySelectorAll('div#tresc > b');
 
-        for (const row of rows) {
-            // Pobierz wszystkie komórki z danego wiersza
-            const cells = row.querySelectorAll('td');
-            
-            // Upewnij się, że wiersz ma co najmniej 3 komórki i zawiera link
-            if (cells.length >= 3 && row.querySelector('a[href$=".pdf"]')) {
-                const dateText = cells[0].innerText.trim();
-                const typeText = cells[1].innerText.trim();
-                const linkElement = cells[2].querySelector('a');
+        for (const element of allBoldElements) {
+            const text = element.innerText;
+            const dateRegex = /(\d{4}-\d{2}-\d{2})/;
+            const match = text.match(dateRegex);
 
-                const dateRegex = /\d{4}-\d{2}-\d{2}/;
-                const match = dateText.match(dateRegex);
+            // Jeśli element <b> zawiera datę...
+            if (match) {
+                const date = match[0];
                 
-                if (match && linkElement) {
+                // ...to następny element <b> powinien być typem dokumentu...
+                const typeElement = element.nextElementSibling;
+                // ...a element po nim powinien być linkiem <a>
+                const linkElement = typeElement ? typeElement.nextElementSibling : null;
+
+                if (typeElement && typeElement.tagName === 'B' && linkElement && linkElement.tagName === 'A') {
                     results.push({
-                        date: match[0],
-                        type: typeText,
+                        date: date,
+                        type: typeElement.innerText.trim(),
                         title: linkElement.innerText.trim(),
                         url: linkElement.href
                     });
