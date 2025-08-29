@@ -37,22 +37,22 @@ async function scrapePdfLinks() {
         const container = document.querySelector('div#tresc');
         if (!container) return [];
 
-        // Pobierz wszystkie elementy (węzły) wewnątrz kontenera
+        // Pobieramy wszystkie elementy (węzły) wewnątrz kontenera
         const nodes = Array.from(container.childNodes);
         
-        // Pętla przechodzi przez wszystkie węzły
         for (let i = 0; i < nodes.length; i++) {
-            const node = nodes[i];
-
-            // Szukamy węzła tekstowego, który zawiera datę
-            if (node.nodeType === Node.TEXT_NODE && /\d{4}-\d{2}-\d{2}/.test(node.textContent)) {
+            const currentNode = nodes[i];
+            
+            // Krok 1: Szukamy węzła tekstowego, który zawiera datę
+            if (currentNode.nodeType === Node.TEXT_NODE && /\d{4}-\d{2}-\d{2}/.test(currentNode.textContent)) {
                 
-                // Sprawdzamy, czy kolejne elementy pasują do wzorca: <b>, <a>
-                const typeNode = nodes[i + 2]; // Przeskakujemy myślnik i spację
-                const linkNode = nodes[i + 4]; // Przeskakujemy kolejny myślnik i spację
+                // Krok 2: Sprawdzamy, czy następne elementy to <b> i <a>
+                const typeNode = nodes[i + 1]; // Typ powinien być zaraz po tekście z datą
+                const linkNode = nodes[i + 3]; // Link jest 2 pozycje dalej
 
                 if (typeNode && typeNode.nodeName === 'B' && linkNode && linkNode.nodeName === 'A') {
-                    const dateMatch = node.textContent.match(/(\d{4}-\d{2}-\d{2})/);
+                    const dateMatch = currentNode.textContent.match(/(\d{4}-\d{2}-\d{2})/);
+                    
                     if (dateMatch) {
                          results.push({
                             date: dateMatch[0],
@@ -61,7 +61,7 @@ async function scrapePdfLinks() {
                             url: linkNode.href
                         });
                         // Przeskakujemy przetworzone elementy, aby ich ponownie nie analizować
-                        i += 4;
+                        i += 3;
                     }
                 }
             }
