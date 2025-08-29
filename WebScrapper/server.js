@@ -31,44 +31,37 @@ async function scrapePdfLinks() {
 
     await page.goto(process.env.TARGET_URL, { waitUntil: 'networkidle2' });
 
-    // --- OSTATECZNA, PRECYZYJNA LOGIKA SCRAPOWANIA ---
+    // --- OSTATECZNA LOGIKA BAZUJĄCA NA PLIKU HTML ---
     const documents = await page.evaluate(() => {
         const results = [];
         const container = document.querySelector('div#tresc');
         if (!container) return [];
 
-        // Pobieramy wszystkie bezpośrednie węzły (również tekstowe) z kontenera
+        // Pobierz wszystkie elementy (węzły) wewnątrz kontenera
         const nodes = Array.from(container.childNodes);
-
+        
+        // Pętla przechodzi przez wszystkie węzły
         for (let i = 0; i < nodes.length; i++) {
             const node = nodes[i];
-            
-            // Szukamy węzła <b>, który zawiera datę w formacie YYYY-MM-DD
-            if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'B' && /\d{4}-\d{2}-\d{2}/.test(node.innerText)) {
-                
-                // Sprawdzamy, czy kolejne węzły pasują do oczekiwanej struktury:
-                // node -> <b>DATA</b>
-                // node+1 -> "-" (węzeł tekstowy)
-                // node+2 -> <b>TYP</b>
-                // node+3 -> "-" (węzeł tekstowy)
-                // node+4 -> <b><a href="...">TYTUŁ</a></b>
-                if (i + 4 < nodes.length) {
-                    const typeNode = nodes[i + 2];
-                    const linkContainerNode = nodes[i + 4];
 
-                    if (typeNode && typeNode.nodeName === 'B' && linkContainerNode && linkContainerNode.nodeName === 'B') {
-                        const linkElement = linkContainerNode.querySelector('a[href$=".pdf"]');
-                        
-                        if (linkElement) {
-                            results.push({
-                                date: node.innerText.trim(),
-                                type: typeNode.innerText.trim(),
-                                title: linkElement.innerText.trim(),
-                                url: linkElement.href
-                            });
-                            // Przeskakujemy o 4 pozycje, aby uniknąć ponownego przetwarzania tych samych elementów
-                            i += 4;
-                        }
+            // Szukamy węzła tekstowego, który zawiera datę
+            if (node.nodeType === Node.TEXT_NODE && /\d{4}-\d{2}-\d{2}/.test(node.textContent)) {
+                
+                // Sprawdzamy, czy kolejne elementy pasują do wzorca: <b>, <a>
+                const typeNode = nodes[i + 2]; // Przeskakujemy myślnik i spację
+                const linkNode = nodes[i + 4]; // Przeskakujemy kolejny myślnik i spację
+
+                if (typeNode && typeNode.nodeName === 'B' && linkNode && linkNode.nodeName === 'A') {
+                    const dateMatch = node.textContent.match(/(\d{4}-\d{2}-\d{2})/);
+                    if (dateMatch) {
+                         results.push({
+                            date: dateMatch[0],
+                            type: typeNode.innerText.trim(),
+                            title: linkNode.innerText.trim(),
+                            url: linkNode.href
+                        });
+                        // Przeskakujemy przetworzone elementy, aby ich ponownie nie analizować
+                        i += 4;
                     }
                 }
             }
