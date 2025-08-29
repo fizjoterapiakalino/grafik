@@ -26,10 +26,29 @@
     color: #333;
 }
 
-.employee-list-panel .search-input {
+.employee-list-panel .search-container {
+    position: relative;
+    margin-bottom: 15px;
+}
+
+.employee-list-panel .search-container .search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #888;
+}
+
+.employee-list-panel .search-container .search-input {
     width: 100%;
     box-sizing: border-box;
-    margin-bottom: 15px;
+    padding-left: 40px; /* Zwiększ padding, aby zrobić miejsce na ikonę */
+    padding-right: 10px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1em;
 }
 
 .employee-list-container {

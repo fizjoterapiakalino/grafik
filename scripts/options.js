@@ -36,16 +36,17 @@ const Options = (() => {
         }
 
         const sortedEmployees = Object.entries(employees)
-            .map(([index, data]) => ({ index: parseInt(index, 10), name: data.displayName || data.name }))
+            .map(([index, data]) => ({ index: parseInt(index, 10), firstName: data.firstName, lastName: data.lastName, displayName: data.displayName || data.name }))
             .sort((a, b) => a.index - b.index);
 
-        sortedEmployees.forEach(({ index, name }) => {
-            if (!name) return;
+        sortedEmployees.forEach(({ index, firstName, lastName, displayName }) => {
+            const nameToDisplay = (firstName && lastName) ? `${firstName} ${lastName}` : displayName;
+            if (!nameToDisplay) return;
 
             const item = document.createElement('div');
             item.className = 'employee-list-item';
             item.dataset.employeeIndex = index;
-            item.innerHTML = `<i class="fas fa-user"></i> <span>${name}</span>`;
+            item.innerHTML = `<i class="fas fa-user"></i> <span>${nameToDisplay}</span>`;
 
             item.addEventListener('click', () => handleEmployeeSelect(index));
             employeeListContainer.appendChild(item);

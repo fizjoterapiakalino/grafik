@@ -50,6 +50,7 @@ const Router = (() => {
     let currentUser = null; // Zmienna przechowująca aktualny stan zalogowania
     const SCRAPED_PDFS_CACHE_KEY = 'scrapedPdfLinks';
     const SCRAPING_STATUS_KEY = 'isScraping';
+    const RENDER_API_BASE_URL = 'https://pdf-scraper-api-5qqr.onrender.com'; // Przeniesiono do zasięgu modułu
 
     // Funkcja do pobierania linków PDF z serwera i zapisywania ich do cache
     const fetchAndCachePdfLinks = async (forceScrape = false) => {
@@ -58,7 +59,6 @@ const Router = (() => {
 
         try {
             let response;
-            const RENDER_API_BASE_URL = 'https://pdf-scraper-api-5qqr.onrender.com'; // Nowy adres URL
 
             if (forceScrape) {
                 window.showToast('Rozpoczynam odświeżanie linków ISO...', 5000);
