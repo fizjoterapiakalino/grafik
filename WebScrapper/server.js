@@ -9,6 +9,24 @@ app.use(cors());
 
 let pdfLinks = []; // Przechowuje pobrane linki do PDF
 let isScraping = false; // Nowa zmienna do śledzenia statusu scrapingu
+const sseClients = []; // Tablica do przechowywania klientów SSE
+
+// Endpoint dla Server-Sent Events
+app.get('/api/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  sseClients.push(res);
+
+  req.on('close', () => {
+    const index = sseClients.indexOf(res);
+    if (index > -1) {
+      sseClients.splice(index, 1);
+    }
+  });
+});
 
 // Funkcja do logowania i pobierania linków
 async function scrapePdfLinks() {
@@ -61,6 +79,11 @@ async function scrapePdfLinks() {
       await browser.close();
     }
     isScraping = false; // Zakończono scraping
+
+    // Wyślij zdarzenie do wszystkich klientów SSE po zakończeniu scrapingu
+    sseClients.forEach(client => {
+      client.write(`event: scrapingComplete\ndata: ${JSON.stringify({ links: pdfLinks, isScraping: false })}\n\n`);
+    });
   }
 }
 

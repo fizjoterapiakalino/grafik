@@ -101,8 +101,9 @@ const Router = (() => {
             console.error('Błąd podczas pobierania lub cachowania linków PDF:', error);
             window.showToast('Błąd podczas pobierania linków ISO.', 5000);
             Shared.setIsoLinkActive(false); // Pozostaw nieaktywny w przypadku błędu
-            localStorage.setItem(SCRAPING_STATUS_KEY, 'false'); // Zresetuj status
             return [];
+        } finally {
+            localStorage.setItem(SCRAPING_STATUS_KEY, 'false'); // Zawsze resetuj status po zakończeniu próby scrapingu
         }
     };
 
@@ -124,6 +125,20 @@ const Router = (() => {
         } else {
             fetchAndCachePdfLinks(); // Inicjalne pobieranie linków
         }
+
+        // Inicjalizacja Server-Sent Events
+        const sse = new EventSource(`${RENDER_API_BASE_URL}/api/events`);
+
+        sse.addEventListener('scrapingComplete', (event) => {
+            console.log('Otrzymano zdarzenie scrapingComplete:', event.data);
+            window.showToast('Scraping zakończony w tle. Odświeżam linki ISO...', 5000);
+            fetchAndCachePdfLinks(); // Odśwież linki po zakończeniu scrapingu w tle
+        });
+
+        sse.onerror = (error) => {
+            console.error('Błąd SSE:', error);
+            sse.close(); // Zamknij połączenie w przypadku błędu
+        };
     };
 
     const navigate = async () => {
