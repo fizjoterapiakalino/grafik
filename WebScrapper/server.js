@@ -31,33 +31,45 @@ async function scrapePdfLinks() {
 
     await page.goto(process.env.TARGET_URL, { waitUntil: 'networkidle2' });
 
-    // --- PRECYZYJNA LOGIKA SCRAPOWANIA BAZUJĄCA NA ŹRÓDLE HTML ---
+    // --- OSTATECZNA, PRECYZYJNA LOGIKA SCRAPOWANIA ---
     const documents = await page.evaluate(() => {
         const results = [];
-        // Znajdź wszystkie znaczniki <b>, które mogą być datą
-        const allBoldElements = document.querySelectorAll('div#tresc > b');
+        const container = document.querySelector('div#tresc');
+        if (!container) return [];
 
-        for (const element of allBoldElements) {
-            const text = element.innerText;
-            const dateRegex = /(\d{4}-\d{2}-\d{2})/;
-            const match = text.match(dateRegex);
+        // Pobieramy wszystkie bezpośrednie węzły (również tekstowe) z kontenera
+        const nodes = Array.from(container.childNodes);
 
-            // Jeśli element <b> zawiera datę...
-            if (match) {
-                const date = match[0];
+        for (let i = 0; i < nodes.length; i++) {
+            const node = nodes[i];
+            
+            // Szukamy węzła <b>, który zawiera datę w formacie YYYY-MM-DD
+            if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'B' && /\d{4}-\d{2}-\d{2}/.test(node.innerText)) {
                 
-                // ...to następny element <b> powinien być typem dokumentu...
-                const typeElement = element.nextElementSibling;
-                // ...a element po nim powinien być linkiem <a>
-                const linkElement = typeElement ? typeElement.nextElementSibling : null;
+                // Sprawdzamy, czy kolejne węzły pasują do oczekiwanej struktury:
+                // node -> <b>DATA</b>
+                // node+1 -> "-" (węzeł tekstowy)
+                // node+2 -> <b>TYP</b>
+                // node+3 -> "-" (węzeł tekstowy)
+                // node+4 -> <b><a href="...">TYTUŁ</a></b>
+                if (i + 4 < nodes.length) {
+                    const typeNode = nodes[i + 2];
+                    const linkContainerNode = nodes[i + 4];
 
-                if (typeElement && typeElement.tagName === 'B' && linkElement && linkElement.tagName === 'A') {
-                    results.push({
-                        date: date,
-                        type: typeElement.innerText.trim(),
-                        title: linkElement.innerText.trim(),
-                        url: linkElement.href
-                    });
+                    if (typeNode && typeNode.nodeName === 'B' && linkContainerNode && linkContainerNode.nodeName === 'B') {
+                        const linkElement = linkContainerNode.querySelector('a[href$=".pdf"]');
+                        
+                        if (linkElement) {
+                            results.push({
+                                date: node.innerText.trim(),
+                                type: typeNode.innerText.trim(),
+                                title: linkElement.innerText.trim(),
+                                url: linkElement.href
+                            });
+                            // Przeskakujemy o 4 pozycje, aby uniknąć ponownego przetwarzania tych samych elementów
+                            i += 4;
+                        }
+                    }
                 }
             }
         }
