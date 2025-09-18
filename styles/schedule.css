@@ -214,6 +214,11 @@ td.split-cell > div:first-child {
     background-color: #ffeb3b !important;
 }
 
+.search-highlight {
+    background-color: #a7d9ff !important; /* Jasnoniebieski kolor podświetlenia */
+    box-shadow: inset 0 0 0 2px #007bff; /* Niebieska ramka */
+}
+
 td.current-time-highlight {
     background-color: #FFFF00 !important;
     font-weight: bold;

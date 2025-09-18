@@ -76,15 +76,18 @@ function searchAndHighlight(searchTerm, tableSelector, cellSelector) {
     const table = document.querySelector(tableSelector);
     if (!table) return;
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
+
+    // Pokaż wszystkie wiersze przed rozpoczęciem wyszukiwania
+    table.querySelectorAll('tbody tr').forEach(row => {
+        row.style.display = '';
+    });
+
     table.querySelectorAll(cellSelector).forEach(cell => {
         const cellText = cell.textContent.toLowerCase();
-        const row = cell.closest('tr');
-        if (row) {
-            if (cellText.includes(lowerCaseSearchTerm)) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
+        if (searchTerm && cellText.includes(lowerCaseSearchTerm)) {
+            cell.classList.add('search-highlight');
+        } else {
+            cell.classList.remove('search-highlight');
         }
     });
 }
