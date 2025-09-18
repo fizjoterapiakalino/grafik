@@ -1,115 +1,247 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const dateTimeText = document.getElementById('dateTimeText');
-    const appHeader = document.getElementById('appHeader');
+const Shared = (() => {
+    const initialize = () => {
+        const dateTimeText = document.getElementById('dateTimeText');
+        const appHeader = document.getElementById('appHeader');
 
-    // Function to update the date and time in the header
-    const updateDateTimeHeader = () => {
-        if (!dateTimeText) return;
-        const now = new Date();
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
-        dateTimeText.textContent = now.toLocaleDateString('pl-PL', options);
-    };
+        const updateDateTimeHeader = () => {
+            if (!dateTimeText) return;
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            dateTimeText.textContent = now.toLocaleDateString('pl-PL', options);
+        };
 
-    // --- NEW: Hamburger Menu in Header ---
-    const generateHamburgerMenu = () => {
-        // Find the right side of the header to inject the menu
-        let headerRightMenu = appHeader.querySelector('.header-right-menu');
-        if (!headerRightMenu) {
-            headerRightMenu = document.createElement('div');
-            headerRightMenu.className = 'header-right-menu';
-            appHeader.appendChild(headerRightMenu);
-        }
-
-        const navLinks = [
-            { href: 'schedule.html', text: 'Grafik', icon: 'fas fa-calendar-alt' },
-            { href: 'leaves.html', text: 'Urlopy', icon: 'fas fa-plane-departure' },
-            { href: 'options.html', text: 'Opcje', icon: 'fas fa-cogs' }
-        ];
-        const currentPage = window.location.pathname.split('/').pop();
-
-        // Create hamburger icon
-        const hamburger = document.createElement('div');
-        hamburger.className = 'hamburger-menu';
-        hamburger.innerHTML = '<i class="fas fa-bars"></i>';
-        
-        // Create navigation panel that slides from the right
-        const navPanel = document.createElement('div');
-        navPanel.className = 'nav-panel';
-        
-        const ul = document.createElement('ul');
-        navLinks.forEach(link => {
-            const li = document.createElement('li');
-            const a = document.createElement('a');
-            a.href = link.href;
-            
-            const icon = document.createElement('i');
-            icon.className = link.icon;
-            a.appendChild(icon);
-            
-            const textSpan = document.createElement('span');
-            textSpan.textContent = ' ' + link.text; // Dodaj spację przed tekstem
-            a.appendChild(textSpan);
-
-            if (currentPage === link.href) {
-                a.classList.add('active');
+        const generateHamburgerMenu = () => {
+            let headerRightMenu = appHeader.querySelector('.header-right-menu');
+            if (!headerRightMenu) {
+                headerRightMenu = document.createElement('div');
+                headerRightMenu.className = 'header-right-menu';
+                appHeader.appendChild(headerRightMenu);
             }
-            li.appendChild(a);
-            ul.appendChild(li);
-        });
-        navPanel.appendChild(ul);
 
-        // Add footer information to the navigation panel
-        const footerInfo = document.createElement('div');
-        footerInfo.className = 'footer-info';
-        footerInfo.innerHTML = '<p>&copy; 2025 Fizjoterapia Kalinowa. Wszelkie prawa zastrzeżone.</p>'; // You can customize this text
-        navPanel.appendChild(footerInfo);
+            const navLinks = [
+                { href: '#schedule', text: 'Grafik', icon: 'fas fa-calendar-alt' },
+                { href: '#leaves', text: 'Urlopy', icon: 'fas fa-plane-departure' },
+                { href: '#changes', text: 'Harmonogram zmian', icon: 'fas fa-exchange-alt' },
+                { href: '#scrapped-pdfs', text: 'ISO', icon: 'fas fa-file-pdf', id: 'navLinkIso' }, // Dodano ID
+                { href: '#options', text: 'Opcje', icon: 'fas fa-cogs' }
+            ];
+            
+            const hamburger = document.createElement('div');
+            hamburger.className = 'hamburger-menu';
+            hamburger.innerHTML = '<i class="fas fa-bars"></i>';
+            
+            const navPanel = document.createElement('div');
+            navPanel.className = 'nav-panel';
 
-        // Add hamburger icon to the header, and panel to the body
-        headerRightMenu.appendChild(hamburger);
-        document.body.appendChild(navPanel);
+            const userInfoDiv = document.createElement('div');
+            userInfoDiv.className = 'user-info';
+            userInfoDiv.id = 'navPanelUserInfo'; // Dodaj ID dla łatwiejszej aktualizacji
+            userInfoDiv.textContent = 'Zalogowano jako: Gość'; // Domyślny tekst
+            navPanel.appendChild(userInfoDiv);
+            
+            const ul = document.createElement('ul');
+            navLinks.forEach(link => {
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.href = link.href;
+                
+                const icon = document.createElement('i');
+                icon.className = link.icon;
+                a.appendChild(icon);
+                
+                const textSpan = document.createElement('span');
+                textSpan.textContent = ' ' + link.text;
+                a.appendChild(textSpan);
 
-        // Event listener to toggle menu visibility
-        hamburger.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent the document click listener from firing immediately
-            navPanel.classList.toggle('visible');
-            hamburger.classList.toggle('active');
-        });
-        
-        // Event listener to close menu when clicking outside
-        document.addEventListener('click', (e) => {
-            if (navPanel.classList.contains('visible') && !navPanel.contains(e.target) && !hamburger.contains(e.target)) {
-                navPanel.classList.remove('visible');
-                hamburger.classList.remove('active');
-            }
-        });
-    };
+                li.appendChild(a);
+                ul.appendChild(li);
 
-    // --- "Toast" Notification System ---
-    window.showToast = (message, duration = 3000) => {
-        let toastContainer = document.getElementById('toast-container');
-        if (!toastContainer) {
-            toastContainer = document.createElement('div');
-            toastContainer.id = 'toast-container';
-            document.body.appendChild(toastContainer);
-        }
-
-        const toast = document.createElement('div');
-        toast.className = 'toast show';
-        toast.textContent = message;
-        toastContainer.appendChild(toast);
-
-        setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => {
-                if (toast.parentNode === toastContainer) {
-                   toastContainer.removeChild(toast);
+                // Dodaj ID do elementu <a> dla linku ISO
+                if (link.id) {
+                    a.id = link.id;
                 }
-            }, 500);
-        }, duration);
+
+                // Ukryj menu po kliknięciu linku
+                a.addEventListener('click', () => {
+                    navPanel.classList.remove('visible');
+                    hamburger.classList.remove('active');
+                });
+            });
+            navPanel.appendChild(ul);
+
+            // Add logout button in a separate list to push it to the bottom
+            const logoutUl = document.createElement('ul');
+            const logoutLi = document.createElement('li');
+            logoutLi.id = 'logoutBtnContainer';
+            logoutLi.style.display = 'none'; // Initially hidden
+            const logoutA = document.createElement('a');
+            logoutA.href = '#';
+            logoutA.id = 'logoutBtn';
+            logoutA.innerHTML = '<i class="fas fa-sign-out-alt"></i> <span>Wyloguj</span>';
+            logoutLi.appendChild(logoutA);
+            logoutUl.appendChild(logoutLi);
+            navPanel.appendChild(logoutUl); // Dodaj nową listę bezpośrednio do panelu
+
+            const footerInfo = document.createElement('div');
+            footerInfo.className = 'footer-info';
+            footerInfo.innerHTML = '<p>&copy; 2025 Fizjoterapia Kalinowa. Wszelkie prawa zastrzeżone.</p>';
+            navPanel.appendChild(footerInfo);
+
+            headerRightMenu.appendChild(hamburger);
+            document.body.appendChild(navPanel);
+
+            const updateActiveLink = () => {
+                const currentHash = window.location.hash || '#schedule';
+                navPanel.querySelectorAll('a').forEach(a => {
+                    if (a.getAttribute('href') === currentHash) {
+                        a.classList.add('active');
+                    } else {
+                        a.classList.remove('active');
+                    }
+                });
+            };
+
+            hamburger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                navPanel.classList.toggle('visible');
+                hamburger.classList.toggle('active');
+            });
+            
+            document.addEventListener('click', (e) => {
+                if (navPanel.classList.contains('visible') && !navPanel.contains(e.target) && !hamburger.contains(e.target)) {
+                    navPanel.classList.remove('visible');
+                    hamburger.classList.remove('active');
+                }
+            });
+
+            window.addEventListener('hashchange', updateActiveLink);
+            updateActiveLink(); // Set on initial load
+        };
+
+        window.showToast = (message, duration = 3000) => {
+            let toastContainer = document.getElementById('toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toast-container';
+                document.body.appendChild(toastContainer);
+            }
+
+            const toast = document.createElement('div');
+            toast.className = 'toast show';
+            toast.textContent = message;
+            toastContainer.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (toast.parentNode === toastContainer) {
+                       toastContainer.removeChild(toast);
+                    }
+                }, 500);
+            }, duration);
+        };
+
+        const setupGlobalEventListeners = () => {
+            const searchInput = document.getElementById('searchInput');
+            const clearSearchButton = document.getElementById('clearSearchButton');
+
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    const searchTerm = e.target.value.trim();
+                    document.dispatchEvent(new CustomEvent('app:search', { detail: { searchTerm } }));
+                    if (clearSearchButton) {
+                        clearSearchButton.style.display = searchTerm ? 'block' : 'none';
+                    }
+                });
+            }
+
+            if (clearSearchButton) {
+                clearSearchButton.addEventListener('click', () => {
+                    if (searchInput) {
+                        searchInput.value = '';
+                        searchInput.focus();
+                    }
+                    document.dispatchEvent(new CustomEvent('app:search', { detail: { searchTerm: '' } }));
+                    clearSearchButton.style.display = 'none';
+                });
+            }
+        };
+
+        generateHamburgerMenu();
+        setInterval(updateDateTimeHeader, 1000);
+        updateDateTimeHeader();
+        setupGlobalEventListeners();
+
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => {
+                firebase.auth().signOut().then(() => {
+                    window.location.hash = '#login'; // Przekieruj po wylogowaniu
+                    // Explicitly get elements to ensure they are correctly referenced
+                    const currentNavPanel = document.querySelector('.nav-panel');
+                    const currentHamburger = document.querySelector('.hamburger-menu');
+                    if (currentNavPanel) {
+                        currentNavPanel.classList.remove('visible'); // Ukryj menu po wylogowaniu
+                    }
+                    if (currentHamburger) {
+                        currentHamburger.classList.remove('active');
+                    }
+                });
+            });
+        }
     };
 
-    // Initialization
-    generateHamburgerMenu();
-    setInterval(updateDateTimeHeader, 1000);
-    updateDateTimeHeader();
-});
+    const updateUserInfo = (userName) => {
+        const userInfoElement = document.getElementById('navPanelUserInfo');
+        if (userInfoElement) {
+            userInfoElement.textContent = `Zalogowano jako: ${userName || 'Gość'}`;
+        }
+    };
+
+    const setIsoLinkActive = (isActive) => {
+        const isoLink = document.getElementById('navLinkIso');
+        if (isoLink) {
+            if (isActive) {
+                isoLink.classList.remove('disabled');
+                isoLink.style.pointerEvents = 'auto'; // Przywróć interaktywność
+                isoLink.style.opacity = '1'; // Przywróć normalną przezroczystość
+            } else {
+                isoLink.classList.add('disabled');
+                isoLink.style.pointerEvents = 'none'; // Wyłącz interaktywność
+                isoLink.style.opacity = '0.5'; // Ustaw ciemniejszy wygląd
+            }
+        }
+    };
+
+    return {
+        initialize,
+        updateUserInfo,
+        setIsoLinkActive // Eksportuj nową metodę
+    };
+})();
+
+window.setSaveStatus = (status) => {
+    const statusElement = document.getElementById('saveStatus');
+    if (!statusElement) return;
+
+    statusElement.classList.remove('saving', 'saved', 'error');
+    statusElement.style.display = 'block';
+
+    switch (status) {
+        case 'saving':
+            statusElement.classList.add('saving');
+            statusElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Zapisywanie...';
+            break;
+        case 'saved':
+            statusElement.classList.add('saved');
+            statusElement.innerHTML = '<i class="fas fa-check-circle"></i> Zapisano';
+            setTimeout(() => {
+                statusElement.style.display = 'none';
+            }, 2000);
+            break;
+        case 'error':
+            statusElement.classList.add('error');
+            statusElement.innerHTML = '<i class="fas fa-exclamation-circle"></i> Błąd zapisu';
+            break;
+    }
+};

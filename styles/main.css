@@ -85,61 +85,91 @@ body {
     transform: translateX(0);
 }
 
-/* Style dla panelu nawigacyjnego (hamburger menu) */
-.nav-panel {
-    position: fixed;
-    top: 0;
-    right: 0;
-    width: 280px; /* Szerokość panelu */
-    height: 100vh; /* Pełna wysokość widoku */
-    background-color: #333; /* Tło panelu */
-    transform: translateX(100%); /* Domyślnie ukryty poza ekranem */
-    transition: transform 0.3s ease-in-out;
-    z-index: 1000;
-    box-shadow: -2px 0 5px rgba(0,0,0,0.2); /* Cień dla efektu wysuwania */
+
+/* --- Style strony logowania --- */
+.login-container {
     display: flex;
-    flex-direction: column;
-    justify-content: space-between; /* Rozmieść elementy, aby stopka była na dole */
-    padding-top: 0;
-    padding-bottom: 40px; /* Zwiększono padding na dole, aby zapewnić więcej miejsca dla stopki */
-    box-sizing: border-box;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #f0f2f5;
 }
 
-.nav-panel.visible {
-    transform: translateX(0); /* Pokaż panel */
+.login-box {
+    background: white;
+    padding: 40px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 550px; /* Zwiększono szerokość */
 }
 
-.nav-panel ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    flex-grow: 1; /* Pozwól liście linków rosnąć */
-    overflow-y: auto; /* Dodaj przewijanie, jeśli linków jest dużo */
-}
-
-.nav-panel li a {
-    display: block;
-    padding: 15px 20px;
-    color: #ffffff;
-    text-decoration: none;
-    font-size: 1.1em;
-    border-bottom: 1px solid #444;
-    transition: background-color 0.2s;
-}
-
-.nav-panel li a:hover,
-.nav-panel li a.active {
-    background-color: #555;
-}
-
-.nav-panel .footer-info {
-    padding: 15px;
+.login-box h2 {
     text-align: center;
-    color: #ffffff;
-    font-size: 1em; /* Zwiększono rozmiar czcionki dla lepszej widoczności */
-    border-top: 1px solid #666;
-    box-sizing: border-box;
-    margin-top: auto;
+    margin-bottom: 30px;
+    color: #333;
+}
+
+.login-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 40px; /* Odstęp między logo a formularzem */
+}
+
+.login-logo {
+    width: 100px; /* Zwiększono logo */
+    height: auto;
     flex-shrink: 0;
-    background-color: #222;
+}
+
+.login-form {
+    width: 100%;
+}
+
+.form-group {
+    margin-bottom: 20px; /* Zwiększono odstęp */
+    text-align: left;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #555;
+    font-weight: bold;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end; /* Przycisk po prawej */
+    margin-top: 20px;
+}
+
+.login-btn {
+    padding: 12px 25px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s;
+}
+
+.login-btn:hover {
+    background-color: #45a049;
+}
+
+.login-error {
+    color: #D8000C;
+    margin-top: 15px;
+    min-height: 1.2em;
+    text-align: left;
 }

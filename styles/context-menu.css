@@ -1,0 +1,68 @@
+/* --- Menu Kontekstowe --- */
+.context-menu {
+    position: absolute;
+    display: none;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    padding: 5px 0;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1100;
+    transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
+    opacity: 0;
+    transform: scale(0.95);
+    min-width: 200px;
+}
+
+.context-menu.visible {
+    display: block;
+    opacity: 1;
+    transform: scale(1);
+}
+
+.context-menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.context-menu li {
+    display: flex;
+    align-items: center;
+    padding: 8px 15px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    color: #333;
+    font-size: 0.95em;
+}
+
+.context-menu li:hover {
+    background-color: #f2f2f2;
+}
+
+.context-menu li i {
+    margin-right: 12px;
+    width: 1.2em;
+    text-align: center;
+    color: #555;
+}
+
+/* Specjalny styl dla opcji usuwania/czyszczenia */
+.context-menu li.danger,
+.context-menu li.danger i {
+    color: #dc3545; /* Czerwony kolor ostrzegawczy */
+}
+
+.context-menu li.danger:hover {
+    background-color: #f8d7da; /* Jasnoczerwone tło przy najechaniu */
+}
+
+/* Specjalny styl dla opcji informacyjnych */
+.context-menu li.info,
+.context-menu li.info i {
+    color: #007bff; /* Niebieski kolor informacyjny */
+}
+
+.context-menu li.info:hover {
+    background-color: #e9f5ff; /* Jasnoniebieskie tło przy najechaniu */
+}
