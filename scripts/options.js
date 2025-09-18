@@ -160,6 +160,8 @@ const Options = (() => {
         try {
             await db.runTransaction(async (transaction) => {
                 const scheduleRef = db.collection("schedules").doc("mainSchedule");
+                const leavesRef = db.collection("leaves").doc("mainLeaves"); // Deklaracja leavesRef
+                const leavesDoc = await transaction.get(leavesRef); // Odczyt przed zapisem
                 
                 transaction.update(scheduleRef, {
                     [`employees.${selectedEmployeeIndex}`]: updatedEmployee
@@ -169,8 +171,6 @@ const Options = (() => {
                 // Logika migracji nazwy w urlopach
                 const oldNameKey = oldEmployee.displayName || oldEmployee.name;
                 if (oldNameKey !== newDisplayName) {
-                    const leavesRef = db.collection("leaves").doc("mainLeaves");
-                    const leavesDoc = await transaction.get(leavesRef);
                     if (leavesDoc.exists && leavesDoc.data()[oldNameKey]) {
                         const leavesData = leavesDoc.data();
                         const employeeLeaveData = leavesData[oldNameKey];

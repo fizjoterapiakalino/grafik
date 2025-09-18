@@ -75,10 +75,15 @@ const ScheduleUI = (() => {
             cell.classList.add('break-cell');
             cell.style.backgroundColor = AppConfig.schedule.defaultCellColor;
         } else if (cellObj.isSplit) {
-            const createPart = (content, isMassage, isPnf) => {
+            const createPart = (content, isMassage, isPnf, isEveryOtherDay, gender) => {
                 const div = document.createElement('div');
                 div.setAttribute('tabindex', '0');
-                let htmlContent = `<span>${capitalizeFirstLetter(content || '')}</span>`;
+                let htmlContent = '';
+                if (gender) {
+                    htmlContent += `<i class="fas gender-icon ${gender}"></i>`;
+                }
+                htmlContent += `<span>${capitalizeFirstLetter(content || '')}</span>`;
+                
                 if (isMassage) {
                     div.classList.add('massage-text');
                     div.dataset.isMassage = 'true';
@@ -87,7 +92,7 @@ const ScheduleUI = (() => {
                     div.classList.add('pnf-text');
                     div.dataset.isPnf = 'true';
                 }
-                if (cellObj.isEveryOtherDay) { // Dodaj obsługę dla isEveryOtherDay
+                if (isEveryOtherDay) {
                     div.classList.add('every-other-day-text');
                     div.dataset.isEveryOtherDay = 'true';
                 }
@@ -96,10 +101,15 @@ const ScheduleUI = (() => {
             };
             cell.classList.add('split-cell');
             cell.style.backgroundColor = AppConfig.schedule.contentCellColor;
-            cell.appendChild(createPart(cellObj.content1, cellObj.isMassage1, cellObj.isPnf1, cellObj.isEveryOtherDay1)); // Przekaż isEveryOtherDay1
-            cell.appendChild(createPart(cellObj.content2, cellObj.isMassage2, cellObj.isPnf2, cellObj.isEveryOtherDay2)); // Przekaż isEveryOtherDay2
+            cell.appendChild(createPart(cellObj.content1, cellObj.isMassage1, cellObj.isPnf1, cellObj.isEveryOtherDay1, cellObj.treatmentData1?.gender));
+            cell.appendChild(createPart(cellObj.content2, cellObj.isMassage2, cellObj.isPnf2, cellObj.isEveryOtherDay2, cellObj.treatmentData2?.gender));
         } else {
-            let htmlContent = `<span>${capitalizeFirstLetter(cellObj.content || '')}</span>`;
+            let htmlContent = '';
+            if (cellObj.gender) {
+                htmlContent += `<i class="fas gender-icon ${cellObj.gender}"></i>`;
+            }
+            htmlContent += `<span>${capitalizeFirstLetter(cellObj.content || '')}</span>`;
+            
             if (cellObj.isMassage) {
                 cell.classList.add('massage-text');
                 cell.dataset.isMassage = 'true';
@@ -108,7 +118,7 @@ const ScheduleUI = (() => {
                 cell.classList.add('pnf-text');
                 cell.dataset.isPnf = 'true';
             }
-            if (cellObj.isEveryOtherDay) { // Dodaj obsługę dla isEveryOtherDay
+            if (cellObj.isEveryOtherDay) {
                 cell.classList.add('every-other-day-text');
                 cell.dataset.isEveryOtherDay = 'true';
             }

@@ -7,34 +7,9 @@ const port = process.env.PORT || 3000;
 
 app.use(cors());
 
-let pdfLinks = []; // Przechowuje pobrane linki do PDF
-let isScraping = false; // Nowa zmienna do śledzenia statusu scrapingu
-const sseClients = []; // Tablica do przechowywania klientów SSE
+let scrapedData = []; 
 
-// Endpoint dla Server-Sent Events
-app.get('/api/events', (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
-
-  sseClients.push(res);
-
-  req.on('close', () => {
-    const index = sseClients.indexOf(res);
-    if (index > -1) {
-      sseClients.splice(index, 1);
-    }
-  });
-});
-
-// Funkcja do logowania i pobierania linków
 async function scrapePdfLinks() {
-  if (isScraping) {
-    console.log('Scraping jest już w toku. Pomijam nowe żądanie.');
-    return;
-  }
-  isScraping = true;
   console.log('Rozpoczynam scraping...');
   let browser = null;
 
@@ -49,28 +24,53 @@ async function scrapePdfLinks() {
 
     const page = await browser.newPage();
 
-    // --- KLUCZOWA ZMIANA JEST TUTAJ ---
-    // Ustawiamy dane logowania, których Puppeteer użyje automatycznie
     await page.authenticate({
         username: process.env.LOGIN_USERNAME,
         password: process.env.LOGIN_PASSWORD,
     });
 
-    // Teraz przechodzimy na stronę. Puppeteer sam obsłuży okno logowania.
     await page.goto(process.env.TARGET_URL, { waitUntil: 'networkidle2' });
 
-    // Nie potrzebujemy już page.type() i page.click() do logowania.
+    // --- OSTATECZNA LOGIKA BAZUJĄCA NA PLIKU HTML ---
+    const documents = await page.evaluate(() => {
+        const results = [];
+        const container = document.querySelector('div#tresc');
+        if (!container) return [];
 
-    // Pobieranie linków do PDF
-    // TODO: Upewnij się, że selektor 'a[href$=".pdf"]' jest poprawny dla strony po zalogowaniu.
-    const links = await page.evaluate(() => {
-      // Upewniamy się, że linki są pełnymi adresami URL
-      const anchors = Array.from(document.querySelectorAll('a[href$=".pdf"]'));
-      return anchors.map(a => a.href);
+        // Pobieramy wszystkie elementy (węzły) wewnątrz kontenera
+        const nodes = Array.from(container.childNodes);
+        
+        for (let i = 0; i < nodes.length; i++) {
+            const currentNode = nodes[i];
+            
+            // Krok 1: Szukamy węzła tekstowego, który zawiera datę
+            if (currentNode.nodeType === Node.TEXT_NODE && /\d{4}-\d{2}-\d{2}/.test(currentNode.textContent)) {
+                
+                // Krok 2: Sprawdzamy, czy następne elementy to <b> i <a>
+                const typeNode = nodes[i + 1]; // Typ powinien być zaraz po tekście z datą
+                const linkNode = nodes[i + 3]; // Link jest 2 pozycje dalej
+
+                if (typeNode && typeNode.nodeName === 'B' && linkNode && linkNode.nodeName === 'A') {
+                    const dateMatch = currentNode.textContent.match(/(\d{4}-\d{2}-\d{2})/);
+                    
+                    if (dateMatch) {
+                         results.push({
+                            date: dateMatch[0],
+                            type: typeNode.innerText.trim(),
+                            title: linkNode.innerText.trim(),
+                            url: linkNode.href
+                        });
+                        // Przeskakujemy przetworzone elementy, aby ich ponownie nie analizować
+                        i += 3;
+                    }
+                }
+            }
+        }
+        return results;
     });
 
-    pdfLinks = links;
-    console.log(`Pobrano ${pdfLinks.length} linków do PDF.`);
+    scrapedData = documents;
+    console.log(`Pobrano dane ${scrapedData.length} dokumentów.`);
 
   } catch (error) {
     console.error('Błąd podczas scrapingu:', error);
@@ -78,32 +78,15 @@ async function scrapePdfLinks() {
     if (browser !== null) {
       await browser.close();
     }
-    isScraping = false; // Zakończono scraping
-
-    // Wyślij zdarzenie do wszystkich klientów SSE po zakończeniu scrapingu
-    sseClients.forEach(client => {
-      client.write(`event: scrapingComplete\ndata: ${JSON.stringify({ links: pdfLinks, isScraping: false })}\n\n`);
-    });
   }
 }
 
-// Endpoint API do zwracania linków PDF
 app.get('/api/pdfs', (req, res) => {
-  res.json({ links: pdfLinks, isScraping: isScraping });
+  res.json(scrapedData); 
 });
 
-// Nowy endpoint do ręcznego wywołania scrapingu
-app.post('/api/scrape', async (req, res) => {
-  if (isScraping) {
-    return res.status(202).json({ message: 'Scraping już w toku.', isScraping: true });
-  }
-  scrapePdfLinks(); // Uruchom scraping w tle
-  res.status(200).json({ message: 'Scraping rozpoczęty.', isScraping: true });
-});
-
-// Uruchom scraping przy starcie serwera i co jakiś czas
 scrapePdfLinks();
-setInterval(scrapePdfLinks, 60 * 60 * 1000); // Co godzinę
+setInterval(scrapePdfLinks, 60 * 60 * 1000);
 
 app.listen(port, () => {
   console.log(`Serwer działa na porcie ${port}`);

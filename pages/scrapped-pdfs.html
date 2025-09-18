@@ -1,6 +1,27 @@
 <div class="scrapped-pdfs-container">
     <h1>Dostępne Dokumenty PDF</h1>
-    <p>Poniżej znajduje się lista dokumentów pobranych automatycznie ze strony zla-chrzanow.pl/private/.</p>
-    <div id="pdf-links-container">
+    
+    <div class="search-and-info">
+        <p>Lista dokumentów pobranych automatycznie. Użyj pola, aby filtrować wyniki.</p>
+        <div class="search-container">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" id="pdfSearchInput" class="search-input" placeholder="Wpisz tytuł, typ lub datę...">
         </div>
+    </div>
+    
+    <div id="pdf-table-container" style="display: none;">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Typ dokumentu</th>
+                    <th>Tytuł</th>
+                </tr>
+            </thead>
+            <tbody id="pdf-table-body">
+                </tbody>
+        </table>
+    </div>
+
+    <div id="pdf-links-container"></div>
 </div>

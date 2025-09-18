@@ -242,21 +242,23 @@ td.current-time-highlight {
 }
 
 /* --- Modal Styles --- */
-.modal {
-    display: none; 
-    position: fixed; 
-    z-index: 1000; 
-    left: 0;
+.modal-overlay { /* Dodano style dla modal-overlay */
+    display: none;
+    position: fixed;
     top: 0;
-    width: 100%; 
-    height: 100%; 
-    overflow: auto; 
-    background-color: rgba(0,0,0,0.5); 
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center; /* Wyśrodkuj zawartość w poziomie */
+    align-items: center;   /* Wyśrodkuj zawartość w pionie */
+    overflow: auto;
 }
 
 .modal-content {
     background-color: #fefefe;
-    margin: 15% auto; 
+    /* margin: 15% auto; */ /* Usunięto, ponieważ flexbox w .modal-overlay to obsłuży */
     padding: 20px;
     border: 1px solid #888;
     width: 80%; 
@@ -356,4 +358,94 @@ td.current-time-highlight {
     font-size: 1.1em; /* Większa czcionka */
     font-weight: bold; /* Pogrubiona czcionka */
     color: #FFD700; /* Kolor dla wyróżnienia */
+}
+
+/* Style dla ułożenia pól obok siebie w modalu */
+.form-row {
+    display: flex;
+    gap: 20px; /* Odstęp między polami */
+    margin-bottom: 15px;
+}
+
+.form-row .form-group {
+    flex: 1; /* Rozciągnij, aby zajmowały równą przestrzeń */
+    margin-bottom: 0; /* Usuń dolny margines, ponieważ jest już na .form-row */
+}
+
+/* Style dla pola tekstowego Informacje dodatkowe */
+#additionalInfo {
+    width: 100%;
+    box-sizing: border-box; /* Uwzględnij padding i border w szerokości */
+    resize: vertical; /* Pozwól na zmianę rozmiaru tylko w pionie */
+}
+
+/* Style dla pogrubionej i większej czcionki */
+.bold-large-font {
+    font-weight: bold;
+    font-size: 1.1em; /* Zwiększenie czcionki o około 2px */
+}
+
+/* Style dla opcji płci w modalu */
+.patient-name-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap; /* Pozwól na zawijanie, jeśli brakuje miejsca */
+    gap: 10px; /* Odstęp między elementami w wierszu */
+}
+
+.patient-name-row label {
+    margin-right: 5px; /* Odstęp między etykietą a inputem */
+}
+
+.name-input-wrapper {
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+    gap: 10px; /* Odstęp między inputem a opcjami płci */
+}
+
+.name-input-wrapper input[type="text"] {
+    flex-grow: 1; /* Pozwól inputowi na rozciąganie */
+    min-width: 150px; /* Minimalna szerokość inputu */
+}
+
+.gender-options-inline { /* Nowa klasa dla opcji płci w tym samym wierszu */
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.gender-options-inline input[type="radio"] {
+    margin-right: 5px;
+}
+
+/* Stare .gender-options już niepotrzebne, ale zostawiam na wypadek, gdyby było używane gdzie indziej */
+.gender-options {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.gender-options input[type="radio"] {
+    margin-right: 5px;
+}
+
+/* Style dla ikonki płci */
+.gender-icon {
+    display: inline-block;
+    margin-left: 8px;
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
+    font-size: 0.9em;
+    vertical-align: middle;
+}
+
+.gender-icon.male::before {
+    content: "\f222"; /* Ikona mężczyzny */
+    color: #007bff; /* Niebieski */
+}
+
+.gender-icon.female::before {
+    content: "\f221"; /* Ikona kobiety */
+    color: hotpink; /* Różowy */
 }

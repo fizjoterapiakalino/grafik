@@ -235,6 +235,20 @@ const ScheduleEvents = (() => {
             return;
         }
 
+        if ((event.ctrlKey || event.metaKey) && event.key === 'p') {
+            event.preventDefault();
+            if (activeCell) {
+                if (_dependencies.ui.getElementText(activeCell).trim() !== '') {
+                    window.showToast('Nie można dodać przerwy do zajętej komórki. Najpierw wyczyść komórkę.', 3000);
+                    return;
+                }
+                _dependencies.updateCellState(activeCell, state => { state.isBreak = true; window.showToast('Dodano przerwę'); });
+            } else {
+                window.showToast('Wybierz komórkę, aby dodać przerwę.', 3000);
+            }
+            return;
+        }
+
         const target = document.activeElement;
         const isEditing = target.getAttribute('contenteditable') === 'true';
 

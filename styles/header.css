@@ -79,8 +79,8 @@
     padding: 8px 12px 8px 35px; /* Add space for icon */
     border-radius: 20px;
     border: 1px solid #555;
-    background-color: #444;
-    color: white;
+    background-color: #ffffff;
+    color: rgb(0, 0, 0);
     transition: width 0.3s ease;
     width: 200px;
 }
