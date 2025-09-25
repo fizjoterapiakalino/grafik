@@ -8,17 +8,31 @@ const Schedule = (() => {
     let unsubscribeSchedule;
     let isSaving = false;
     let saveQueue = null;
+    let currentUserId = null; // Dodana zmienna do przechowywania UID aktualnego użytkownika
+
+    // Funkcja do pobierania referencji do dokumentu grafiku (zawsze mainSchedule)
+    const getScheduleDocRef = () => {
+        return db.collection(AppConfig.firestore.collections.schedules).doc(AppConfig.firestore.docs.mainSchedule);
+    };
 
     const listenForScheduleChanges = () => {
-        const docRef = db.collection(AppConfig.firestore.collections.schedules).doc(AppConfig.firestore.docs.mainSchedule);
+        if (unsubscribeSchedule) {
+            unsubscribeSchedule(); // Anuluj poprzednią subskrypcję, jeśli istnieje
+        }
+
+        const docRef = getScheduleDocRef(); // Zawsze odwołuj się do mainSchedule
         unsubscribeSchedule = docRef.onSnapshot(
             (doc) => {
                 if (doc.exists) {
                     const savedData = doc.data();
                     appState.scheduleCells = savedData.scheduleCells || {};
-                    ScheduleUI.render(); 
+                    ScheduleUI.render();
                 } else {
-                    console.log("No schedule found, creating a new one.");
+                    console.log(`No main schedule found, creating a new one.`);
+                    // Jeśli główny dokument nie istnieje, zainicjuj pusty grafik i zapisz go
+                    appState.scheduleCells = {};
+                    ScheduleUI.render();
+                    saveSchedule(); // Zapisz pusty grafik, aby utworzyć dokument mainSchedule
                 }
             },
             (error) => {
@@ -38,7 +52,7 @@ const Schedule = (() => {
         window.setSaveStatus('saving');
 
         try {
-            await db.collection(AppConfig.firestore.collections.schedules).doc(AppConfig.firestore.docs.mainSchedule).set(appState, { merge: true });
+            await getScheduleDocRef().set(appState, { merge: true }); // Zawsze zapisuj do mainSchedule
             window.setSaveStatus('saved');
             isSaving = false;
 
@@ -444,7 +458,15 @@ const Schedule = (() => {
 
             undoManager.initialize(getCurrentTableState());
 
-            listenForScheduleChanges();
+            // Nasłuchuj zmian stanu uwierzytelnienia Firebase
+            firebase.auth().onAuthStateChanged(user => {
+                if (user) {
+                    currentUserId = user.uid;
+                } else {
+                    currentUserId = null;
+                }
+                listenForScheduleChanges(); // Załaduj grafik po ustaleniu UID
+            });
 
         } catch (error) {
             console.error("Błąd inicjalizacji strony harmonogramu:", error);

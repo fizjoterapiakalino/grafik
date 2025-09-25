@@ -12,7 +12,7 @@ const UIShell = (() => {
                 <p>Wczytywanie...</p>
             </div>
             <div id="toast-container"></div>
-            <div id="appHeader" class="app-header">
+            <div id="appHeader" class="app-header" style="display: none;"> <!-- Domyślnie ukryty -->
                 <div class="banner-left-content">
                     <img src="logo.png" alt="Logo Kalinowa" class="banner-logo">
                     <span class="banner-title">Grafik Kalinowa</span>
@@ -58,7 +58,9 @@ const UIShell = (() => {
             if (!response.ok) {
                 throw new Error(`Could not load page: ${pageName}`);
             }
-            pageContent.innerHTML = await response.text();
+            const pageHtml = await response.text();
+            pageContent.innerHTML = pageHtml;
+
             const scheduleActionButtons = document.getElementById('scheduleActionButtons');
             if (scheduleActionButtons) {
                 if (pageName === 'schedule') {

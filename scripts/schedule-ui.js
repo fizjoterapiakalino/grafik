@@ -148,29 +148,67 @@ const ScheduleUI = (() => {
     };
 
     const renderTable = () => {
-        const tableHeaderRow = document.getElementById('tableHeaderRow');
-        const tbody = document.getElementById('mainScheduleTable').querySelector('tbody');
         const mainTable = document.getElementById('mainScheduleTable');
+        if (!mainTable) {
+            console.warn("mainScheduleTable not found, skipping render.");
+            return; // Zakończ, jeśli tabela nie istnieje
+        }
+
+        const tableHeaderRow = document.getElementById('tableHeaderRow');
+        const tbody = mainTable.querySelector('tbody');
+        
+        if (!tableHeaderRow || !tbody) {
+            console.error("Table header row or tbody not found, cannot render schedule.");
+            return;
+        }
+
         tableHeaderRow.innerHTML = '<th>Godz.</th>';
         tbody.innerHTML = '';
 
         let employeeIndices = [];
         let isSingleUserView = false;
+        const ADMIN_EMAIL = 'test@test.com'; // Definicja administratora
 
         const currentUser = firebase.auth().currentUser;
+        console.log("ScheduleUI.renderTable: Current User:", currentUser ? currentUser.email : "No user");
         if (currentUser) {
-            const employee = EmployeeManager.getEmployeeByUid(currentUser.uid);
-            if (employee) {
-                employeeIndices.push(employee.id);
-                isSingleUserView = true;
+            console.log("ScheduleUI.renderTable: Current User UID:", currentUser.uid);
+            if (currentUser.email === ADMIN_EMAIL) {
+                // Administrator - wyświetl wszystkich pracowników
+                const allEmployees = EmployeeManager.getAll();
+                employeeIndices = Object.keys(allEmployees).sort((a, b) => parseInt(a) - parseInt(b));
+                isSingleUserView = false;
+                console.log("ScheduleUI.renderTable: User is ADMIN. Displaying all employees.");
+            } else {
+                // Zwykły użytkownik - wyświetl tylko jego kolumnę
+                const employee = EmployeeManager.getEmployeeByUid(currentUser.uid);
+                console.log("ScheduleUI.renderTable: Employee for UID:", currentUser.uid, employee);
+                if (employee) {
+                    employeeIndices.push(employee.id);
+                    isSingleUserView = true;
+                    console.log(`ScheduleUI.renderTable: User ${currentUser.email} is linked to employee ${employee.name}. Displaying single column.`);
+                } else {
+                    // Jeśli użytkownik nie jest adminem i nie jest powiązany z pracownikiem,
+                    // to nadal wyświetlamy wszystkich, ale to jest przypadek, który powinien być rzadki
+                    // lub wskazywać na brak konfiguracji pracownika dla danego UID.
+                    // Na potrzeby zadania, jeśli nie jest adminem i nie ma pracownika,
+                    // wyświetlamy wszystkich, ale to może być do zmiany w przyszłości.
+                    const allEmployees = EmployeeManager.getAll();
+                    employeeIndices = Object.keys(allEmployees).sort((a, b) => parseInt(a) - parseInt(b));
+                    isSingleUserView = false;
+                    console.warn(`ScheduleUI.renderTable: User ${currentUser.email} is not an admin and not linked to an employee. Displaying all employees.`);
+                }
             }
-        }
-
-        if (!isSingleUserView) {
+        } else {
+            // Użytkownik wylogowany - wyświetl wszystkich pracowników (pełny grafik)
             const allEmployees = EmployeeManager.getAll();
             employeeIndices = Object.keys(allEmployees).sort((a, b) => parseInt(a) - parseInt(b));
+            isSingleUserView = false;
+            console.log("ScheduleUI.renderTable: User logged out. Displaying all employees.");
         }
         
+        console.log("ScheduleUI.renderTable: Final employeeIndices:", employeeIndices);
+        console.log("ScheduleUI.renderTable: Final isSingleUserView:", isSingleUserView);
         mainTable.classList.toggle('single-user-view', isSingleUserView);
 
         for (const i of employeeIndices) {
