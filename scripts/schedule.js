@@ -23,9 +23,17 @@ const Schedule = (() => {
         const docRef = getScheduleDocRef(); // Zawsze odwołuj się do mainSchedule
         unsubscribeSchedule = docRef.onSnapshot(
             (doc) => {
+                console.log("listenForScheduleChanges: Snapshot received.");
                 if (doc.exists) {
+                    console.log("listenForScheduleChanges: Document data:", doc.data());
                     const savedData = doc.data();
-                    appState.scheduleCells = savedData.scheduleCells || {};
+                    if (savedData.scheduleCells && Object.keys(savedData.scheduleCells).length > 0) {
+                        appState.scheduleCells = savedData.scheduleCells;
+                        console.log("listenForScheduleChanges: appState.scheduleCells updated with data:", appState.scheduleCells);
+                    } else {
+                        appState.scheduleCells = {}; // Upewnij się, że jest puste
+                        console.warn("listenForScheduleChanges: Document 'mainSchedule' exists, but its 'scheduleCells' field is either missing or empty. The table will be empty.");
+                    }
                     ScheduleUI.render();
                 } else {
                     console.log(`No main schedule found, creating a new one.`);
@@ -426,6 +434,34 @@ const Schedule = (() => {
                     window.showToast('Zmieniono styl');
                 });
             },
+            mergeSplitCell(cell) {
+                const time = cell.dataset.time;
+                const employeeIndex = cell.dataset.employeeIndex;
+                const cellState = appState.scheduleCells[time]?.[employeeIndex];
+
+                if (!cellState || !cellState.isSplit) {
+                    window.showToast('Ta komórka nie jest podzielona.', 3000);
+                    return;
+                }
+
+                const content1 = cellState.content1 || '';
+                const content2 = cellState.content2 || '';
+
+                if (content1.trim() !== '' && content2.trim() !== '') {
+                    window.showToast('Jedna z części komórki musi być pusta, aby je scalić.', 3000);
+                    return;
+                }
+
+                const mergedContent = content1.trim() === '' ? content2 : content1;
+
+                updateCellState(cell, state => {
+                    delete state.isSplit;
+                    delete state.content1;
+                    delete state.content2;
+                    state.content = mergedContent;
+                    window.showToast('Scalono komórkę.');
+                });
+            },
             undoLastAction() {
                 const prevState = undoManager.undo();
                 if (prevState) {
@@ -453,6 +489,7 @@ const Schedule = (() => {
                 openPatientInfoModal: mainController.openPatientInfoModal.bind(mainController),
                 openEmployeeSelectionModal: mainController.openEmployeeSelectionModal.bind(mainController),
                 toggleSpecialStyle: mainController.toggleSpecialStyle.bind(mainController),
+                mergeSplitCell: mainController.mergeSplitCell.bind(mainController),
                 undoLastAction: mainController.undoLastAction.bind(mainController)
             });
 

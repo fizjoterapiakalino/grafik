@@ -144,8 +144,8 @@ const Router = (() => {
         });
 
         sse.onerror = (error) => {
-            console.error('Błąd SSE:', error);
-            sse.close(); // Zamknij połączenie w przypadku błędu
+            console.warn('Nie udało się nawiązać połączenia SSE z serwerem PDF Scraper. Ta funkcja nie jest krytyczna dla działania grafiku.');
+            sse.close(); // Zamknij połączenie, aby uniknąć dalszych błędów
         };
     };
 

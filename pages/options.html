@@ -49,6 +49,19 @@
                 <label for="carriedOverLeaveInput">Urlop zaległy (z poprz. roku):</label>
                 <input type="number" id="carriedOverLeaveInput" min="0" value="0">
             </div>
+            <div class="form-group form-group-checkbox">
+                <input type="checkbox" id="employeeRoleAdmin">
+                <label for="employeeRoleAdmin">Administrator (pełny dostęp)</label>
+            </div>
+            <div class="form-group">
+                <label for="employeeUidInput">Przypisany Użytkownik (UID)</label>
+                <div class="uid-input-group">
+                    <input type="text" id="employeeUidInput" readonly placeholder="Brak przypisanego użytkownika">
+                    <div class="uid-actions">
+                        <button id="assignUidBtn" class="action-btn uid-btn">Przypisz do mnie</button>
+                        <button id="clearUidBtn" class="action-btn uid-btn cancel-btn"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </div>
             <div class="form-actions">
                 <button id="saveEmployeeBtn" class="action-btn confirm-btn">
                     <i class="fas fa-save"></i> Zapisz zmiany

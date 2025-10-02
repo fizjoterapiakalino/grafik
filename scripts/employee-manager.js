@@ -61,6 +61,31 @@ const EmployeeManager = (() => {
                 }
             }
             return null;
+        },
+        // Sprawdza, czy użytkownik o danym UID ma rolę admina
+        isUserAdmin: function(uid) {
+            if (!uid) return false;
+            const employee = this.getEmployeeByUid(uid);
+            return employee?.role === 'admin';
+        },
+        // Aktualizuje dane pracownika i zapisuje do Firestore
+        updateEmployee: async function(id, data) {
+            if (!_employees[id]) {
+                console.error(`Pracownik o ID ${id} nie istnieje.`);
+                return;
+            }
+            // Zaktualizuj lokalny stan
+            _employees[id] = { ..._employees[id], ...data };
+
+            // Zapisz cały obiekt employees do Firestore
+            try {
+                const docRef = db.collection("schedules").doc("mainSchedule");
+                await docRef.set({ employees: _employees }, { merge: true });
+            } catch (error) {
+                console.error("Błąd podczas aktualizacji danych pracownika w Firestore:", error);
+                window.showToast("Nie udało się zapisać zmian.", 5000);
+                // Wycofaj zmiany w lokalnym stanie w razie błędu? Można to rozważyć.
+            }
         }
     };
 })();

@@ -15,7 +15,7 @@ const UIShell = (() => {
             <div id="appHeader" class="app-header" style="display: none;"> <!-- Domyślnie ukryty -->
                 <div class="banner-left-content">
                     <img src="logo.png" alt="Logo Kalinowa" class="banner-logo">
-                    <span class="banner-title">Grafik Kalinowa</span>
+                    <span id="bannerTitleLink" class="banner-title">Grafik Kalinowa</span>
                 </div>
                 <div id="dateTimeText" class="date-time-text"></div>
                 <div class="header-right-menu">
@@ -23,6 +23,7 @@ const UIShell = (() => {
                     <div id="scheduleActionButtons" class="schedule-action-buttons">
                         <button id="btnPatientInfo" class="action-icon-btn" title="Informacje o pacjencie"><i class="fas fa-user-circle"></i></button>
                         <button id="btnSplitCell" class="action-icon-btn" title="Podziel komórkę"><i class="fas fa-users"></i></button>
+                        <button id="btnMergeCells" class="action-icon-btn" title="Scal komórki"><i class="fas fa-user"></i></button>
                         <button id="btnAddBreak" class="action-icon-btn" title="Dodaj przerwę"><i class="fas fa-coffee"></i></button>
                         <button id="btnMassage" class="action-icon-btn" title="Oznacz jako Masaż"><i class="fas fa-hand-paper"></i></button>
                         <button id="btnPnf" class="action-icon-btn" title="Oznacz jako PNF"><i class="fas fa-brain"></i></button>
@@ -44,6 +45,15 @@ const UIShell = (() => {
 
         // Initialize shared components like hamburger menu
         Shared.initialize();
+
+        // Add event listener for banner title to navigate to schedule
+        const bannerTitleLink = document.getElementById('bannerTitleLink');
+        if (bannerTitleLink) {
+            bannerTitleLink.style.cursor = 'pointer'; // Indicate it's clickable
+            bannerTitleLink.addEventListener('click', () => {
+                window.location.hash = 'schedule'; // Use hash navigation for SPA
+            });
+        }
     };
 
     const loadPage = async (pageName) => { // Usunięto callback

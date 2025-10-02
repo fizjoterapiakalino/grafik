@@ -1,69 +1,56 @@
-// scripts/migration.js
-document.addEventListener('DOMContentLoaded', () => {
-    const migrateBtn = document.getElementById('migrateBtn');
-    const statusDiv = document.getElementById('status');
+const Migration = (() => {
 
-    // Sprawdzenie, czy obiekty firebase i db są dostępne
-    if (typeof firebase === 'undefined' || typeof db === 'undefined') {
-        statusDiv.textContent = "Błąd: Firebase nie jest poprawnie załadowany. Sprawdź konfigurację w firebase-config.js.";
-        console.error("Firebase lub Firestore DB nie zostały zainicjowane.");
-        return;
-    }
+    const runMigration = async () => {
+        const sourceDocId = '2025-08-08'; // Dokument źródłowy z danymi
+        const targetDocId = 'mainSchedule'; // Dokument docelowy
 
-    migrateBtn.addEventListener('click', async () => {
-        statusDiv.textContent = "Rozpoczynam migrację...";
-        const docRef = db.collection("schedules").doc("mainSchedule");
+        const sourceRef = db.collection('schedules').doc(sourceDocId);
+        const targetRef = db.collection('schedules').doc(targetDocId);
 
         try {
-            await db.runTransaction(async (transaction) => {
-                const doc = await transaction.get(docRef);
+            window.showToast('Rozpoczynam migrację danych...', 3000);
 
-                if (!doc.exists) {
-                    throw new Error("Dokument mainSchedule nie istnieje!");
-                }
+            const sourceDoc = await sourceRef.get();
 
-                const data = doc.data();
+            if (!sourceDoc.exists) {
+                console.error(`Dokument źródłowy '${sourceDocId}' nie istnieje!`);
+                window.showToast(`Błąd: Dokument źródłowy '${sourceDocId}' nie istnieje!`, 5000);
+                return;
+            }
 
-                if (!data.employeeHeaders) {
-                    statusDiv.textContent = "Wygląda na to, że migracja została już przeprowadzona (brak pola 'employeeHeaders').";
-                    console.log("Migracja nie jest wymagana.");
-                    return;
-                }
+            const sourceData = sourceDoc.data();
+            const scheduleCellsToMigrate = sourceData.scheduleCells;
 
-                if (data.employees) {
-                    statusDiv.textContent = "Wykryto pole 'employees'. Przerwij migrację, aby uniknąć nadpisania danych.";
-                    console.warn("Wykryto pole 'employees', przerwanie.");
-                    return;
-                }
+            if (!scheduleCellsToMigrate) {
+                console.error(`Dokument źródłowy '${sourceDocId}' nie zawiera pola 'scheduleCells'!`);
+                window.showToast(`Błąd: Dokument źródłowy '${sourceDocId}' nie zawiera danych do migracji.`, 5000);
+                return;
+            }
 
-                statusDiv.textContent = "Konwertowanie danych...";
-                const oldHeaders = data.employeeHeaders;
-                const newEmployees = {};
+            await targetRef.set({
+                scheduleCells: scheduleCellsToMigrate
+            }, { merge: true });
 
-                for (const index in oldHeaders) {
-                    const name = oldHeaders[index];
-                    if (name) { // Upewnij się, że nazwa nie jest pusta
-                        newEmployees[index] = {
-                            name: name,
-                            leaveEntitlement: 26, // Domyślna wartość
-                            carriedOverLeave: 0     // Domyślna wartość
-                        };
-                    }
-                }
-
-                // Aktualizacja dokumentu: dodanie nowego pola i usunięcie starego
-                transaction.update(docRef, {
-                    employees: newEmployees,
-                    employeeHeaders: firebase.firestore.FieldValue.delete()
-                });
-            });
-
-            statusDiv.textContent = "Migracja zakończona pomyślnie! Struktura danych została zaktualizowana.";
-            console.log("Migracja zakończona sukcesem.");
+            console.log('Migracja zakończona pomyślnie!');
+            window.showToast('Dane grafiku zostały pomyślnie przeniesione do mainSchedule!', 5000);
 
         } catch (error) {
-            statusDiv.textContent = `Błąd podczas migracji: ${error.message}`;
-            console.error("Błąd migracji:", error);
+            console.error('Wystąpił błąd podczas migracji:', error);
+            window.showToast('Błąd krytyczny podczas migracji. Sprawdź konsolę.', 5000);
         }
-    });
-});
+    };
+
+    const init = () => {
+        const migrateButton = document.getElementById('runMigrationButton');
+        if (migrateButton) {
+            migrateButton.addEventListener('click', runMigration);
+        } else {
+            console.warn('Przycisk migracji nie został znaleziony.');
+        }
+    };
+
+    return {
+        init
+    };
+
+})();

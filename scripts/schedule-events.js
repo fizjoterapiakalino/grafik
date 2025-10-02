@@ -345,6 +345,7 @@ const ScheduleEvents = (() => {
             }},
             { id: 'contextClear', class: 'danger', action: cell => _dependencies.updateCellState(cell, state => { Object.keys(state).forEach(key => delete state[key]); window.showToast('Wyczyszczono komórkę'); }) },
             { id: 'contextSplitCell', action: cell => _dependencies.updateCellState(cell, state => { state.content1 = state.content || ''; state.content2 = ''; delete state.content; state.isSplit = true; window.showToast('Podzielono komórkę'); }) },
+            { id: 'contextMergeCells', class: 'info', condition: cell => cell.classList.contains('split-cell'), action: cell => _dependencies.mergeSplitCell(cell) },
             { id: 'contextMassage', action: cell => _dependencies.toggleSpecialStyle(cell, 'isMassage') },
             { id: 'contextPnf', action: cell => _dependencies.toggleSpecialStyle(cell, 'isPnf') },
             { id: 'contextEveryOtherDay', action: cell => _dependencies.toggleSpecialStyle(cell, 'isEveryOtherDay') } // Nowa opcja
@@ -364,6 +365,13 @@ const ScheduleEvents = (() => {
                 _dependencies.updateCellState(activeCell, state => { state.content1 = state.content || ''; state.content2 = ''; delete state.content; state.isSplit = true; window.showToast('Podzielono komórkę'); });
             } else {
                 window.showToast('Wybierz komórkę do podzielenia.', 3000);
+            }
+        });
+        document.getElementById('btnMergeCells')?.addEventListener('click', () => {
+            if (activeCell) {
+                _dependencies.mergeSplitCell(activeCell);
+            } else {
+                window.showToast('Wybierz podzieloną komórkę do scalenia.', 3000);
             }
         });
         document.getElementById('btnAddBreak')?.addEventListener('click', () => {

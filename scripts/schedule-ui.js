@@ -167,14 +167,15 @@ const ScheduleUI = (() => {
 
         let employeeIndices = [];
         let isSingleUserView = false;
-        const ADMIN_EMAIL = 'test@test.com'; // Definicja administratora
 
         const currentUser = firebase.auth().currentUser;
         console.log("ScheduleUI.renderTable: Current User:", currentUser ? currentUser.email : "No user");
         if (currentUser) {
             console.log("ScheduleUI.renderTable: Current User UID:", currentUser.uid);
-            if (currentUser.email === ADMIN_EMAIL) {
-                // Administrator - wyświetl wszystkich pracowników
+            
+            // Użyj nowej logiki opartej na rolach
+            if (EmployeeManager.isUserAdmin(currentUser.uid)) {
+                // Użytkownik ma rolę admina
                 const allEmployees = EmployeeManager.getAll();
                 employeeIndices = Object.keys(allEmployees).sort((a, b) => parseInt(a) - parseInt(b));
                 isSingleUserView = false;
@@ -189,14 +190,12 @@ const ScheduleUI = (() => {
                     console.log(`ScheduleUI.renderTable: User ${currentUser.email} is linked to employee ${employee.name}. Displaying single column.`);
                 } else {
                     // Jeśli użytkownik nie jest adminem i nie jest powiązany z pracownikiem,
-                    // to nadal wyświetlamy wszystkich, ale to jest przypadek, który powinien być rzadki
-                    // lub wskazywać na brak konfiguracji pracownika dla danego UID.
-                    // Na potrzeby zadania, jeśli nie jest adminem i nie ma pracownika,
-                    // wyświetlamy wszystkich, ale to może być do zmiany w przyszłości.
-                    const allEmployees = EmployeeManager.getAll();
-                    employeeIndices = Object.keys(allEmployees).sort((a, b) => parseInt(a) - parseInt(b));
-                    isSingleUserView = false;
-                    console.warn(`ScheduleUI.renderTable: User ${currentUser.email} is not an admin and not linked to an employee. Displaying all employees.`);
+                    // wyświetl pusty grafik i pokaż komunikat.
+                    employeeIndices = [];
+                    isSingleUserView = true; // Traktuj jak widok pojedynczego użytkownika, ale pusty
+                    console.warn(`ScheduleUI.renderTable: User ${currentUser.email} is not linked to any employee. Displaying empty schedule.`);
+                    // Można by tu dodać wyświetlanie komunikatu w UI, np. w miejscu tabeli
+                    tbody.innerHTML = `<tr><td colspan="2" class="unassigned-user-message">Twoje konto nie jest przypisane do żadnego pracownika. Skontaktuj się z administratorem.</td></tr>`;
                 }
             }
         } else {

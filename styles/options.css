@@ -139,13 +139,59 @@
     color: #555;
 }
 
-.details-edit-form input[type="text"] {
+.details-edit-form input[type="text"],
+.details-edit-form input[type="number"] {
     width: 100%;
     padding: 10px;
     border: 1px solid #ccc;
     border-radius: 4px;
     font-size: 1em;
     box-sizing: border-box;
+}
+
+.form-group-checkbox {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.form-group-checkbox input[type="checkbox"] {
+    margin-right: 10px;
+    width: 20px; /* Adjust size as needed */
+    height: 20px; /* Adjust size as needed */
+}
+
+.form-group-checkbox label {
+    margin-bottom: 0; /* Remove bottom margin for inline display */
+}
+
+.uid-input-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.uid-input-group input[type="text"] {
+    flex-grow: 1;
+}
+
+.uid-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.uid-actions .action-btn {
+    padding: 8px 12px;
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.uid-actions .cancel-btn {
+    padding: 8px 12px; /* Ensure consistent padding for icon button */
+}
+
+.uid-actions .cancel-btn i {
+    margin: 0; /* Remove margin for icon only */
 }
 
 .details-edit-form .form-actions {

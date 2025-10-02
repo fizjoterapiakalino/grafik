@@ -3,10 +3,33 @@ const Options = (() => {
     let loadingOverlay, employeeListContainer, employeeSearchInput, addEmployeeBtn,
         detailsPlaceholder, detailsEditForm, employeeFirstNameInput, employeeLastNameInput,
         employeeDisplayNameInput, employeeNumberInput, leaveEntitlementInput,
-        carriedOverLeaveInput, saveEmployeeBtn, deleteEmployeeBtn;
+        carriedOverLeaveInput, saveEmployeeBtn, deleteEmployeeBtn, employeeUidInput,
+        assignUidBtn, clearUidBtn;
 
     // --- ZMIENNE STANU APLIKACJI ---
     let selectedEmployeeIndex = null;
+
+    // --- NAZWANE FUNKCJE OBSŁUGI ZDARZEŃ ---
+    const handleAssignUid = () => {
+        const currentUser = firebase.auth().currentUser;
+        if (currentUser) {
+            // Sprawdź, czy ten UID nie jest już przypisany do innego pracownika
+            const allEmployees = EmployeeManager.getAll();
+            const existingEmployee = Object.values(allEmployees).find(emp => emp.uid === currentUser.uid);
+            if (existingEmployee && existingEmployee.id !== selectedEmployeeIndex) {
+                window.showToast(`Ten użytkownik jest już przypisany do: ${existingEmployee.displayName}.`, 4000);
+                return;
+            }
+            employeeUidInput.value = currentUser.uid;
+        } else {
+            window.showToast("Nie jesteś zalogowany.", 3000);
+        }
+    };
+
+    const handleClearUid = () => {
+        employeeUidInput.value = '';
+    };
+
 
     // --- FUNKCJE POMOCNICZE ---
     const showLoading = (show) => {
@@ -70,6 +93,8 @@ const Options = (() => {
         employeeNumberInput.value = employee.employeeNumber || ''; // Nowe pole
         leaveEntitlementInput.value = employee.leaveEntitlement || 26;
         carriedOverLeaveInput.value = employee.carriedOverLeave || 0;
+        document.getElementById('employeeRoleAdmin').checked = employee.role === 'admin';
+        employeeUidInput.value = employee.uid || '';
     };
     
     const filterEmployees = () => {
@@ -134,9 +159,11 @@ const Options = (() => {
         const newFirstName = employeeFirstNameInput.value.trim();
         const newLastName = employeeLastNameInput.value.trim();
         const newDisplayName = employeeDisplayNameInput.value.trim();
-        const newEmployeeNumber = employeeNumberInput.value.trim(); // Nowe pole
+        const newEmployeeNumber = employeeNumberInput.value.trim();
         const newEntitlement = parseInt(leaveEntitlementInput.value, 10);
         const newCarriedOver = parseInt(carriedOverLeaveInput.value, 10);
+        const isAdmin = document.getElementById('employeeRoleAdmin').checked;
+        const newUid = employeeUidInput.value.trim();
 
         if (newDisplayName === '') {
             window.showToast("Nazwa wyświetlana nie może być pusta.", 3000);
@@ -147,44 +174,49 @@ const Options = (() => {
             return;
         }
 
-        const updatedEmployee = {
+        const updatedData = {
             firstName: newFirstName,
             lastName: newLastName,
             displayName: newDisplayName,
-            employeeNumber: newEmployeeNumber, // Nowe pole
+            employeeNumber: newEmployeeNumber,
             leaveEntitlement: newEntitlement,
-            carriedOverLeave: newCarriedOver
+            carriedOverLeave: newCarriedOver,
+            role: isAdmin ? 'admin' : 'user',
+            uid: newUid
         };
 
         showLoading(true);
         try {
-            await db.runTransaction(async (transaction) => {
-                const scheduleRef = db.collection("schedules").doc("mainSchedule");
-                const leavesRef = db.collection("leaves").doc("mainLeaves"); // Deklaracja leavesRef
-                const leavesDoc = await transaction.get(leavesRef); // Odczyt przed zapisem
-                
-                transaction.update(scheduleRef, {
-                    [`employees.${selectedEmployeeIndex}`]: updatedEmployee
-                });
+            // Użyj nowej, uproszczonej funkcji z EmployeeManager
+            await EmployeeManager.updateEmployee(selectedEmployeeIndex, updatedData);
 
-                // Jeśli nazwa się zmieniła, zaktualizuj klucze w urlopach
-                // Logika migracji nazwy w urlopach
-                const oldNameKey = oldEmployee.displayName || oldEmployee.name;
-                if (oldNameKey !== newDisplayName) {
-                    if (leavesDoc.exists && leavesDoc.data()[oldNameKey]) {
-                        const leavesData = leavesDoc.data();
-                        const employeeLeaveData = leavesData[oldNameKey];
-                        delete leavesData[oldNameKey];
-                        leavesData[newDisplayName] = employeeLeaveData;
-                        transaction.set(leavesRef, leavesData);
-                    }
+            // Logika migracji nazwy w urlopach (jeśli konieczna)
+            const oldNameKey = oldEmployee.displayName || oldEmployee.name;
+            if (oldNameKey !== newDisplayName) {
+                // Ta logika powinna być idealnie częścią transakcji,
+                // ale dla uproszczenia zostawiamy ją jako osobne wywołanie.
+                // W przyszłości można to zintegrować w EmployeeManager.
+                const leavesRef = db.collection("leaves").doc("mainLeaves");
+                const leavesDoc = await leavesRef.get();
+                if (leavesDoc.exists && leavesDoc.data()[oldNameKey]) {
+                    const leavesData = leavesDoc.data();
+                    const employeeLeaveData = leavesData[oldNameKey];
+                    delete leavesData[oldNameKey];
+                    leavesData[newDisplayName] = employeeLeaveData;
+                    await leavesRef.set(leavesData);
                 }
-            });
+            }
 
-            await EmployeeManager.load();
-            renderEmployeeList();
-            handleEmployeeSelect(selectedEmployeeIndex);
+            await EmployeeManager.load(); // Przeładuj dane, aby mieć pewność, że EmployeeManager ma aktualne dane
+
+            // Zamiast przebudowywać całą listę, zaktualizuj tylko zmieniony element
+            const listItem = employeeListContainer.querySelector(`.employee-list-item[data-employee-index="${selectedEmployeeIndex}"]`);
+            if (listItem) {
+                const nameToDisplay = (newFirstName && newLastName) ? `${newFirstName} ${newLastName}` : newDisplayName;
+                listItem.querySelector('span').textContent = nameToDisplay;
+            }
             window.showToast("Dane pracownika zaktualizowane.", 2000);
+            // Nie ma potrzeby wywoływać handleEmployeeSelect, bo formularz już ma nowe dane
 
         } catch (error) {
             console.error("Błąd podczas zapisywania zmian pracownika:", error);
@@ -281,6 +313,9 @@ const Options = (() => {
         carriedOverLeaveInput = document.getElementById('carriedOverLeaveInput');
         saveEmployeeBtn = document.getElementById('saveEmployeeBtn');
         deleteEmployeeBtn = document.getElementById('deleteEmployeeBtn');
+        employeeUidInput = document.getElementById('employeeUidInput');
+        assignUidBtn = document.getElementById('assignUidBtn');
+        clearUidBtn = document.getElementById('clearUidBtn');
 
         resetDetailsPanel();
         showLoading(true);
@@ -299,6 +334,9 @@ const Options = (() => {
         addEmployeeBtn.addEventListener('click', handleAddEmployee);
         saveEmployeeBtn.addEventListener('click', handleSaveEmployee);
         deleteEmployeeBtn.addEventListener('click', handleDeleteEmployee);
+
+        assignUidBtn.addEventListener('click', handleAssignUid);
+        clearUidBtn.addEventListener('click', handleClearUid);
     };
 
     const destroy = () => {
@@ -306,6 +344,8 @@ const Options = (() => {
         addEmployeeBtn.removeEventListener('click', handleAddEmployee);
         saveEmployeeBtn.removeEventListener('click', handleSaveEmployee);
         deleteEmployeeBtn.removeEventListener('click', handleDeleteEmployee);
+        assignUidBtn.removeEventListener('click', handleAssignUid);
+        clearUidBtn.removeEventListener('click', handleClearUid);
         console.log("Options module destroyed");
     };
 
