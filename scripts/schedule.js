@@ -154,8 +154,8 @@ const Schedule = (() => {
                         cellState.content = newText;
                     }
 
-                    // Jeśli pacjent nie istnieje i komórka nie ma jeszcze daty, ustaw ją
-                    if (!patientExists && !cellState.treatmentStartDate) {
+                    // Jeśli pacjent nie istnieje, komórka nie ma jeszcze daty i nie jest to operacja przeniesienia, ustaw datę
+                    if (!patientExists && !cellState.treatmentStartDate && !isMove) {
                         const today = new Date();
                         const year = today.getFullYear();
                         const month = String(today.getMonth() + 1).padStart(2, '0');
