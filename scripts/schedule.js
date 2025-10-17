@@ -78,6 +78,7 @@ const Schedule = (() => {
 
     const renderAndSave = () => {
         ScheduleUI.render();
+        ScheduleUI.updatePatientCount(); // Aktualizuj licznik pacjentów po każdej zmianie
         saveSchedule();
     };
 
@@ -326,19 +327,6 @@ const Schedule = (() => {
                 const saveModalBtn = document.getElementById('savePatientInfoModal');
                 const closeModalBtn = document.getElementById('closePatientInfoModal');
                 const additionalInfoTextarea = document.getElementById('additionalInfo');
-                const genderMaleRadio = document.getElementById('genderMale');
-                const genderFemaleRadio = document.getElementById('genderFemale');
-                const patientGenderIcon = document.getElementById('patientGenderIcon');
-
-                // Definicja funkcji updateGenderIconInModal musi być przed jej użyciem
-                const updateGenderIconInModal = (gender) => {
-                    patientGenderIcon.className = 'gender-icon';
-                    if (gender === 'male') {
-                        patientGenderIcon.classList.add('male');
-                    } else if (gender === 'female') {
-                        patientGenderIcon.classList.add('female');
-                    }
-                };
 
                 const parentCell = element.closest('td');
                 const time = parentCell.dataset.time;
@@ -351,37 +339,23 @@ const Schedule = (() => {
                 patientNameInput.value = patientName;
 
                 let treatmentData = {};
-                let currentGender = '';
                 let currentAdditionalInfo = '';
 
                 if (isSplitPart) {
                     const dataKey = `treatmentData${partIndex}`;
                     treatmentData = cellState[dataKey] || {};
-                    currentGender = treatmentData.gender || '';
                     currentAdditionalInfo = treatmentData.additionalInfo || '';
                 } else {
                     treatmentData = {
                         startDate: cellState.treatmentStartDate,
                         extensionDays: cellState.treatmentExtensionDays
                     };
-                    currentGender = cellState.gender || '';
                     currentAdditionalInfo = cellState.additionalInfo || '';
                 }
                 
                 startDateInput.value = treatmentData.startDate || '';
                 extensionDaysInput.value = treatmentData.extensionDays || 0;
                 additionalInfoTextarea.value = currentAdditionalInfo;
-
-                // Ustawienie wybranej płci
-                if (currentGender === 'male') {
-                    genderMaleRadio.checked = true;
-                } else if (currentGender === 'female') {
-                    genderFemaleRadio.checked = true;
-                } else {
-                    genderMaleRadio.checked = false;
-                    genderFemaleRadio.checked = false;
-                }
-                updateGenderIconInModal(currentGender);
 
                 const calculateEndDate = (startDate, extensionDays) => {
                     if (!startDate) return '';
@@ -406,29 +380,22 @@ const Schedule = (() => {
 
                 const startDateChangeHandler = () => updateEndDate();
                 const extensionInputHandler = () => updateEndDate();
-                const genderChangeHandler = (event) => updateGenderIconInModal(event.target.value);
 
                 startDateInput.addEventListener('change', startDateChangeHandler);
                 extensionDaysInput.addEventListener('input', extensionInputHandler);
-                genderMaleRadio.addEventListener('change', genderChangeHandler);
-                genderFemaleRadio.addEventListener('change', genderChangeHandler);
 
                 const closeModal = () => {
                     startDateInput.removeEventListener('change', startDateChangeHandler);
                     extensionDaysInput.removeEventListener('input', extensionInputHandler);
-                    genderMaleRadio.removeEventListener('change', genderChangeHandler);
-                    genderFemaleRadio.removeEventListener('change', genderChangeHandler);
                     modal.style.display = 'none';
                 };
 
                 saveModalBtn.onclick = () => {
                     updateCellState(parentCell, state => {
-                        const selectedGender = document.querySelector('input[name="patientGender"]:checked')?.value || '';
                         const newTreatmentData = {
                             startDate: startDateInput.value,
                             extensionDays: parseInt(extensionDaysInput.value, 10),
-                            endDate: endDateInput.value,
-                            gender: selectedGender,
+                            endDate: endDateInput.value, // gender usunięty
                             additionalInfo: additionalInfoTextarea.value
                         };
 
@@ -439,7 +406,6 @@ const Schedule = (() => {
                             state.treatmentStartDate = newTreatmentData.startDate;
                             state.treatmentExtensionDays = newTreatmentData.extensionDays;
                             state.treatmentEndDate = newTreatmentData.endDate;
-                            state.gender = newTreatmentData.gender;
                             state.additionalInfo = newTreatmentData.additionalInfo;
                         }
                     });

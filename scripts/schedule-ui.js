@@ -78,11 +78,7 @@ const ScheduleUI = (() => {
             const createPart = (content, isMassage, isPnf, isEveryOtherDay, gender) => {
                 const div = document.createElement('div');
                 div.setAttribute('tabindex', '0');
-                let htmlContent = '';
-                if (gender) {
-                    htmlContent += `<i class="fas gender-icon ${gender}"></i>`;
-                }
-                htmlContent += `<span>${capitalizeFirstLetter(content || '')}</span>`;
+                let htmlContent = `<span>${capitalizeFirstLetter(content || '')}</span>`;
                 
                 if (isMassage) {
                     div.classList.add('massage-text');
@@ -104,11 +100,7 @@ const ScheduleUI = (() => {
             cell.appendChild(createPart(cellObj.content1, cellObj.isMassage1, cellObj.isPnf1, cellObj.isEveryOtherDay1, cellObj.treatmentData1?.gender));
             cell.appendChild(createPart(cellObj.content2, cellObj.isMassage2, cellObj.isPnf2, cellObj.isEveryOtherDay2, cellObj.treatmentData2?.gender));
         } else {
-            let htmlContent = '';
-            if (cellObj.gender) {
-                htmlContent += `<i class="fas gender-icon ${cellObj.gender}"></i>`;
-            }
-            htmlContent += `<span>${capitalizeFirstLetter(cellObj.content || '')}</span>`;
+            let htmlContent = `<span>${capitalizeFirstLetter(cellObj.content || '')}</span>`;
             
             if (cellObj.isMassage) {
                 cell.classList.add('massage-text');
@@ -277,11 +269,38 @@ const ScheduleUI = (() => {
                 }
             }
         }, 60000); // Uruchamiaj co minutę
+
+        updatePatientCount(); // Zaktualizuj liczbę pacjentów po renderowaniu tabeli
+    };
+
+    const updatePatientCount = () => {
+        const patientCountElement = document.getElementById('patientCount');
+        if (!patientCountElement) return;
+
+        let therapyCount = 0;
+        const cells = document.querySelectorAll('#mainScheduleTable tbody td.editable-cell');
+
+        cells.forEach(cell => {
+            if (cell.classList.contains('break-cell')) return;
+
+            if (cell.classList.contains('split-cell')) {
+                const parts = cell.querySelectorAll('div > span');
+                const name1 = parts[0]?.textContent.trim();
+                const name2 = parts[1]?.textContent.trim();
+                if (name1) therapyCount++;
+                if (name2) therapyCount++;
+            } else {
+                const name = getElementText(cell).trim();
+                if (name) therapyCount++;
+            }
+        });
+        patientCountElement.textContent = `Terapie: ${therapyCount}`;
     };
 
     return {
         initialize,
         render: renderTable,
-        getElementText
+        getElementText,
+        updatePatientCount
     };
 })();

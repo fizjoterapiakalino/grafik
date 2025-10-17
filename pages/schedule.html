@@ -11,11 +11,12 @@
 <div class="schedule-legend">
     <h3>Legenda:</h3>
     <ul>
-        <li><span class="legend-color massage-color"></span> Masaż</li>
-        <li><span class="legend-color pnf-color"></span> PNF</li>
-        <li><span class="legend-color every-other-day-color"></span> Co 2 Dni</li>
-        <li><span class="legend-color break-color"></span> Przerwa</li>
+        <li><span class="legend-color massage-color"></span>Masaż</li>
+        <li><span class="legend-color pnf-color"></span>PNF</li>
+        <li><span class="legend-color every-other-day-color"></span>Co 2 Dni</li>
+        <li><span class="legend-color break-color"></span>Przerwa</li>
     </ul>
+    <span id="patientCount" class="patient-count-legend"></span>
 </div>
 
 <div id="contextMenu" class="context-menu">
@@ -25,6 +26,7 @@
         <li id="contextAddBreak"><i class="fas fa-coffee"></i><span>Dodaj przerwę</span></li>
         <li id="contextMassage"><i class="fas fa-hand-paper"></i><span>Oznacz jako Masaż</span></li>
         <li id="contextPnf"><i class="fas fa-brain"></i><span>Oznacz jako PNF</span></li>
+        <li id="contextEveryOtherDay"><i class="fas fa-calendar-alt"></i><span>Oznacz jako Co 2 Dni</span></li>
         <li id="contextClear" class="danger"><i class="fas fa-trash-alt"></i><span>Wyczyść komórkę</span></li>
         <li id="contextRemoveBreak" class="danger" style="display: none;"><i class="fas fa-backspace"></i><span>Usuń przerwę</span></li>
     </ul>
@@ -37,16 +39,7 @@
         <div class="modal-body">
             <div class="form-group patient-name-row">
                 <label for="patientName">Imię i nazwisko:</label>
-                <div class="name-input-wrapper">
-                    <input type="text" id="patientName" readonly>
-                    <div class="gender-options-inline">
-                        <input type="radio" id="genderMale" name="patientGender" value="male">
-                        <label for="genderMale">Pan</label>
-                        <input type="radio" id="genderFemale" name="patientGender" value="female">
-                        <label for="genderFemale">Pani</label>
-                    </div>
-                </div>
-                <span id="patientGenderIcon" class="gender-icon"></span>
+                <input type="text" id="patientName" readonly>
             </div>
             <div class="form-row">
                 <div class="form-group">
