@@ -43,6 +43,7 @@ const LeavesSummary = (() => {
         // Przetwórz dane i wygeneruj wiersze
         for (const employeeId in employees) {
             const employee = employees[employeeId];
+            if (employee.isHidden) continue;
             const employeeDisplayName = employee.displayName || employee.name;
             if (!employee || !employeeDisplayName) continue;
 

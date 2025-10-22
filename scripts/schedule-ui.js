@@ -169,9 +169,11 @@ const ScheduleUI = (() => {
             if (EmployeeManager.isUserAdmin(currentUser.uid)) {
                 // Użytkownik ma rolę admina
                 const allEmployees = EmployeeManager.getAll();
-                employeeIndices = Object.keys(allEmployees).sort((a, b) => parseInt(a) - parseInt(b));
+                employeeIndices = Object.keys(allEmployees)
+                    .filter(id => !allEmployees[id].isHidden)
+                    .sort((a, b) => parseInt(a) - parseInt(b));
                 isSingleUserView = false;
-                console.log("ScheduleUI.renderTable: User is ADMIN. Displaying all employees.");
+                console.log("ScheduleUI.renderTable: User is ADMIN. Displaying visible employees.");
             } else {
                 // Zwykły użytkownik - wyświetl tylko jego kolumnę
                 const employee = EmployeeManager.getEmployeeByUid(currentUser.uid);
@@ -193,9 +195,11 @@ const ScheduleUI = (() => {
         } else {
             // Użytkownik wylogowany - wyświetl wszystkich pracowników (pełny grafik)
             const allEmployees = EmployeeManager.getAll();
-            employeeIndices = Object.keys(allEmployees).sort((a, b) => parseInt(a) - parseInt(b));
+            employeeIndices = Object.keys(allEmployees)
+                .filter(id => !allEmployees[id].isHidden)
+                .sort((a, b) => parseInt(a) - parseInt(b));
             isSingleUserView = false;
-            console.log("ScheduleUI.renderTable: User logged out. Displaying all employees.");
+            console.log("ScheduleUI.renderTable: User logged out. Displaying visible employees.");
         }
         
         console.log("ScheduleUI.renderTable: Final employeeIndices:", employeeIndices);

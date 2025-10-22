@@ -112,7 +112,12 @@ const Changes = (() => {
             const leavesCell = row.querySelector('.leaves-cell');
             let leavesHtml = '';
 
+            const employees = EmployeeManager.getAll();
+
             for (const employeeName in allLeavesData) {
+                const employee = Object.values(employees).find(emp => (emp.displayName || emp.name) === employeeName);
+                if (employee && employee.isHidden) continue;
+
                 const employeeLeaves = allLeavesData[employeeName];
                 employeeLeaves.forEach(leave => {
                     const leaveStart = new Date(leave.startDate);
@@ -120,7 +125,7 @@ const Changes = (() => {
 
                     // Uwzględnij tylko urlopy wypoczynkowe i wszystkie daty
                     if (leave.type === 'vacation' && !(leaveEnd < periodStart || leaveStart > periodEnd)) {
-                        const employeeId = Object.keys(allLeavesData).find(key => allLeavesData[key] === employeeLeaves);
+                        const employeeId = Object.keys(employees).find(id => (employees[id].displayName || employees[id].name) === employeeName);
                         const lastName = EmployeeManager.getLastNameById(employeeId);
                         leavesHtml += `${lastName}<br>`;
                     }
@@ -152,7 +157,9 @@ const Changes = (() => {
         employeeListDiv.innerHTML = ''; // Clear list
         searchInput.value = ''; // Clear search input
 
-        const allEmployees = EmployeeManager.getAll();
+        const allEmployees = Object.fromEntries(
+            Object.entries(EmployeeManager.getAll()).filter(([, employee]) => !employee.isHidden)
+        );
         const period = cell.parentElement.dataset.startDate;
         const columnIndex = cell.cellIndex;
         const cellState = appState.changesCells[period]?.[columnIndex] || {};
@@ -293,7 +300,7 @@ const Changes = (() => {
         const tableBody = Array.from(table.querySelectorAll('tbody tr')).map(row => {
             return Array.from(row.cells).map((cell, cellIndex) => {
                 if (cellIndex === 0 || cellIndex === 8) { // Kolumna Okres i Urlopy
-                    return cell.innerHTML.replace(/<br\s*[\/]?>/gi, "\n");
+                    return cell.innerHTML.replace(/<br\s*[\/]?>>/gi, "\n");
                 }
                 const period = row.dataset.startDate;
                 const cellState = appState.changesCells[period]?.[cellIndex];

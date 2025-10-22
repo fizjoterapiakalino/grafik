@@ -4,7 +4,7 @@ const Options = (() => {
         detailsPlaceholder, detailsEditForm, employeeFirstNameInput, employeeLastNameInput,
         employeeDisplayNameInput, employeeNumberInput, leaveEntitlementInput,
         carriedOverLeaveInput, saveEmployeeBtn, deleteEmployeeBtn, employeeUidInput,
-        assignUidBtn, clearUidBtn;
+        assignUidBtn, clearUidBtn, employeeIsHidden;
 
     // --- ZMIENNE STANU APLIKACJI ---
     let selectedEmployeeIndex = null;
@@ -94,6 +94,7 @@ const Options = (() => {
         leaveEntitlementInput.value = employee.leaveEntitlement || 26;
         carriedOverLeaveInput.value = employee.carriedOverLeave || 0;
         document.getElementById('employeeRoleAdmin').checked = employee.role === 'admin';
+        employeeIsHidden.checked = employee.isHidden || false;
         employeeUidInput.value = employee.uid || '';
     };
     
@@ -163,6 +164,7 @@ const Options = (() => {
         const newEntitlement = parseInt(leaveEntitlementInput.value, 10);
         const newCarriedOver = parseInt(carriedOverLeaveInput.value, 10);
         const isAdmin = document.getElementById('employeeRoleAdmin').checked;
+        const isHidden = employeeIsHidden.checked;
         const newUid = employeeUidInput.value.trim();
 
         if (newDisplayName === '') {
@@ -182,6 +184,7 @@ const Options = (() => {
             leaveEntitlement: newEntitlement,
             carriedOverLeave: newCarriedOver,
             role: isAdmin ? 'admin' : 'user',
+            isHidden: isHidden,
             uid: newUid
         };
 
@@ -316,6 +319,7 @@ const Options = (() => {
         employeeUidInput = document.getElementById('employeeUidInput');
         assignUidBtn = document.getElementById('assignUidBtn');
         clearUidBtn = document.getElementById('clearUidBtn');
+        employeeIsHidden = document.getElementById('employeeIsHidden');
 
         resetDetailsPanel();
         showLoading(true);
