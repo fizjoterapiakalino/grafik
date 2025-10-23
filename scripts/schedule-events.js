@@ -153,7 +153,7 @@ const ScheduleEvents = (() => {
         event.preventDefault();
         const dropTargetCell = event.target.closest('td.editable-cell');
         document.querySelectorAll('.drag-over-target').forEach(el => el.classList.remove('drag-over-target'));
-        
+
         if (dropTargetCell && !dropTargetCell.classList.contains('break-cell') && draggedCell && draggedCell !== dropTargetCell) {
             _dependencies.undoManager.pushState(_dependencies.getCurrentTableState());
 
@@ -162,14 +162,36 @@ const ScheduleEvents = (() => {
             const targetTime = dropTargetCell.dataset.time;
             const targetIndex = dropTargetCell.dataset.employeeIndex;
 
-            const sourceData = _dependencies.appState.scheduleCells[sourceTime]?.[sourceIndex] || {};
-            const targetData = _dependencies.appState.scheduleCells[targetTime]?.[targetIndex] || {};
-
+            // Ensure the state objects exist
             if (!_dependencies.appState.scheduleCells[sourceTime]) _dependencies.appState.scheduleCells[sourceTime] = {};
-            _dependencies.appState.scheduleCells[sourceTime][sourceIndex] = targetData;
-            
+            if (!_dependencies.appState.scheduleCells[sourceTime][sourceIndex]) _dependencies.appState.scheduleCells[sourceTime][sourceIndex] = {};
             if (!_dependencies.appState.scheduleCells[targetTime]) _dependencies.appState.scheduleCells[targetTime] = {};
-            _dependencies.appState.scheduleCells[targetTime][targetIndex] = sourceData;
+            if (!_dependencies.appState.scheduleCells[targetTime][targetIndex]) _dependencies.appState.scheduleCells[targetTime][targetIndex] = {};
+
+            const sourceCellState = _dependencies.appState.scheduleCells[sourceTime][sourceIndex];
+            const targetCellState = _dependencies.appState.scheduleCells[targetTime][targetIndex];
+
+            // 1. Update history for both cells with their content *before* the move
+            const sourceOldContent = sourceCellState.isSplit ? `${(sourceCellState.content1 || '')}/${(sourceCellState.content2 || '')}` : sourceCellState.content;
+            CellHistory.updateHistory(sourceCellState, sourceOldContent);
+
+            const targetOldContent = targetCellState.isSplit ? `${(targetCellState.content1 || '')}/${(targetCellState.content2 || '')}` : targetCellState.content;
+            CellHistory.updateHistory(targetCellState, targetOldContent);
+
+            // 2. Get a copy of the source content (without its history)
+            const sourceContent = { ...sourceCellState };
+            delete sourceContent.history;
+
+            // 3. Overwrite the target cell with the source content, but merge with target's existing history
+            _dependencies.appState.scheduleCells[targetTime][targetIndex] = {
+                ...sourceContent,
+                history: targetCellState.history
+            };
+
+            // 4. Clear the source cell, preserving only its history
+            _dependencies.appState.scheduleCells[sourceTime][sourceIndex] = {
+                history: sourceCellState.history
+            };
 
             _dependencies.renderAndSave();
             _dependencies.undoManager.pushState(_dependencies.getCurrentTableState());
@@ -278,7 +300,9 @@ const ScheduleEvents = (() => {
                 const time = cellToClear.dataset.time;
                 const employeeIndex = cellToClear.dataset.employeeIndex;
                 _dependencies.updateCellState(cellToClear, state => {
-                    Object.keys(state).forEach(key => delete state[key]);
+                    Object.keys(state).forEach(key => {
+                        if (key !== 'history') delete state[key];
+                    });
                     window.showToast('Wyczyszczono komórkę');
                 });
                 const newCell = document.querySelector(`td[data-time="${time}"][data-employee-index="${employeeIndex}"]`);
@@ -343,7 +367,51 @@ const ScheduleEvents = (() => {
                 }
                 _dependencies.updateCellState(cell, state => { state.isBreak = true; window.showToast('Dodano przerwę'); });
             }},
-            { id: 'contextClear', class: 'danger', action: cell => _dependencies.updateCellState(cell, state => { Object.keys(state).forEach(key => delete state[key]); window.showToast('Wyczyszczono komórkę'); }) },
+            { 
+                id: 'contextHistory',
+                onShow: (cell) => {
+                    const subMenu = document.getElementById('contextHistorySubMenu');
+                    const cellState = _dependencies.appState.scheduleCells[cell.dataset.time]?.[cell.dataset.employeeIndex];
+                    subMenu.innerHTML = ''; // Clear previous items
+
+                    if (cellState && cellState.history && cellState.history.length > 0) {
+                        cellState.history.forEach(historyEntry => {
+                            const li = document.createElement('li');
+                            li.textContent = historyEntry;
+                            li.addEventListener('click', (e) => {
+                                e.stopPropagation(); // Prevent menu from closing
+                                _dependencies.updateCellState(cell, state => {
+                                    if (historyEntry.includes('/')) {
+                                        const parts = historyEntry.split('/', 2);
+                                        state.isSplit = true;
+                                        state.content1 = parts[0];
+                                        state.content2 = parts[1];
+                                        delete state.content;
+                                    } else {
+                                        state.isSplit = false;
+                                        state.content = historyEntry;
+                                        delete state.content1;
+                                        delete state.content2;
+                                    }
+                                });
+                                document.getElementById('contextMenu').classList.remove('visible');
+                            });
+                            subMenu.appendChild(li);
+                        });
+                    } else {
+                        const li = document.createElement('li');
+                        li.textContent = '(pusta historia)';
+                        li.classList.add('disabled');
+                        subMenu.appendChild(li);
+                    }
+                }
+            },
+                        { id: 'contextClear', class: 'danger', action: cell => _dependencies.updateCellState(cell, state => { 
+                Object.keys(state).forEach(key => {
+                    if (key !== 'history') delete state[key];
+                });
+                window.showToast('Wyczyszczono komórkę'); 
+            }) },
             { id: 'contextSplitCell', action: cell => _dependencies.updateCellState(cell, state => { state.content1 = state.content || ''; state.content2 = ''; delete state.content; state.isSplit = true; window.showToast('Podzielono komórkę'); }) },
             { id: 'contextMergeCells', class: 'info', condition: cell => cell.classList.contains('split-cell'), action: cell => _dependencies.mergeSplitCell(cell) },
             { id: 'contextMassage', action: cell => _dependencies.toggleSpecialStyle(cell, 'isMassage') },
@@ -408,7 +476,12 @@ const ScheduleEvents = (() => {
         });
         document.getElementById('btnClearCell')?.addEventListener('click', () => {
             if (activeCell) {
-                _dependencies.updateCellState(activeCell, state => { Object.keys(state).forEach(key => delete state[key]); window.showToast('Wyczyszczono komórkę'); });
+                _dependencies.updateCellState(activeCell, state => { 
+                    Object.keys(state).forEach(key => {
+                        if (key !== 'history') delete state[key];
+                    });
+                    window.showToast('Wyczyszczono komórkę'); 
+                });
             } else {
                 window.showToast('Wybierz komórkę do wyczyszczenia.', 3000);
             }

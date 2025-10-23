@@ -90,6 +90,10 @@ const Schedule = (() => {
         if (!appState.scheduleCells[time]) appState.scheduleCells[time] = {};
         let cellState = appState.scheduleCells[time][employeeIndex] || {};
         
+        const oldContent = cellState.isSplit ? `${cellState.content1 || ''}/${cellState.content2 || ''}` : cellState.content;
+        CellHistory.updateHistory(cellState, oldContent);
+        // --- End of History Management ---
+
         updateFn(cellState);
 
         appState.scheduleCells[time][employeeIndex] = cellState;
@@ -120,51 +124,70 @@ const Schedule = (() => {
                 const time = parentCell.dataset.time;
                 const duplicate = this.findDuplicateEntry(newText, time, employeeIndex);
                 const updateSchedule = (isMove = false) => {
-                    undoManager.pushState(getCurrentTableState()); // Przenieś pushState na początek, aby objąć całą operację
+                    undoManager.pushState(getCurrentTableState());
 
-                    if (!appState.scheduleCells[time]) appState.scheduleCells[time] = {};
-                    if (!appState.scheduleCells[time][employeeIndex]) appState.scheduleCells[time][employeeIndex] = {};
-                    let cellState = appState.scheduleCells[time][employeeIndex];
+                    const targetTime = time;
+                    const targetIndex = employeeIndex;
+
+                    if (!appState.scheduleCells[targetTime]) appState.scheduleCells[targetTime] = {};
+                    if (!appState.scheduleCells[targetTime][targetIndex]) appState.scheduleCells[targetTime][targetIndex] = {};
+                    let targetCellState = appState.scheduleCells[targetTime][targetIndex];
+
+                    const oldContent = targetCellState.isSplit ? `${(targetCellState.content1 || '')}/${(targetCellState.content2 || '')}` : targetCellState.content;
+                    if (isMove || oldContent !== newText) {
+                        CellHistory.updateHistory(targetCellState, oldContent);
+                    }
 
                     if (isMove && duplicate) {
-                        // Przenieś cały stan z duplikatu do bieżącej komórki
-                        const oldCellState = appState.scheduleCells[duplicate.time][duplicate.employeeIndex];
-                        cellState = { ...oldCellState }; // Kopiuj stan starej komórki do nowej
+                        const sourceTime = duplicate.time;
+                        const sourceIndex = duplicate.employeeIndex;
                         
-                        // Wyczyść starą komórkę
-                        appState.scheduleCells[duplicate.time][duplicate.employeeIndex] = {};
-                    }
+                        if (!appState.scheduleCells[sourceTime]) appState.scheduleCells[sourceTime] = {};
+                        if (!appState.scheduleCells[sourceTime][sourceIndex]) appState.scheduleCells[sourceTime][sourceIndex] = {};
+                        const sourceCellState = appState.scheduleCells[sourceTime][sourceIndex];
 
-                    // Sprawdź, czy pacjent istnieje GDZIEKOLWIEK w grafiku (po ewentualnym przeniesieniu)
-                    const patientExists = this.findDuplicateEntry(newText, null, null);
+                        const sourceOldContent = sourceCellState.isSplit ? `${(sourceCellState.content1 || '')}/${(sourceCellState.content2 || '')}` : sourceCellState.content;
+                        CellHistory.updateHistory(sourceCellState, sourceOldContent);
 
-                    if (newText.includes('/')) {
-                        const parts = newText.split('/', 2);
-                        cellState = { ...cellState, isSplit: true, content1: parts[0], content2: parts[1] };
-                    } else if (cellState.isSplit) {
-                        const isFirstDiv = element === parentCell.querySelector('div:first-child');
-                        if (isFirstDiv) {
-                            cellState.content1 = newText;
-                        } else {
-                            cellState.content2 = newText;
-                        }
-                        if (!cellState.content1 && !cellState.content2) {
-                            delete cellState.isSplit;
-                        }
+                        const sourceContent = { ...sourceCellState };
+                        delete sourceContent.history;
+
+                        appState.scheduleCells[targetTime][targetIndex] = { ...sourceContent, history: targetCellState.history };
+                        
+                        appState.scheduleCells[sourceTime][sourceIndex] = { history: sourceCellState.history };
+
                     } else {
-                        cellState.content = newText;
+                        // This is a normal edit, not a move.
+                        const patientExists = this.findDuplicateEntry(newText, null, null);
+
+                        if (newText.includes('/')) {
+                            targetCellState.isSplit = true;
+                            targetCellState.content1 = newText.split('/', 2)[0];
+                            targetCellState.content2 = newText.split('/', 2)[1];
+                            delete targetCellState.content;
+                        } else if (targetCellState.isSplit) {
+                            const isFirstDiv = element === parentCell.querySelector('div:first-child');
+                            if (isFirstDiv) {
+                                targetCellState.content1 = newText;
+                            } else {
+                                targetCellState.content2 = newText;
+                            }
+                            if (!targetCellState.content1 && !targetCellState.content2) {
+                                delete targetCellState.isSplit;
+                            }
+                        } else {
+                            targetCellState.content = newText;
+                        }
+
+                        if (!patientExists && !targetCellState.treatmentStartDate && !isMove) {
+                            const today = new Date();
+                            const year = today.getFullYear();
+                            const month = String(today.getMonth() + 1).padStart(2, '0');
+                            const day = String(today.getDate()).padStart(2, '0');
+                            targetCellState.treatmentStartDate = `${year}-${month}-${day}`;
+                        }
                     }
 
-                    // Jeśli pacjent nie istnieje, komórka nie ma jeszcze daty i nie jest to operacja przeniesienia, ustaw datę
-                    if (!patientExists && !cellState.treatmentStartDate && !isMove) {
-                        const today = new Date();
-                        const year = today.getFullYear();
-                        const month = String(today.getMonth() + 1).padStart(2, '0');
-                        const day = String(today.getDate()).padStart(2, '0');
-                        cellState.treatmentStartDate = `${year}-${month}-${day}`;
-                    }
-
-                    appState.scheduleCells[time][employeeIndex] = cellState;
                     renderAndSave();
                     undoManager.pushState(getCurrentTableState());
                 };

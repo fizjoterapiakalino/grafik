@@ -17,6 +17,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 contextMenu.contextEvent = event;
                 currentTarget = target;
 
+                // New: Call onShow for items that have it
+                itemConfig.forEach(item => {
+                    if (item.onShow) {
+                        item.onShow(currentTarget, event);
+                    }
+                });
+
                 itemConfig.forEach(item => {
                     const element = document.getElementById(item.id);
                     if (element) {

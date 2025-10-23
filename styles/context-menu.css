@@ -66,3 +66,40 @@
 .context-menu li.info:hover {
     background-color: #e9f5ff; /* Jasnoniebieskie tło przy najechaniu */
 }
+
+/* --- Podmenu Historii --- */
+.context-submenu {
+    display: none;
+    position: absolute;
+    left: 100%;
+    top: -5px; /* Dopasuj, aby było na tej samej wysokości co element nadrzędny */
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    padding: 5px 0;
+    min-width: 180px;
+    z-index: 1101; /* Wyżej niż główne menu */
+}
+
+.context-menu li:hover > .context-submenu {
+    display: block;
+}
+
+.context-submenu li {
+    padding: 8px 15px;
+}
+
+.context-submenu li:hover {
+    background-color: #f2f2f2;
+}
+
+.context-submenu li.empty-history {
+    color: #999;
+    font-style: italic;
+    cursor: default;
+}
+
+.context-submenu li.empty-history:hover {
+    background-color: transparent;
+}
