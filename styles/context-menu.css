@@ -103,3 +103,13 @@
 .context-submenu li.empty-history:hover {
     background-color: transparent;
 }
+
+.context-menu li.has-submenu {
+    position: relative;
+}
+
+.context-menu li.has-submenu .submenu-arrow {
+    margin-left: auto;
+    font-size: 0.8em;
+    color: #999;
+}

@@ -7,7 +7,7 @@ const Schedule = (() => {
     let undoButton;
     let unsubscribeSchedule;
     let isSaving = false;
-    let saveQueue = null;
+    let saveQueued = false;
     let currentUserId = null; // Dodana zmienna do przechowywania UID aktualnego użytkownika
 
     // Funkcja do pobierania referencji do dokumentu grafiku (zawsze mainSchedule)
@@ -23,21 +23,15 @@ const Schedule = (() => {
         const docRef = getScheduleDocRef(); // Zawsze odwołuj się do mainSchedule
         unsubscribeSchedule = docRef.onSnapshot(
             (doc) => {
-                console.log("listenForScheduleChanges: Snapshot received.");
                 if (doc.exists) {
-                    console.log("listenForScheduleChanges: Document data:", doc.data());
                     const savedData = doc.data();
                     if (savedData.scheduleCells && Object.keys(savedData.scheduleCells).length > 0) {
                         appState.scheduleCells = savedData.scheduleCells;
-                        console.log("listenForScheduleChanges: appState.scheduleCells updated with data:", appState.scheduleCells);
                     } else {
                         appState.scheduleCells = {}; // Upewnij się, że jest puste
-                        console.warn("listenForScheduleChanges: Document 'mainSchedule' exists, but its 'scheduleCells' field is either missing or empty. The table will be empty.");
                     }
                     ScheduleUI.render();
                 } else {
-                    console.log(`No main schedule found, creating a new one.`);
-                    // Jeśli główny dokument nie istnieje, zainicjuj pusty grafik i zapisz go
                     appState.scheduleCells = {};
                     ScheduleUI.render();
                     saveSchedule(); // Zapisz pusty grafik, aby utworzyć dokument mainSchedule
@@ -52,7 +46,7 @@ const Schedule = (() => {
 
     const saveSchedule = async () => {
         if (isSaving) {
-            saveQueue = { ...appState };
+            saveQueued = true;
             return;
         }
 
@@ -60,13 +54,12 @@ const Schedule = (() => {
         window.setSaveStatus('saving');
 
         try {
-            await getScheduleDocRef().set(appState, { merge: true }); // Zawsze zapisuj do mainSchedule
+            await getScheduleDocRef().set(appState, { merge: true });
             window.setSaveStatus('saved');
             isSaving = false;
 
-            if (saveQueue) {
-                appState = saveQueue;
-                saveQueue = null;
+            if (saveQueued) {
+                saveQueued = false;
                 await saveSchedule();
             }
         } catch (error) {
@@ -82,6 +75,32 @@ const Schedule = (() => {
         saveSchedule();
     };
 
+    const MAX_HISTORY_ENTRIES = 10;
+
+    const _updateCellHistory = (cellState, oldContent) => {
+        if (!oldContent || oldContent.trim() === '') {
+            return;
+        }
+
+        if (!cellState.history) {
+            cellState.history = [];
+        }
+
+        const lastHistoryValue = cellState.history[0] ? cellState.history[0].oldValue : null;
+        if (lastHistoryValue === oldContent) {
+            return;
+        }
+
+        const historyEntry = {
+            oldValue: oldContent,
+            timestamp: new Date().toISOString(),
+            userId: currentUserId
+        };
+
+        cellState.history.unshift(historyEntry);
+        cellState.history = cellState.history.slice(0, MAX_HISTORY_ENTRIES);
+    };
+
     const updateCellState = (cell, updateFn) => {
         if (!cell) return;
         undoManager.pushState(getCurrentTableState());
@@ -91,8 +110,7 @@ const Schedule = (() => {
         let cellState = appState.scheduleCells[time][employeeIndex] || {};
         
         const oldContent = cellState.isSplit ? `${cellState.content1 || ''}/${cellState.content2 || ''}` : cellState.content;
-        CellHistory.updateHistory(cellState, oldContent);
-        // --- End of History Management ---
+        _updateCellHistory(cellState, oldContent);
 
         updateFn(cellState);
 
@@ -124,70 +142,57 @@ const Schedule = (() => {
                 const time = parentCell.dataset.time;
                 const duplicate = this.findDuplicateEntry(newText, time, employeeIndex);
                 const updateSchedule = (isMove = false) => {
-                    undoManager.pushState(getCurrentTableState());
+                    undoManager.pushState(getCurrentTableState()); // Przenieś pushState na początek, aby objąć całą operację
 
-                    const targetTime = time;
-                    const targetIndex = employeeIndex;
+                    if (!appState.scheduleCells[time]) appState.scheduleCells[time] = {};
+                    if (!appState.scheduleCells[time][employeeIndex]) appState.scheduleCells[time][employeeIndex] = {};
+                    let cellState = appState.scheduleCells[time][employeeIndex];
 
-                    if (!appState.scheduleCells[targetTime]) appState.scheduleCells[targetTime] = {};
-                    if (!appState.scheduleCells[targetTime][targetIndex]) appState.scheduleCells[targetTime][targetIndex] = {};
-                    let targetCellState = appState.scheduleCells[targetTime][targetIndex];
-
-                    const oldContent = targetCellState.isSplit ? `${(targetCellState.content1 || '')}/${(targetCellState.content2 || '')}` : targetCellState.content;
-                    if (isMove || oldContent !== newText) {
-                        CellHistory.updateHistory(targetCellState, oldContent);
+                    // --- History Management ---
+                    const oldContent = cellState.isSplit ? `${(cellState.content1 || '')}/${(cellState.content2 || '')}` : cellState.content;
+                    if (oldContent !== newText) {
+                        _updateCellHistory(cellState, oldContent);
+                    }
+                    // --- End of History Management ---
+                    
+                                            if (isMove && duplicate) {                        // Przenieś cały stan z duplikatu do bieżącej komórki
+                        const oldCellState = appState.scheduleCells[duplicate.time][duplicate.employeeIndex];
+                        cellState = { ...oldCellState }; // Kopiuj stan starej komórki do nowej
+                        
+                        // Wyczyść starą komórkę
+                        appState.scheduleCells[duplicate.time][duplicate.employeeIndex] = {};
                     }
 
-                    if (isMove && duplicate) {
-                        const sourceTime = duplicate.time;
-                        const sourceIndex = duplicate.employeeIndex;
-                        
-                        if (!appState.scheduleCells[sourceTime]) appState.scheduleCells[sourceTime] = {};
-                        if (!appState.scheduleCells[sourceTime][sourceIndex]) appState.scheduleCells[sourceTime][sourceIndex] = {};
-                        const sourceCellState = appState.scheduleCells[sourceTime][sourceIndex];
+                    // Sprawdź, czy pacjent istnieje GDZIEKOLWIEK w grafiku (po ewentualnym przeniesieniu)
+                    const patientExists = this.findDuplicateEntry(newText, null, null);
 
-                        const sourceOldContent = sourceCellState.isSplit ? `${(sourceCellState.content1 || '')}/${(sourceCellState.content2 || '')}` : sourceCellState.content;
-                        CellHistory.updateHistory(sourceCellState, sourceOldContent);
-
-                        const sourceContent = { ...sourceCellState };
-                        delete sourceContent.history;
-
-                        appState.scheduleCells[targetTime][targetIndex] = { ...sourceContent, history: targetCellState.history };
-                        
-                        appState.scheduleCells[sourceTime][sourceIndex] = { history: sourceCellState.history };
-
-                    } else {
-                        // This is a normal edit, not a move.
-                        const patientExists = this.findDuplicateEntry(newText, null, null);
-
-                        if (newText.includes('/')) {
-                            targetCellState.isSplit = true;
-                            targetCellState.content1 = newText.split('/', 2)[0];
-                            targetCellState.content2 = newText.split('/', 2)[1];
-                            delete targetCellState.content;
-                        } else if (targetCellState.isSplit) {
-                            const isFirstDiv = element === parentCell.querySelector('div:first-child');
-                            if (isFirstDiv) {
-                                targetCellState.content1 = newText;
-                            } else {
-                                targetCellState.content2 = newText;
-                            }
-                            if (!targetCellState.content1 && !targetCellState.content2) {
-                                delete targetCellState.isSplit;
-                            }
+                    if (newText.includes('/')) {
+                        const parts = newText.split('/', 2);
+                        cellState = { ...cellState, isSplit: true, content1: parts[0], content2: parts[1] };
+                    } else if (cellState.isSplit) {
+                        const isFirstDiv = element === parentCell.querySelector('div:first-child');
+                        if (isFirstDiv) {
+                            cellState.content1 = newText;
                         } else {
-                            targetCellState.content = newText;
+                            cellState.content2 = newText;
                         }
-
-                        if (!patientExists && !targetCellState.treatmentStartDate && !isMove) {
-                            const today = new Date();
-                            const year = today.getFullYear();
-                            const month = String(today.getMonth() + 1).padStart(2, '0');
-                            const day = String(today.getDate()).padStart(2, '0');
-                            targetCellState.treatmentStartDate = `${year}-${month}-${day}`;
+                        if (!cellState.content1 && !cellState.content2) {
+                            delete cellState.isSplit;
                         }
+                    } else {
+                        cellState.content = newText;
                     }
 
+                    // Jeśli pacjent nie istnieje, komórka nie ma jeszcze daty i nie jest to operacja przeniesienia, ustaw datę
+                    if (!patientExists && !cellState.treatmentStartDate && !isMove) {
+                        const today = new Date();
+                        const year = today.getFullYear();
+                        const month = String(today.getMonth() + 1).padStart(2, '0');
+                        const day = String(today.getDate()).padStart(2, '0');
+                        cellState.treatmentStartDate = `${year}-${month}-${day}`;
+                    }
+
+                    appState.scheduleCells[time][employeeIndex] = cellState;
                     renderAndSave();
                     undoManager.pushState(getCurrentTableState());
                 };
@@ -201,6 +206,13 @@ const Schedule = (() => {
             exitEditMode(element) {
                 if (!element || element.getAttribute('contenteditable') !== 'true') return;
                 const newText = capitalizeFirstLetter(element.textContent.trim());
+
+                if (newText.length > 35) {
+                    window.showToast('Wprowadzony tekst jest za długi (maks. 35 znaków).', 3000);
+                    element.setAttribute('contenteditable', 'false');
+                    ScheduleUI.render(); // Revert to previous state
+                    return;
+                }
 
                 // Sprawdź, czy wprowadzony tekst to same cyfry
                 if (/^\d+$/.test(newText)) {
@@ -444,6 +456,75 @@ const Schedule = (() => {
                 };
                 modal.style.display = 'flex';
             },
+            showHistoryModal(cell) {
+                const modal = document.getElementById('historyModal');
+                const modalBody = document.getElementById('historyModalBody');
+                const closeModalBtn = document.getElementById('closeHistoryModal');
+
+                if (!modal || !modalBody || !closeModalBtn) {
+                    console.error('History modal elements not found!');
+                    return;
+                }
+
+                const time = cell.dataset.time;
+                const employeeIndex = cell.dataset.employeeIndex;
+                const cellState = appState.scheduleCells[time]?.[employeeIndex];
+
+                if (!cellState || !cellState.history || cellState.history.length === 0) {
+                    modalBody.innerHTML = '<p>Brak historii dla tej komórki.</p>';
+                } else {
+                    modalBody.innerHTML = `
+                        <ul class="history-list">
+                            ${cellState.history.map(entry => `
+                                <li class="history-item">
+                                    <div class="history-value">${entry.oldValue || '(pusty)'}</div>
+                                    <div class="history-meta">
+                                        <span>${new Date(entry.timestamp).toLocaleString('pl-PL')}</span>
+                                        <span>przez: ${EmployeeManager.getEmployeeByUid(entry.userId)?.name || 'Nieznany'}</span>
+                                    </div>
+                                    <button class="action-btn revert-btn" data-value="${entry.oldValue}">Przywróć</button>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    `;
+                }
+
+                modalBody.querySelectorAll('.revert-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const valueToRevert = btn.dataset.value;
+                        updateCellState(cell, state => {
+                            if (valueToRevert.includes('/')) {
+                                const parts = valueToRevert.split('/', 2);
+                                state.isSplit = true;
+                                state.content1 = parts[0];
+                                state.content2 = parts[1];
+                                delete state.content;
+                            } else {
+                                delete state.isSplit;
+                                delete state.content1;
+                                delete state.content2;
+                                state.content = valueToRevert;
+                            }
+                        });
+                        modal.style.display = 'none';
+                    });
+                });
+
+                const closeModal = () => {
+                    modal.style.display = 'none';
+                    modal.onclick = null;
+                    closeModalBtn.onclick = null;
+                };
+
+                closeModalBtn.onclick = closeModal;
+                modal.onclick = (event) => {
+                    if (event.target === modal) {
+                        closeModal();
+                    }
+                };
+
+                modal.style.display = 'flex';
+            },
             openEmployeeSelectionModal(cell) {
                 console.log("openEmployeeSelectionModal called with cell:", cell);
                 // TODO: Implement employee selection modal for schedule
@@ -495,6 +576,18 @@ const Schedule = (() => {
                     appState.scheduleCells = prevState.scheduleCells;
                     renderAndSave();
                 }
+            },
+            clearCell(cell) {
+                const clearContent = state => {
+                    const contentKeys = ['content', 'content1', 'content2', 'isSplit', 'isMassage', 'isPnf', 'isEveryOtherDay', 'treatmentStartDate', 'treatmentExtensionDays', 'treatmentEndDate', 'additionalInfo', 'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2'];
+                    for (const key of contentKeys) {
+                        if (state.hasOwnProperty(key)) {
+                            state[key] = null;
+                        }
+                    }
+                    window.showToast('Wyczyszczono komórkę');
+                };
+                updateCellState(cell, clearContent);
             }
         };
 
@@ -514,10 +607,12 @@ const Schedule = (() => {
                 enterEditMode: mainController.enterEditMode.bind(mainController),
                 getCurrentTableStateForCell: mainController.getCurrentTableStateForCell.bind(mainController),
                 openPatientInfoModal: mainController.openPatientInfoModal.bind(mainController),
+                showHistoryModal: mainController.showHistoryModal.bind(mainController),
                 openEmployeeSelectionModal: mainController.openEmployeeSelectionModal.bind(mainController),
                 toggleSpecialStyle: mainController.toggleSpecialStyle.bind(mainController),
                 mergeSplitCell: mainController.mergeSplitCell.bind(mainController),
-                undoLastAction: mainController.undoLastAction.bind(mainController)
+                undoLastAction: mainController.undoLastAction.bind(mainController),
+                clearCell: mainController.clearCell.bind(mainController)
             });
 
             undoManager.initialize(getCurrentTableState());

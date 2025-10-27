@@ -153,7 +153,7 @@ const ScheduleEvents = (() => {
         event.preventDefault();
         const dropTargetCell = event.target.closest('td.editable-cell');
         document.querySelectorAll('.drag-over-target').forEach(el => el.classList.remove('drag-over-target'));
-
+        
         if (dropTargetCell && !dropTargetCell.classList.contains('break-cell') && draggedCell && draggedCell !== dropTargetCell) {
             _dependencies.undoManager.pushState(_dependencies.getCurrentTableState());
 
@@ -162,36 +162,34 @@ const ScheduleEvents = (() => {
             const targetTime = dropTargetCell.dataset.time;
             const targetIndex = dropTargetCell.dataset.employeeIndex;
 
-            // Ensure the state objects exist
-            if (!_dependencies.appState.scheduleCells[sourceTime]) _dependencies.appState.scheduleCells[sourceTime] = {};
-            if (!_dependencies.appState.scheduleCells[sourceTime][sourceIndex]) _dependencies.appState.scheduleCells[sourceTime][sourceIndex] = {};
+            const sourceData = _dependencies.appState.scheduleCells[sourceTime]?.[sourceIndex] || {};
+            let targetData = _dependencies.appState.scheduleCells[targetTime]?.[targetIndex] || {};
+
+            // Get the content of the target cell before it's overwritten
+            const oldTargetContent = targetData.isSplit ? `${(targetData.content1 || '')}/${(targetData.content2 || '')}` : targetData.content;
+
+            // The new state for the target cell is the source cell's data
+            let newTargetData = { ...sourceData };
+
+            // If the target had content, add it to the history of the moved entry
+            if (oldTargetContent && oldTargetContent.trim() !== '') {
+                if (!newTargetData.history) {
+                    newTargetData.history = [];
+                }
+                // Add old target content to the front of the history, avoiding duplicates
+                if (newTargetData.history[0] !== oldTargetContent) {
+                    newTargetData.history.unshift(oldTargetContent);
+                }
+                newTargetData.history = newTargetData.history.slice(0, 3);
+            }
+
+            // Update target cell
             if (!_dependencies.appState.scheduleCells[targetTime]) _dependencies.appState.scheduleCells[targetTime] = {};
-            if (!_dependencies.appState.scheduleCells[targetTime][targetIndex]) _dependencies.appState.scheduleCells[targetTime][targetIndex] = {};
+            _dependencies.appState.scheduleCells[targetTime][targetIndex] = newTargetData;
 
-            const sourceCellState = _dependencies.appState.scheduleCells[sourceTime][sourceIndex];
-            const targetCellState = _dependencies.appState.scheduleCells[targetTime][targetIndex];
-
-            // 1. Update history for both cells with their content *before* the move
-            const sourceOldContent = sourceCellState.isSplit ? `${(sourceCellState.content1 || '')}/${(sourceCellState.content2 || '')}` : sourceCellState.content;
-            CellHistory.updateHistory(sourceCellState, sourceOldContent);
-
-            const targetOldContent = targetCellState.isSplit ? `${(targetCellState.content1 || '')}/${(targetCellState.content2 || '')}` : targetCellState.content;
-            CellHistory.updateHistory(targetCellState, targetOldContent);
-
-            // 2. Get a copy of the source content (without its history)
-            const sourceContent = { ...sourceCellState };
-            delete sourceContent.history;
-
-            // 3. Overwrite the target cell with the source content, but merge with target's existing history
-            _dependencies.appState.scheduleCells[targetTime][targetIndex] = {
-                ...sourceContent,
-                history: targetCellState.history
-            };
-
-            // 4. Clear the source cell, preserving only its history
-            _dependencies.appState.scheduleCells[sourceTime][sourceIndex] = {
-                history: sourceCellState.history
-            };
+            // Clear source cell
+            if (!_dependencies.appState.scheduleCells[sourceTime]) _dependencies.appState.scheduleCells[sourceTime] = {};
+            _dependencies.appState.scheduleCells[sourceTime][sourceIndex] = {};
 
             _dependencies.renderAndSave();
             _dependencies.undoManager.pushState(_dependencies.getCurrentTableState());
@@ -297,14 +295,9 @@ const ScheduleEvents = (() => {
             event.preventDefault();
             const cellToClear = activeCell.closest('td.editable-cell');
             if (cellToClear) {
+                _dependencies.clearCell(cellToClear);
                 const time = cellToClear.dataset.time;
                 const employeeIndex = cellToClear.dataset.employeeIndex;
-                _dependencies.updateCellState(cellToClear, state => {
-                    Object.keys(state).forEach(key => {
-                        if (key !== 'history') delete state[key];
-                    });
-                    window.showToast('Wyczyszczono komórkę');
-                });
                 const newCell = document.querySelector(`td[data-time="${time}"][data-employee-index="${employeeIndex}"]`);
                 if (newCell) {
                     const focusTarget = newCell.querySelector('div[tabindex="0"]') || newCell;
@@ -368,50 +361,14 @@ const ScheduleEvents = (() => {
                 _dependencies.updateCellState(cell, state => { state.isBreak = true; window.showToast('Dodano przerwę'); });
             }},
             { 
-                id: 'contextHistory',
-                onShow: (cell) => {
-                    const subMenu = document.getElementById('contextHistorySubMenu');
+                id: 'contextShowHistory', 
+                condition: cell => {
                     const cellState = _dependencies.appState.scheduleCells[cell.dataset.time]?.[cell.dataset.employeeIndex];
-                    subMenu.innerHTML = ''; // Clear previous items
-
-                    if (cellState && cellState.history && cellState.history.length > 0) {
-                        cellState.history.forEach(historyEntry => {
-                            const li = document.createElement('li');
-                            li.textContent = historyEntry;
-                            li.addEventListener('click', (e) => {
-                                e.stopPropagation(); // Prevent menu from closing
-                                _dependencies.updateCellState(cell, state => {
-                                    if (historyEntry.includes('/')) {
-                                        const parts = historyEntry.split('/', 2);
-                                        state.isSplit = true;
-                                        state.content1 = parts[0];
-                                        state.content2 = parts[1];
-                                        delete state.content;
-                                    } else {
-                                        state.isSplit = false;
-                                        state.content = historyEntry;
-                                        delete state.content1;
-                                        delete state.content2;
-                                    }
-                                });
-                                document.getElementById('contextMenu').classList.remove('visible');
-                            });
-                            subMenu.appendChild(li);
-                        });
-                    } else {
-                        const li = document.createElement('li');
-                        li.textContent = '(pusta historia)';
-                        li.classList.add('disabled');
-                        subMenu.appendChild(li);
-                    }
-                }
+                    return cellState && cellState.history && cellState.history.length > 0;
+                },
+                action: (cell) => _dependencies.showHistoryModal(cell)
             },
-                        { id: 'contextClear', class: 'danger', action: cell => _dependencies.updateCellState(cell, state => { 
-                Object.keys(state).forEach(key => {
-                    if (key !== 'history') delete state[key];
-                });
-                window.showToast('Wyczyszczono komórkę'); 
-            }) },
+            { id: 'contextClear', class: 'danger', action: cell => _dependencies.clearCell(cell) },
             { id: 'contextSplitCell', action: cell => _dependencies.updateCellState(cell, state => { state.content1 = state.content || ''; state.content2 = ''; delete state.content; state.isSplit = true; window.showToast('Podzielono komórkę'); }) },
             { id: 'contextMergeCells', class: 'info', condition: cell => cell.classList.contains('split-cell'), action: cell => _dependencies.mergeSplitCell(cell) },
             { id: 'contextMassage', action: cell => _dependencies.toggleSpecialStyle(cell, 'isMassage') },
@@ -476,12 +433,7 @@ const ScheduleEvents = (() => {
         });
         document.getElementById('btnClearCell')?.addEventListener('click', () => {
             if (activeCell) {
-                _dependencies.updateCellState(activeCell, state => { 
-                    Object.keys(state).forEach(key => {
-                        if (key !== 'history') delete state[key];
-                    });
-                    window.showToast('Wyczyszczono komórkę'); 
-                });
+                _dependencies.clearCell(activeCell);
             } else {
                 window.showToast('Wybierz komórkę do wyczyszczenia.', 3000);
             }

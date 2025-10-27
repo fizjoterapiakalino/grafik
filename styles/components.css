@@ -247,3 +247,42 @@
     background-color: #f2f2f2;
     cursor: not-allowed;
 }
+
+/* History Modal */
+.history-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.history-item:last-child {
+    border-bottom: none;
+}
+
+.history-value {
+    font-weight: bold;
+    flex-grow: 1;
+}
+
+.history-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-size: 0.8em;
+    color: #666;
+    margin-left: 15px;
+    min-width: 120px;
+}
+
+.history-item .revert-btn {
+    margin-left: 15px;
+    padding: 5px 10px;
+}

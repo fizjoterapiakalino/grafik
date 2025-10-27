@@ -142,7 +142,6 @@ const ScheduleUI = (() => {
     const renderTable = () => {
         const mainTable = document.getElementById('mainScheduleTable');
         if (!mainTable) {
-            console.warn("mainScheduleTable not found, skipping render.");
             return; // Zakończ, jeśli tabela nie istnieje
         }
 
@@ -161,49 +160,32 @@ const ScheduleUI = (() => {
         let isSingleUserView = false;
 
         const currentUser = firebase.auth().currentUser;
-        console.log("ScheduleUI.renderTable: Current User:", currentUser ? currentUser.email : "No user");
         if (currentUser) {
-            console.log("ScheduleUI.renderTable: Current User UID:", currentUser.uid);
-            
-            // Użyj nowej logiki opartej na rolach
             if (EmployeeManager.isUserAdmin(currentUser.uid)) {
-                // Użytkownik ma rolę admina
                 const allEmployees = EmployeeManager.getAll();
                 employeeIndices = Object.keys(allEmployees)
                     .filter(id => !allEmployees[id].isHidden)
                     .sort((a, b) => parseInt(a) - parseInt(b));
                 isSingleUserView = false;
-                console.log("ScheduleUI.renderTable: User is ADMIN. Displaying visible employees.");
             } else {
-                // Zwykły użytkownik - wyświetl tylko jego kolumnę
                 const employee = EmployeeManager.getEmployeeByUid(currentUser.uid);
-                console.log("ScheduleUI.renderTable: Employee for UID:", currentUser.uid, employee);
                 if (employee) {
                     employeeIndices.push(employee.id);
                     isSingleUserView = true;
-                    console.log(`ScheduleUI.renderTable: User ${currentUser.email} is linked to employee ${employee.name}. Displaying single column.`);
                 } else {
-                    // Jeśli użytkownik nie jest adminem i nie jest powiązany z pracownikiem,
-                    // wyświetl pusty grafik i pokaż komunikat.
                     employeeIndices = [];
-                    isSingleUserView = true; // Traktuj jak widok pojedynczego użytkownika, ale pusty
-                    console.warn(`ScheduleUI.renderTable: User ${currentUser.email} is not linked to any employee. Displaying empty schedule.`);
-                    // Można by tu dodać wyświetlanie komunikatu w UI, np. w miejscu tabeli
+                    isSingleUserView = true; 
                     tbody.innerHTML = `<tr><td colspan="2" class="unassigned-user-message">Twoje konto nie jest przypisane do żadnego pracownika. Skontaktuj się z administratorem.</td></tr>`;
                 }
             }
         } else {
-            // Użytkownik wylogowany - wyświetl wszystkich pracowników (pełny grafik)
             const allEmployees = EmployeeManager.getAll();
             employeeIndices = Object.keys(allEmployees)
                 .filter(id => !allEmployees[id].isHidden)
                 .sort((a, b) => parseInt(a) - parseInt(b));
             isSingleUserView = false;
-            console.log("ScheduleUI.renderTable: User logged out. Displaying visible employees.");
         }
         
-        console.log("ScheduleUI.renderTable: Final employeeIndices:", employeeIndices);
-        console.log("ScheduleUI.renderTable: Final isSingleUserView:", isSingleUserView);
         mainTable.classList.toggle('single-user-view', isSingleUserView);
 
         for (const i of employeeIndices) {
