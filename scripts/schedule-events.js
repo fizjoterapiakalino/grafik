@@ -153,7 +153,7 @@ const ScheduleEvents = (() => {
         event.preventDefault();
         const dropTargetCell = event.target.closest('td.editable-cell');
         document.querySelectorAll('.drag-over-target').forEach(el => el.classList.remove('drag-over-target'));
-        
+
         if (dropTargetCell && !dropTargetCell.classList.contains('break-cell') && draggedCell && draggedCell !== dropTargetCell) {
             _dependencies.undoManager.pushState(_dependencies.getCurrentTableState());
 
@@ -162,34 +162,76 @@ const ScheduleEvents = (() => {
             const targetTime = dropTargetCell.dataset.time;
             const targetIndex = dropTargetCell.dataset.employeeIndex;
 
-            const sourceData = _dependencies.appState.scheduleCells[sourceTime]?.[sourceIndex] || {};
-            let targetData = _dependencies.appState.scheduleCells[targetTime]?.[targetIndex] || {};
+            // Ensure paths in appState exist and get DIRECT references
+            if (!_dependencies.appState.scheduleCells[sourceTime]) {
+                _dependencies.appState.scheduleCells[sourceTime] = {};
+            }
+            if (!_dependencies.appState.scheduleCells[sourceTime][sourceIndex]) {
+                _dependencies.appState.scheduleCells[sourceTime][sourceIndex] = {};
+            }
+            const sourceCellState = _dependencies.appState.scheduleCells[sourceTime][sourceIndex];
 
-            // Get the content of the target cell before it's overwritten
-            const oldTargetContent = targetData.isSplit ? `${(targetData.content1 || '')}/${(targetData.content2 || '')}` : targetData.content;
+            if (!_dependencies.appState.scheduleCells[targetTime]) {
+                _dependencies.appState.scheduleCells[targetTime] = {};
+            }
+            if (!_dependencies.appState.scheduleCells[targetTime][targetIndex]) {
+                _dependencies.appState.scheduleCells[targetTime][targetIndex] = {};
+            }
+            const targetCellState = _dependencies.appState.scheduleCells[targetTime][targetIndex];
 
-            // The new state for the target cell is the source cell's data
-            let newTargetData = { ...sourceData };
+            const sourceContentString = sourceCellState.isSplit ?
+                `${sourceCellState.content1 || ''}/${sourceCellState.content2 || ''}` :
+                sourceCellState.content;
 
-            // If the target had content, add it to the history of the moved entry
-            if (oldTargetContent && oldTargetContent.trim() !== '') {
-                if (!newTargetData.history) {
-                    newTargetData.history = [];
-                }
-                // Add old target content to the front of the history, avoiding duplicates
-                if (newTargetData.history[0] !== oldTargetContent) {
-                    newTargetData.history.unshift(oldTargetContent);
-                }
-                newTargetData.history = newTargetData.history.slice(0, 3);
+            if (!sourceContentString || sourceContentString.trim() === '') {
+                return; // Don't drag empty cells
             }
 
-            // Update target cell
-            if (!_dependencies.appState.scheduleCells[targetTime]) _dependencies.appState.scheduleCells[targetTime] = {};
-            _dependencies.appState.scheduleCells[targetTime][targetIndex] = newTargetData;
+            const oldTargetContentString = targetCellState.isSplit ?
+                `${targetCellState.content1 || ''}/${targetCellState.content2 || ''}` :
+                targetCellState.content;
 
-            // Clear source cell
-            if (!_dependencies.appState.scheduleCells[sourceTime]) _dependencies.appState.scheduleCells[sourceTime] = {};
-            _dependencies.appState.scheduleCells[sourceTime][sourceIndex] = {};
+            // 1. Update Target Cell's history
+            if (oldTargetContentString && oldTargetContentString.trim() !== '') {
+                if (!targetCellState.history) targetCellState.history = [];
+                const historyEntry = {
+                    oldValue: oldTargetContentString,
+                    timestamp: new Date().toISOString(),
+                    userId: firebase.auth().currentUser?.uid || 'unknown'
+                };
+                targetCellState.history.unshift(historyEntry);
+                targetCellState.history = targetCellState.history.slice(0, 10);
+            }
+
+            // 2. Update Source Cell's history
+            if (!sourceCellState.history) sourceCellState.history = [];
+            const sourceHistoryEntry = {
+                oldValue: sourceContentString,
+                timestamp: new Date().toISOString(),
+                userId: firebase.auth().currentUser?.uid || 'unknown'
+            };
+            sourceCellState.history.unshift(sourceHistoryEntry);
+            sourceCellState.history = sourceCellState.history.slice(0, 10);
+
+            // 3. Move content from source to target
+            const contentKeys = ['content', 'content1', 'content2', 'isSplit', 'isMassage', 'isPnf', 'isEveryOtherDay', 'treatmentStartDate', 'treatmentExtensionDays', 'treatmentEndDate', 'additionalInfo', 'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2'];
+            
+            // First clear all possible content keys on the target
+            for (const key of contentKeys) {
+                delete targetCellState[key];
+            }
+
+            // Now copy only the defined properties from the source
+            for (const key of contentKeys) {
+                if (sourceCellState[key] !== undefined) {
+                    targetCellState[key] = sourceCellState[key];
+                }
+            }
+
+            // 4. Clear Source Cell's content by setting its properties to null
+            for (const key of contentKeys) {
+                sourceCellState[key] = null;
+            }
 
             _dependencies.renderAndSave();
             _dependencies.undoManager.pushState(_dependencies.getCurrentTableState());
