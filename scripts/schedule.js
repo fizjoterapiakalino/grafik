@@ -180,11 +180,22 @@ const Schedule = (() => {
                             delete cellState.isSplit;
                         }
                     } else {
+                        const oldContent = cellState.content || '';
+                        if (oldContent.trim().toLowerCase() !== newText.trim().toLowerCase() && newText.trim() !== '') {
+                            // Content has changed, so reset the date and related info
+                            const today = new Date();
+                            const year = today.getFullYear();
+                            const month = String(today.getMonth() + 1).padStart(2, '0');
+                            const day = String(today.getDate()).padStart(2, '0');
+                            cellState.treatmentStartDate = `${year}-${month}-${day}`;
+                            cellState.additionalInfo = null;
+                            cellState.treatmentExtensionDays = 0;
+                            cellState.treatmentEndDate = null;
+                        }
                         cellState.content = newText;
                     }
-
                     // Jeśli pacjent nie istnieje, komórka nie ma jeszcze daty i nie jest to operacja przeniesienia, ustaw datę
-                    if (!patientExists && !cellState.treatmentStartDate && !isMove) {
+                    if (!cellState.treatmentStartDate && !isMove) {
                         const today = new Date();
                         const year = today.getFullYear();
                         const month = String(today.getMonth() + 1).padStart(2, '0');

@@ -5,6 +5,8 @@
 </div>
 
 <div id="leavesFilterContainer" class="leaves-filter-container" style="padding: 10px; background-color: #f8f9fa; border-radius: 5px; margin-bottom: 15px;">
+    <label for="yearSelect">Rok:</label>
+    <select id="yearSelect" class="year-select"></select>
     <div id="leavesLegend" class="leaves-legend"></div>
     <button id="clearFiltersBtn" class="action-btn">Wyczyść filtry</button>
 </div>
@@ -53,6 +55,7 @@
             <div class="selection-mode-info">
                 <p><kbd>Ctrl</kbd> + klik, aby zaznaczyć pojedyncze dni.</p>
             </div>
+            <div id="leaveTypeLegend" class="leave-type-legend"></div>
             <div class="leave-type-selector">
                 <label for="leaveTypeSelect">Typ urlopu:</label>
                 <select id="leaveTypeSelect">

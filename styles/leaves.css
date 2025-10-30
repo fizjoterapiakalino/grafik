@@ -127,7 +127,7 @@
 
 /* Specjalna, szersza wersja dla modala z kalendarzem, używamy ID dla większej specyficzności */
 #calendarModal .modal-content.wide {
-    max-width: 1200px;
+    max-width: 1100px; /* Zmniejszona maksymalna szerokość */
     display: flex;
     flex-direction: column;
     height: 90vh; /* Ograniczenie wysokości modalu */
@@ -136,12 +136,12 @@
 .calendar-scroll-area {
     flex-grow: 1;
     overflow-y: auto; /* Przewijanie tylko dla obszaru kalendarzy */
-    padding-right: 15px; /* Miejsce na pasek przewijania */
+    padding-right: 5px; /* Zmniejszone miejsce na pasek przewijania */
 }
 
 .modal-footer {
     flex-shrink: 0;
-    padding-top: 15px;
+    padding-top: 10px; /* Zmniejszony padding */
     border-top: 1px solid #eee;
     background-color: #fff;
 }
@@ -150,14 +150,14 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
+    margin-bottom: 10px; /* Zmniejszony margines */
     overflow: hidden; /* Ukrywa wysuwające się kalendarze */
 }
 
 .calendars-container {
     display: flex;
     flex-direction: row;
-    gap: 20px;
+    gap: 10px; /* Zmniejszony odstęp */
     flex: 1;
     transition: transform 0.3s ease-in-out; /* Animacja przejścia */
 }
@@ -184,12 +184,12 @@
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 5px;
+    gap: 2px; /* Zmniejszony odstęp */
 }
 
 .day-name, .day-cell-calendar {
     text-align: center;
-    padding: 8px;
+    padding: 4px; /* Zmniejszony padding */
     border-radius: 4px;
 }
 
@@ -389,4 +389,32 @@
     opacity: 0;
     width: 0;
     height: 0;
+}
+
+/* Styles for the leave type legend in CalendarModal */
+.leave-type-legend {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 8px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    font-size: 0.9em;
+    color: #555;
+}
+
+.leave-type-legend .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: bold;
+}
+
+.leave-type-legend .legend-color-box {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
 }

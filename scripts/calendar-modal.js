@@ -2,7 +2,8 @@
 const CalendarModal = (() => {
     // --- SELEKTORY I ZMIENNE WEWNĘTRZNE MODUŁU ---
     let modal, prevMonthBtn, nextMonthBtn, confirmBtn, cancelBtn, clearSelectionBtn,
-        startDatePreview, endDatePreview, calendarSlider, workdaysCounter, leaveTypeSelect;
+        startDatePreview, endDatePreview, calendarSlider, workdaysCounter, leaveTypeSelect,
+        leaveTypeLegend;
 
     let currentEmployee = null;
     let currentYear = new Date().getUTCFullYear();
@@ -137,6 +138,27 @@ const CalendarModal = (() => {
             }
             if (isStartDate) dayCell.classList.add('start-date');
             if (isEndDate) dayCell.classList.add('end-date');
+        }
+    };
+
+    const updateLeaveTypeLegend = () => {
+        if (!leaveTypeLegend || !leaveTypeSelect) return;
+
+        leaveTypeLegend.innerHTML = ''; // Clear existing legend
+
+        const selectedType = leaveTypeSelect.value;
+
+        // Create a legend item for the currently selected type
+        const selectedOption = leaveTypeSelect.querySelector(`option[value="${selectedType}"]`);
+        if (selectedOption) {
+            const key = selectedOption.value;
+            const color = AppConfig.leaves.leaveTypeColors[key] || AppConfig.leaves.leaveTypeColors.default;
+            const text = selectedOption.textContent;
+
+            const legendItem = document.createElement('div');
+            legendItem.className = 'legend-item';
+            legendItem.innerHTML = `<span class="legend-color-box" style="background-color: ${color};"></span> <strong>${text}</strong>`;
+            leaveTypeLegend.appendChild(legendItem);
         }
     };
 
@@ -279,6 +301,7 @@ const CalendarModal = (() => {
         modal.addEventListener('click', (event) => {
             if (event.target === modal) closeModal();
         });
+        leaveTypeSelect.addEventListener('change', updateLeaveTypeLegend); // Add this line
     };
 
     const init = () => {
@@ -293,6 +316,7 @@ const CalendarModal = (() => {
         calendarSlider = document.querySelector('.calendar-slider');
         workdaysCounter = document.getElementById('workdaysCounter');
         leaveTypeSelect = document.getElementById('leaveTypeSelect');
+        leaveTypeLegend = document.getElementById('leaveTypeLegend'); // Initialize leaveTypeLegend
         
         if(modal) { // Only setup listeners if the modal exists on the page
             setupEventListeners();
@@ -308,6 +332,7 @@ const CalendarModal = (() => {
 
         resetSelection();
         loadEmployeeLeavesForModal(existingLeaves);
+        updateLeaveTypeLegend(); // Call this after leaveTypeSelect is potentially set
         modal.style.display = 'flex';
         return new Promise((resolve, reject) => {
             _resolvePromise = resolve;
