@@ -56,14 +56,34 @@ const UIShell = (() => {
         }
     };
 
-    const loadPage = async (pageName) => { // Usunięto callback
+    const loadPage = async (pageName) => {
         const pageContent = document.getElementById('page-content');
+        const DYNAMIC_CSS_ID = 'page-specific-css';
+
         if (!pageContent) {
             console.error('Fatal error: #page-content element not found.');
             return Promise.reject('Page content container not found');
         }
 
+        // Remove old page-specific CSS
+        const oldStylesheet = document.getElementById(DYNAMIC_CSS_ID);
+        if (oldStylesheet) {
+            oldStylesheet.remove();
+        }
+
         try {
+            // Load new CSS if it exists
+            const cssPath = `styles/${pageName}.css`;
+            const cssResponse = await fetch(cssPath);
+            if (cssResponse.ok) {
+                const newStylesheet = document.createElement('link');
+                newStylesheet.id = DYNAMIC_CSS_ID;
+                newStylesheet.rel = 'stylesheet';
+                newStylesheet.href = cssPath;
+                document.head.appendChild(newStylesheet);
+            }
+
+            // Load new HTML
             const response = await fetch(`pages/${pageName}.html`);
             if (!response.ok) {
                 throw new Error(`Could not load page: ${pageName}`);
@@ -74,9 +94,9 @@ const UIShell = (() => {
             const scheduleActionButtons = document.getElementById('scheduleActionButtons');
             if (scheduleActionButtons) {
                 if (pageName === 'schedule') {
-                    scheduleActionButtons.style.display = 'flex'; // Pokaż przyciski dla strony schedule
+                    scheduleActionButtons.style.display = 'flex';
                 } else {
-                    scheduleActionButtons.style.display = 'none'; // Ukryj dla innych stron
+                    scheduleActionButtons.style.display = 'none';
                 }
             }
         } catch (error) {

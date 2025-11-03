@@ -406,6 +406,7 @@ const Schedule = (() => {
                 const calculateEndDate = (startDate, extensionDays) => {
                     if (!startDate) return '';
                     let endDate = new Date(startDate);
+                    endDate.setDate(endDate.getDate() - 1);
                     let totalDays = 15 + parseInt(extensionDays || 0, 10);
                     let daysAdded = 0;
                     while (daysAdded < totalDays) {
