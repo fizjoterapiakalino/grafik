@@ -114,26 +114,28 @@ const Changes = (() => {
 
             const employees = EmployeeManager.getAll();
 
-            for (const employeeName in allLeavesData) {
-                const employee = Object.values(employees).find(emp => (emp.displayName || emp.name) === employeeName);
-                if (employee && employee.isHidden) continue;
+            for (const employeeId in employees) {
+                const employee = employees[employeeId];
+                if (employee.isHidden) continue;
 
+                const employeeName = employee.displayName || employee.name;
                 const employeeLeaves = allLeavesData[employeeName];
-                employeeLeaves.forEach(leave => {
-                    const leaveStart = new Date(leave.startDate);
-                    const leaveEnd = new Date(leave.endDate);
 
-                    // Uwzględnij tylko urlopy wypoczynkowe i wszystkie daty
-                    if (leave.type === 'vacation' && !(leaveEnd < periodStart || leaveStart > periodEnd)) {
-                        const employeeId = Object.keys(employees).find(id => (employees[id].displayName || employees[id].name) === employeeName);
-                        const lastName = EmployeeManager.getLastNameById(employeeId);
-                        leavesHtml += `${lastName}<br>`;
-                    }
-                });
+                if (Array.isArray(employeeLeaves)) {
+                    employeeLeaves.forEach(leave => {
+                        const leaveStart = new Date(leave.startDate);
+                        const leaveEnd = new Date(leave.endDate);
+
+                        if (leave.type === 'vacation' && !(leaveEnd < periodStart || leaveStart > periodEnd)) {
+                            const lastName = EmployeeManager.getLastNameById(employeeId);
+                            // Fallback to full name if last name is not available
+                            leavesHtml += `${lastName || employeeName}<br>`;
+                        }
+                    });
+                }
             }
             leavesCell.innerHTML = leavesHtml;
 
-            // Dodaj klasę 'past-period' jeśli okres jest w przeszłości
             if (periodEnd < today) {
                 row.classList.add('past-period');
             }
