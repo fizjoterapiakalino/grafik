@@ -9,6 +9,117 @@ const Options = (() => {
     // --- ZMIENNE STANU APLIKACJI ---
     let selectedEmployeeIndex = null;
 
+    // --- NOWE SELEKTORY DLA KOPII ZAPASOWEJ ---
+    let createBackupBtn, restoreBackupBtn, lastBackupDateSpan;
+
+    // --- NOWE FUNKCJE DLA KOPII ZAPASOWEJ ---
+
+    const getBackupDocRef = () => db.collection("backup").doc("latest");
+
+    const displayLastBackupDate = async () => {
+        try {
+            const backupDoc = await getBackupDocRef().get();
+            if (backupDoc.exists) {
+                const backupData = backupDoc.data();
+                if (backupData.backupDate) {
+                    const date = backupData.backupDate.toDate();
+                    lastBackupDateSpan.textContent = date.toLocaleString('pl-PL');
+                } else {
+                    lastBackupDateSpan.textContent = "Brak daty w kopii";
+                }
+            } else {
+                lastBackupDateSpan.textContent = "Nigdy";
+            }
+        } catch (error) {
+            console.error("Błąd podczas pobierania daty kopii zapasowej:", error);
+            lastBackupDateSpan.textContent = "Błąd odczytu";
+        }
+    };
+
+    const createBackup = async () => {
+        if (!confirm("Czy na pewno chcesz utworzyć nową kopię zapasową? Spowoduje to nadpisanie poprzedniej kopii.")) {
+            return;
+        }
+        showLoading(true);
+        try {
+            const scheduleRef = db.collection("schedules").doc("mainSchedule");
+            const leavesRef = db.collection("leaves").doc("mainLeaves");
+
+            const [scheduleDoc, leavesDoc] = await Promise.all([scheduleRef.get(), leavesRef.get()]);
+
+            const backupData = {
+                backupDate: new Date(),
+                scheduleData: scheduleDoc.exists ? scheduleDoc.data() : {},
+                leavesData: leavesDoc.exists ? leavesDoc.data() : {}
+            };
+
+            await getBackupDocRef().set(backupData);
+
+            await displayLastBackupDate();
+            window.showToast("Kopia zapasowa utworzona pomyślnie!", 3000);
+        } catch (error) {
+            console.error("Błąd podczas tworzenia kopii zapasowej:", error);
+            window.showToast("Wystąpił błąd podczas tworzenia kopii zapasowej.", 5000);
+        } finally {
+            showLoading(false);
+        }
+    };
+
+    const handleRestoreBackup = async () => {
+        const backupDoc = await getBackupDocRef().get();
+        if (!backupDoc.exists) {
+            window.showToast("Brak kopii zapasowej do przywrócenia.", 3000);
+            return;
+        }
+
+        const modal = document.getElementById('restoreConfirmationModal');
+        const confirmationInput = document.getElementById('restoreConfirmationInput');
+        const confirmBtn = document.getElementById('confirmRestoreBtn');
+        const cancelBtn = document.getElementById('cancelRestoreBtn');
+
+        modal.style.display = 'flex';
+
+        const onConfirm = async () => {
+            closeModal();
+            showLoading(true);
+            try {
+                const backupData = backupDoc.data();
+                const scheduleRef = db.collection("schedules").doc("mainSchedule");
+                const leavesRef = db.collection("leaves").doc("mainLeaves");
+
+                const batch = db.batch();
+                batch.set(scheduleRef, backupData.scheduleData || {});
+                batch.set(leavesRef, backupData.leavesData || {});
+                await batch.commit();
+                
+                window.showToast("Dane przywrócone pomyślnie! Odśwież stronę, aby zobaczyć zmiany.", 5000);
+            } catch (error) {
+                console.error("Błąd podczas przywracania danych:", error);
+                window.showToast("Wystąpił błąd podczas przywracania danych.", 5000);
+            } finally {
+                showLoading(false);
+            }
+        };
+
+        const onInput = () => {
+            confirmBtn.disabled = confirmationInput.value.trim() !== "PRZYWRÓĆ";
+        };
+
+        const closeModal = () => {
+            modal.style.display = 'none';
+            confirmationInput.value = '';
+            confirmBtn.disabled = true;
+            confirmBtn.removeEventListener('click', onConfirm);
+            cancelBtn.removeEventListener('click', closeModal);
+            confirmationInput.removeEventListener('input', onInput);
+        };
+        
+        confirmBtn.addEventListener('click', onConfirm);
+        cancelBtn.addEventListener('click', closeModal);
+        confirmationInput.addEventListener('input', onInput);
+    };
+
+
     // --- NAZWANE FUNKCJE OBSŁUGI ZDARZEŃ ---
     const handleAssignUid = () => {
         const currentUser = firebase.auth().currentUser;
@@ -320,12 +431,17 @@ const Options = (() => {
         assignUidBtn = document.getElementById('assignUidBtn');
         clearUidBtn = document.getElementById('clearUidBtn');
         employeeIsHidden = document.getElementById('employeeIsHidden');
+        // Nowe elementy dla kopii zapasowej
+        createBackupBtn = document.getElementById('createBackupBtn');
+        restoreBackupBtn = document.getElementById('restoreBackupBtn');
+        lastBackupDateSpan = document.getElementById('lastBackupDate');
 
         resetDetailsPanel();
         showLoading(true);
         try {
             await EmployeeManager.load();
             renderEmployeeList();
+            await displayLastBackupDate(); // Wyświetl datę kopii
         } catch (error) {
             console.error("Błąd inicjalizacji strony opcji:", error);
             window.showToast("Wystąpił krytyczny błąd inicjalizacji. Odśwież stronę.", 5000);
@@ -338,9 +454,11 @@ const Options = (() => {
         addEmployeeBtn.addEventListener('click', handleAddEmployee);
         saveEmployeeBtn.addEventListener('click', handleSaveEmployee);
         deleteEmployeeBtn.addEventListener('click', handleDeleteEmployee);
-
         assignUidBtn.addEventListener('click', handleAssignUid);
         clearUidBtn.addEventListener('click', handleClearUid);
+        // Nowe listenery dla kopii zapasowej
+        createBackupBtn.addEventListener('click', createBackup);
+        restoreBackupBtn.addEventListener('click', handleRestoreBackup);
     };
 
     const destroy = () => {
@@ -350,6 +468,9 @@ const Options = (() => {
         deleteEmployeeBtn.removeEventListener('click', handleDeleteEmployee);
         assignUidBtn.removeEventListener('click', handleAssignUid);
         clearUidBtn.removeEventListener('click', handleClearUid);
+        // Usuń nowe listenery
+        createBackupBtn.removeEventListener('click', createBackup);
+        restoreBackupBtn.removeEventListener('click', handleRestoreBackup);
         console.log("Options module destroyed");
     };
 

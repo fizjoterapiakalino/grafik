@@ -9,6 +9,7 @@ const Schedule = (() => {
     let isSaving = false;
     let saveQueued = false;
     let currentUserId = null; // Dodana zmienna do przechowywania UID aktualnego użytkownika
+    let isInitialLoad = true;
 
     // Funkcja do pobierania referencji do dokumentu grafiku (zawsze mainSchedule)
     const getScheduleDocRef = () => {
@@ -30,12 +31,17 @@ const Schedule = (() => {
                     } else {
                         appState.scheduleCells = {}; // Upewnij się, że jest puste
                     }
-                    ScheduleUI.render();
                 } else {
                     appState.scheduleCells = {};
-                    ScheduleUI.render();
                     saveSchedule(); // Zapisz pusty grafik, aby utworzyć dokument mainSchedule
                 }
+
+                if (isInitialLoad) {
+                    undoManager.initialize(getCurrentTableState());
+                    isInitialLoad = false;
+                }
+
+                ScheduleUI.render();
             },
             (error) => {
                 console.error('Error listening to schedule changes:', error);
@@ -117,7 +123,6 @@ const Schedule = (() => {
         appState.scheduleCells[time][employeeIndex] = cellState;
         
         renderAndSave();
-        undoManager.pushState(getCurrentTableState());
     };
     
     const getCurrentTableState = () => JSON.parse(JSON.stringify(appState));
@@ -142,8 +147,7 @@ const Schedule = (() => {
                 const time = parentCell.dataset.time;
                 const duplicate = this.findDuplicateEntry(newText, time, employeeIndex);
                 const updateSchedule = (isMove = false) => {
-                    undoManager.pushState(getCurrentTableState()); // Przenieś pushState na początek, aby objąć całą operację
-
+                    undoManager.pushState(getCurrentTableState());
                     if (!appState.scheduleCells[time]) appState.scheduleCells[time] = {};
                     if (!appState.scheduleCells[time][employeeIndex]) appState.scheduleCells[time][employeeIndex] = {};
                     let cellState = appState.scheduleCells[time][employeeIndex];
@@ -205,7 +209,6 @@ const Schedule = (() => {
 
                     appState.scheduleCells[time][employeeIndex] = cellState;
                     renderAndSave();
-                    undoManager.pushState(getCurrentTableState());
                 };
                 if (duplicate) {
                     this.showDuplicateConfirmationDialog(duplicate, () => updateSchedule(true), () => updateSchedule(false), () => { ScheduleUI.render(); });
@@ -252,7 +255,6 @@ const Schedule = (() => {
                 }
                 const isEditableTarget = (element.tagName === 'TD' && !element.classList.contains('split-cell')) || (element.tagName === 'DIV' && element.parentNode.classList.contains('split-cell'));
                 if (!isEditableTarget) return;
-                undoManager.pushState(getCurrentTableState());
                 const originalValue = ScheduleUI.getElementText(element);
                 element.dataset.originalValue = originalValue;
                 element.innerHTML = ScheduleUI.getElementText(element);
@@ -626,8 +628,6 @@ const Schedule = (() => {
                 undoLastAction: mainController.undoLastAction.bind(mainController),
                 clearCell: mainController.clearCell.bind(mainController)
             });
-
-            undoManager.initialize(getCurrentTableState());
 
             // Nasłuchuj zmian stanu uwierzytelnienia Firebase
             firebase.auth().onAuthStateChanged(user => {

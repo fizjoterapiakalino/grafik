@@ -92,3 +92,33 @@
         </div>
     </div>
 </div>
+
+<div class="backup-container">
+    <h2>Kopia zapasowa</h2>
+    <div class="backup-controls">
+        <button id="createBackupBtn" class="action-btn">
+            <i class="fas fa-save"></i> Utwórz kopię zapasową
+        </button>
+        <button id="restoreBackupBtn" class="action-btn confirm-btn">
+            <i class="fas fa-undo"></i> Przywróć z kopii zapasowej
+        </button>
+    </div>
+    <div class="backup-info">
+        <p>Ostatnia kopia zapasowa: <span id="lastBackupDate">Nigdy</span></p>
+    </div>
+</div>
+
+<div id="restoreConfirmationModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <h2 class="modal-title">Potwierdź przywrócenie danych</h2>
+        <p>Czy na pewno chcesz przywrócić dane z ostatniej kopii zapasowej? <strong>Ta operacja nadpisze wszystkie aktualne dane w grafiku i urlopach.</strong> Ta operacja jest nieodwracalna.</p>
+        <p>Aby potwierdzić, wpisz "PRZYWRÓĆ" w polu poniżej:</p>
+        <div class="form-group">
+            <input type="text" id="restoreConfirmationInput" autocomplete="off">
+        </div>
+        <div class="modal-actions">
+            <button id="confirmRestoreBtn" class="action-btn cancel-btn" disabled>Przywróć dane</button>
+            <button id="cancelRestoreBtn" class="action-btn">Anuluj</button>
+        </div>
+    </div>
+</div>

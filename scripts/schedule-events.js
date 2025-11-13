@@ -234,7 +234,6 @@ const ScheduleEvents = (() => {
             }
 
             _dependencies.renderAndSave();
-            _dependencies.undoManager.pushState(_dependencies.getCurrentTableState());
         }
     };
 
