@@ -3,10 +3,144 @@ const Options = (() => {
     let loadingOverlay, employeeListContainer, employeeSearchInput, addEmployeeBtn,
         detailsPlaceholder, detailsEditForm, employeeFirstNameInput, employeeLastNameInput,
         employeeDisplayNameInput, employeeNumberInput, leaveEntitlementInput,
-        carriedOverLeaveInput, saveEmployeeBtn, deleteEmployeeBtn;
+        carriedOverLeaveInput, saveEmployeeBtn, deleteEmployeeBtn, employeeUidInput,
+        assignUidBtn, clearUidBtn, employeeIsHidden;
 
     // --- ZMIENNE STANU APLIKACJI ---
     let selectedEmployeeIndex = null;
+
+    // --- NOWE SELEKTORY DLA KOPII ZAPASOWEJ ---
+    let createBackupBtn, restoreBackupBtn, lastBackupDateSpan;
+
+    // --- NOWE FUNKCJE DLA KOPII ZAPASOWEJ ---
+
+    const getBackupDocRef = () => db.collection("backup").doc("latest");
+
+    const displayLastBackupDate = async () => {
+        try {
+            const backupDoc = await getBackupDocRef().get();
+            if (backupDoc.exists) {
+                const backupData = backupDoc.data();
+                if (backupData.backupDate) {
+                    const date = backupData.backupDate.toDate();
+                    lastBackupDateSpan.textContent = date.toLocaleString('pl-PL');
+                } else {
+                    lastBackupDateSpan.textContent = "Brak daty w kopii";
+                }
+            } else {
+                lastBackupDateSpan.textContent = "Nigdy";
+            }
+        } catch (error) {
+            console.error("Błąd podczas pobierania daty kopii zapasowej:", error);
+            lastBackupDateSpan.textContent = "Błąd odczytu";
+        }
+    };
+
+    const createBackup = async () => {
+        if (!confirm("Czy na pewno chcesz utworzyć nową kopię zapasową? Spowoduje to nadpisanie poprzedniej kopii.")) {
+            return;
+        }
+        showLoading(true);
+        try {
+            const scheduleRef = db.collection("schedules").doc("mainSchedule");
+            const leavesRef = db.collection("leaves").doc("mainLeaves");
+
+            const [scheduleDoc, leavesDoc] = await Promise.all([scheduleRef.get(), leavesRef.get()]);
+
+            const backupData = {
+                backupDate: new Date(),
+                scheduleData: scheduleDoc.exists ? scheduleDoc.data() : {},
+                leavesData: leavesDoc.exists ? leavesDoc.data() : {}
+            };
+
+            await getBackupDocRef().set(backupData);
+
+            await displayLastBackupDate();
+            window.showToast("Kopia zapasowa utworzona pomyślnie!", 3000);
+        } catch (error) {
+            console.error("Błąd podczas tworzenia kopii zapasowej:", error);
+            window.showToast("Wystąpił błąd podczas tworzenia kopii zapasowej.", 5000);
+        } finally {
+            showLoading(false);
+        }
+    };
+
+    const handleRestoreBackup = async () => {
+        const backupDoc = await getBackupDocRef().get();
+        if (!backupDoc.exists) {
+            window.showToast("Brak kopii zapasowej do przywrócenia.", 3000);
+            return;
+        }
+
+        const modal = document.getElementById('restoreConfirmationModal');
+        const confirmationInput = document.getElementById('restoreConfirmationInput');
+        const confirmBtn = document.getElementById('confirmRestoreBtn');
+        const cancelBtn = document.getElementById('cancelRestoreBtn');
+
+        modal.style.display = 'flex';
+
+        const onConfirm = async () => {
+            closeModal();
+            showLoading(true);
+            try {
+                const backupData = backupDoc.data();
+                const scheduleRef = db.collection("schedules").doc("mainSchedule");
+                const leavesRef = db.collection("leaves").doc("mainLeaves");
+
+                const batch = db.batch();
+                batch.set(scheduleRef, backupData.scheduleData || {});
+                batch.set(leavesRef, backupData.leavesData || {});
+                await batch.commit();
+                
+                window.showToast("Dane przywrócone pomyślnie! Odśwież stronę, aby zobaczyć zmiany.", 5000);
+            } catch (error) {
+                console.error("Błąd podczas przywracania danych:", error);
+                window.showToast("Wystąpił błąd podczas przywracania danych.", 5000);
+            } finally {
+                showLoading(false);
+            }
+        };
+
+        const onInput = () => {
+            confirmBtn.disabled = confirmationInput.value.trim() !== "PRZYWRÓĆ";
+        };
+
+        const closeModal = () => {
+            modal.style.display = 'none';
+            confirmationInput.value = '';
+            confirmBtn.disabled = true;
+            confirmBtn.removeEventListener('click', onConfirm);
+            cancelBtn.removeEventListener('click', closeModal);
+            confirmationInput.removeEventListener('input', onInput);
+        };
+        
+        confirmBtn.addEventListener('click', onConfirm);
+        cancelBtn.addEventListener('click', closeModal);
+        confirmationInput.addEventListener('input', onInput);
+    };
+
+
+    // --- NAZWANE FUNKCJE OBSŁUGI ZDARZEŃ ---
+    const handleAssignUid = () => {
+        const currentUser = firebase.auth().currentUser;
+        if (currentUser) {
+            // Sprawdź, czy ten UID nie jest już przypisany do innego pracownika
+            const allEmployees = EmployeeManager.getAll();
+            const existingEmployee = Object.values(allEmployees).find(emp => emp.uid === currentUser.uid);
+            if (existingEmployee && existingEmployee.id !== selectedEmployeeIndex) {
+                window.showToast(`Ten użytkownik jest już przypisany do: ${existingEmployee.displayName}.`, 4000);
+                return;
+            }
+            employeeUidInput.value = currentUser.uid;
+        } else {
+            window.showToast("Nie jesteś zalogowany.", 3000);
+        }
+    };
+
+    const handleClearUid = () => {
+        employeeUidInput.value = '';
+    };
+
 
     // --- FUNKCJE POMOCNICZE ---
     const showLoading = (show) => {
@@ -70,6 +204,9 @@ const Options = (() => {
         employeeNumberInput.value = employee.employeeNumber || ''; // Nowe pole
         leaveEntitlementInput.value = employee.leaveEntitlement || 26;
         carriedOverLeaveInput.value = employee.carriedOverLeave || 0;
+        document.getElementById('employeeRoleAdmin').checked = employee.role === 'admin';
+        employeeIsHidden.checked = employee.isHidden || false;
+        employeeUidInput.value = employee.uid || '';
     };
     
     const filterEmployees = () => {
@@ -134,9 +271,12 @@ const Options = (() => {
         const newFirstName = employeeFirstNameInput.value.trim();
         const newLastName = employeeLastNameInput.value.trim();
         const newDisplayName = employeeDisplayNameInput.value.trim();
-        const newEmployeeNumber = employeeNumberInput.value.trim(); // Nowe pole
+        const newEmployeeNumber = employeeNumberInput.value.trim();
         const newEntitlement = parseInt(leaveEntitlementInput.value, 10);
         const newCarriedOver = parseInt(carriedOverLeaveInput.value, 10);
+        const isAdmin = document.getElementById('employeeRoleAdmin').checked;
+        const isHidden = employeeIsHidden.checked;
+        const newUid = employeeUidInput.value.trim();
 
         if (newDisplayName === '') {
             window.showToast("Nazwa wyświetlana nie może być pusta.", 3000);
@@ -147,44 +287,50 @@ const Options = (() => {
             return;
         }
 
-        const updatedEmployee = {
+        const updatedData = {
             firstName: newFirstName,
             lastName: newLastName,
             displayName: newDisplayName,
-            employeeNumber: newEmployeeNumber, // Nowe pole
+            employeeNumber: newEmployeeNumber,
             leaveEntitlement: newEntitlement,
-            carriedOverLeave: newCarriedOver
+            carriedOverLeave: newCarriedOver,
+            role: isAdmin ? 'admin' : 'user',
+            isHidden: isHidden,
+            uid: newUid
         };
 
         showLoading(true);
         try {
-            await db.runTransaction(async (transaction) => {
-                const scheduleRef = db.collection("schedules").doc("mainSchedule");
-                const leavesRef = db.collection("leaves").doc("mainLeaves"); // Deklaracja leavesRef
-                const leavesDoc = await transaction.get(leavesRef); // Odczyt przed zapisem
-                
-                transaction.update(scheduleRef, {
-                    [`employees.${selectedEmployeeIndex}`]: updatedEmployee
-                });
+            // Użyj nowej, uproszczonej funkcji z EmployeeManager
+            await EmployeeManager.updateEmployee(selectedEmployeeIndex, updatedData);
 
-                // Jeśli nazwa się zmieniła, zaktualizuj klucze w urlopach
-                // Logika migracji nazwy w urlopach
-                const oldNameKey = oldEmployee.displayName || oldEmployee.name;
-                if (oldNameKey !== newDisplayName) {
-                    if (leavesDoc.exists && leavesDoc.data()[oldNameKey]) {
-                        const leavesData = leavesDoc.data();
-                        const employeeLeaveData = leavesData[oldNameKey];
-                        delete leavesData[oldNameKey];
-                        leavesData[newDisplayName] = employeeLeaveData;
-                        transaction.set(leavesRef, leavesData);
-                    }
+            // Logika migracji nazwy w urlopach (jeśli konieczna)
+            const oldNameKey = oldEmployee.displayName || oldEmployee.name;
+            if (oldNameKey !== newDisplayName) {
+                // Ta logika powinna być idealnie częścią transakcji,
+                // ale dla uproszczenia zostawiamy ją jako osobne wywołanie.
+                // W przyszłości można to zintegrować w EmployeeManager.
+                const leavesRef = db.collection("leaves").doc("mainLeaves");
+                const leavesDoc = await leavesRef.get();
+                if (leavesDoc.exists && leavesDoc.data()[oldNameKey]) {
+                    const leavesData = leavesDoc.data();
+                    const employeeLeaveData = leavesData[oldNameKey];
+                    delete leavesData[oldNameKey];
+                    leavesData[newDisplayName] = employeeLeaveData;
+                    await leavesRef.set(leavesData);
                 }
-            });
+            }
 
-            await EmployeeManager.load();
-            renderEmployeeList();
-            handleEmployeeSelect(selectedEmployeeIndex);
+            await EmployeeManager.load(); // Przeładuj dane, aby mieć pewność, że EmployeeManager ma aktualne dane
+
+            // Zamiast przebudowywać całą listę, zaktualizuj tylko zmieniony element
+            const listItem = employeeListContainer.querySelector(`.employee-list-item[data-employee-index="${selectedEmployeeIndex}"]`);
+            if (listItem) {
+                const nameToDisplay = (newFirstName && newLastName) ? `${newFirstName} ${newLastName}` : newDisplayName;
+                listItem.querySelector('span').textContent = nameToDisplay;
+            }
             window.showToast("Dane pracownika zaktualizowane.", 2000);
+            // Nie ma potrzeby wywoływać handleEmployeeSelect, bo formularz już ma nowe dane
 
         } catch (error) {
             console.error("Błąd podczas zapisywania zmian pracownika:", error);
@@ -281,12 +427,21 @@ const Options = (() => {
         carriedOverLeaveInput = document.getElementById('carriedOverLeaveInput');
         saveEmployeeBtn = document.getElementById('saveEmployeeBtn');
         deleteEmployeeBtn = document.getElementById('deleteEmployeeBtn');
+        employeeUidInput = document.getElementById('employeeUidInput');
+        assignUidBtn = document.getElementById('assignUidBtn');
+        clearUidBtn = document.getElementById('clearUidBtn');
+        employeeIsHidden = document.getElementById('employeeIsHidden');
+        // Nowe elementy dla kopii zapasowej
+        createBackupBtn = document.getElementById('createBackupBtn');
+        restoreBackupBtn = document.getElementById('restoreBackupBtn');
+        lastBackupDateSpan = document.getElementById('lastBackupDate');
 
         resetDetailsPanel();
         showLoading(true);
         try {
             await EmployeeManager.load();
             renderEmployeeList();
+            await displayLastBackupDate(); // Wyświetl datę kopii
         } catch (error) {
             console.error("Błąd inicjalizacji strony opcji:", error);
             window.showToast("Wystąpił krytyczny błąd inicjalizacji. Odśwież stronę.", 5000);
@@ -299,6 +454,11 @@ const Options = (() => {
         addEmployeeBtn.addEventListener('click', handleAddEmployee);
         saveEmployeeBtn.addEventListener('click', handleSaveEmployee);
         deleteEmployeeBtn.addEventListener('click', handleDeleteEmployee);
+        assignUidBtn.addEventListener('click', handleAssignUid);
+        clearUidBtn.addEventListener('click', handleClearUid);
+        // Nowe listenery dla kopii zapasowej
+        createBackupBtn.addEventListener('click', createBackup);
+        restoreBackupBtn.addEventListener('click', handleRestoreBackup);
     };
 
     const destroy = () => {
@@ -306,6 +466,11 @@ const Options = (() => {
         addEmployeeBtn.removeEventListener('click', handleAddEmployee);
         saveEmployeeBtn.removeEventListener('click', handleSaveEmployee);
         deleteEmployeeBtn.removeEventListener('click', handleDeleteEmployee);
+        assignUidBtn.removeEventListener('click', handleAssignUid);
+        clearUidBtn.removeEventListener('click', handleClearUid);
+        // Usuń nowe listenery
+        createBackupBtn.removeEventListener('click', createBackup);
+        restoreBackupBtn.removeEventListener('click', handleRestoreBackup);
         console.log("Options module destroyed");
     };
 

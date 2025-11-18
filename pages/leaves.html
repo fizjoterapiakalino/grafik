@@ -5,6 +5,8 @@
 </div>
 
 <div id="leavesFilterContainer" class="leaves-filter-container" style="padding: 10px; background-color: #f8f9fa; border-radius: 5px; margin-bottom: 15px;">
+    <label for="yearSelect">Rok:</label>
+    <select id="yearSelect" class="year-select"></select>
     <div id="leavesLegend" class="leaves-legend"></div>
     <button id="clearFiltersBtn" class="action-btn">Wyczyść filtry</button>
 </div>
@@ -30,6 +32,15 @@
 
 <div id="calendarModal" class="modal-overlay" style="display: none;">
     <div class="modal-content wide">
+        <div class="leave-type-selector" style="text-align: left; margin-bottom: 15px;">
+            <label for="leaveTypeSelect" style="display: block; margin-bottom: 5px; font-size: 1.2em;">Wybierz typ urlopu</label>
+            <select id="leaveTypeSelect">
+                <option value="vacation" selected>Wypoczynkowy</option>
+                <option value="child_care_art_188">Opieka nad zdrowym dzieckiem</option>
+                <option value="sick_child_care">Opieka nad chorym dzieckiem</option>
+                <option value="family_member_care">Opieka chorym członkiem rodziny</option>
+            </select>
+        </div>
         <div class="calendar-scroll-area">
             <div class="calendar-header">
                 <button id="prevMonthBtn" class="nav-btn"><i class="fas fa-chevron-left"></i></button>
@@ -43,25 +54,15 @@
             </div>
         </div>
         <div class="modal-footer">
-            <div class="calendar-selection-info">
-                <div class="selection-preview-container">
-                    <p><strong>Start:</strong> <span id="startDatePreview">-</span></p>
-                    <p><strong>Koniec:</strong> <span id="endDatePreview">-</span></p>
-                </div>
+            <div class="calendar-selection-info" style="display: flex; justify-content: space-around; width: 100%; margin-bottom: 10px;">
+                <p><strong>Start:</strong> <span id="startDatePreview">-</span></p>
+                <p><strong>Koniec:</strong> <span id="endDatePreview">-</span></p>
                 <p><strong>Zaplanowano dni:</strong> <span id="workdaysCounter">0</span></p>
             </div>
             <div class="selection-mode-info">
                 <p><kbd>Ctrl</kbd> + klik, aby zaznaczyć pojedyncze dni.</p>
             </div>
-            <div class="leave-type-selector">
-                <label for="leaveTypeSelect">Typ urlopu:</label>
-                <select id="leaveTypeSelect">
-                    <option value="vacation" selected>Wypoczynkowy</option>
-                    <option value="child_care_art_188">Opieka nad zdrowym dzieckiem</option>
-                    <option value="sick_child_care">Opieka nad chorym dzieckiem</option>
-                    <option value="family_member_care">Opieka chorym członkiem rodziny</option>
-                </select>
-            </div>
+            <div id="leaveTypeLegend" class="leave-type-legend"></div>
             <div class="modal-actions">
                 <button id="clearSelectionBtn" class="action-btn">Wyczyść</button>
                 <button id="confirmSelectionBtn" class="action-btn confirm-btn">Zatwierdź</button>

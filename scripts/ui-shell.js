@@ -12,10 +12,10 @@ const UIShell = (() => {
                 <p>Wczytywanie...</p>
             </div>
             <div id="toast-container"></div>
-            <div id="appHeader" class="app-header">
+            <div id="appHeader" class="app-header" style="display: none;"> <!-- Domyślnie ukryty -->
                 <div class="banner-left-content">
                     <img src="logo.png" alt="Logo Kalinowa" class="banner-logo">
-                    <span class="banner-title">Grafik Kalinowa</span>
+                    <span id="bannerTitleLink" class="banner-title">Grafik Kalinowa</span>
                 </div>
                 <div id="dateTimeText" class="date-time-text"></div>
                 <div class="header-right-menu">
@@ -23,6 +23,7 @@ const UIShell = (() => {
                     <div id="scheduleActionButtons" class="schedule-action-buttons">
                         <button id="btnPatientInfo" class="action-icon-btn" title="Informacje o pacjencie"><i class="fas fa-user-circle"></i></button>
                         <button id="btnSplitCell" class="action-icon-btn" title="Podziel komórkę"><i class="fas fa-users"></i></button>
+                        <button id="btnMergeCells" class="action-icon-btn" title="Scal komórki"><i class="fas fa-user"></i></button>
                         <button id="btnAddBreak" class="action-icon-btn" title="Dodaj przerwę"><i class="fas fa-coffee"></i></button>
                         <button id="btnMassage" class="action-icon-btn" title="Oznacz jako Masaż"><i class="fas fa-hand-paper"></i></button>
                         <button id="btnPnf" class="action-icon-btn" title="Oznacz jako PNF"><i class="fas fa-brain"></i></button>
@@ -44,27 +45,58 @@ const UIShell = (() => {
 
         // Initialize shared components like hamburger menu
         Shared.initialize();
+
+        // Add event listener for banner title to navigate to schedule
+        const bannerTitleLink = document.getElementById('bannerTitleLink');
+        if (bannerTitleLink) {
+            bannerTitleLink.style.cursor = 'pointer'; // Indicate it's clickable
+            bannerTitleLink.addEventListener('click', () => {
+                window.location.hash = 'schedule'; // Use hash navigation for SPA
+            });
+        }
     };
 
-    const loadPage = async (pageName) => { // Usunięto callback
+    const loadPage = async (pageName) => {
         const pageContent = document.getElementById('page-content');
+        const DYNAMIC_CSS_ID = 'page-specific-css';
+
         if (!pageContent) {
             console.error('Fatal error: #page-content element not found.');
             return Promise.reject('Page content container not found');
         }
 
+        // Remove old page-specific CSS
+        const oldStylesheet = document.getElementById(DYNAMIC_CSS_ID);
+        if (oldStylesheet) {
+            oldStylesheet.remove();
+        }
+
         try {
+            // Load new CSS if it exists
+            const cssPath = `styles/${pageName}.css`;
+            const cssResponse = await fetch(cssPath);
+            if (cssResponse.ok) {
+                const newStylesheet = document.createElement('link');
+                newStylesheet.id = DYNAMIC_CSS_ID;
+                newStylesheet.rel = 'stylesheet';
+                newStylesheet.href = cssPath;
+                document.head.appendChild(newStylesheet);
+            }
+
+            // Load new HTML
             const response = await fetch(`pages/${pageName}.html`);
             if (!response.ok) {
                 throw new Error(`Could not load page: ${pageName}`);
             }
-            pageContent.innerHTML = await response.text();
+            const pageHtml = await response.text();
+            pageContent.innerHTML = pageHtml;
+
             const scheduleActionButtons = document.getElementById('scheduleActionButtons');
             if (scheduleActionButtons) {
                 if (pageName === 'schedule') {
-                    scheduleActionButtons.style.display = 'flex'; // Pokaż przyciski dla strony schedule
+                    scheduleActionButtons.style.display = 'flex';
                 } else {
-                    scheduleActionButtons.style.display = 'none'; // Ukryj dla innych stron
+                    scheduleActionButtons.style.display = 'none';
                 }
             }
         } catch (error) {

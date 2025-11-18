@@ -7,19 +7,41 @@ const Schedule = (() => {
     let undoButton;
     let unsubscribeSchedule;
     let isSaving = false;
-    let saveQueue = null;
+    let saveQueued = false;
+    let currentUserId = null; // Dodana zmienna do przechowywania UID aktualnego użytkownika
+    let isInitialLoad = true;
+
+    // Funkcja do pobierania referencji do dokumentu grafiku (zawsze mainSchedule)
+    const getScheduleDocRef = () => {
+        return db.collection(AppConfig.firestore.collections.schedules).doc(AppConfig.firestore.docs.mainSchedule);
+    };
 
     const listenForScheduleChanges = () => {
-        const docRef = db.collection(AppConfig.firestore.collections.schedules).doc(AppConfig.firestore.docs.mainSchedule);
+        if (unsubscribeSchedule) {
+            unsubscribeSchedule(); // Anuluj poprzednią subskrypcję, jeśli istnieje
+        }
+
+        const docRef = getScheduleDocRef(); // Zawsze odwołuj się do mainSchedule
         unsubscribeSchedule = docRef.onSnapshot(
             (doc) => {
                 if (doc.exists) {
                     const savedData = doc.data();
-                    appState.scheduleCells = savedData.scheduleCells || {};
-                    ScheduleUI.render(); 
+                    if (savedData.scheduleCells && Object.keys(savedData.scheduleCells).length > 0) {
+                        appState.scheduleCells = savedData.scheduleCells;
+                    } else {
+                        appState.scheduleCells = {}; // Upewnij się, że jest puste
+                    }
                 } else {
-                    console.log("No schedule found, creating a new one.");
+                    appState.scheduleCells = {};
+                    saveSchedule(); // Zapisz pusty grafik, aby utworzyć dokument mainSchedule
                 }
+
+                if (isInitialLoad) {
+                    undoManager.initialize(getCurrentTableState());
+                    isInitialLoad = false;
+                }
+
+                ScheduleUI.render();
             },
             (error) => {
                 console.error('Error listening to schedule changes:', error);
@@ -30,7 +52,7 @@ const Schedule = (() => {
 
     const saveSchedule = async () => {
         if (isSaving) {
-            saveQueue = { ...appState };
+            saveQueued = true;
             return;
         }
 
@@ -38,13 +60,12 @@ const Schedule = (() => {
         window.setSaveStatus('saving');
 
         try {
-            await db.collection(AppConfig.firestore.collections.schedules).doc(AppConfig.firestore.docs.mainSchedule).set(appState, { merge: true });
+            await getScheduleDocRef().set(appState, { merge: true });
             window.setSaveStatus('saved');
             isSaving = false;
 
-            if (saveQueue) {
-                appState = saveQueue;
-                saveQueue = null;
+            if (saveQueued) {
+                saveQueued = false;
                 await saveSchedule();
             }
         } catch (error) {
@@ -56,7 +77,34 @@ const Schedule = (() => {
 
     const renderAndSave = () => {
         ScheduleUI.render();
+        ScheduleUI.updatePatientCount(); // Aktualizuj licznik pacjentów po każdej zmianie
         saveSchedule();
+    };
+
+    const MAX_HISTORY_ENTRIES = 10;
+
+    const _updateCellHistory = (cellState, oldContent) => {
+        if (!oldContent || oldContent.trim() === '') {
+            return;
+        }
+
+        if (!cellState.history) {
+            cellState.history = [];
+        }
+
+        const lastHistoryValue = cellState.history[0] ? cellState.history[0].oldValue : null;
+        if (lastHistoryValue === oldContent) {
+            return;
+        }
+
+        const historyEntry = {
+            oldValue: oldContent,
+            timestamp: new Date().toISOString(),
+            userId: currentUserId
+        };
+
+        cellState.history.unshift(historyEntry);
+        cellState.history = cellState.history.slice(0, MAX_HISTORY_ENTRIES);
     };
 
     const updateCellState = (cell, updateFn) => {
@@ -67,12 +115,14 @@ const Schedule = (() => {
         if (!appState.scheduleCells[time]) appState.scheduleCells[time] = {};
         let cellState = appState.scheduleCells[time][employeeIndex] || {};
         
+        const oldContent = cellState.isSplit ? `${cellState.content1 || ''}/${cellState.content2 || ''}` : cellState.content;
+        _updateCellHistory(cellState, oldContent);
+
         updateFn(cellState);
 
         appState.scheduleCells[time][employeeIndex] = cellState;
         
         renderAndSave();
-        undoManager.pushState(getCurrentTableState());
     };
     
     const getCurrentTableState = () => JSON.parse(JSON.stringify(appState));
@@ -89,9 +139,7 @@ const Schedule = (() => {
         });
 
         const mainController = {
-            exitEditMode(element) {
-                if (!element || element.getAttribute('contenteditable') !== 'true') return;
-                const newText = capitalizeFirstLetter(element.textContent.trim());
+            processExitEditMode(element, newText) {
                 element.setAttribute('contenteditable', 'false');
                 const parentCell = element.closest('td');
                 if (!parentCell) return;
@@ -99,14 +147,19 @@ const Schedule = (() => {
                 const time = parentCell.dataset.time;
                 const duplicate = this.findDuplicateEntry(newText, time, employeeIndex);
                 const updateSchedule = (isMove = false) => {
-                    undoManager.pushState(getCurrentTableState()); // Przenieś pushState na początek, aby objąć całą operację
-
+                    undoManager.pushState(getCurrentTableState());
                     if (!appState.scheduleCells[time]) appState.scheduleCells[time] = {};
                     if (!appState.scheduleCells[time][employeeIndex]) appState.scheduleCells[time][employeeIndex] = {};
                     let cellState = appState.scheduleCells[time][employeeIndex];
 
-                    if (isMove && duplicate) {
-                        // Przenieś cały stan z duplikatu do bieżącej komórki
+                    // --- History Management ---
+                    const oldContent = cellState.isSplit ? `${(cellState.content1 || '')}/${(cellState.content2 || '')}` : cellState.content;
+                    if (oldContent !== newText) {
+                        _updateCellHistory(cellState, oldContent);
+                    }
+                    // --- End of History Management ---
+                    
+                                            if (isMove && duplicate) {                        // Przenieś cały stan z duplikatu do bieżącej komórki
                         const oldCellState = appState.scheduleCells[duplicate.time][duplicate.employeeIndex];
                         cellState = { ...oldCellState }; // Kopiuj stan starej komórki do nowej
                         
@@ -131,11 +184,22 @@ const Schedule = (() => {
                             delete cellState.isSplit;
                         }
                     } else {
+                        const oldContent = cellState.content || '';
+                        if (oldContent.trim().toLowerCase() !== newText.trim().toLowerCase() && newText.trim() !== '') {
+                            // Content has changed, so reset the date and related info
+                            const today = new Date();
+                            const year = today.getFullYear();
+                            const month = String(today.getMonth() + 1).padStart(2, '0');
+                            const day = String(today.getDate()).padStart(2, '0');
+                            cellState.treatmentStartDate = `${year}-${month}-${day}`;
+                            cellState.additionalInfo = null;
+                            cellState.treatmentExtensionDays = 0;
+                            cellState.treatmentEndDate = null;
+                        }
                         cellState.content = newText;
                     }
-
-                    // Jeśli pacjent nie istnieje i komórka nie ma jeszcze daty, ustaw ją
-                    if (!patientExists && !cellState.treatmentStartDate) {
+                    // Jeśli pacjent nie istnieje, komórka nie ma jeszcze daty i nie jest to operacja przeniesienia, ustaw datę
+                    if (!cellState.treatmentStartDate && !isMove) {
                         const today = new Date();
                         const year = today.getFullYear();
                         const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -145,13 +209,40 @@ const Schedule = (() => {
 
                     appState.scheduleCells[time][employeeIndex] = cellState;
                     renderAndSave();
-                    undoManager.pushState(getCurrentTableState());
                 };
                 if (duplicate) {
                     this.showDuplicateConfirmationDialog(duplicate, () => updateSchedule(true), () => updateSchedule(false), () => { ScheduleUI.render(); });
                 } else {
                     updateSchedule(false);
                 }
+            },
+
+            exitEditMode(element) {
+                if (!element || element.getAttribute('contenteditable') !== 'true') return;
+                const newText = capitalizeFirstLetter(element.textContent.trim());
+
+                if (newText.length > 35) {
+                    window.showToast('Wprowadzony tekst jest za długi (maks. 35 znaków).', 3000);
+                    element.setAttribute('contenteditable', 'false');
+                    ScheduleUI.render(); // Revert to previous state
+                    return;
+                }
+
+                // Sprawdź, czy wprowadzony tekst to same cyfry
+                if (/^\d+$/.test(newText)) {
+                    this.showNumericConfirmationDialog(newText, 
+                        () => { // onConfirm
+                            this.processExitEditMode(element, newText);
+                        }, 
+                        () => { // onCancel
+                            element.setAttribute('contenteditable', 'false');
+                            ScheduleUI.render(); // Przywróć poprzedni stan przez re-render
+                        }
+                    );
+                    return; // Zatrzymaj dalsze wykonywanie, czekając na decyzję użytkownika
+                }
+
+                this.processExitEditMode(element, newText);
             },
             enterEditMode(element, clearContent = false, initialChar = '') {
                 if (!element || element.classList.contains('break-cell') || element.getAttribute('contenteditable') === 'true') return;
@@ -164,7 +255,6 @@ const Schedule = (() => {
                 }
                 const isEditableTarget = (element.tagName === 'TD' && !element.classList.contains('split-cell')) || (element.tagName === 'DIV' && element.parentNode.classList.contains('split-cell'));
                 if (!isEditableTarget) return;
-                undoManager.pushState(getCurrentTableState());
                 const originalValue = ScheduleUI.getElementText(element);
                 element.dataset.originalValue = originalValue;
                 element.innerHTML = ScheduleUI.getElementText(element);
@@ -225,6 +315,25 @@ const Schedule = (() => {
                     if (onCancel) onCancel();
                 };
             },
+            showNumericConfirmationDialog(text, onConfirm, onCancel) {
+                const modal = document.getElementById('numericConfirmationModal');
+                const modalText = document.getElementById('numericConfirmationModalText');
+                const confirmBtn = document.getElementById('confirmNumericBtn');
+                const cancelBtn = document.getElementById('cancelNumericBtn');
+
+                modalText.innerHTML = `Czy na pewno chcesz wprowadzić do grafiku ciąg cyfr: "<b>${text}</b>"?`;
+                modal.style.display = 'flex';
+
+                const closeAndCleanup = () => {
+                    modal.style.display = 'none';
+                    confirmBtn.onclick = null;
+                    cancelBtn.onclick = null;
+                };
+
+                confirmBtn.onclick = () => { closeAndCleanup(); onConfirm(); };
+                cancelBtn.onclick = () => { closeAndCleanup(); onCancel(); };
+            },
+
             getCurrentTableStateForCell(cell) {
                 if (cell.tagName === 'TH') {
                     return { content: ScheduleUI.getElementText(cell) };
@@ -266,19 +375,6 @@ const Schedule = (() => {
                 const saveModalBtn = document.getElementById('savePatientInfoModal');
                 const closeModalBtn = document.getElementById('closePatientInfoModal');
                 const additionalInfoTextarea = document.getElementById('additionalInfo');
-                const genderMaleRadio = document.getElementById('genderMale');
-                const genderFemaleRadio = document.getElementById('genderFemale');
-                const patientGenderIcon = document.getElementById('patientGenderIcon');
-
-                // Definicja funkcji updateGenderIconInModal musi być przed jej użyciem
-                const updateGenderIconInModal = (gender) => {
-                    patientGenderIcon.className = 'gender-icon';
-                    if (gender === 'male') {
-                        patientGenderIcon.classList.add('male');
-                    } else if (gender === 'female') {
-                        patientGenderIcon.classList.add('female');
-                    }
-                };
 
                 const parentCell = element.closest('td');
                 const time = parentCell.dataset.time;
@@ -291,20 +387,17 @@ const Schedule = (() => {
                 patientNameInput.value = patientName;
 
                 let treatmentData = {};
-                let currentGender = '';
                 let currentAdditionalInfo = '';
 
                 if (isSplitPart) {
                     const dataKey = `treatmentData${partIndex}`;
                     treatmentData = cellState[dataKey] || {};
-                    currentGender = treatmentData.gender || '';
                     currentAdditionalInfo = treatmentData.additionalInfo || '';
                 } else {
                     treatmentData = {
                         startDate: cellState.treatmentStartDate,
                         extensionDays: cellState.treatmentExtensionDays
                     };
-                    currentGender = cellState.gender || '';
                     currentAdditionalInfo = cellState.additionalInfo || '';
                 }
                 
@@ -312,20 +405,10 @@ const Schedule = (() => {
                 extensionDaysInput.value = treatmentData.extensionDays || 0;
                 additionalInfoTextarea.value = currentAdditionalInfo;
 
-                // Ustawienie wybranej płci
-                if (currentGender === 'male') {
-                    genderMaleRadio.checked = true;
-                } else if (currentGender === 'female') {
-                    genderFemaleRadio.checked = true;
-                } else {
-                    genderMaleRadio.checked = false;
-                    genderFemaleRadio.checked = false;
-                }
-                updateGenderIconInModal(currentGender);
-
                 const calculateEndDate = (startDate, extensionDays) => {
                     if (!startDate) return '';
                     let endDate = new Date(startDate);
+                    endDate.setDate(endDate.getDate() - 1);
                     let totalDays = 15 + parseInt(extensionDays || 0, 10);
                     let daysAdded = 0;
                     while (daysAdded < totalDays) {
@@ -346,29 +429,22 @@ const Schedule = (() => {
 
                 const startDateChangeHandler = () => updateEndDate();
                 const extensionInputHandler = () => updateEndDate();
-                const genderChangeHandler = (event) => updateGenderIconInModal(event.target.value);
 
                 startDateInput.addEventListener('change', startDateChangeHandler);
                 extensionDaysInput.addEventListener('input', extensionInputHandler);
-                genderMaleRadio.addEventListener('change', genderChangeHandler);
-                genderFemaleRadio.addEventListener('change', genderChangeHandler);
 
                 const closeModal = () => {
                     startDateInput.removeEventListener('change', startDateChangeHandler);
                     extensionDaysInput.removeEventListener('input', extensionInputHandler);
-                    genderMaleRadio.removeEventListener('change', genderChangeHandler);
-                    genderFemaleRadio.removeEventListener('change', genderChangeHandler);
                     modal.style.display = 'none';
                 };
 
                 saveModalBtn.onclick = () => {
                     updateCellState(parentCell, state => {
-                        const selectedGender = document.querySelector('input[name="patientGender"]:checked')?.value || '';
                         const newTreatmentData = {
                             startDate: startDateInput.value,
                             extensionDays: parseInt(extensionDaysInput.value, 10),
-                            endDate: endDateInput.value,
-                            gender: selectedGender,
+                            endDate: endDateInput.value, // gender usunięty
                             additionalInfo: additionalInfoTextarea.value
                         };
 
@@ -379,7 +455,6 @@ const Schedule = (() => {
                             state.treatmentStartDate = newTreatmentData.startDate;
                             state.treatmentExtensionDays = newTreatmentData.extensionDays;
                             state.treatmentEndDate = newTreatmentData.endDate;
-                            state.gender = newTreatmentData.gender;
                             state.additionalInfo = newTreatmentData.additionalInfo;
                         }
                     });
@@ -393,6 +468,75 @@ const Schedule = (() => {
                         closeModal();
                     }
                 };
+                modal.style.display = 'flex';
+            },
+            showHistoryModal(cell) {
+                const modal = document.getElementById('historyModal');
+                const modalBody = document.getElementById('historyModalBody');
+                const closeModalBtn = document.getElementById('closeHistoryModal');
+
+                if (!modal || !modalBody || !closeModalBtn) {
+                    console.error('History modal elements not found!');
+                    return;
+                }
+
+                const time = cell.dataset.time;
+                const employeeIndex = cell.dataset.employeeIndex;
+                const cellState = appState.scheduleCells[time]?.[employeeIndex];
+
+                if (!cellState || !cellState.history || cellState.history.length === 0) {
+                    modalBody.innerHTML = '<p>Brak historii dla tej komórki.</p>';
+                } else {
+                    modalBody.innerHTML = `
+                        <ul class="history-list">
+                            ${cellState.history.map(entry => `
+                                <li class="history-item">
+                                    <div class="history-value">${entry.oldValue || '(pusty)'}</div>
+                                    <div class="history-meta">
+                                        <span>${new Date(entry.timestamp).toLocaleString('pl-PL')}</span>
+                                        <span>przez: ${EmployeeManager.getEmployeeByUid(entry.userId)?.name || 'Nieznany'}</span>
+                                    </div>
+                                    <button class="action-btn revert-btn" data-value="${entry.oldValue}">Przywróć</button>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    `;
+                }
+
+                modalBody.querySelectorAll('.revert-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const valueToRevert = btn.dataset.value;
+                        updateCellState(cell, state => {
+                            if (valueToRevert.includes('/')) {
+                                const parts = valueToRevert.split('/', 2);
+                                state.isSplit = true;
+                                state.content1 = parts[0];
+                                state.content2 = parts[1];
+                                delete state.content;
+                            } else {
+                                delete state.isSplit;
+                                delete state.content1;
+                                delete state.content2;
+                                state.content = valueToRevert;
+                            }
+                        });
+                        modal.style.display = 'none';
+                    });
+                });
+
+                const closeModal = () => {
+                    modal.style.display = 'none';
+                    modal.onclick = null;
+                    closeModalBtn.onclick = null;
+                };
+
+                closeModalBtn.onclick = closeModal;
+                modal.onclick = (event) => {
+                    if (event.target === modal) {
+                        closeModal();
+                    }
+                };
+
                 modal.style.display = 'flex';
             },
             openEmployeeSelectionModal(cell) {
@@ -412,12 +556,52 @@ const Schedule = (() => {
                     window.showToast('Zmieniono styl');
                 });
             },
+            mergeSplitCell(cell) {
+                const time = cell.dataset.time;
+                const employeeIndex = cell.dataset.employeeIndex;
+                const cellState = appState.scheduleCells[time]?.[employeeIndex];
+
+                if (!cellState || !cellState.isSplit) {
+                    window.showToast('Ta komórka nie jest podzielona.', 3000);
+                    return;
+                }
+
+                const content1 = cellState.content1 || '';
+                const content2 = cellState.content2 || '';
+
+                if (content1.trim() !== '' && content2.trim() !== '') {
+                    window.showToast('Jedna z części komórki musi być pusta, aby je scalić.', 3000);
+                    return;
+                }
+
+                const mergedContent = content1.trim() === '' ? content2 : content1;
+
+                updateCellState(cell, state => {
+                    delete state.isSplit;
+                    delete state.content1;
+                    delete state.content2;
+                    state.content = mergedContent;
+                    window.showToast('Scalono komórkę.');
+                });
+            },
             undoLastAction() {
                 const prevState = undoManager.undo();
                 if (prevState) {
                     appState.scheduleCells = prevState.scheduleCells;
                     renderAndSave();
                 }
+            },
+            clearCell(cell) {
+                const clearContent = state => {
+                    const contentKeys = ['content', 'content1', 'content2', 'isSplit', 'isMassage', 'isPnf', 'isEveryOtherDay', 'treatmentStartDate', 'treatmentExtensionDays', 'treatmentEndDate', 'additionalInfo', 'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2'];
+                    for (const key of contentKeys) {
+                        if (state.hasOwnProperty(key)) {
+                            state[key] = null;
+                        }
+                    }
+                    window.showToast('Wyczyszczono komórkę');
+                };
+                updateCellState(cell, clearContent);
             }
         };
 
@@ -437,14 +621,23 @@ const Schedule = (() => {
                 enterEditMode: mainController.enterEditMode.bind(mainController),
                 getCurrentTableStateForCell: mainController.getCurrentTableStateForCell.bind(mainController),
                 openPatientInfoModal: mainController.openPatientInfoModal.bind(mainController),
+                showHistoryModal: mainController.showHistoryModal.bind(mainController),
                 openEmployeeSelectionModal: mainController.openEmployeeSelectionModal.bind(mainController),
                 toggleSpecialStyle: mainController.toggleSpecialStyle.bind(mainController),
-                undoLastAction: mainController.undoLastAction.bind(mainController)
+                mergeSplitCell: mainController.mergeSplitCell.bind(mainController),
+                undoLastAction: mainController.undoLastAction.bind(mainController),
+                clearCell: mainController.clearCell.bind(mainController)
             });
 
-            undoManager.initialize(getCurrentTableState());
-
-            listenForScheduleChanges();
+            // Nasłuchuj zmian stanu uwierzytelnienia Firebase
+            firebase.auth().onAuthStateChanged(user => {
+                if (user) {
+                    currentUserId = user.uid;
+                } else {
+                    currentUserId = null;
+                }
+                listenForScheduleChanges(); // Załaduj grafik po ustaleniu UID
+            });
 
         } catch (error) {
             console.error("Błąd inicjalizacji strony harmonogramu:", error);

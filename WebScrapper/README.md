@@ -60,9 +60,6 @@ Zastąp `[NAZWA_TWOJEJ_USLUGI]` rzeczywistą nazwą Twojej usługi webowej na Re
 
 Aby wyświetlić te linki na swojej stronie hostowanej na GitHub Pages:
 
-1.  **Zaktualizuj plik `pages/scrapped-pdfs.html`** w swoim głównym projekcie.
-2.  **Zmień `GLITCH_API_URL`** na URL API Twojej usługi Render.com.
-
 Przykład kodu JavaScript do umieszczenia na stronie GitHub Pages:
 
 ```html

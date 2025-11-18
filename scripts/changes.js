@@ -112,23 +112,30 @@ const Changes = (() => {
             const leavesCell = row.querySelector('.leaves-cell');
             let leavesHtml = '';
 
-            for (const employeeName in allLeavesData) {
-                const employeeLeaves = allLeavesData[employeeName];
-                employeeLeaves.forEach(leave => {
-                    const leaveStart = new Date(leave.startDate);
-                    const leaveEnd = new Date(leave.endDate);
+            const employees = EmployeeManager.getAll();
 
-                    // Uwzględnij tylko urlopy wypoczynkowe i wszystkie daty
-                    if (leave.type === 'vacation' && !(leaveEnd < periodStart || leaveStart > periodEnd)) {
-                        const employeeId = Object.keys(allLeavesData).find(key => allLeavesData[key] === employeeLeaves);
-                        const lastName = EmployeeManager.getLastNameById(employeeId);
-                        leavesHtml += `${lastName}<br>`;
-                    }
-                });
+            for (const employeeId in employees) {
+                const employee = employees[employeeId];
+                if (employee.isHidden) continue;
+
+                const employeeName = employee.displayName || employee.name;
+                const employeeLeaves = allLeavesData[employeeName];
+
+                if (Array.isArray(employeeLeaves)) {
+                    employeeLeaves.forEach(leave => {
+                        const leaveStart = new Date(leave.startDate);
+                        const leaveEnd = new Date(leave.endDate);
+
+                        if (leave.type === 'vacation' && !(leaveEnd < periodStart || leaveStart > periodEnd)) {
+                            const lastName = EmployeeManager.getLastNameById(employeeId);
+                            // Fallback to full name if last name is not available
+                            leavesHtml += `${lastName || employeeName}<br>`;
+                        }
+                    });
+                }
             }
             leavesCell.innerHTML = leavesHtml;
 
-            // Dodaj klasę 'past-period' jeśli okres jest w przeszłości
             if (periodEnd < today) {
                 row.classList.add('past-period');
             }
@@ -152,7 +159,9 @@ const Changes = (() => {
         employeeListDiv.innerHTML = ''; // Clear list
         searchInput.value = ''; // Clear search input
 
-        const allEmployees = EmployeeManager.getAll();
+        const allEmployees = Object.fromEntries(
+            Object.entries(EmployeeManager.getAll()).filter(([, employee]) => !employee.isHidden)
+        );
         const period = cell.parentElement.dataset.startDate;
         const columnIndex = cell.cellIndex;
         const cellState = appState.changesCells[period]?.[columnIndex] || {};
@@ -293,7 +302,7 @@ const Changes = (() => {
         const tableBody = Array.from(table.querySelectorAll('tbody tr')).map(row => {
             return Array.from(row.cells).map((cell, cellIndex) => {
                 if (cellIndex === 0 || cellIndex === 8) { // Kolumna Okres i Urlopy
-                    return cell.innerHTML.replace(/<br\s*[\/]?>/gi, "\n");
+                    return cell.innerHTML.replace(/<br\s*[\/]?>>/gi, "\n");
                 }
                 const period = row.dataset.startDate;
                 const cellState = appState.changesCells[period]?.[cellIndex];

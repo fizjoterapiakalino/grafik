@@ -78,11 +78,7 @@ const ScheduleUI = (() => {
             const createPart = (content, isMassage, isPnf, isEveryOtherDay, gender) => {
                 const div = document.createElement('div');
                 div.setAttribute('tabindex', '0');
-                let htmlContent = '';
-                if (gender) {
-                    htmlContent += `<i class="fas gender-icon ${gender}"></i>`;
-                }
-                htmlContent += `<span>${capitalizeFirstLetter(content || '')}</span>`;
+                let htmlContent = `<span>${capitalizeFirstLetter(content || '')}</span>`;
                 
                 if (isMassage) {
                     div.classList.add('massage-text');
@@ -104,11 +100,7 @@ const ScheduleUI = (() => {
             cell.appendChild(createPart(cellObj.content1, cellObj.isMassage1, cellObj.isPnf1, cellObj.isEveryOtherDay1, cellObj.treatmentData1?.gender));
             cell.appendChild(createPart(cellObj.content2, cellObj.isMassage2, cellObj.isPnf2, cellObj.isEveryOtherDay2, cellObj.treatmentData2?.gender));
         } else {
-            let htmlContent = '';
-            if (cellObj.gender) {
-                htmlContent += `<i class="fas gender-icon ${cellObj.gender}"></i>`;
-            }
-            htmlContent += `<span>${capitalizeFirstLetter(cellObj.content || '')}</span>`;
+            let htmlContent = `<span>${capitalizeFirstLetter(cellObj.content || '')}</span>`;
             
             if (cellObj.isMassage) {
                 cell.classList.add('massage-text');
@@ -148,9 +140,19 @@ const ScheduleUI = (() => {
     };
 
     const renderTable = () => {
-        const tableHeaderRow = document.getElementById('tableHeaderRow');
-        const tbody = document.getElementById('mainScheduleTable').querySelector('tbody');
         const mainTable = document.getElementById('mainScheduleTable');
+        if (!mainTable) {
+            return; // Zakończ, jeśli tabela nie istnieje
+        }
+
+        const tableHeaderRow = document.getElementById('tableHeaderRow');
+        const tbody = mainTable.querySelector('tbody');
+        
+        if (!tableHeaderRow || !tbody) {
+            console.error("Table header row or tbody not found, cannot render schedule.");
+            return;
+        }
+
         tableHeaderRow.innerHTML = '<th>Godz.</th>';
         tbody.innerHTML = '';
 
@@ -159,16 +161,29 @@ const ScheduleUI = (() => {
 
         const currentUser = firebase.auth().currentUser;
         if (currentUser) {
-            const employee = EmployeeManager.getEmployeeByUid(currentUser.uid);
-            if (employee) {
-                employeeIndices.push(employee.id);
-                isSingleUserView = true;
+            if (EmployeeManager.isUserAdmin(currentUser.uid)) {
+                const allEmployees = EmployeeManager.getAll();
+                employeeIndices = Object.keys(allEmployees)
+                    .filter(id => !allEmployees[id].isHidden)
+                    .sort((a, b) => parseInt(a) - parseInt(b));
+                isSingleUserView = false;
+            } else {
+                const employee = EmployeeManager.getEmployeeByUid(currentUser.uid);
+                if (employee) {
+                    employeeIndices.push(employee.id);
+                    isSingleUserView = true;
+                } else {
+                    employeeIndices = [];
+                    isSingleUserView = true; 
+                    tbody.innerHTML = `<tr><td colspan="2" class="unassigned-user-message">Twoje konto nie jest przypisane do żadnego pracownika. Skontaktuj się z administratorem.</td></tr>`;
+                }
             }
-        }
-
-        if (!isSingleUserView) {
+        } else {
             const allEmployees = EmployeeManager.getAll();
-            employeeIndices = Object.keys(allEmployees).sort((a, b) => parseInt(a) - parseInt(b));
+            employeeIndices = Object.keys(allEmployees)
+                .filter(id => !allEmployees[id].isHidden)
+                .sort((a, b) => parseInt(a) - parseInt(b));
+            isSingleUserView = false;
         }
         
         mainTable.classList.toggle('single-user-view', isSingleUserView);
@@ -240,11 +255,38 @@ const ScheduleUI = (() => {
                 }
             }
         }, 60000); // Uruchamiaj co minutę
+
+        updatePatientCount(); // Zaktualizuj liczbę pacjentów po renderowaniu tabeli
+    };
+
+    const updatePatientCount = () => {
+        const patientCountElement = document.getElementById('patientCount');
+        if (!patientCountElement) return;
+
+        let therapyCount = 0;
+        const cells = document.querySelectorAll('#mainScheduleTable tbody td.editable-cell');
+
+        cells.forEach(cell => {
+            if (cell.classList.contains('break-cell')) return;
+
+            if (cell.classList.contains('split-cell')) {
+                const parts = cell.querySelectorAll('div > span');
+                const name1 = parts[0]?.textContent.trim();
+                const name2 = parts[1]?.textContent.trim();
+                if (name1) therapyCount++;
+                if (name2) therapyCount++;
+            } else {
+                const name = getElementText(cell).trim();
+                if (name) therapyCount++;
+            }
+        });
+        patientCountElement.textContent = `Terapie: ${therapyCount}`;
     };
 
     return {
         initialize,
         render: renderTable,
-        getElementText
+        getElementText,
+        updatePatientCount
     };
 })();

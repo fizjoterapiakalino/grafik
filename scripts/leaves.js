@@ -2,7 +2,7 @@ const Leaves = (() => {
     // --- SELEKTORY I ZMIENNE GLOBALNE ---
     let loadingOverlay, leavesTableBody, leavesHeaderRow, searchInput, clearSearchBtn,
         monthlyViewBtn, summaryViewBtn, careViewBtn, monthlyViewContainer, careViewContainer,
-        clearFiltersBtn, leavesFilterContainer;
+        clearFiltersBtn, leavesFilterContainer, yearSelect;
     
     const months = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
 
@@ -105,6 +105,30 @@ const Leaves = (() => {
         return new Date(Date.UTC(year, month - 1, day));
     };
 
+    const handleYearChange = async (e) => {
+        currentYear = parseInt(e.target.value, 10);
+        await showMonthlyView(); // Re-render the monthly view for the new year
+    };
+
+    const populateYearSelect = () => {
+        const currentYear = new Date().getUTCFullYear();
+        const startYear = currentYear - 5; // 5 years back
+        const endYear = currentYear + 5;   // 5 years forward
+
+        yearSelect.innerHTML = ''; // Clear existing options
+
+        for (let year = startYear; year <= endYear; year++) {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            if (year === currentYear) {
+                option.selected = true;
+            }
+            yearSelect.appendChild(option);
+        }
+        yearSelect.addEventListener('change', handleYearChange);
+    };
+
     // --- GŁÓWNA LOGIKA APLIKACJI ---
 
     const generateLegendAndFilters = () => {
@@ -165,7 +189,8 @@ const Leaves = (() => {
         careViewBtn = document.getElementById('careViewBtn');
         monthlyViewContainer = document.getElementById('leavesTable');
         careViewContainer = document.getElementById('careViewContainer');
-        leavesFilterContainer = document.getElementById('leavesFilterContainer'); // Inicjalizuj tutaj
+        leavesFilterContainer = document.getElementById('leavesFilterContainer');
+        yearSelect = document.getElementById('yearSelect'); // Inicjalizuj yearSelect
 
         // Inicjalizacja modułów zależnych
         CalendarModal.init();
@@ -173,10 +198,11 @@ const Leaves = (() => {
         if (loadingOverlay) loadingOverlay.style.display = 'flex';
         try {
             await EmployeeManager.load();
-            generateLegendAndFilters(); // Generuj filtry przed pierwszym renderowaniem
-            clearFiltersBtn = document.getElementById('clearFiltersBtn'); // Inicjalizuj tutaj po wygenerowaniu filtrów
-            setupEventListeners(); // Ustaw nasłuchiwacze po wygenerowaniu filtrów
-            await showMonthlyView(); // Wywołaj showMonthlyView po załadowaniu filtrów
+            populateYearSelect(); // Nowa funkcja do wypełniania i ustawiania nasłuchiwacza
+            generateLegendAndFilters();
+            clearFiltersBtn = document.getElementById('clearFiltersBtn');
+            setupEventListeners();
+            await showMonthlyView();
 
             // --- Inicjalizacja Menu Kontekstowego ---
             const contextMenuItems = [
@@ -202,6 +228,7 @@ const Leaves = (() => {
         document.removeEventListener('keydown', _handleKeyDown);
         document.removeEventListener('app:search', _handleAppSearch);
         clearFiltersBtn.removeEventListener('click', handleClearFilters);
+        yearSelect.removeEventListener('change', handleYearChange); // Remove yearSelect listener
 
         if (window.destroyContextMenu) {
             window.destroyContextMenu('contextMenu');
@@ -301,7 +328,11 @@ const Leaves = (() => {
 
     const generateTableRows = (employees) => {
         leavesTableBody.innerHTML = '';
-        const sortedEmployeeNames = Object.values(employees).map(emp => emp.displayName || emp.name).filter(Boolean).sort();
+        const sortedEmployeeNames = Object.values(employees)
+            .filter(emp => !emp.isHidden)
+            .map(emp => emp.displayName || emp.name)
+            .filter(Boolean)
+            .sort();
         sortedEmployeeNames.forEach(name => {
             const tr = document.createElement('tr');
             tr.dataset.employee = name;

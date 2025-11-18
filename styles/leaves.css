@@ -127,7 +127,7 @@
 
 /* Specjalna, szersza wersja dla modala z kalendarzem, używamy ID dla większej specyficzności */
 #calendarModal .modal-content.wide {
-    max-width: 1200px;
+    max-width: 1100px; /* Zmniejszona maksymalna szerokość */
     display: flex;
     flex-direction: column;
     height: 90vh; /* Ograniczenie wysokości modalu */
@@ -136,12 +136,12 @@
 .calendar-scroll-area {
     flex-grow: 1;
     overflow-y: auto; /* Przewijanie tylko dla obszaru kalendarzy */
-    padding-right: 15px; /* Miejsce na pasek przewijania */
+    padding-right: 5px; /* Zmniejszone miejsce na pasek przewijania */
 }
 
 .modal-footer {
     flex-shrink: 0;
-    padding-top: 15px;
+    padding-top: 10px; /* Zmniejszony padding */
     border-top: 1px solid #eee;
     background-color: #fff;
 }
@@ -150,14 +150,14 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
+    margin-bottom: 10px; /* Zmniejszony margines */
     overflow: hidden; /* Ukrywa wysuwające się kalendarze */
 }
 
 .calendars-container {
     display: flex;
     flex-direction: row;
-    gap: 20px;
+    gap: 10px; /* Zmniejszony odstęp */
     flex: 1;
     transition: transform 0.3s ease-in-out; /* Animacja przejścia */
 }
@@ -184,12 +184,12 @@
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 5px;
+    gap: 2px; /* Zmniejszony odstęp */
 }
 
 .day-name, .day-cell-calendar {
     text-align: center;
-    padding: 8px;
+    padding: 4px; /* Zmniejszony padding */
     border-radius: 4px;
 }
 
@@ -389,4 +389,120 @@
     opacity: 0;
     width: 0;
     height: 0;
+}
+
+/* Styles for the leave type legend in CalendarModal */
+.leave-type-legend {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 8px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    font-size: 0.9em;
+    color: #555;
+}
+
+.leave-type-legend .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: bold;
+}
+
+.leave-type-legend .legend-color-box {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+
+/* --- Refactor for 12-Month View --- */
+
+#calendarModal .modal-content.wide {
+    max-width: 1200px; /* Increased width for 12 months */
+}
+
+.calendar-slider {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr); /* 4 months per row */
+    gap: 25px;
+    width: 100%;
+    transform: none !important; /* Override transform from slider view */
+}
+
+.calendar-wrapper {
+    width: 100%; /* Each wrapper takes full width of its grid cell */
+}
+
+.calendar-header .nav-btn {
+    display: none; /* Hide month navigation buttons */
+}
+
+.calendar-grid {
+    gap: 4px;
+}
+
+.day-name, .day-cell-calendar {
+    padding: 5px;
+    font-size: 0.85em; /* Smaller font for compact view */
+    height: 30px; /* Explicit height */
+    width: 30px;  /* Explicit width */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+/* --- Circular Selection --- */
+
+.day-cell-calendar.selected {
+    border-radius: 50% !important; /* Perfect circle */
+    position: relative;
+    z-index: 1;
+}
+
+/* Remove border-radius from in-range cells to create a continuous bar */
+.day-cell-calendar.in-range {
+    border-radius: 0 !important;
+}
+
+/* Adjust start and end date to connect with the in-range bar */
+.day-cell-calendar.start-date {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-top-left-radius: 50% !important;
+    border-bottom-left-radius: 50% !important;
+}
+
+.day-cell-calendar.end-date {
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-top-right-radius: 50% !important;
+    border-bottom-right-radius: 50% !important;
+}
+
+/* --- Date Summary and Label --- */
+
+.calendar-selection-info {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 15px;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+.calendar-selection-info p {
+    margin: 0;
+    font-size: 1em;
+}
+
+.leave-type-selector label {
+    font-size: 1.3em !important; /* Increased font size +2px from 1.2em */
+    font-weight: bold;
 }

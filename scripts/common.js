@@ -8,6 +8,12 @@ const AppConfig = {
         defaultCellColor: '#e0e0e0',
         contentCellColor: '#ffffff',
     },
+    changes: {
+        employeeColors: [
+            '#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF', '#A0C4FF', '#BDB2FF', '#FFC6FF',
+            '#F44336', '#FF9800', '#FFEB3B', '#4CAF50', '#2196F3', '#3F51B5', '#9C27B0', '#E91E63'
+        ]
+    },
     leaves: {
         careLimits: {
             child_care_art_188: 2,

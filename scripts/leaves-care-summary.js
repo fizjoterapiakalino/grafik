@@ -19,7 +19,11 @@ const LeavesCareSummary = (() => {
 
         const tbody = document.createElement('tbody');
         const employees = EmployeeManager.getAll();
-        const sortedEmployeeNames = Object.values(employees).map(emp => emp.displayName || emp.name).filter(Boolean).sort();
+        const sortedEmployeeNames = Object.values(employees)
+            .filter(emp => !emp.isHidden)
+            .map(emp => emp.displayName || emp.name)
+            .filter(Boolean)
+            .sort();
 
         sortedEmployeeNames.forEach(employeeName => {
             const employeeLeaves = allLeavesData[employeeName] || [];
