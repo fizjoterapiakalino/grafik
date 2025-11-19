@@ -294,7 +294,7 @@ export const Schedule = (() => {
 
         clearCell(cell) {
             const clearContent = state => {
-                const contentKeys = ['content', 'content1', 'content2', 'isSplit', 'isMassage', 'isPnf', 'isEveryOtherDay', 'treatmentStartDate', 'treatmentExtensionDays', 'treatmentEndDate', 'additionalInfo', 'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2'];
+                const contentKeys = ['content', 'content1', 'content2', 'isSplit', 'isBreak', 'isMassage', 'isPnf', 'isEveryOtherDay', 'treatmentStartDate', 'treatmentExtensionDays', 'treatmentEndDate', 'additionalInfo', 'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2'];
                 for (const key of contentKeys) {
                     if (state.hasOwnProperty(key)) {
                         state[key] = null;
@@ -306,9 +306,18 @@ export const Schedule = (() => {
         }
     };
 
+    const handleUndoClick = () => {
+        ScheduleData.undo();
+    };
+
     const init = async () => {
         loadingOverlay = document.getElementById('loadingOverlay');
         undoButton = document.getElementById('undoButton');
+
+        if (undoButton) {
+            undoButton.removeEventListener('click', handleUndoClick); // Ensure no duplicates
+            undoButton.addEventListener('click', handleUndoClick);
+        }
 
         if (loadingOverlay) loadingOverlay.style.display = 'flex';
         try {
@@ -332,6 +341,7 @@ export const Schedule = (() => {
                 },
                 ui: ScheduleUI,
                 updateCellState: updateCellState,
+                updateMultipleCells: ScheduleData.updateMultipleCells,
                 renderAndSave: renderAndSave,
                 getCurrentTableState: ScheduleData.getCurrentTableState,
                 exitEditMode: mainController.exitEditMode.bind(mainController),
@@ -365,6 +375,9 @@ export const Schedule = (() => {
     };
 
     const destroy = () => {
+        if (undoButton) {
+            undoButton.removeEventListener('click', handleUndoClick);
+        }
         ScheduleEvents.destroy();
         ScheduleData.destroy();
         console.log("Schedule module destroyed");

@@ -144,6 +144,26 @@ export const ScheduleData = (() => {
         saveSchedule();
     };
 
+    const updateMultipleCells = (updates) => {
+        // updates: array of { time, employeeIndex, updateFn }
+        undoManager.pushState(getCurrentTableState());
+
+        updates.forEach(({ time, employeeIndex, updateFn }) => {
+            if (!appState.scheduleCells[time]) appState.scheduleCells[time] = {};
+            let cellState = appState.scheduleCells[time][employeeIndex] || {};
+
+            const oldContent = cellState.isSplit ? `${cellState.content1 || ''}/${cellState.content2 || ''}` : cellState.content;
+            _updateCellHistory(cellState, oldContent);
+
+            updateFn(cellState);
+
+            appState.scheduleCells[time][employeeIndex] = cellState;
+        });
+
+        notifyChange();
+        saveSchedule();
+    };
+
     const getCurrentTableState = () => JSON.parse(JSON.stringify(appState));
 
     const getCellState = (time, employeeIndex) => {
@@ -177,6 +197,7 @@ export const ScheduleData = (() => {
         listenForScheduleChanges,
         saveSchedule,
         updateCellState,
+        updateMultipleCells,
         getCurrentTableState,
         getCellState,
         undo,

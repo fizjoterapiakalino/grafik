@@ -127,6 +127,22 @@ export const ScheduleEvents = (() => {
                 patientInfoBtn.classList.toggle('active', hasPatientInfo);
                 patientInfoBtn.disabled = !hasPatientInfo;
             }
+
+            const addBreakBtn = document.getElementById('btnAddBreak');
+            if (addBreakBtn) {
+                const isBreak = activeCell.classList.contains('break-cell');
+                addBreakBtn.classList.toggle('active', true); // Always active if cell selected
+                addBreakBtn.disabled = false;
+
+                if (isBreak) {
+                    addBreakBtn.classList.add('btn-danger');
+                    addBreakBtn.title = "Usuń przerwę";
+                    // Opcjonalnie zmiana ikony, jeśli jest dostępna
+                } else {
+                    addBreakBtn.classList.remove('btn-danger');
+                    addBreakBtn.title = "Dodaj przerwę";
+                }
+            }
         }
     };
 
@@ -141,6 +157,24 @@ export const ScheduleEvents = (() => {
             event.preventDefault();
         }
     };
+
+    // ... (rest of the file) ...
+
+    document.getElementById('btnAddBreak')?.addEventListener('click', () => {
+        if (activeCell) {
+            if (activeCell.classList.contains('break-cell')) {
+                _dependencies.updateCellState(activeCell, state => { state.isBreak = false; window.showToast('Usunięto przerwę'); });
+            } else {
+                if (_dependencies.ui.getElementText(activeCell).trim() !== '') {
+                    window.showToast('Nie można dodać przerwy do zajętej komórki. Najpierw wyczyść komórkę.', 3000);
+                    return;
+                }
+                _dependencies.updateCellState(activeCell, state => { state.isBreak = true; window.showToast('Dodano przerwę'); });
+            }
+        } else {
+            window.showToast('Wybierz komórkę, aby zarządzać przerwą.', 3000);
+        }
+    });
 
     const _handleDragOver = (event) => {
         event.preventDefault();
@@ -160,29 +194,14 @@ export const ScheduleEvents = (() => {
         document.querySelectorAll('.drag-over-target').forEach(el => el.classList.remove('drag-over-target'));
 
         if (dropTargetCell && !dropTargetCell.classList.contains('break-cell') && draggedCell && draggedCell !== dropTargetCell) {
-            _dependencies.undoManager.pushState(_dependencies.getCurrentTableState());
-
             const sourceTime = draggedCell.dataset.time;
             const sourceIndex = draggedCell.dataset.employeeIndex;
             const targetTime = dropTargetCell.dataset.time;
             const targetIndex = dropTargetCell.dataset.employeeIndex;
 
-            // Ensure paths in appState exist and get DIRECT references
-            if (!_dependencies.appState.scheduleCells[sourceTime]) {
-                _dependencies.appState.scheduleCells[sourceTime] = {};
-            }
-            if (!_dependencies.appState.scheduleCells[sourceTime][sourceIndex]) {
-                _dependencies.appState.scheduleCells[sourceTime][sourceIndex] = {};
-            }
-            const sourceCellState = _dependencies.appState.scheduleCells[sourceTime][sourceIndex];
-
-            if (!_dependencies.appState.scheduleCells[targetTime]) {
-                _dependencies.appState.scheduleCells[targetTime] = {};
-            }
-            if (!_dependencies.appState.scheduleCells[targetTime][targetIndex]) {
-                _dependencies.appState.scheduleCells[targetTime][targetIndex] = {};
-            }
-            const targetCellState = _dependencies.appState.scheduleCells[targetTime][targetIndex];
+            // Get source content to copy (read-only access to state)
+            const sourceCellState = _dependencies.appState.scheduleCells[sourceTime]?.[sourceIndex] || {};
+            const contentKeys = ['content', 'content1', 'content2', 'isSplit', 'isMassage', 'isPnf', 'isEveryOtherDay', 'treatmentStartDate', 'treatmentExtensionDays', 'treatmentEndDate', 'additionalInfo', 'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2'];
 
             const sourceContentString = sourceCellState.isSplit ?
                 `${sourceCellState.content1 || ''}/${sourceCellState.content2 || ''}` :
@@ -192,53 +211,38 @@ export const ScheduleEvents = (() => {
                 return; // Don't drag empty cells
             }
 
-            const oldTargetContentString = targetCellState.isSplit ?
-                `${targetCellState.content1 || ''}/${targetCellState.content2 || ''}` :
-                targetCellState.content;
-
-            // 1. Update Target Cell's history
-            if (oldTargetContentString && oldTargetContentString.trim() !== '') {
-                if (!targetCellState.history) targetCellState.history = [];
-                const historyEntry = {
-                    oldValue: oldTargetContentString,
-                    timestamp: new Date().toISOString(),
-                    userId: auth.currentUser?.uid || 'unknown'
-                };
-                targetCellState.history.unshift(historyEntry);
-                targetCellState.history = targetCellState.history.slice(0, 10);
-            }
-
-            // 2. Update Source Cell's history
-            if (!sourceCellState.history) sourceCellState.history = [];
-            const sourceHistoryEntry = {
-                oldValue: sourceContentString,
-                timestamp: new Date().toISOString(),
-                userId: auth.currentUser?.uid || 'unknown'
-            };
-            sourceCellState.history.unshift(sourceHistoryEntry);
-            sourceCellState.history = sourceCellState.history.slice(0, 10);
-
-            // 3. Move content from source to target
-            const contentKeys = ['content', 'content1', 'content2', 'isSplit', 'isMassage', 'isPnf', 'isEveryOtherDay', 'treatmentStartDate', 'treatmentExtensionDays', 'treatmentEndDate', 'additionalInfo', 'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2'];
-
-            // First clear all possible content keys on the target
-            for (const key of contentKeys) {
-                delete targetCellState[key];
-            }
-
-            // Now copy only the defined properties from the source
-            for (const key of contentKeys) {
-                if (sourceCellState[key] !== undefined) {
-                    targetCellState[key] = sourceCellState[key];
+            const updates = [
+                // Update Target Cell
+                {
+                    time: targetTime,
+                    employeeIndex: targetIndex,
+                    updateFn: (targetState) => {
+                        // Clear target content first
+                        for (const key of contentKeys) {
+                            delete targetState[key];
+                        }
+                        // Copy from source
+                        for (const key of contentKeys) {
+                            if (sourceCellState[key] !== undefined) {
+                                targetState[key] = sourceCellState[key];
+                            }
+                        }
+                    }
+                },
+                // Update Source Cell
+                {
+                    time: sourceTime,
+                    employeeIndex: sourceIndex,
+                    updateFn: (sourceState) => {
+                        // Clear source content
+                        for (const key of contentKeys) {
+                            sourceState[key] = null;
+                        }
+                    }
                 }
-            }
+            ];
 
-            // 4. Clear Source Cell's content by setting its properties to null
-            for (const key of contentKeys) {
-                sourceCellState[key] = null;
-            }
-
-            _dependencies.renderAndSave();
+            _dependencies.updateMultipleCells(updates);
         }
     };
 
@@ -406,7 +410,16 @@ export const ScheduleEvents = (() => {
                         return;
                     }
                     _dependencies.updateCellState(cell, state => { state.isBreak = true; window.showToast('Dodano przerwę'); });
-                }
+                },
+                condition: cell => !cell.classList.contains('break-cell')
+            },
+            {
+                id: 'contextRemoveBreak',
+                class: 'danger',
+                action: cell => {
+                    _dependencies.updateCellState(cell, state => { state.isBreak = false; window.showToast('Usunięto przerwę'); });
+                },
+                condition: cell => cell.classList.contains('break-cell')
             },
             {
                 id: 'contextShowHistory',
@@ -449,13 +462,17 @@ export const ScheduleEvents = (() => {
         });
         document.getElementById('btnAddBreak')?.addEventListener('click', () => {
             if (activeCell) {
-                if (_dependencies.ui.getElementText(activeCell).trim() !== '') {
-                    window.showToast('Nie można dodać przerwy do zajętej komórki. Najpierw wyczyść komórkę.', 3000);
-                    return;
+                if (activeCell.classList.contains('break-cell')) {
+                    _dependencies.updateCellState(activeCell, state => { state.isBreak = false; window.showToast('Usunięto przerwę'); });
+                } else {
+                    if (_dependencies.ui.getElementText(activeCell).trim() !== '') {
+                        window.showToast('Nie można dodać przerwy do zajętej komórki. Najpierw wyczyść komórkę.', 3000);
+                        return;
+                    }
+                    _dependencies.updateCellState(activeCell, state => { state.isBreak = true; window.showToast('Dodano przerwę'); });
                 }
-                _dependencies.updateCellState(activeCell, state => { state.isBreak = true; window.showToast('Dodano przerwę'); });
             } else {
-                window.showToast('Wybierz komórkę, aby dodać przerwę.', 3000);
+                window.showToast('Wybierz komórkę, aby zarządzać przerwą.', 3000);
             }
         });
         document.getElementById('btnMassage')?.addEventListener('click', () => {
