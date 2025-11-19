@@ -1,5 +1,7 @@
 // scripts/login.js
-const Login = (() => {
+import { auth } from './firebase-config.js';
+
+export const Login = (() => {
     let loginForm = null; // Zmienna do przechowywania referencji do formularza
 
     const handleSubmit = async (e) => {
@@ -18,7 +20,7 @@ const Login = (() => {
         const password = passwordInput.value;
 
         try {
-            await firebase.auth().signInWithEmailAndPassword(email, password);
+            await auth.signInWithEmailAndPassword(email, password);
             // Po udanym logowaniu, router automatycznie przekieruje
             window.location.hash = '#schedule';
         } catch (error) {
@@ -46,3 +48,6 @@ const Login = (() => {
 
     return { init, destroy };
 })();
+
+// Backward compatibility
+window.Login = Login;

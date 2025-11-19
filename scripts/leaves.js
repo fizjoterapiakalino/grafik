@@ -1,9 +1,17 @@
-const Leaves = (() => {
+// scripts/leaves.js
+import { db } from './firebase-config.js';
+import { AppConfig, hideLoadingOverlay } from './common.js';
+import { EmployeeManager } from './employee-manager.js';
+import { LeavesSummary } from './leaves-summary.js';
+import { LeavesCareSummary } from './leaves-care-summary.js';
+import { CalendarModal } from './calendar-modal.js';
+
+export const Leaves = (() => {
     // --- SELEKTORY I ZMIENNE GLOBALNE ---
     let loadingOverlay, leavesTableBody, leavesHeaderRow, searchInput, clearSearchBtn,
         monthlyViewBtn, summaryViewBtn, careViewBtn, monthlyViewContainer, careViewContainer,
         clearFiltersBtn, leavesFilterContainer, yearSelect;
-    
+
     const months = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
 
     let currentYear = new Date().getUTCFullYear();
@@ -136,7 +144,7 @@ const Leaves = (() => {
         if (!legendContainer) return;
         legendContainer.innerHTML = '<strong>Filtruj wg typu:</strong>';
         const leaveTypeSelect = document.getElementById('leaveTypeSelect');
-        
+
         // Jeśli activeFilters jest puste, zainicjuj je wszystkimi typami urlopów
         if (activeFilters.size === 0) {
             Array.from(leaveTypeSelect.options).forEach(option => {
@@ -149,7 +157,7 @@ const Leaves = (() => {
         Array.from(leaveTypeSelect.options).forEach(option => {
             const key = option.value;
             const color = AppConfig.leaves.leaveTypeColors[key] || AppConfig.leaves.leaveTypeColors.default;
-            
+
             const filterItem = document.createElement('label');
             filterItem.className = 'legend-item filter-label';
             filterItem.innerHTML = `
@@ -241,12 +249,12 @@ const Leaves = (() => {
         if (!cell) return;
         const employeeName = cell.closest('tr').dataset.employee;
         const monthIndex = parseInt(cell.dataset.month, 10);
-        
+
         try {
             const allLeaves = await getAllLeavesData();
             const existingLeaves = allLeaves[employeeName] || [];
             const updatedLeaves = await CalendarModal.open(employeeName, existingLeaves, monthIndex);
-            
+
             await saveLeavesData(employeeName, updatedLeaves);
             renderSingleEmployeeLeaves(employeeName, updatedLeaves);
         } catch (error) {
@@ -295,7 +303,7 @@ const Leaves = (() => {
         monthlyViewBtn.classList.remove('active');
         summaryViewBtn.classList.add('active');
         careViewBtn.classList.remove('active');
-        
+
         monthlyViewContainer.style.display = ''; // Podsumowanie roczne używa tej samej tabeli
         careViewContainer.style.display = 'none';
         leavesFilterContainer.style.display = 'none'; // Ukryj kontener filtrów
@@ -388,7 +396,7 @@ const Leaves = (() => {
 
         filteredLeaves.forEach(leave => {
             if (!leave.id || !leave.startDate || !leave.endDate) return;
-            
+
             const bgColor = AppConfig.leaves.leaveTypeColors[leave.type] || AppConfig.leaves.leaveTypeColors.default;
             const start = toUTCDate(leave.startDate);
             const end = toUTCDate(leave.endDate);
@@ -443,3 +451,6 @@ const Leaves = (() => {
         destroy
     };
 })();
+
+// Backward compatibility
+window.Leaves = Leaves;

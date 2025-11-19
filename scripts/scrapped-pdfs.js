@@ -1,4 +1,5 @@
-const ScrappedPdfs = (() => {
+// scripts/scrapped-pdfs.js
+export const ScrappedPdfs = (() => {
     const RENDER_API_URL = 'https://pdf-scraper-api-5qqr.onrender.com/api/pdfs';
     let allLinksData = [];
 
@@ -31,7 +32,7 @@ const ScrappedPdfs = (() => {
         try {
             const response = await fetch(RENDER_API_URL);
             if (!response.ok) throw new Error(`Błąd HTTP: ${response.status}`);
-            
+
             // API zwraca teraz kompletną, posortowaną tablicę obiektów
             const documents = await response.json();
 
@@ -42,10 +43,10 @@ const ScrappedPdfs = (() => {
 
             // Nie musimy już nic parsować, dane są gotowe. Sortujemy po dacie.
             allLinksData = documents.sort((a, b) => b.date.localeCompare(a.date));
-            
+
             container.style.display = 'none';
             document.getElementById('pdf-table-container').style.display = 'block';
-            
+
             displayLinks(allLinksData);
 
         } catch (error) {
@@ -53,14 +54,14 @@ const ScrappedPdfs = (() => {
             container.innerHTML = '<p>Wystąpił błąd podczas ładowania linków.</p>';
         }
     };
-    
+
     const initSearch = () => {
         const searchInput = document.getElementById('pdfSearchInput');
         if (!searchInput) return;
 
         searchInput.addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
-            const filteredLinks = allLinksData.filter(link => 
+            const filteredLinks = allLinksData.filter(link =>
                 link.title.toLowerCase().includes(searchTerm) ||
                 link.type.toLowerCase().includes(searchTerm) ||
                 link.date.toLowerCase().includes(searchTerm)
@@ -78,3 +79,6 @@ const ScrappedPdfs = (() => {
 
     return { init, destroy };
 })();
+
+// Backward compatibility
+window.ScrappedPdfs = ScrappedPdfs;

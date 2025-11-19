@@ -1,4 +1,6 @@
-const Shared = (() => {
+// scripts/shared.js
+
+export const Shared = (() => {
     const initialize = () => {
         const dateTimeText = document.getElementById('dateTimeText');
         const appHeader = document.getElementById('appHeader');
@@ -25,11 +27,11 @@ const Shared = (() => {
                 { href: '#scrapped-pdfs', text: 'ISO', icon: 'fas fa-file-pdf', id: 'navLinkIso' }, // Dodano ID
                 { href: '#options', text: 'Opcje', icon: 'fas fa-cogs' }
             ];
-            
+
             const hamburger = document.createElement('div');
             hamburger.className = 'hamburger-menu';
             hamburger.innerHTML = '<i class="fas fa-bars"></i>';
-            
+
             const navPanel = document.createElement('div');
             navPanel.className = 'nav-panel';
 
@@ -38,17 +40,17 @@ const Shared = (() => {
             userInfoDiv.id = 'navPanelUserInfo'; // Dodaj ID dla łatwiejszej aktualizacji
             userInfoDiv.textContent = 'Zalogowano jako: Gość'; // Domyślny tekst
             navPanel.appendChild(userInfoDiv);
-            
+
             const ul = document.createElement('ul');
             navLinks.forEach(link => {
                 const li = document.createElement('li');
                 const a = document.createElement('a');
                 a.href = link.href;
-                
+
                 const icon = document.createElement('i');
                 icon.className = link.icon;
                 a.appendChild(icon);
-                
+
                 const textSpan = document.createElement('span');
                 textSpan.textContent = ' ' + link.text;
                 a.appendChild(textSpan);
@@ -106,7 +108,7 @@ const Shared = (() => {
                 navPanel.classList.toggle('visible');
                 hamburger.classList.toggle('active');
             });
-            
+
             document.addEventListener('click', (e) => {
                 if (navPanel.classList.contains('visible') && !navPanel.contains(e.target) && !hamburger.contains(e.target)) {
                     navPanel.classList.remove('visible');
@@ -135,7 +137,7 @@ const Shared = (() => {
                 toast.classList.remove('show');
                 setTimeout(() => {
                     if (toast.parentNode === toastContainer) {
-                       toastContainer.removeChild(toast);
+                        toastContainer.removeChild(toast);
                     }
                 }, 500);
             }, duration);
@@ -220,7 +222,7 @@ const Shared = (() => {
     };
 })();
 
-window.setSaveStatus = (status) => {
+export const setSaveStatus = (status) => {
     const statusElement = document.getElementById('saveStatus');
     if (!statusElement) return;
 
@@ -245,3 +247,7 @@ window.setSaveStatus = (status) => {
             break;
     }
 };
+
+// Backward compatibility
+window.Shared = Shared;
+window.setSaveStatus = setSaveStatus;

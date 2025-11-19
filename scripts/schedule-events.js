@@ -1,4 +1,9 @@
-const ScheduleEvents = (() => {
+// scripts/schedule-events.js
+import { AppConfig } from './common.js';
+import { auth } from './firebase-config.js';
+import { initializeContextMenu, destroyContextMenu } from './context-menu.js';
+
+export const ScheduleEvents = (() => {
     let _dependencies = {};
     let mainTable;
     let activeCell = null;
@@ -31,10 +36,10 @@ const ScheduleEvents = (() => {
             setActiveCell(null);
         }
     };
-    
+
     const _handleDragLeave = (event) => {
         const target = event.target.closest('.drag-over-target');
-        if(target) target.classList.remove('drag-over-target');
+        if (target) target.classList.remove('drag-over-target');
     };
 
     const _handleAppSearch = (e) => {
@@ -85,14 +90,14 @@ const ScheduleEvents = (() => {
         if (activeCell) {
             activeCell.classList.remove('active-cell');
             if (activeCell.tagName === 'DIV' && activeCell.parentNode.classList.contains('active-cell')) {
-                 activeCell.parentNode.classList.remove('active-cell');
+                activeCell.parentNode.classList.remove('active-cell');
             }
             if (activeCell.getAttribute('contenteditable') === 'true') {
                 _dependencies.exitEditMode(activeCell);
             }
             clearDuplicateHighlights();
         }
-        
+
         activeCell = cell;
 
         // Dezaktywuj wszystkie przyciski akcji
@@ -197,7 +202,7 @@ const ScheduleEvents = (() => {
                 const historyEntry = {
                     oldValue: oldTargetContentString,
                     timestamp: new Date().toISOString(),
-                    userId: firebase.auth().currentUser?.uid || 'unknown'
+                    userId: auth.currentUser?.uid || 'unknown'
                 };
                 targetCellState.history.unshift(historyEntry);
                 targetCellState.history = targetCellState.history.slice(0, 10);
@@ -208,14 +213,14 @@ const ScheduleEvents = (() => {
             const sourceHistoryEntry = {
                 oldValue: sourceContentString,
                 timestamp: new Date().toISOString(),
-                userId: firebase.auth().currentUser?.uid || 'unknown'
+                userId: auth.currentUser?.uid || 'unknown'
             };
             sourceCellState.history.unshift(sourceHistoryEntry);
             sourceCellState.history = sourceCellState.history.slice(0, 10);
 
             // 3. Move content from source to target
             const contentKeys = ['content', 'content1', 'content2', 'isSplit', 'isMassage', 'isPnf', 'isEveryOtherDay', 'treatmentStartDate', 'treatmentExtensionDays', 'treatmentEndDate', 'additionalInfo', 'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2'];
-            
+
             // First clear all possible content keys on the target
             for (const key of contentKeys) {
                 delete targetCellState[key];
@@ -251,33 +256,33 @@ const ScheduleEvents = (() => {
 
         switch (key) {
             case 'ArrowRight':
-                 if(activeCell.tagName === 'DIV' && activeCell.nextElementSibling) {
-                     nextElement = activeCell.nextElementSibling;
-                 } else {
-                     const nextCell = currentRow.cells[currentIndexInRow + 1];
-                     if(nextCell) nextElement = nextCell.querySelector('div') || nextCell;
-                 }
+                if (activeCell.tagName === 'DIV' && activeCell.nextElementSibling) {
+                    nextElement = activeCell.nextElementSibling;
+                } else {
+                    const nextCell = currentRow.cells[currentIndexInRow + 1];
+                    if (nextCell) nextElement = nextCell.querySelector('div') || nextCell;
+                }
                 break;
             case 'ArrowLeft':
-                 if(activeCell.tagName === 'DIV' && activeCell.previousElementSibling) {
-                     nextElement = activeCell.previousElementSibling;
-                 } else {
+                if (activeCell.tagName === 'DIV' && activeCell.previousElementSibling) {
+                    nextElement = activeCell.previousElementSibling;
+                } else {
                     const prevCell = currentRow.cells[currentIndexInRow - 1];
                     if (prevCell && prevCell.matches('.editable-cell, .editable-header')) {
-                         nextElement = Array.from(prevCell.querySelectorAll('div')).pop() || prevCell;
+                        nextElement = Array.from(prevCell.querySelectorAll('div')).pop() || prevCell;
                     }
-                 }
+                }
                 break;
             case 'ArrowDown':
                 const nextRow = currentRow.nextElementSibling;
-                if(nextRow) {
+                if (nextRow) {
                     const nextCell = nextRow.cells[currentIndexInRow];
                     if (nextCell) nextElement = nextCell.querySelector('div') || nextCell;
                 }
                 break;
             case 'ArrowUp':
                 const prevRow = currentRow.previousElementSibling;
-                 if(prevRow) {
+                if (prevRow) {
                     const prevCell = prevRow.cells[currentIndexInRow];
                     if (prevCell) nextElement = prevCell.querySelector('div') || prevCell;
                 }
@@ -313,23 +318,23 @@ const ScheduleEvents = (() => {
         const target = document.activeElement;
         const isEditing = target.getAttribute('contenteditable') === 'true';
 
-        if(isEditing) {
+        if (isEditing) {
             if (event.key === 'Escape') _dependencies.exitEditMode(target);
             if (event.key === 'Enter') {
-                 event.preventDefault();
-                 _dependencies.exitEditMode(target);
-                 const parentCell = target.closest('td');
-                 if (parentCell) {
-                     const nextRow = parentCell.closest('tr').nextElementSibling;
-                     if (nextRow) {
-                         const nextCell = nextRow.cells[parentCell.cellIndex];
-                         setActiveCell(nextCell);
-                     }
-                 }
+                event.preventDefault();
+                _dependencies.exitEditMode(target);
+                const parentCell = target.closest('td');
+                if (parentCell) {
+                    const nextRow = parentCell.closest('tr').nextElementSibling;
+                    if (nextRow) {
+                        const nextCell = nextRow.cells[parentCell.cellIndex];
+                        setActiveCell(nextCell);
+                    }
+                }
             }
             return;
         }
-        
+
         if (!activeCell) return;
 
         if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -356,7 +361,7 @@ const ScheduleEvents = (() => {
             _dependencies.enterEditMode(activeCell);
             return;
         }
-        
+
         if (event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
             event.preventDefault();
             _dependencies.enterEditMode(activeCell, true, event.key);
@@ -388,21 +393,23 @@ const ScheduleEvents = (() => {
         mainTable.addEventListener('dragleave', _handleDragLeave);
         mainTable.addEventListener('drop', _handleDrop);
         mainTable.addEventListener('dragend', _handleDragEnd);
-        
+
         document.addEventListener('keydown', _handleKeyDown);
         document.addEventListener('app:search', _handleAppSearch);
 
         const contextMenuItems = [
             { id: 'contextPatientInfo', class: 'info', condition: cell => !cell.classList.contains('break-cell') && _dependencies.ui.getElementText(cell).trim() !== '', action: (cell, event) => _dependencies.openPatientInfoModal(event.target.closest('div[tabindex="0"]') || event.target.closest('td.editable-cell')) },
-            { id: 'contextAddBreak', action: cell => {
-                if (_dependencies.ui.getElementText(cell).trim() !== '') {
-                    window.showToast('Nie można dodać przerwy do zajętej komórki. Najpierw wyczyść komórkę.', 3000);
-                    return;
+            {
+                id: 'contextAddBreak', action: cell => {
+                    if (_dependencies.ui.getElementText(cell).trim() !== '') {
+                        window.showToast('Nie można dodać przerwy do zajętej komórki. Najpierw wyczyść komórkę.', 3000);
+                        return;
+                    }
+                    _dependencies.updateCellState(cell, state => { state.isBreak = true; window.showToast('Dodano przerwę'); });
                 }
-                _dependencies.updateCellState(cell, state => { state.isBreak = true; window.showToast('Dodano przerwę'); });
-            }},
-            { 
-                id: 'contextShowHistory', 
+            },
+            {
+                id: 'contextShowHistory',
                 condition: cell => {
                     const cellState = _dependencies.appState.scheduleCells[cell.dataset.time]?.[cell.dataset.employeeIndex];
                     return cellState && cellState.history && cellState.history.length > 0;
@@ -416,7 +423,7 @@ const ScheduleEvents = (() => {
             { id: 'contextPnf', action: cell => _dependencies.toggleSpecialStyle(cell, 'isPnf') },
             { id: 'contextEveryOtherDay', action: cell => _dependencies.toggleSpecialStyle(cell, 'isEveryOtherDay') } // Nowa opcja
         ];
-        window.initializeContextMenu('contextMenu', 'td.editable-cell', contextMenuItems);
+        initializeContextMenu('contextMenu', 'td.editable-cell', contextMenuItems);
 
         // Obsługa kliknięć dla nowych przycisków akcji
         document.getElementById('btnPatientInfo')?.addEventListener('click', () => {
@@ -494,11 +501,9 @@ const ScheduleEvents = (() => {
         document.removeEventListener('click', _handleDocumentClick);
         document.removeEventListener('keydown', _handleKeyDown);
         document.removeEventListener('app:search', _handleAppSearch);
-        
-        if (window.destroyContextMenu) {
-            window.destroyContextMenu('contextMenu');
-        }
-        
+
+        destroyContextMenu('contextMenu');
+
         activeCell = null;
         console.log("ScheduleEvents destroyed");
     };
@@ -508,3 +513,6 @@ const ScheduleEvents = (() => {
         destroy
     };
 })();
+
+// Backward compatibility
+window.ScheduleEvents = ScheduleEvents;

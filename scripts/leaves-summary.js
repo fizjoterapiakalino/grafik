@@ -1,6 +1,8 @@
 // scripts/leaves-summary.js
+import { EmployeeManager } from './employee-manager.js';
+import { countWorkdays } from './common.js';
 
-const LeavesSummary = (() => {
+export const LeavesSummary = (() => {
 
     /**
      * Zwraca kolor tła w zależności od liczby pozostałych dni urlopu.
@@ -48,11 +50,11 @@ const LeavesSummary = (() => {
             if (!employee || !employeeDisplayName) continue;
 
             const employeeLeaves = allLeavesData[employeeDisplayName] || [];
-            
+
             const entitlement = employee.leaveEntitlement || 0;
             const carriedOver = employee.carriedOverLeave || 0;
             const total = entitlement + carriedOver;
-            
+
             let usedDays = 0;
             let scheduledDays = 0;
 
@@ -64,7 +66,7 @@ const LeavesSummary = (() => {
                 if (leaveStartDate > today) {
                     scheduledDays += leaveDuration;
                 } else {
-                // Jeśli rozpoczął się dzisiaj lub w przeszłości, jest "wykorzystany"
+                    // Jeśli rozpoczął się dzisiaj lub w przeszłości, jest "wykorzystany"
                     usedDays += leaveDuration;
                 }
             });
@@ -89,3 +91,6 @@ const LeavesSummary = (() => {
         render
     };
 })();
+
+// Backward compatibility
+window.LeavesSummary = LeavesSummary;

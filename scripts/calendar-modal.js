@@ -1,5 +1,7 @@
 // scripts/calendar-modal.js
-const CalendarModal = (() => {
+import { AppConfig, months } from './common.js';
+
+export const CalendarModal = (() => {
     // --- SELEKTORY I ZMIENNE WEWNĘTRZNE MODUŁU ---
     let modal, prevMonthBtn, nextMonthBtn, confirmBtn, cancelBtn, clearSelectionBtn,
         startDatePreview, endDatePreview, calendarSlider, workdaysCounter, leaveTypeSelect,
@@ -7,7 +9,7 @@ const CalendarModal = (() => {
 
     let currentEmployee = null;
     let currentYear = new Date().getUTCFullYear();
-    
+
     let selectionStartDate = null;
     let hoverEndDate = null;
     let singleSelectedDays = new Set();
@@ -166,23 +168,23 @@ const CalendarModal = (() => {
         const target = event.target.closest('.day-cell-calendar');
         if (!target || !target.dataset.date) return;
         const clickedDate = target.dataset.date;
-    
+
         // Walidacja dla opieki nad zdrowym dzieckiem (art. 188)
         if (leaveTypeSelect.value === 'child_care_art_188') {
             const selectedArt188Days = Array.from(singleSelectedDays).filter(date => {
                 const type = dateToTypeMap.get(date);
                 return type === 'child_care_art_188' || !type; // Uwzględnij nowo wybrane i już istniejące
             });
-    
+
             // Sprawdź, czy próbujemy dodać dzień, który już jest na liście
             const isAddingNewDay = !singleSelectedDays.has(clickedDate);
-    
+
             if (selectedArt188Days.length >= 2 && isAddingNewDay) {
                 window.showToast('Wykorzystano maksymalną liczbę 2 dni opieki nad zdrowym dzieckiem.', 3000, 'error');
                 return; // Zablokuj dodanie kolejnego dnia
             }
         }
-    
+
         if (event.ctrlKey || event.metaKey) {
             isRangeSelectionActive = false;
             selectionStartDate = null;
@@ -201,7 +203,7 @@ const CalendarModal = (() => {
                 if (start > end) [start, end] = [end, start];
                 const startDate = toUTCDate(start);
                 const endDate = toUTCDate(end);
-    
+
                 // Ponowna walidacja dla zaznaczenia zakresu
                 if (leaveTypeSelect.value === 'child_care_art_188') {
                     let tempDayCount = 0;
@@ -221,7 +223,7 @@ const CalendarModal = (() => {
                         return;
                     }
                 }
-    
+
                 for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
                     singleSelectedDays.add(toDateString(d));
                 }
@@ -317,8 +319,8 @@ const CalendarModal = (() => {
         workdaysCounter = document.getElementById('workdaysCounter');
         leaveTypeSelect = document.getElementById('leaveTypeSelect');
         leaveTypeLegend = document.getElementById('leaveTypeLegend'); // Initialize leaveTypeLegend
-        
-        if(modal) { // Only setup listeners if the modal exists on the page
+
+        if (modal) { // Only setup listeners if the modal exists on the page
             setupEventListeners();
         }
     };
@@ -326,9 +328,9 @@ const CalendarModal = (() => {
     const open = (employeeName, existingLeaves, monthIndex) => {
         currentEmployee = employeeName;
         currentYear = new Date().getUTCFullYear();
-        
-        if(prevMonthBtn) prevMonthBtn.style.display = 'none';
-        if(nextMonthBtn) nextMonthBtn.style.display = 'none';
+
+        if (prevMonthBtn) prevMonthBtn.style.display = 'none';
+        if (nextMonthBtn) nextMonthBtn.style.display = 'none';
 
         resetSelection();
         loadEmployeeLeavesForModal(existingLeaves);
@@ -345,3 +347,6 @@ const CalendarModal = (() => {
         open
     };
 })();
+
+// Backward compatibility
+window.CalendarModal = CalendarModal;

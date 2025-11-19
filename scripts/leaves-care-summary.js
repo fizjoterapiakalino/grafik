@@ -1,4 +1,8 @@
-const LeavesCareSummary = (() => {
+// scripts/leaves-care-summary.js
+import { EmployeeManager } from './employee-manager.js';
+import { AppConfig, countWorkdays } from './common.js';
+
+export const LeavesCareSummary = (() => {
     const render = (container, allLeavesData) => {
         container.innerHTML = ''; // Wyczyść kontener
 
@@ -81,3 +85,6 @@ const LeavesCareSummary = (() => {
         render
     };
 })();
+
+// Backward compatibility
+window.LeavesCareSummary = LeavesCareSummary;

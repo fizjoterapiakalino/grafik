@@ -1,4 +1,8 @@
-const UIShell = (() => {
+// scripts/ui-shell.js
+import { Shared } from './shared.js';
+import { EmployeeManager } from './employee-manager.js';
+
+export const UIShell = (() => {
     const render = () => {
         const appRoot = document.getElementById('app-root');
         if (!appRoot) {
@@ -166,3 +170,6 @@ const UIShell = (() => {
         hideLoading
     };
 })();
+
+// Backward compatibility
+window.UIShell = UIShell;

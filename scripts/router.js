@@ -1,5 +1,10 @@
 // scripts/router.js
-const Router = (() => {
+import { UIShell } from './ui-shell.js';
+import { EmployeeManager } from './employee-manager.js';
+import { Shared } from './shared.js';
+import { auth } from './firebase-config.js';
+
+export const Router = (() => {
     const routes = {
         'schedule': {
             page: 'schedule',
@@ -23,12 +28,12 @@ const Router = (() => {
             getModule: () => (typeof Changes !== 'undefined' ? Changes : null)
         },
         'scrapped-pdfs': { // <== DODAJ TEN BLOK
-        page: 'scrapped-pdfs',
-        init: () => {
-            if (typeof ScrappedPdfs !== 'undefined') ScrappedPdfs.init();
+            page: 'scrapped-pdfs',
+            init: () => {
+                if (typeof ScrappedPdfs !== 'undefined') ScrappedPdfs.init();
+            },
+            getModule: () => (typeof ScrappedPdfs !== 'undefined' ? ScrappedPdfs : null)
         },
-        getModule: () => (typeof ScrappedPdfs !== 'undefined' ? ScrappedPdfs : null)
-         },
         'options': {
             page: 'options',
             init: () => {
@@ -82,10 +87,10 @@ const Router = (() => {
     const init = () => {
         UIShell.render();
         window.addEventListener('hashchange', navigate);
-        
+
         // Ustaw listener, który wywoła nawigację po każdej zmianie stanu autentykacji
         let isInitialAuthCheck = true; // Flaga do śledzenia pierwszego sprawdzenia stanu autentykacji
-        firebase.auth().onAuthStateChanged(user => {
+        auth.onAuthStateChanged(user => {
             const currentUid = user ? user.uid : null;
             if (isInitialAuthCheck || currentUid !== lastUserUid) { // Nawiguj przy pierwszym sprawdzeniu lub jeśli użytkownik się zmienił
                 currentUser = user;
@@ -114,86 +119,89 @@ const Router = (() => {
     };
 
     const navigate = async () => {
-            if (isNavigating) {
+        if (isNavigating) {
+            return;
+        }
+        isNavigating = true;
+        UIShell.showLoading();
+
+        try {
+            // 1. Zniszcz stary moduł, jeśli istnieje
+            if (activeModule && typeof activeModule.destroy === 'function') {
+                activeModule.destroy();
+                activeModule = null;
+            }
+
+            // 2. Ustal, dokąd nawigować
+            const pageName = window.location.hash.substring(1);
+            let targetPage;
+
+            if (currentUser) {
+                // Użytkownik ZALOGOWANY: domyślnie idzie do grafiku, chyba że hash mówi inaczej
+                targetPage = pageName === 'login' || !pageName ? 'schedule' : pageName;
+            } else {
+                // Użytkownik NIEZALOGOWANY: zawsze idzie do logowania
+                targetPage = 'login';
+            }
+
+            // Ustaw hash, jeśli jest inny niż cel - to ujednolica URL
+            if (pageName !== targetPage) {
+                history.replaceState(null, '', '#' + targetPage);
+            }
+
+            const route = routes[targetPage];
+            if (!route) {
+                console.error(`No route found for ${targetPage}`);
                 return;
             }
-            isNavigating = true;
-            UIShell.showLoading();
 
-            try {
-                // 1. Zniszcz stary moduł, jeśli istnieje
-                if (activeModule && typeof activeModule.destroy === 'function') {
-                    activeModule.destroy();
-                    activeModule = null;
-                }
-
-                // 2. Ustal, dokąd nawigować
-                const pageName = window.location.hash.substring(1);
-                let targetPage;
-
-                if (currentUser) {
-                    // Użytkownik ZALOGOWANY: domyślnie idzie do grafiku, chyba że hash mówi inaczej
-                    targetPage = pageName === 'login' || !pageName ? 'schedule' : pageName;
-                } else {
-                    // Użytkownik NIEZALOGOWANY: zawsze idzie do logowania
-                    targetPage = 'login';
-                }
-                
-                // Ustaw hash, jeśli jest inny niż cel - to ujednolica URL
-                if (pageName !== targetPage) {
-                    history.replaceState(null, '', '#' + targetPage);
-                }
-
-                const route = routes[targetPage];
-                if (!route) {
-                    console.error(`No route found for ${targetPage}`);
-                    return;
-                }
-
-                // 3. Załaduj dane, jeśli są potrzebne
-                if (currentUser) {
-                    await EmployeeManager.load();
-                }
-
-                // 4. Zaktualizuj ogólny UI (np. nagłówek)
-                UIShell.updateUserState(currentUser);
-                const appHeader = document.getElementById('appHeader');
-                if (appHeader) {
-                    const displayStyle = currentUser ? 'flex' : 'none';
-                    appHeader.style.display = displayStyle;
-                } else {
-                    console.warn("appHeader element not found when trying to set display style.");
-                }
-
-                // 5. Załaduj HTML nowej strony
-                await UIShell.loadPage(route.page);
-
-                // Zarządzanie widocznością przycisku drukowania
-                const printButton = document.getElementById('printChangesTable');
-                if (printButton) {
-                    printButton.style.display = targetPage === 'changes' ? 'block' : 'none';
-                }
-
-                // 6. Zainicjuj nowy moduł (teraz, gdy DOM jest gotowy)
-                if (route.init) {
-                    route.init();
-                }
-                activeModule = route.getModule ? route.getModule() : null;
-
-                // Jeśli nawigujemy do strony scrapped-pdfs, wymuś odświeżenie linków
-                if (targetPage === 'scrapped-pdfs') {
-                    await fetchAndCachePdfLinks(true);
-                }
-
-            } catch (error) {
-                console.error("Navigation error:", error);
-            } finally {
-                UIShell.hideLoading();
-                isNavigating = false; // Zresetuj flagę po zakończeniu nawigacji
+            // 3. Załaduj dane, jeśli są potrzebne
+            if (currentUser) {
+                await EmployeeManager.load();
             }
-        };
+
+            // 4. Zaktualizuj ogólny UI (np. nagłówek)
+            UIShell.updateUserState(currentUser);
+            const appHeader = document.getElementById('appHeader');
+            if (appHeader) {
+                const displayStyle = currentUser ? 'flex' : 'none';
+                appHeader.style.display = displayStyle;
+            } else {
+                console.warn("appHeader element not found when trying to set display style.");
+            }
+
+            // 5. Załaduj HTML nowej strony
+            await UIShell.loadPage(route.page);
+
+            // Zarządzanie widocznością przycisku drukowania
+            const printButton = document.getElementById('printChangesTable');
+            if (printButton) {
+                printButton.style.display = targetPage === 'changes' ? 'block' : 'none';
+            }
+
+            // 6. Zainicjuj nowy moduł (teraz, gdy DOM jest gotowy)
+            if (route.init) {
+                route.init();
+            }
+            activeModule = route.getModule ? route.getModule() : null;
+
+            // Jeśli nawigujemy do strony scrapped-pdfs, wymuś odświeżenie linków
+            if (targetPage === 'scrapped-pdfs') {
+                await fetchAndCachePdfLinks(true);
+            }
+
+        } catch (error) {
+            console.error("Navigation error:", error);
+        } finally {
+            UIShell.hideLoading();
+            isNavigating = false; // Zresetuj flagę po zakończeniu nawigacji
+        }
+    };
 
     return {
         init,
     };
 })();
+
+// Backward compatibility
+window.Router = Router;

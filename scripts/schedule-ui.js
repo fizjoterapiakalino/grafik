@@ -1,6 +1,10 @@
 // scripts/schedule-ui.js
+import { AppConfig, capitalizeFirstLetter } from './common.js';
+import { EmployeeManager } from './employee-manager.js';
+import { Shared } from './shared.js';
+import { auth } from './firebase-config.js';
 
-const ScheduleUI = (() => {
+export const ScheduleUI = (() => {
     let _appState = null;
     let _employeeTooltip = null; // Globalny element tooltipa
 
@@ -60,14 +64,14 @@ const ScheduleUI = (() => {
 
     const applyCellDataToDom = (cell, cellObj) => {
         cell.className = 'editable-cell';
-            cell.innerHTML = '';
-            delete cell.dataset.isMassage;
-            delete cell.dataset.isPnf;
-            delete cell.dataset.isEveryOtherDay; // Usuń stary atrybut
+        cell.innerHTML = '';
+        delete cell.dataset.isMassage;
+        delete cell.dataset.isPnf;
+        delete cell.dataset.isEveryOtherDay; // Usuń stary atrybut
 
         if (cell.tagName === 'TH') {
-             cell.textContent = cellObj.content || '';
-             return;
+            cell.textContent = cellObj.content || '';
+            return;
         }
 
         if (cellObj.isBreak) {
@@ -79,7 +83,7 @@ const ScheduleUI = (() => {
                 const div = document.createElement('div');
                 div.setAttribute('tabindex', '0');
                 let htmlContent = `<span>${capitalizeFirstLetter(content || '')}</span>`;
-                
+
                 if (isMassage) {
                     div.classList.add('massage-text');
                     div.dataset.isMassage = 'true';
@@ -101,12 +105,12 @@ const ScheduleUI = (() => {
             cell.appendChild(createPart(cellObj.content2, cellObj.isMassage2, cellObj.isPnf2, cellObj.isEveryOtherDay2, cellObj.treatmentData2?.gender));
         } else {
             let htmlContent = `<span>${capitalizeFirstLetter(cellObj.content || '')}</span>`;
-            
+
             if (cellObj.isMassage) {
                 cell.classList.add('massage-text');
                 cell.dataset.isMassage = 'true';
             }
-             if (cellObj.isPnf) {
+            if (cellObj.isPnf) {
                 cell.classList.add('pnf-text');
                 cell.dataset.isPnf = 'true';
             }
@@ -147,7 +151,7 @@ const ScheduleUI = (() => {
 
         const tableHeaderRow = document.getElementById('tableHeaderRow');
         const tbody = mainTable.querySelector('tbody');
-        
+
         if (!tableHeaderRow || !tbody) {
             console.error("Table header row or tbody not found, cannot render schedule.");
             return;
@@ -159,7 +163,7 @@ const ScheduleUI = (() => {
         let employeeIndices = [];
         let isSingleUserView = false;
 
-        const currentUser = firebase.auth().currentUser;
+        const currentUser = auth.currentUser;
         if (currentUser) {
             if (EmployeeManager.isUserAdmin(currentUser.uid)) {
                 const allEmployees = EmployeeManager.getAll();
@@ -174,7 +178,7 @@ const ScheduleUI = (() => {
                     isSingleUserView = true;
                 } else {
                     employeeIndices = [];
-                    isSingleUserView = true; 
+                    isSingleUserView = true;
                     tbody.innerHTML = `<tr><td colspan="2" class="unassigned-user-message">Twoje konto nie jest przypisane do żadnego pracownika. Skontaktuj się z administratorem.</td></tr>`;
                 }
             }
@@ -185,7 +189,7 @@ const ScheduleUI = (() => {
                 .sort((a, b) => parseInt(a) - parseInt(b));
             isSingleUserView = false;
         }
-        
+
         mainTable.classList.toggle('single-user-view', isSingleUserView);
 
         for (const i of employeeIndices) {
@@ -214,7 +218,7 @@ const ScheduleUI = (() => {
                 const tr = tbody.insertRow();
                 const timeString = `${hour}:${minute.toString().padStart(2, '0')}`;
                 tr.insertCell().textContent = timeString;
-                
+
                 for (const i of employeeIndices) {
                     const cell = tr.insertCell();
                     const cellData = _appState.scheduleCells[timeString]?.[i] || {};
@@ -290,3 +294,6 @@ const ScheduleUI = (() => {
         updatePatientCount
     };
 })();
+
+// Backward compatibility
+window.ScheduleUI = ScheduleUI;

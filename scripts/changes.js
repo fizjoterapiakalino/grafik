@@ -1,4 +1,9 @@
-const Changes = (() => {
+// scripts/changes.js
+import { db } from './firebase-config.js';
+import { AppConfig } from './common.js';
+import { EmployeeManager } from './employee-manager.js';
+
+export const Changes = (() => {
     let changesTableBody, changesHeaderRow;
     let appState = {
         changesCells: {}
@@ -34,10 +39,10 @@ const Changes = (() => {
                     workDaysCount++;
                 }
                 if (workDaysCount < 10) {
-                   endDate.setUTCDate(endDate.getUTCDate() + 1);
+                    endDate.setUTCDate(endDate.getUTCDate() + 1);
                 }
             }
-            
+
             periods.push({
                 start: startDate.toISOString().split('T')[0],
                 end: endDate.toISOString().split('T')[0]
@@ -166,7 +171,7 @@ const Changes = (() => {
         const columnIndex = cell.cellIndex;
         const cellState = appState.changesCells[period]?.[columnIndex] || {};
         const assignedEmployees = new Set(cellState.assignedEmployees || []);
-        
+
         const allAssignedEmployeesInRow = new Set();
         if (appState.changesCells[period]) {
             Object.values(appState.changesCells[period]).forEach(cellData => {
@@ -186,7 +191,7 @@ const Changes = (() => {
             if (assignedEmployees.has(id)) {
                 employeeEl.classList.add('selected-employee');
             }
-            
+
             if (allAssignedEmployeesInRow.has(id) && !assignedEmployees.has(id)) {
                 employeeEl.classList.add('disabled-employee');
             }
@@ -245,11 +250,11 @@ const Changes = (() => {
         const columnIndex = cell.cellIndex;
         if (!appState.changesCells[period]) appState.changesCells[period] = {};
         let cellState = appState.changesCells[period][columnIndex] || {};
-        
+
         updateFn(cellState);
 
         appState.changesCells[period][columnIndex] = cellState;
-        
+
         renderChangesAndSave();
     };
 
@@ -289,7 +294,7 @@ const Changes = (() => {
             });
         });
     };
-    
+
     const renderChangesAndSave = () => {
         renderChangesContent();
         saveChanges();
@@ -298,7 +303,7 @@ const Changes = (() => {
     const printChangesTableToPdf = () => {
         const table = document.getElementById('changesTable');
         const tableHeaders = Array.from(table.querySelectorAll('thead th')).map(th => ({ text: th.textContent, style: 'tableHeader' }));
-        
+
         const tableBody = Array.from(table.querySelectorAll('tbody tr')).map(row => {
             return Array.from(row.cells).map((cell, cellIndex) => {
                 if (cellIndex === 0 || cellIndex === 8) { // Kolumna Okres i Urlopy
@@ -326,10 +331,10 @@ const Changes = (() => {
                         body: [tableHeaders, ...tableBody]
                     },
                     layout: {
-    		fillColor: function (rowIndex, node, columnIndex) {
-    			return (rowIndex === 0) ? '#4CAF50' : null;
-    		}
-    	}
+                        fillColor: function (rowIndex, node, columnIndex) {
+                            return (rowIndex === 0) ? '#4CAF50' : null;
+                        }
+                    }
                 }
             ],
             styles: {
@@ -365,8 +370,8 @@ const Changes = (() => {
             console.error("Changes module: Required table elements not found. Aborting initialization.");
             return;
         }
-        
-        if(printButton) {
+
+        if (printButton) {
             printButton.addEventListener('click', printChangesTableToPdf);
         }
 
@@ -384,7 +389,7 @@ const Changes = (() => {
 
     const destroy = () => {
         const printButton = document.getElementById('printChangesTable');
-        if(printButton) {
+        if (printButton) {
             printButton.removeEventListener('click', printChangesTableToPdf);
         }
         console.log("Changes module destroyed");
@@ -395,3 +400,6 @@ const Changes = (() => {
         destroy
     };
 })();
+
+// Backward compatibility
+window.Changes = Changes;

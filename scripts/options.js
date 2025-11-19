@@ -1,4 +1,8 @@
-const Options = (() => {
+// scripts/options.js
+import { db, auth } from './firebase-config.js';
+import { EmployeeManager } from './employee-manager.js';
+
+export const Options = (() => {
     // --- SELEKTORY ELEMENTÓW DOM ---
     let loadingOverlay, employeeListContainer, employeeSearchInput, addEmployeeBtn,
         detailsPlaceholder, detailsEditForm, employeeFirstNameInput, employeeLastNameInput,
@@ -91,7 +95,7 @@ const Options = (() => {
                 batch.set(scheduleRef, backupData.scheduleData || {});
                 batch.set(leavesRef, backupData.leavesData || {});
                 await batch.commit();
-                
+
                 window.showToast("Dane przywrócone pomyślnie! Odśwież stronę, aby zobaczyć zmiany.", 5000);
             } catch (error) {
                 console.error("Błąd podczas przywracania danych:", error);
@@ -113,7 +117,7 @@ const Options = (() => {
             cancelBtn.removeEventListener('click', closeModal);
             confirmationInput.removeEventListener('input', onInput);
         };
-        
+
         confirmBtn.addEventListener('click', onConfirm);
         cancelBtn.addEventListener('click', closeModal);
         confirmationInput.addEventListener('input', onInput);
@@ -122,7 +126,7 @@ const Options = (() => {
 
     // --- NAZWANE FUNKCJE OBSŁUGI ZDARZEŃ ---
     const handleAssignUid = () => {
-        const currentUser = firebase.auth().currentUser;
+        const currentUser = auth.currentUser;
         if (currentUser) {
             // Sprawdź, czy ten UID nie jest już przypisany do innego pracownika
             const allEmployees = EmployeeManager.getAll();
@@ -153,7 +157,7 @@ const Options = (() => {
         selectedEmployeeIndex = null;
         detailsPlaceholder.style.display = 'flex';
         detailsEditForm.style.display = 'none';
-        
+
         const activeItem = document.querySelector('.employee-list-item.active');
         if (activeItem) {
             activeItem.classList.remove('active');
@@ -208,7 +212,7 @@ const Options = (() => {
         employeeIsHidden.checked = employee.isHidden || false;
         employeeUidInput.value = employee.uid || '';
     };
-    
+
     const filterEmployees = () => {
         const searchTerm = employeeSearchInput.value.toLowerCase();
         document.querySelectorAll('.employee-list-item').forEach(item => {
@@ -339,7 +343,7 @@ const Options = (() => {
             showLoading(false);
         }
     };
-    
+
     const handleDeleteEmployee = async () => {
         if (selectedEmployeeIndex === null) return;
 
@@ -404,7 +408,7 @@ const Options = (() => {
             cancelBtn.removeEventListener('click', closeModal);
             confirmationInput.removeEventListener('input', onInput);
         };
-        
+
         confirmBtn.addEventListener('click', onConfirm);
         cancelBtn.addEventListener('click', closeModal);
         confirmationInput.addEventListener('input', onInput);
@@ -479,3 +483,6 @@ const Options = (() => {
         destroy
     };
 })();
+
+// Backward compatibility
+window.Options = Options;

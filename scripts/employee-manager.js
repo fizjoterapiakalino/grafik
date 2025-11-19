@@ -1,6 +1,7 @@
 // scripts/employee-manager.js
+import { db } from './firebase-config.js';
 
-const EmployeeManager = (() => {
+export const EmployeeManager = (() => {
     let _employees = {}; // Prywatna zmienna na dane pracowników
 
     // Prywatna funkcja do pobierania danych z Firestore
@@ -11,7 +12,7 @@ const EmployeeManager = (() => {
             if (doc.exists && doc.data().employees) {
                 _employees = doc.data().employees;
             } else {
-                 // Logika na wypadek, gdyby struktura 'employees' nie istniała
+                // Logika na wypadek, gdyby struktura 'employees' nie istniała
                 _employees = {};
                 console.warn("Brak obiektu 'employees' w Firestore. Inicjalizacja pustego stanu.");
             }
@@ -25,7 +26,7 @@ const EmployeeManager = (() => {
     // Publiczne API modułu
     return {
         // Inicjalizuje moduł, pobierając dane
-        load: async function() {
+        load: async function () {
             await _fetchFromDB();
         },
         // Zwraca wszystkich pracowników
@@ -63,13 +64,13 @@ const EmployeeManager = (() => {
             return null;
         },
         // Sprawdza, czy użytkownik o danym UID ma rolę admina
-        isUserAdmin: function(uid) {
+        isUserAdmin: function (uid) {
             if (!uid) return false;
             const employee = this.getEmployeeByUid(uid);
             return employee?.role === 'admin';
         },
         // Aktualizuje dane pracownika i zapisuje do Firestore
-        updateEmployee: async function(id, data) {
+        updateEmployee: async function (id, data) {
             if (!_employees[id]) {
                 console.error(`Pracownik o ID ${id} nie istnieje.`);
                 return;
@@ -89,3 +90,6 @@ const EmployeeManager = (() => {
         }
     };
 })();
+
+// Backward compatibility
+window.EmployeeManager = EmployeeManager;

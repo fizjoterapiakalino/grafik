@@ -1,6 +1,6 @@
 // scripts/common.js
 
-const AppConfig = {
+export const AppConfig = {
     schedule: {
         startHour: 7,
         endHour: 17,
@@ -43,9 +43,9 @@ const AppConfig = {
     }
 };
 
-const months = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
+export const months = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
 
-function showToast(message, duration = 3000) {
+export function showToast(message, duration = 3000) {
     const container = document.getElementById('toast-container');
     if (!container) return;
     const toast = document.createElement('div');
@@ -67,18 +67,18 @@ function showToast(message, duration = 3000) {
     }, duration);
 }
 
-function hideLoadingOverlay(overlay) {
+export function hideLoadingOverlay(overlay) {
     if (overlay) {
         overlay.style.display = 'none';
     }
 }
 
-function capitalizeFirstLetter(string) {
+export function capitalizeFirstLetter(string) {
     if (!string) return '';
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
-function searchAndHighlight(searchTerm, tableSelector, cellSelector) {
+export function searchAndHighlight(searchTerm, tableSelector, cellSelector) {
     const table = document.querySelector(tableSelector);
     if (!table) return;
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
@@ -98,8 +98,8 @@ function searchAndHighlight(searchTerm, tableSelector, cellSelector) {
     });
 }
 
-class UndoManager {
-    constructor({ maxStates = 20, onUpdate = () => {} }) {
+export class UndoManager {
+    constructor({ maxStates = 20, onUpdate = () => { } }) {
         this.maxStates = maxStates;
         this.onUpdate = onUpdate;
         this.stack = [];
@@ -138,7 +138,7 @@ class UndoManager {
     }
 }
 
-function countWorkdays(startDate, endDate) {
+export function countWorkdays(startDate, endDate) {
     let count = 0;
     const start = new Date(startDate + 'T00:00:00Z');
     const end = new Date(endDate + 'T00:00:00Z');
@@ -155,4 +155,12 @@ function countWorkdays(startDate, endDate) {
     return count;
 };
 
+// Backward compatibility
+window.AppConfig = AppConfig;
+window.months = months;
 window.showToast = showToast;
+window.hideLoadingOverlay = hideLoadingOverlay;
+window.capitalizeFirstLetter = capitalizeFirstLetter;
+window.searchAndHighlight = searchAndHighlight;
+window.UndoManager = UndoManager;
+window.countWorkdays = countWorkdays;
