@@ -6,6 +6,44 @@ html, body {
     overflow-x: hidden; /* Zapobiegaj poziomemu przewijaniu */
 }
 
+:root {
+    /* Colors */
+    --color-primary: #4CAF50;
+    --color-primary-dark: #45a049;
+    --color-secondary: #007bff;
+    --color-secondary-dark: #0056b3;
+    --color-danger: #dc3545;
+    --color-danger-dark: #c82333;
+    --color-warning: #ffeb3b;
+    --color-text: #333;
+    --color-text-light: #555;
+    --color-bg: #f4f4f4;
+    --color-white: #ffffff;
+    --color-border: #ddd;
+    --color-border-dark: #999;
+    
+    /* Specific Colors */
+    --bg-header: #6c757d;
+    --bg-header-light: #f2f2f2;
+    --bg-editable: #e0e0e0;
+    --bg-active: #FFD700;
+    --bg-break: #6c757d;
+    --bg-massage: hotpink;
+    --bg-pnf: #007bff;
+    --bg-every-other-day: #8A2BE2;
+    --bg-search-highlight: #a7d9ff;
+    
+    /* Spacing */
+    --spacing-xs: 5px;
+    --spacing-sm: 10px;
+    --spacing-md: 15px;
+    --spacing-lg: 20px;
+    
+    /* Borders */
+    --border-radius: 8px;
+    --border-radius-sm: 4px;
+}
+
 body {
     font-family: Arial, sans-serif;
     background-color: #f4f4f4;
