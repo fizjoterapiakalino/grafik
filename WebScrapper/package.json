@@ -1,18 +1,23 @@
 {
-  "name": "webscrapper-glitch",
-  "version": "1.0.0",
-  "description": "Web scraper for zla-chrzanow.pl/private, hosted on Glitch, to provide PDF links via API.",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "@sparticuz/chromium": "^123.0.1",
-    "cors": "^2.8.5",
-    "express": "^4.17.1",
-    "puppeteer-core": "^22.10.0"
-  }
+    "name": "webscrapper-glitch",
+    "version": "1.0.0",
+    "description": "Web scraper for zla-chrzanow.pl/private, hosted on Glitch, to provide PDF links via API.",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "test": "jest --env=jsdom"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "@sparticuz/chromium": "^123.0.1",
+        "cors": "^2.8.5",
+        "express": "^4.17.1",
+        "puppeteer-core": "^22.10.0"
+    },
+    "devDependencies": {
+        "jest": "^30.2.0",
+        "jest-environment-jsdom": "^30.2.0"
+    }
 }

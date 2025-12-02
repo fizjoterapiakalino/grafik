@@ -1,0 +1,34 @@
+{
+    "name": "app",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "test": "jest --env=jsdom",
+        "lint": "eslint .",
+        "format": "prettier --write ."
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/maegras1/Grafik---DEV.git"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "type": "commonjs",
+    "bugs": {
+        "url": "https://github.com/maegras1/Grafik---DEV/issues"
+    },
+    "homepage": "https://github.com/maegras1/Grafik---DEV#readme",
+    "devDependencies": {
+        "@babel/core": "^7.28.5",
+        "@babel/preset-env": "^7.28.5",
+        "babel-jest": "^30.2.0",
+        "eslint": "^9.39.1",
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-prettier": "^5.5.4",
+        "jest": "^30.2.0",
+        "jest-environment-jsdom": "^30.2.0",
+        "prettier": "^3.6.2"
+    }
+}

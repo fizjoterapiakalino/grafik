@@ -3,7 +3,6 @@ import { EmployeeManager } from './employee-manager.js';
 import { countWorkdays } from './common.js';
 
 export const LeavesSummary = (() => {
-
     /**
      * Zwraca kolor tła w zależności od liczby pozostałych dni urlopu.
      * @param {number} days - Liczba pozostałych dni.
@@ -11,9 +10,9 @@ export const LeavesSummary = (() => {
      */
     const getRemainingDaysColor = (days) => {
         if (days > 10) return '#d4edda'; // Zielony
-        if (days > 2) return '#fff3cd';  // Żółty
-        if (days > 0) return '#ffeeba';  // Pomarańczowy
-        return '#f8d7da';               // Czerwony
+        if (days > 2) return '#fff3cd'; // Żółty
+        if (days > 0) return '#ffeeba'; // Pomarańczowy
+        return '#f8d7da'; // Czerwony
     };
 
     /**
@@ -58,7 +57,7 @@ export const LeavesSummary = (() => {
             let usedDays = 0;
             let scheduledDays = 0;
 
-            employeeLeaves.forEach(leave => {
+            employeeLeaves.forEach((leave) => {
                 const leaveStartDate = new Date(leave.startDate + 'T00:00:00Z');
                 const leaveDuration = countWorkdays(leave.startDate, leave.endDate);
 
@@ -88,7 +87,7 @@ export const LeavesSummary = (() => {
 
     // Publiczne API modułu
     return {
-        render
+        render,
     };
 })();
 

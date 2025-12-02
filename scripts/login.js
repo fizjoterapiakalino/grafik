@@ -11,7 +11,7 @@ export const Login = (() => {
         const loginError = document.getElementById('loginError');
 
         if (!emailInput || !passwordInput || !loginError) {
-            console.error("Login form elements not found.");
+            console.error('Login form elements not found.');
             return;
         }
 
@@ -24,8 +24,8 @@ export const Login = (() => {
             // Po udanym logowaniu, router automatycznie przekieruje
             window.location.hash = '#schedule';
         } catch (error) {
-            console.error("Błąd logowania:", error);
-            loginError.textContent = "Nieprawidłowy e-mail lub hasło.";
+            console.error('Błąd logowania:', error);
+            loginError.textContent = 'Nieprawidłowy e-mail lub hasło.';
         }
     };
 
@@ -34,7 +34,7 @@ export const Login = (() => {
         if (loginForm) {
             loginForm.addEventListener('submit', handleSubmit);
         } else {
-            console.error("Login form not found, cannot initialize Login module.");
+            console.error('Login form not found, cannot initialize Login module.');
         }
     };
 
@@ -43,7 +43,7 @@ export const Login = (() => {
             loginForm.removeEventListener('submit', handleSubmit);
             loginForm = null;
         }
-        console.log("Login module destroyed");
+        console.log('Login module destroyed');
     };
 
     return { init, destroy };

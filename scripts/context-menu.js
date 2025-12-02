@@ -19,19 +19,24 @@ export const initializeContextMenu = (menuId, targetSelector, itemConfig) => {
             currentTarget = target;
 
             // New: Call onShow for items that have it
-            itemConfig.forEach(item => {
+            itemConfig.forEach((item) => {
                 if (item.onShow) {
                     item.onShow(currentTarget, event);
                 }
             });
 
-            itemConfig.forEach(item => {
+            itemConfig.forEach((item) => {
                 const element = document.getElementById(item.id);
                 if (element) {
                     const shouldShow = item.condition ? item.condition(currentTarget) : true;
                     element.style.display = shouldShow ? 'flex' : 'none';
                 }
             });
+
+            // Temporarily show to measure
+            contextMenu.style.visibility = 'hidden';
+            contextMenu.style.display = 'block'; // Ensure it has dimensions
+            contextMenu.classList.add('visible'); // Add class if it affects styling/dimensions
 
             const { clientX: mouseX, clientY: mouseY } = event;
             const { innerWidth: windowWidth, innerHeight: windowHeight } = window;
@@ -41,23 +46,36 @@ export const initializeContextMenu = (menuId, targetSelector, itemConfig) => {
             let x = mouseX;
             let y = mouseY;
 
-            if (mouseX + menuWidth > windowWidth) x = windowWidth - menuWidth - 5;
-            if (mouseY + menuHeight > windowHeight) y = windowHeight - menuHeight - 5;
+            // Prevent going off-screen right
+            if (x + menuWidth > windowWidth) {
+                x = windowWidth - menuWidth - 10;
+            }
+
+            // Prevent going off-screen bottom
+            if (y + menuHeight > windowHeight) {
+                y = windowHeight - menuHeight - 10;
+            }
+
+            // Ensure not negative (top/left)
+            if (x < 0) x = 10;
+            if (y < 0) y = 10;
 
             contextMenu.style.left = `${x}px`;
             contextMenu.style.top = `${y}px`;
-            contextMenu.classList.add('visible');
+            contextMenu.style.visibility = 'visible';
+            // contextMenu.classList.add('visible'); // Already added above
         }
     };
 
     const handleClickOutside = (event) => {
         if (!contextMenu.contains(event.target)) {
             contextMenu.classList.remove('visible');
+            contextMenu.style.display = 'none'; // Explicitly hide
         }
     };
 
     const itemClickHandlers = new Map();
-    itemConfig.forEach(item => {
+    itemConfig.forEach((item) => {
         const element = document.getElementById(item.id);
         if (element) {
             const handler = () => {
@@ -65,6 +83,7 @@ export const initializeContextMenu = (menuId, targetSelector, itemConfig) => {
                     item.action(currentTarget, contextMenu.contextEvent);
                 }
                 contextMenu.classList.remove('visible');
+                contextMenu.style.display = 'none'; // Explicitly hide
             };
             itemClickHandlers.set(item.id, handler);
             element.addEventListener('click', handler);
@@ -74,11 +93,49 @@ export const initializeContextMenu = (menuId, targetSelector, itemConfig) => {
     document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('click', handleClickOutside);
 
+    // Long Press Support for Mobile
+    let longPressTimer;
+    const LONG_PRESS_DURATION = 500; // ms
+
+    const handleTouchStart = (event) => {
+        const target = event.target.closest(targetSelector);
+        if (target) {
+            longPressTimer = setTimeout(() => {
+                // Create a synthetic contextmenu event
+                const contextMenuEvent = new MouseEvent('contextmenu', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: event.touches[0].clientX,
+                    clientY: event.touches[0].clientY,
+                });
+                target.dispatchEvent(contextMenuEvent);
+            }, LONG_PRESS_DURATION);
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+        }
+    };
+
+    const handleTouchMove = () => {
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+        }
+    };
+
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd);
+    document.addEventListener('touchmove', handleTouchMove);
+    document.addEventListener('click', handleClickOutside);
+
     contextMenuInstances[menuId] = {
         handleContextMenu,
         handleClickOutside,
         itemClickHandlers,
-        itemConfig
+        itemConfig,
     };
 };
 
@@ -87,7 +144,7 @@ export const destroyContextMenu = (menuId) => {
     if (instance) {
         document.removeEventListener('contextmenu', instance.handleContextMenu);
         document.removeEventListener('click', instance.handleClickOutside);
-        instance.itemConfig.forEach(item => {
+        instance.itemConfig.forEach((item) => {
             const element = document.getElementById(item.id);
             const handler = instance.itemClickHandlers.get(item.id);
             if (element && handler) {

@@ -7,7 +7,7 @@ export const EmployeeManager = (() => {
     // Prywatna funkcja do pobierania danych z Firestore
     const _fetchFromDB = async () => {
         try {
-            const docRef = db.collection("schedules").doc("mainSchedule");
+            const docRef = db.collection('schedules').doc('mainSchedule');
             const doc = await docRef.get();
             if (doc.exists && doc.data().employees) {
                 _employees = doc.data().employees;
@@ -17,8 +17,8 @@ export const EmployeeManager = (() => {
                 console.warn("Brak obiektu 'employees' w Firestore. Inicjalizacja pustego stanu.");
             }
         } catch (error) {
-            console.error("Błąd krytyczny podczas pobierania danych pracowników z Firestore:", error);
-            window.showToast("Wystąpił błąd podczas pobierania listy pracowników. Spróbuj odświeżyć stronę.", 5000);
+            console.error('Błąd krytyczny podczas pobierania danych pracowników z Firestore:', error);
+            window.showToast('Wystąpił błąd podczas pobierania listy pracowników. Spróbuj odświeżyć stronę.', 5000);
             _employees = {}; // W razie błędu zwróć pusty obiekt, aby aplikacja mogła działać w ograniczonym zakresie
         }
     };
@@ -41,7 +41,7 @@ export const EmployeeManager = (() => {
             const firstName = employee.firstName || '';
             const lastName = employee.lastName || '';
             const fullName = `${firstName} ${lastName}`.trim();
-            return fullName === '' ? (employee.displayName || `Pracownik ${id}`) : fullName;
+            return fullName === '' ? employee.displayName || `Pracownik ${id}` : fullName;
         },
         getLastNameById: (id) => {
             const employee = _employees[id];
@@ -51,7 +51,7 @@ export const EmployeeManager = (() => {
         // Zwraca informacje urlopowe
         getLeaveInfoById: (id) => ({
             entitlement: _employees[id]?.leaveEntitlement || 0,
-            carriedOver: _employees[id]?.carriedOverLeave || 0
+            carriedOver: _employees[id]?.carriedOverLeave || 0,
         }),
         // Zwraca pracownika i jego indeks na podstawie UID
         getEmployeeByUid: (uid) => {
@@ -76,18 +76,21 @@ export const EmployeeManager = (() => {
                 return;
             }
             // Zaktualizuj lokalny stan
-            _employees[id] = { ..._employees[id], ...data };
+            const updatedEmployee = { ..._employees[id], ...data };
+            _employees[id] = updatedEmployee;
 
-            // Zapisz cały obiekt employees do Firestore
+            // Zapisz TYLKO tego pracownika do Firestore używając dot notation
             try {
-                const docRef = db.collection("schedules").doc("mainSchedule");
-                await docRef.set({ employees: _employees }, { merge: true });
+                const docRef = db.collection('schedules').doc('mainSchedule');
+                const updateData = {};
+                updateData[`employees.${id}`] = updatedEmployee;
+                await docRef.update(updateData);
             } catch (error) {
-                console.error("Błąd podczas aktualizacji danych pracownika w Firestore:", error);
-                window.showToast("Nie udało się zapisać zmian.", 5000);
-                // Wycofaj zmiany w lokalnym stanie w razie błędu? Można to rozważyć.
+                console.error('Błąd podczas aktualizacji danych pracownika w Firestore:', error);
+                window.showToast('Nie udało się zapisać zmian.', 5000);
+                // Opcjonalnie: Wycofaj zmiany lokalne
             }
-        }
+        },
     };
 })();
 

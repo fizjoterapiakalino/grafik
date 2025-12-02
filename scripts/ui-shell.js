@@ -26,16 +26,12 @@ export const UIShell = (() => {
                     <div id="saveStatus" class="save-status"></div> <!-- Przeniesiony saveStatus na początek -->
                     <div id="scheduleActionButtons" class="schedule-action-buttons">
                         <button id="btnPatientInfo" class="action-icon-btn" title="Informacje o pacjencie"><i class="fas fa-user-circle"></i></button>
-                        <button id="btnSplitCell" class="action-icon-btn" title="Podziel komórkę"><i class="fas fa-users"></i></button>
-                        <button id="btnMergeCells" class="action-icon-btn" title="Scal komórki"><i class="fas fa-user"></i></button>
                         <button id="btnAddBreak" class="action-icon-btn" title="Dodaj przerwę"><i class="fas fa-coffee"></i></button>
-                        <button id="btnMassage" class="action-icon-btn" title="Oznacz jako Masaż"><i class="fas fa-hand-paper"></i></button>
-                        <button id="btnPnf" class="action-icon-btn" title="Oznacz jako PNF"><i class="fas fa-brain"></i></button>
-                        <button id="btnEveryOtherDay" class="action-icon-btn" title="Oznacz jako Co 2 Dni"><i class="fas fa-calendar-alt"></i></button> <!-- Nowy przycisk -->
                         <button id="btnClearCell" class="action-icon-btn danger" title="Wyczyść komórkę"><i class="fas fa-trash-alt"></i></button>
+                        <button id="btnIso" class="action-icon-btn" title="Dokumenty ISO"><i class="fas fa-file-alt"></i><span class="notification-badge" style="display: none;"></span></button>
                     </div>
                     <div class="search-container">
-                        <i class="fas fa-search search-icon"></i>
+                        <button id="searchToggleBtn" class="search-toggle-btn" title="Szukaj"><i class="fas fa-search"></i></button>
                         <input type="text" id="searchInput" class="search-input" placeholder="Szukaj...">
                         <button id="clearSearchButton" class="clear-search-btn" style="display: none;"><i class="fas fa-times"></i></button>
                     </div>
@@ -56,6 +52,49 @@ export const UIShell = (() => {
             bannerTitleLink.style.cursor = 'pointer'; // Indicate it's clickable
             bannerTitleLink.addEventListener('click', () => {
                 window.location.hash = 'schedule'; // Use hash navigation for SPA
+            });
+        }
+
+        const btnIso = document.getElementById('btnIso');
+        if (btnIso) {
+            btnIso.addEventListener('click', () => {
+                window.location.hash = 'scrapped-pdfs';
+            });
+        }
+
+        window.addEventListener('iso-updates-available', (event) => {
+            const badge = document.querySelector('#btnIso .notification-badge');
+            if (badge) {
+                badge.style.display = 'block';
+                // Optional: badge.textContent = event.detail.count;
+            }
+        });
+
+        window.addEventListener('iso-updates-cleared', () => {
+            const badge = document.querySelector('#btnIso .notification-badge');
+            if (badge) {
+                badge.style.display = 'none';
+            }
+        });
+
+        // Search Bar Toggle Logic
+        const searchToggleBtn = document.getElementById('searchToggleBtn');
+        const searchInput = document.getElementById('searchInput');
+        const searchContainer = document.querySelector('.search-container');
+
+        if (searchToggleBtn && searchInput) {
+            searchToggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                searchInput.classList.toggle('expanded');
+                if (searchInput.classList.contains('expanded')) {
+                    searchInput.focus();
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (searchContainer && !searchContainer.contains(e.target)) {
+                    searchInput.classList.remove('expanded');
+                }
             });
         }
     };
@@ -167,7 +206,7 @@ export const UIShell = (() => {
         loadPage,
         updateUserState, // Eksportuj nową metodę
         showLoading,
-        hideLoading
+        hideLoading,
     };
 })();
 

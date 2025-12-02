@@ -3,8 +3,18 @@ import { AppConfig, months } from './common.js';
 
 export const CalendarModal = (() => {
     // --- SELEKTORY I ZMIENNE WEWNĘTRZNE MODUŁU ---
-    let modal, prevMonthBtn, nextMonthBtn, confirmBtn, cancelBtn, clearSelectionBtn,
-        startDatePreview, endDatePreview, calendarSlider, workdaysCounter, leaveTypeSelect,
+    let modal,
+        prevMonthBtn,
+        nextMonthBtn,
+        confirmBtn,
+        applyBtn,
+        cancelBtn,
+        clearSelectionBtn,
+        startDatePreview,
+        endDatePreview,
+        calendarSlider,
+        workdaysCounter,
+        leaveTypeSelect,
         leaveTypeLegend;
 
     let currentEmployee = null;
@@ -33,7 +43,7 @@ export const CalendarModal = (() => {
 
     const countWorkdaysInSet = (datesSet) => {
         let workdays = 0;
-        datesSet.forEach(dateString => {
+        datesSet.forEach((dateString) => {
             const day = new Date(dateString + 'T00:00:00Z').getUTCDay();
             if (day !== 0 && day !== 6) {
                 workdays++;
@@ -52,7 +62,7 @@ export const CalendarModal = (() => {
 
     const loadEmployeeLeavesForModal = (employeeLeaves) => {
         dateToTypeMap.clear();
-        employeeLeaves.forEach(leave => {
+        employeeLeaves.forEach((leave) => {
             const start = toUTCDate(leave.startDate);
             const end = toUTCDate(leave.endDate);
             for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
@@ -74,7 +84,7 @@ export const CalendarModal = (() => {
         grid.className = 'calendar-grid';
         grid.innerHTML = `<div class="day-name">Po</div><div class="day-name">Wt</div><div class="day-name">Śr</div><div class="day-name">Cz</div><div class="day-name">Pi</div><div class="day-name">So</div><div class="day-name">Ni</div>`;
         const firstDayOfMonth = new Date(Date.UTC(year, month, 1));
-        const startingDay = (firstDayOfMonth.getUTCDay() === 0) ? 6 : firstDayOfMonth.getUTCDay() - 1;
+        const startingDay = firstDayOfMonth.getUTCDay() === 0 ? 6 : firstDayOfMonth.getUTCDay() - 1;
         for (let i = 0; i < startingDay; i++) {
             grid.insertAdjacentHTML('beforeend', `<div class="day-cell-calendar other-month"></div>`);
         }
@@ -106,8 +116,14 @@ export const CalendarModal = (() => {
     };
 
     const updateAllDayCells = () => {
-        document.querySelectorAll('#calendarModal .day-cell-calendar').forEach(cell => {
+        document.querySelectorAll('#calendarModal .day-cell-calendar').forEach((cell) => {
             if (cell.dataset.date) updateDayCellSelection(cell);
+        });
+
+        // Also update days that are in dateToTypeMap but NOT in singleSelectedDays (already applied leaves)
+        dateToTypeMap.forEach((type, dateString) => {
+            const cell = document.querySelector(`#calendarModal .day-cell-calendar[data-date="${dateString}"]`);
+            if (cell) updateDayCellSelection(cell);
         });
     };
 
@@ -121,19 +137,27 @@ export const CalendarModal = (() => {
         let endStr = hoverEndDate;
         if (startStr && endStr && startStr > endStr) [startStr, endStr] = [endStr, startStr];
 
-        const isInRange = isRangeSelectionActive && startStr && endStr && dateString >= startStr && dateString <= endStr;
+        const isInRange =
+            isRangeSelectionActive && startStr && endStr && dateString >= startStr && dateString <= endStr;
         const isSelected = singleSelectedDays.has(dateString);
+        const isApplied = dateToTypeMap.has(dateString);
 
-        if (isSelected || isInRange) {
-            const leaveType = dateToTypeMap.get(dateString) || leaveTypeSelect.value;
+        if (isSelected || isInRange || isApplied) {
+            const leaveType = isApplied ? dateToTypeMap.get(dateString) : leaveTypeSelect.value;
             const color = AppConfig.leaves.leaveTypeColors[leaveType] || AppConfig.leaves.leaveTypeColors.default;
 
             dayCell.classList.add('selected');
             dayCell.style.backgroundColor = color;
             dayCell.style.color = 'white';
 
-            const isStartDate = dateString === startStr || (isSelected && !singleSelectedDays.has(toDateString(new Date(toUTCDate(dateString).getTime() - 86400000))));
-            const isEndDate = dateString === endStr || (isSelected && !singleSelectedDays.has(toDateString(new Date(toUTCDate(dateString).getTime() + 86400000))));
+            const isStartDate =
+                dateString === startStr ||
+                (isSelected &&
+                    !singleSelectedDays.has(toDateString(new Date(toUTCDate(dateString).getTime() - 86400000))));
+            const isEndDate =
+                dateString === endStr ||
+                (isSelected &&
+                    !singleSelectedDays.has(toDateString(new Date(toUTCDate(dateString).getTime() + 86400000))));
 
             if (isInRange && dateString !== startStr && dateString !== endStr) {
                 dayCell.classList.add('in-range');
@@ -171,7 +195,7 @@ export const CalendarModal = (() => {
 
         // Walidacja dla opieki nad zdrowym dzieckiem (art. 188)
         if (leaveTypeSelect.value === 'child_care_art_188') {
-            const selectedArt188Days = Array.from(singleSelectedDays).filter(date => {
+            const selectedArt188Days = Array.from(singleSelectedDays).filter((date) => {
                 const type = dateToTypeMap.get(date);
                 return type === 'child_care_art_188' || !type; // Uwzględnij nowo wybrane i już istniejące
             });
@@ -212,9 +236,16 @@ export const CalendarModal = (() => {
                             tempDayCount++;
                         }
                     }
-                    const totalDaysAfterAdd = Array.from(singleSelectedDays).filter(d => dateToTypeMap.get(d) === 'child_care_art_188' || !dateToTypeMap.has(d)).length + tempDayCount;
+                    const totalDaysAfterAdd =
+                        Array.from(singleSelectedDays).filter(
+                            (d) => dateToTypeMap.get(d) === 'child_care_art_188' || !dateToTypeMap.has(d),
+                        ).length + tempDayCount;
                     if (totalDaysAfterAdd > 2) {
-                        window.showToast('Przekroczono limit 2 dni opieki nad zdrowym dzieckiem w zaznaczonym zakresie.', 4000, 'error');
+                        window.showToast(
+                            'Przekroczono limit 2 dni opieki nad zdrowym dzieckiem w zaznaczonym zakresie.',
+                            4000,
+                            'error',
+                        );
                         // Resetuj zaznaczenie zakresu, aby uniknąć nieprawidłowego stanu
                         isRangeSelectionActive = false;
                         selectionStartDate = null;
@@ -252,29 +283,72 @@ export const CalendarModal = (() => {
         workdaysCounter.textContent = countWorkdaysInSet(singleSelectedDays);
     };
 
-    const confirmSelection = () => {
+    const applySelection = () => {
         const selectedLeaveType = leaveTypeSelect.value;
-        const sortedDays = Array.from(singleSelectedDays).sort();
+        const daysToApply = Array.from(singleSelectedDays);
+
+        if (daysToApply.length === 0) {
+            window.showToast('Nie zaznaczono żadnych dni.', 2000, 'warning');
+            return;
+        }
+
+        daysToApply.forEach(dateString => {
+            dateToTypeMap.set(dateString, selectedLeaveType);
+        });
+
+        // Clear selection but keep the modal open
+        resetSelection();
+        updateAllDayCells();
+        window.showToast('Zastosowano typ urlopu.', 1500, 'success');
+    };
+
+    const confirmSelection = () => {
+        // First, ensure any currently selected days are also applied (if user didn't click Apply first)
+        if (singleSelectedDays.size > 0) {
+            const selectedLeaveType = leaveTypeSelect.value;
+            singleSelectedDays.forEach(dateString => {
+                dateToTypeMap.set(dateString, selectedLeaveType);
+            });
+        }
+
+        // Now generate the leaves list from the map
+        const sortedDays = Array.from(dateToTypeMap.keys()).sort();
         const newLeaves = [];
+
         if (sortedDays.length > 0) {
             let rangeStart = sortedDays[0];
             let rangeEnd = sortedDays[0];
+            let currentType = dateToTypeMap.get(rangeStart);
+
             for (let i = 1; i < sortedDays.length; i++) {
                 const prevDay = toUTCDate(sortedDays[i - 1]);
                 const currentDay = toUTCDate(sortedDays[i]);
                 const diff = (currentDay - prevDay) / (1000 * 60 * 60 * 24);
-                const startType = dateToTypeMap.get(rangeStart) || selectedLeaveType;
-                const currentType = dateToTypeMap.get(sortedDays[i]) || selectedLeaveType;
-                if (diff === 1 && startType === currentType) {
+                const nextType = dateToTypeMap.get(sortedDays[i]);
+
+                if (diff === 1 && currentType === nextType) {
                     rangeEnd = sortedDays[i];
                 } else {
-                    newLeaves.push({ id: toUTCDate(rangeStart).getTime().toString(), startDate: rangeStart, endDate: rangeEnd, type: startType });
+                    newLeaves.push({
+                        id: toUTCDate(rangeStart).getTime().toString(),
+                        startDate: rangeStart,
+                        endDate: rangeEnd,
+                        type: currentType,
+                    });
                     rangeStart = sortedDays[i];
                     rangeEnd = sortedDays[i];
+                    currentType = nextType;
                 }
             }
-            newLeaves.push({ id: toUTCDate(rangeStart).getTime().toString(), startDate: rangeStart, endDate: rangeEnd, type: dateToTypeMap.get(rangeStart) || selectedLeaveType });
+            // Push the last segment
+            newLeaves.push({
+                id: toUTCDate(rangeStart).getTime().toString(),
+                startDate: rangeStart,
+                endDate: rangeEnd,
+                type: currentType,
+            });
         }
+
         if (_resolvePromise) {
             _resolvePromise(newLeaves);
         }
@@ -294,6 +368,7 @@ export const CalendarModal = (() => {
         calendarSlider.addEventListener('click', handleDayClick);
         calendarSlider.addEventListener('mouseover', handleDayMouseOver);
         confirmBtn.addEventListener('click', confirmSelection);
+        applyBtn.addEventListener('click', applySelection);
         cancelBtn.addEventListener('click', closeModal);
         clearSelectionBtn.addEventListener('click', () => {
             resetSelection();
@@ -311,6 +386,7 @@ export const CalendarModal = (() => {
         prevMonthBtn = document.getElementById('prevMonthBtn');
         nextMonthBtn = document.getElementById('nextMonthBtn');
         confirmBtn = document.getElementById('confirmSelectionBtn');
+        applyBtn = document.getElementById('applySelectionBtn');
         cancelBtn = document.getElementById('cancelSelectionBtn');
         clearSelectionBtn = document.getElementById('clearSelectionBtn');
         startDatePreview = document.getElementById('startDatePreview');
@@ -320,7 +396,8 @@ export const CalendarModal = (() => {
         leaveTypeSelect = document.getElementById('leaveTypeSelect');
         leaveTypeLegend = document.getElementById('leaveTypeLegend'); // Initialize leaveTypeLegend
 
-        if (modal) { // Only setup listeners if the modal exists on the page
+        if (modal) {
+            // Only setup listeners if the modal exists on the page
             setupEventListeners();
         }
     };
@@ -344,7 +421,7 @@ export const CalendarModal = (() => {
 
     return {
         init,
-        open
+        open,
     };
 })();
 

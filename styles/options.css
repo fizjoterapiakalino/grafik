@@ -7,7 +7,7 @@
     background-color: #fff;
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     min-height: 60vh;
 }
 
@@ -139,8 +139,8 @@
     color: #555;
 }
 
-.details-edit-form input[type="text"],
-.details-edit-form input[type="number"] {
+.details-edit-form input[type='text'],
+.details-edit-form input[type='number'] {
     width: 100%;
     padding: 10px;
     border: 1px solid #ccc;
@@ -155,7 +155,7 @@
     margin-bottom: 20px;
 }
 
-.form-group-checkbox input[type="checkbox"] {
+.form-group-checkbox input[type='checkbox'] {
     margin-right: 10px;
     width: 20px; /* Adjust size as needed */
     height: 20px; /* Adjust size as needed */
@@ -171,7 +171,7 @@
     gap: 10px;
 }
 
-.uid-input-group input[type="text"] {
+.uid-input-group input[type='text'] {
     flex-grow: 1;
 }
 
@@ -239,7 +239,7 @@
     background-color: #fff;
     padding: 25px;
     border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
     width: 90%;
     max-width: 500px;
 }
@@ -260,7 +260,7 @@
     background-color: #fff;
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .backup-container h2 {

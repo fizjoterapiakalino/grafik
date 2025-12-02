@@ -10,9 +10,23 @@ export const AppConfig = {
     },
     changes: {
         employeeColors: [
-            '#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF', '#A0C4FF', '#BDB2FF', '#FFC6FF',
-            '#F44336', '#FF9800', '#FFEB3B', '#4CAF50', '#2196F3', '#3F51B5', '#9C27B0', '#E91E63'
-        ]
+            '#FFADAD',
+            '#FFD6A5',
+            '#FDFFB6',
+            '#CAFFBF',
+            '#9BF6FF',
+            '#A0C4FF',
+            '#BDB2FF',
+            '#FFC6FF',
+            '#F44336',
+            '#FF9800',
+            '#FFEB3B',
+            '#4CAF50',
+            '#2196F3',
+            '#3F51B5',
+            '#9C27B0',
+            '#E91E63',
+        ],
     },
     leaves: {
         careLimits: {
@@ -25,25 +39,38 @@ export const AppConfig = {
             child_care_art_188: '#ffcc80',
             sick_child_care: '#f48fb1',
             family_member_care: '#cf93d9',
-            default: '#e6ee9b'
-        }
+            default: '#e6ee9b',
+        },
     },
     firestore: {
         collections: {
             schedules: 'schedules',
-            leaves: 'leaves'
+            leaves: 'leaves',
         },
         docs: {
             mainSchedule: 'mainSchedule',
-            mainLeaves: 'mainLeaves'
-        }
+            mainLeaves: 'mainLeaves',
+        },
     },
     undoManager: {
-        maxStates: 20
-    }
+        maxStates: 20,
+    },
 };
 
-export const months = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
+export const months = [
+    'Styczeń',
+    'Luty',
+    'Marzec',
+    'Kwiecień',
+    'Maj',
+    'Czerwiec',
+    'Lipiec',
+    'Sierpień',
+    'Wrzesień',
+    'Październik',
+    'Listopad',
+    'Grudzień',
+];
 
 export function showToast(message, duration = 3000) {
     const container = document.getElementById('toast-container');
@@ -84,11 +111,11 @@ export function searchAndHighlight(searchTerm, tableSelector, cellSelector) {
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
 
     // Pokaż wszystkie wiersze przed rozpoczęciem wyszukiwania
-    table.querySelectorAll('tbody tr').forEach(row => {
+    table.querySelectorAll('tbody tr').forEach((row) => {
         row.style.display = '';
     });
 
-    table.querySelectorAll(cellSelector).forEach(cell => {
+    table.querySelectorAll(cellSelector).forEach((cell) => {
         const cellText = cell.textContent.toLowerCase();
         if (searchTerm && cellText.includes(lowerCaseSearchTerm)) {
             cell.classList.add('search-highlight');
@@ -99,7 +126,7 @@ export function searchAndHighlight(searchTerm, tableSelector, cellSelector) {
 }
 
 export class UndoManager {
-    constructor({ maxStates = 20, onUpdate = () => { } }) {
+    constructor({ maxStates = 20, onUpdate = () => {} }) {
         this.maxStates = maxStates;
         this.onUpdate = onUpdate;
         this.stack = [];
@@ -153,7 +180,7 @@ export function countWorkdays(startDate, endDate) {
         current.setUTCDate(current.getUTCDate() + 1);
     }
     return count;
-};
+}
 
 // Backward compatibility
 window.AppConfig = AppConfig;

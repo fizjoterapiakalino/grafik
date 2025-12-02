@@ -1,60 +1,116 @@
 /* Globalne style aplikacji */
-html, body {
-    height: 100%; /* Upewnij się, że html i body zajmują całą wysokość okna */
+html,
+body {
+    height: 100%;
+    /* Upewnij się, że html i body zajmują całą wysokość okna */
     margin: 0;
     padding: 0;
-    overflow-x: hidden; /* Zapobiegaj poziomemu przewijaniu */
+    overflow-x: hidden;
+    /* Zapobiegaj poziomemu przewijaniu */
 }
 
 :root {
-    /* Colors */
-    --color-primary: #4CAF50;
-    --color-primary-dark: #45a049;
-    --color-secondary: #007bff;
-    --color-secondary-dark: #0056b3;
-    --color-danger: #dc3545;
-    --color-danger-dark: #c82333;
-    --color-warning: #ffeb3b;
-    --color-text: #333;
-    --color-text-light: #555;
-    --color-bg: #f4f4f4;
+    /* --- Palette: Emerald & Slate --- */
+    /* Primary (Emerald) */
+    --color-primary-50: #ecfdf5;
+    --color-primary-100: #d1fae5;
+    --color-primary-200: #a7f3d0;
+    --color-primary-300: #6ee7b7;
+    --color-primary-400: #34d399;
+    --color-primary-500: #10b981;
+    /* Main Brand Color */
+    --color-primary-600: #059669;
+    --color-primary-700: #047857;
+    --color-primary-800: #065f46;
+    --color-primary-900: #064e3b;
+
+    /* Secondary (Blue/Indigo - for accents/info) */
+    --color-secondary-50: #eff6ff;
+    --color-secondary-500: #3b82f6;
+    --color-secondary-rgb: 59, 130, 246;
+    --color-secondary-600: #2563eb;
+    --color-secondary-700: #1d4ed8;
+
+    /* Neutrals (Slate) */
+    --color-gray-50: #f8fafc;
+    --color-gray-100: #f1f5f9;
+    --color-gray-200: #e2e8f0;
+    --color-gray-300: #cbd5e1;
+    --color-gray-400: #94a3b8;
+    --color-gray-500: #64748b;
+    --color-gray-600: #475569;
+    --color-gray-700: #334155;
+    --color-gray-800: #1e293b;
+    /* Main Text */
+    --color-gray-900: #0f172a;
+
+    /* Semantic Colors */
+    --color-success: var(--color-primary-500);
+    --color-danger: #ef4444;
+    --color-danger-dark: #b91c1c;
+    --color-warning: #f59e0b;
+    --color-info: var(--color-secondary-500);
+
+    /* Mappings to Old Variables (for compatibility during refactor) */
+    --color-primary: var(--color-primary-600);
+    --color-primary-dark: var(--color-primary-700);
+    --color-secondary: var(--color-secondary-500);
+    --color-secondary-dark: var(--color-secondary-700);
+    --color-text: var(--color-gray-800);
+    --color-text-light: var(--color-gray-500);
+    --color-bg: var(--color-gray-50);
     --color-white: #ffffff;
-    --color-border: #ddd;
-    --color-border-dark: #999;
-    
-    /* Specific Colors */
-    --bg-header: #6c757d;
-    --bg-header-light: #f2f2f2;
-    --bg-editable: #e0e0e0;
-    --bg-active: #FFD700;
-    --bg-break: #6c757d;
-    --bg-massage: hotpink;
-    --bg-pnf: #007bff;
-    --bg-every-other-day: #8A2BE2;
-    --bg-search-highlight: #a7d9ff;
-    
+    --color-border: var(--color-gray-200);
+    --color-border-dark: var(--color-gray-400);
+
+    /* Specific Schedule Colors */
+    --bg-header: var(--color-gray-700);
+    --bg-header-light: var(--color-gray-100);
+    --bg-editable: var(--color-gray-200);
+    --bg-active: #fde047;
+    /* Yellow-300 */
+    --bg-break: var(--color-gray-500);
+    --bg-massage: #f472b6;
+    /* Pink-400 */
+    --bg-pnf: var(--color-secondary-500);
+    --bg-every-other-day: #a855f7;
+    /* Purple-500 */
+    --bg-search-highlight: #bae6fd;
+    /* Sky-200 */
+
     /* Spacing */
-    --spacing-xs: 5px;
-    --spacing-sm: 10px;
-    --spacing-md: 15px;
-    --spacing-lg: 20px;
-    
-    /* Borders */
-    --border-radius: 8px;
-    --border-radius-sm: 4px;
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+
+    /* Borders & Radius */
+    --border-radius-sm: 6px;
+    --border-radius: 10px;
+    --border-radius-lg: 16px;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+    /* Typography */
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 body {
-    font-family: Arial, sans-serif;
+    font-family: var(--font-sans);
     background-color: #f4f4f4;
     display: flex;
-    flex-direction: column; /* Umożliwia przypięcie stopki do dołu body, jeśli byłaby poza nav-panel */
+    flex-direction: column;
+    /* Umożliwia przypięcie stopki do dołu body, jeśli byłaby poza nav-panel */
 }
 
 .container {
     padding-top: 20px;
     margin: 0 20px 20px 20px;
-    flex-grow: 1; /* Pozwól kontenerowi rosnąć i zajmować dostępną przestrzeń */
+    flex-grow: 1;
+    /* Pozwól kontenerowi rosnąć i zajmować dostępną przestrzeń */
 }
 
 /* --- Ekran ładowania --- */
@@ -74,27 +130,36 @@ body {
     transition: opacity 0.3s ease-in-out;
     opacity: 1;
 }
+
 .loading-overlay.hidden {
     opacity: 0;
     pointer-events: none;
 }
+
 .loading-overlay .loader {
     border: 8px solid #f3f3f3;
-    border-top: 8px solid #4CAF50;
+    border-top: 8px solid #4caf50;
     border-radius: 50%;
     width: 60px;
     height: 60px;
     animation: spin 1s linear infinite;
 }
+
 .loading-overlay p {
     margin-top: 20px;
     font-size: 1.5em;
     color: #333;
     font-weight: bold;
 }
+
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 /* --- Kontener i style dla powiadomień "Toast" --- */
@@ -107,22 +172,25 @@ body {
     flex-direction: column;
     align-items: flex-end;
 }
+
 .toast {
     background-color: #333;
     color: #fff;
     padding: 15px 20px;
     border-radius: 8px;
     margin-top: 10px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     opacity: 0;
     transform: translateX(100%);
-    transition: opacity 0.5s, transform 0.5s;
+    transition:
+        opacity 0.5s,
+        transform 0.5s;
 }
+
 .toast.show {
     opacity: 1;
     transform: translateX(0);
 }
-
 
 /* --- Style strony logowania --- */
 .login-container {
@@ -139,7 +207,8 @@ body {
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     width: 100%;
-    max-width: 550px; /* Zwiększono szerokość */
+    max-width: 550px;
+    /* Zwiększono szerokość */
 }
 
 .login-box h2 {
@@ -151,11 +220,13 @@ body {
 .login-content {
     display: flex;
     align-items: flex-start;
-    gap: 40px; /* Odstęp między logo a formularzem */
+    gap: 40px;
+    /* Odstęp między logo a formularzem */
 }
 
 .login-logo {
-    width: 100px; /* Zwiększono logo */
+    width: 100px;
+    /* Zwiększono logo */
     height: auto;
     flex-shrink: 0;
 }
@@ -165,7 +236,8 @@ body {
 }
 
 .form-group {
-    margin-bottom: 20px; /* Zwiększono odstęp */
+    margin-bottom: 20px;
+    /* Zwiększono odstęp */
     text-align: left;
 }
 
@@ -186,13 +258,14 @@ body {
 
 .form-actions {
     display: flex;
-    justify-content: flex-end; /* Przycisk po prawej */
+    justify-content: flex-end;
+    /* Przycisk po prawej */
     margin-top: 20px;
 }
 
 .login-btn {
     padding: 12px 25px;
-    background-color: #4CAF50;
+    background-color: #4caf50;
     color: white;
     border: none;
     border-radius: 4px;
@@ -206,7 +279,7 @@ body {
 }
 
 .login-error {
-    color: #D8000C;
+    color: #d8000c;
     margin-top: 15px;
     min-height: 1.2em;
     text-align: left;

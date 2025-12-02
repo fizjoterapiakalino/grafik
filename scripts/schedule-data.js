@@ -4,7 +4,7 @@ import { AppConfig, UndoManager } from './common.js';
 
 export const ScheduleData = (() => {
     let appState = {
-        scheduleCells: {}
+        scheduleCells: {},
     };
     let undoManager;
     let unsubscribeSchedule;
@@ -37,7 +37,7 @@ export const ScheduleData = (() => {
         const historyEntry = {
             oldValue: oldContent,
             timestamp: new Date().toISOString(),
-            userId: currentUserId
+            userId: currentUserId,
         };
 
         cellState.history.unshift(historyEntry);
@@ -60,7 +60,7 @@ export const ScheduleData = (() => {
             maxStates: AppConfig.undoManager.maxStates,
             onUpdate: (manager) => {
                 if (undoButtonElement) undoButtonElement.disabled = !manager.canUndo();
-            }
+            },
         });
     };
 
@@ -98,7 +98,7 @@ export const ScheduleData = (() => {
             (error) => {
                 console.error('Error listening to schedule changes:', error);
                 window.showToast('Błąd synchronizacji grafiku. Odśwież stronę.', 5000);
-            }
+            },
         );
     };
 
@@ -133,7 +133,9 @@ export const ScheduleData = (() => {
         if (!appState.scheduleCells[time]) appState.scheduleCells[time] = {};
         let cellState = appState.scheduleCells[time][employeeIndex] || {};
 
-        const oldContent = cellState.isSplit ? `${cellState.content1 || ''}/${cellState.content2 || ''}` : cellState.content;
+        const oldContent = cellState.isSplit
+            ? `${cellState.content1 || ''}/${cellState.content2 || ''}`
+            : cellState.content;
         _updateCellHistory(cellState, oldContent);
 
         updateFn(cellState);
@@ -152,7 +154,9 @@ export const ScheduleData = (() => {
             if (!appState.scheduleCells[time]) appState.scheduleCells[time] = {};
             let cellState = appState.scheduleCells[time][employeeIndex] || {};
 
-            const oldContent = cellState.isSplit ? `${cellState.content1 || ''}/${cellState.content2 || ''}` : cellState.content;
+            const oldContent = cellState.isSplit
+                ? `${cellState.content1 || ''}/${cellState.content2 || ''}`
+                : cellState.content;
             _updateCellHistory(cellState, oldContent);
 
             updateFn(cellState);
@@ -203,7 +207,7 @@ export const ScheduleData = (() => {
         undo,
         destroy,
         getAppState,
-        pushCurrentState
+        pushCurrentState,
     };
 })();
 

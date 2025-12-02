@@ -8,7 +8,15 @@ export const Shared = (() => {
         const updateDateTimeHeader = () => {
             if (!dateTimeText) return;
             const now = new Date();
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            const options = {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            };
             dateTimeText.textContent = now.toLocaleDateString('pl-PL', options);
         };
 
@@ -25,7 +33,7 @@ export const Shared = (() => {
                 { href: '#leaves', text: 'Urlopy', icon: 'fas fa-plane-departure' },
                 { href: '#changes', text: 'Harmonogram zmian', icon: 'fas fa-exchange-alt' },
                 { href: '#scrapped-pdfs', text: 'ISO', icon: 'fas fa-file-pdf', id: 'navLinkIso' }, // Dodano ID
-                { href: '#options', text: 'Opcje', icon: 'fas fa-cogs' }
+                { href: '#options', text: 'Opcje', icon: 'fas fa-cogs' },
             ];
 
             const hamburger = document.createElement('div');
@@ -42,7 +50,7 @@ export const Shared = (() => {
             navPanel.appendChild(userInfoDiv);
 
             const ul = document.createElement('ul');
-            navLinks.forEach(link => {
+            navLinks.forEach((link) => {
                 const li = document.createElement('li');
                 const a = document.createElement('a');
                 a.href = link.href;
@@ -94,7 +102,7 @@ export const Shared = (() => {
 
             const updateActiveLink = () => {
                 const currentHash = window.location.hash || '#schedule';
-                navPanel.querySelectorAll('a').forEach(a => {
+                navPanel.querySelectorAll('a').forEach((a) => {
                     if (a.getAttribute('href') === currentHash) {
                         a.classList.add('active');
                     } else {
@@ -110,7 +118,11 @@ export const Shared = (() => {
             });
 
             document.addEventListener('click', (e) => {
-                if (navPanel.classList.contains('visible') && !navPanel.contains(e.target) && !hamburger.contains(e.target)) {
+                if (
+                    navPanel.classList.contains('visible') &&
+                    !navPanel.contains(e.target) &&
+                    !hamburger.contains(e.target)
+                ) {
                     navPanel.classList.remove('visible');
                     hamburger.classList.remove('active');
                 }
@@ -177,18 +189,21 @@ export const Shared = (() => {
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => {
-                firebase.auth().signOut().then(() => {
-                    window.location.hash = '#login'; // Przekieruj po wylogowaniu
-                    // Explicitly get elements to ensure they are correctly referenced
-                    const currentNavPanel = document.querySelector('.nav-panel');
-                    const currentHamburger = document.querySelector('.hamburger-menu');
-                    if (currentNavPanel) {
-                        currentNavPanel.classList.remove('visible'); // Ukryj menu po wylogowaniu
-                    }
-                    if (currentHamburger) {
-                        currentHamburger.classList.remove('active');
-                    }
-                });
+                firebase
+                    .auth()
+                    .signOut()
+                    .then(() => {
+                        window.location.hash = '#login'; // Przekieruj po wylogowaniu
+                        // Explicitly get elements to ensure they are correctly referenced
+                        const currentNavPanel = document.querySelector('.nav-panel');
+                        const currentHamburger = document.querySelector('.hamburger-menu');
+                        if (currentNavPanel) {
+                            currentNavPanel.classList.remove('visible'); // Ukryj menu po wylogowaniu
+                        }
+                        if (currentHamburger) {
+                            currentHamburger.classList.remove('active');
+                        }
+                    });
             });
         }
     };
@@ -218,7 +233,7 @@ export const Shared = (() => {
     return {
         initialize,
         updateUserInfo,
-        setIsoLinkActive // Eksportuj nową metodę
+        setIsoLinkActive, // Eksportuj nową metodę
     };
 })();
 
