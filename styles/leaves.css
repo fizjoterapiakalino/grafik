@@ -560,7 +560,28 @@
     font-size: 1em;
 }
 
-.leave-type-selector label {
+.leave-type-selector label,
+.year-selector label {
+    display: block;
+    margin-bottom: 5px;
     font-size: 1.3em !important;
     font-weight: bold;
+}
+
+.modal-select {
+    padding: 8px 12px;
+    font-size: 1em;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background-color: var(--color-white);
+    color: var(--color-text);
+    cursor: pointer;
+    min-width: 120px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.modal-select:focus {
+    outline: none;
+    border-color: var(--color-secondary);
+    box-shadow: 0 0 0 2px rgba(var(--color-secondary-rgb), 0.2);
 }

@@ -15,7 +15,8 @@ export const CalendarModal = (() => {
         calendarSlider,
         workdaysCounter,
         leaveTypeSelect,
-        leaveTypeLegend;
+        leaveTypeLegend,
+        modalYearSelect;
 
     let currentEmployee = null;
     let currentYear = new Date().getUTCFullYear();
@@ -30,7 +31,34 @@ export const CalendarModal = (() => {
     let _resolvePromise;
     let _rejectPromise;
 
+
+
     // --- FUNKCJE WEWNĘTRZNE MODUŁU ---
+
+    const populateYearSelect = () => {
+        const currentYear = new Date().getUTCFullYear();
+        const startYear = currentYear - 5;
+        const endYear = currentYear + 5;
+
+        modalYearSelect.innerHTML = '';
+
+        for (let year = startYear; year <= endYear; year++) {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            modalYearSelect.appendChild(option);
+        }
+    };
+
+    const handleYearChange = (e) => {
+        currentYear = parseInt(e.target.value, 10);
+        generateInitialCalendars();
+        // We might need to re-apply selections if they are valid for the new year, 
+        // but for simplicity, we might just keep the selection state or clear it if it doesn't make sense.
+        // The current implementation of singleSelectedDays stores full date strings (YYYY-MM-DD), 
+        // so they are tied to specific years. 
+        // If we change year, the selected days from previous year won't be visible on the new year calendar, which is correct.
+    };
 
     const toUTCDate = (dateString) => {
         const [year, month, day] = dateString.split('-').map(Number);
@@ -378,7 +406,9 @@ export const CalendarModal = (() => {
         modal.addEventListener('click', (event) => {
             if (event.target === modal) closeModal();
         });
-        leaveTypeSelect.addEventListener('change', updateLeaveTypeLegend); // Add this line
+
+        leaveTypeSelect.addEventListener('change', updateLeaveTypeLegend);
+        modalYearSelect.addEventListener('change', handleYearChange);
     };
 
     const init = () => {
@@ -394,7 +424,13 @@ export const CalendarModal = (() => {
         calendarSlider = document.querySelector('.calendar-slider');
         workdaysCounter = document.getElementById('workdaysCounter');
         leaveTypeSelect = document.getElementById('leaveTypeSelect');
-        leaveTypeLegend = document.getElementById('leaveTypeLegend'); // Initialize leaveTypeLegend
+
+        leaveTypeLegend = document.getElementById('leaveTypeLegend');
+        modalYearSelect = document.getElementById('modalYearSelect');
+
+        if (modalYearSelect) {
+            populateYearSelect();
+        }
 
         if (modal) {
             // Only setup listeners if the modal exists on the page
@@ -402,9 +438,14 @@ export const CalendarModal = (() => {
         }
     };
 
-    const open = (employeeName, existingLeaves, monthIndex) => {
+
+    const open = (employeeName, existingLeaves, monthIndex, year) => {
         currentEmployee = employeeName;
-        currentYear = new Date().getUTCFullYear();
+        currentYear = year || new Date().getUTCFullYear();
+
+        if (modalYearSelect) {
+            modalYearSelect.value = currentYear;
+        }
 
         if (prevMonthBtn) prevMonthBtn.style.display = 'none';
         if (nextMonthBtn) nextMonthBtn.style.display = 'none';

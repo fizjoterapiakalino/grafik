@@ -292,7 +292,7 @@ export const Leaves = (() => {
         try {
             const allLeaves = await getAllLeavesData();
             const existingLeaves = allLeaves[employeeName] || [];
-            const updatedLeaves = await CalendarModal.open(employeeName, existingLeaves, monthIndex);
+            const updatedLeaves = await CalendarModal.open(employeeName, existingLeaves, monthIndex, currentYear);
 
             await saveLeavesData(employeeName, updatedLeaves);
             renderSingleEmployeeLeaves(employeeName, updatedLeaves);
