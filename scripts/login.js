@@ -1,5 +1,7 @@
 // scripts/login.js
-const Login = (() => {
+import { auth } from './firebase-config.js';
+
+export const Login = (() => {
     let loginForm = null; // Zmienna do przechowywania referencji do formularza
 
     const handleSubmit = async (e) => {
@@ -9,7 +11,7 @@ const Login = (() => {
         const loginError = document.getElementById('loginError');
 
         if (!emailInput || !passwordInput || !loginError) {
-            console.error("Login form elements not found.");
+            console.error('Login form elements not found.');
             return;
         }
 
@@ -18,12 +20,12 @@ const Login = (() => {
         const password = passwordInput.value;
 
         try {
-            await firebase.auth().signInWithEmailAndPassword(email, password);
+            await auth.signInWithEmailAndPassword(email, password);
             // Po udanym logowaniu, router automatycznie przekieruje
             window.location.hash = '#schedule';
         } catch (error) {
-            console.error("Błąd logowania:", error);
-            loginError.textContent = "Nieprawidłowy e-mail lub hasło.";
+            console.error('Błąd logowania:', error);
+            loginError.textContent = 'Nieprawidłowy e-mail lub hasło.';
         }
     };
 
@@ -32,7 +34,7 @@ const Login = (() => {
         if (loginForm) {
             loginForm.addEventListener('submit', handleSubmit);
         } else {
-            console.error("Login form not found, cannot initialize Login module.");
+            console.error('Login form not found, cannot initialize Login module.');
         }
     };
 
@@ -41,8 +43,11 @@ const Login = (() => {
             loginForm.removeEventListener('submit', handleSubmit);
             loginForm = null;
         }
-        console.log("Login module destroyed");
+        console.log('Login module destroyed');
     };
 
     return { init, destroy };
 })();
+
+// Backward compatibility
+window.Login = Login;

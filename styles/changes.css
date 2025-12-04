@@ -1,35 +1,38 @@
 .changes-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    background-color: #fff;
+    margin-top: var(--spacing-lg);
+    box-shadow: var(--shadow-md);
+    background-color: var(--color-white);
+    border-radius: var(--border-radius);
+    overflow: hidden;
 }
 
 .changes-table th {
-    background-color: #4CAF50;
-    color: white;
-    padding: 12px 15px;
+    background-color: var(--color-primary-600);
+    color: var(--color-white);
+    padding: var(--spacing-md);
     text-align: left;
     font-weight: 600;
-    border: 1px solid #ddd;
+    border: 1px solid var(--color-gray-200);
     position: sticky;
     top: 0;
     z-index: 2;
 }
 
 .changes-table th:first-child {
-    background-color: #6c757d;
+    background-color: var(--color-gray-700);
 }
 
 .changes-table td {
-    padding: 12px 15px;
-    border: 1px solid #ddd;
+    padding: var(--spacing-md);
+    border: 1px solid var(--color-gray-200);
     text-align: center;
+    color: var(--color-text);
 }
 
 .changes-table tbody tr:hover {
-    background-color: #f1f1f1;
+    background-color: var(--color-gray-50);
 }
 
 /* Employee Selection Modal Styles */
@@ -59,25 +62,30 @@
 }
 
 #employeeSelectionModal .employee-list-item {
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
+    padding: var(--spacing-sm);
+    border: 1px solid var(--color-gray-300);
+    border-radius: var(--border-radius-sm);
     text-align: center;
     cursor: pointer;
-    transition: background-color 0.2s, border-color 0.2s;
+    transition: all 0.2s ease;
+    background-color: var(--color-white);
 }
 
 #employeeSelectionModal .employee-list-item:hover {
-    background-color: #f0f0f0;
+    background-color: var(--color-gray-100);
+    border-color: var(--color-gray-400);
 }
 
 #employeeSelectionModal .employee-list-item.selected-employee {
-    background-color: #d4eaff;
-    border-color: #007bff;
+    background-color: var(--color-primary-50);
+    border-color: var(--color-primary-500);
+    color: var(--color-primary-700);
     font-weight: bold;
+    box-shadow: 0 0 0 1px var(--color-primary-500);
 }
 
 /* Styl dla wierszy reprezentujących przeszłe okresy */
 .changes-table tbody tr.past-period td {
-    color: #a0a0a0; /* Wyszarzony tekst */
+    color: #a0a0a0;
+    /* Wyszarzony tekst */
 }

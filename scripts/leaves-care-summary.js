@@ -1,4 +1,8 @@
-const LeavesCareSummary = (() => {
+// scripts/leaves-care-summary.js
+import { EmployeeManager } from './employee-manager.js';
+import { AppConfig, countWorkdays } from './common.js';
+
+export const LeavesCareSummary = (() => {
     const render = (container, allLeavesData) => {
         container.innerHTML = ''; // Wyczyść kontener
 
@@ -20,19 +24,19 @@ const LeavesCareSummary = (() => {
         const tbody = document.createElement('tbody');
         const employees = EmployeeManager.getAll();
         const sortedEmployeeNames = Object.values(employees)
-            .filter(emp => !emp.isHidden)
-            .map(emp => emp.displayName || emp.name)
+            .filter((emp) => !emp.isHidden)
+            .map((emp) => emp.displayName || emp.name)
             .filter(Boolean)
             .sort();
 
-        sortedEmployeeNames.forEach(employeeName => {
+        sortedEmployeeNames.forEach((employeeName) => {
             const employeeLeaves = allLeavesData[employeeName] || [];
 
             let usedArt188Days = 0;
             let usedSickChildDays = 0;
             let usedFamilyMemberDays = 0;
 
-            employeeLeaves.forEach(leave => {
+            employeeLeaves.forEach((leave) => {
                 const days = countWorkdays(leave.startDate, leave.endDate);
                 switch (leave.type) {
                     case 'child_care_art_188':
@@ -78,6 +82,9 @@ const LeavesCareSummary = (() => {
     };
 
     return {
-        render
+        render,
     };
 })();
+
+// Backward compatibility
+window.LeavesCareSummary = LeavesCareSummary;

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Split Cell Reproduction - Fix Attempt</title>
+    <style>
+        :root {
+            --color-white: #ffffff;
+            --color-border-dark: #ccc;
+            --color-border: #eee;
+            --spacing-sm: 4px;
+            --color-text: #333;
+        }
+
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            border-spacing: 0;
+        }
+
+        .schedule-table td {
+            padding: 7px;
+            border: 1px solid var(--color-border-dark);
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        /* FIX ATTEMPT START */
+        td.split-cell {
+            display: flex;
+            flex-direction: row;
+            padding: 0;
+            /* Key fix for height: */
+            height: 1px;
+            /* This forces the td to participate in height calculation but allows children to expand to the full row height */
+        }
+
+        td.split-cell>div {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing-sm);
+            text-align: center;
+
+            /* Border fixes */
+            border-right: 1px solid var(--color-border);
+            /* Removed border-bottom to avoid double border with td */
+        }
+
+        td.split-cell>div:last-child {
+            border-right: none;
+            /* Avoid double border with td right side */
+        }
+
+        td.split-cell>div:first-child {
+            /* Kept specific styling if needed, but border-right is already handled above */
+            border-right: 1px solid var(--color-border-dark);
+        }
+
+        /* FIX ATTEMPT END */
+
+        .tall-content {
+            height: 100px;
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+
+<body>
+    <table class="schedule-table">
+        <tbody>
+            <tr>
+                <td>Normal Cell</td>
+                <td class="split-cell">
+                    <div>Left Part</div>
+                    <div>Right Part</div>
+                </td>
+                <td>
+                    <div class="tall-content">Tall Sibling</div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+
+</html>

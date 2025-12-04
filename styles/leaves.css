@@ -1,13 +1,13 @@
 /* Główny kontener dla widoku urlopów */
 .leaves-view-container {
-    padding: 20px;
+    padding: var(--spacing-lg);
     background-color: #f9f9f9;
 }
 
 /* Styl dla zakładek przełączających widok */
 .view-tabs {
     border-bottom: 2px solid #ccc;
-    margin-bottom: 20px;
+    margin-bottom: var(--spacing-lg);
 }
 
 .tab-btn {
@@ -16,51 +16,64 @@
     border: none;
     background-color: transparent;
     border-bottom: 2px solid transparent;
-    margin-bottom: -2px; /* Unosi przycisk, aby jego dolna krawędź nachodziła na krawędź kontenera */
+    margin-bottom: -2px;
     font-size: 1em;
-    color: #555;
-    transition: color 0.2s, border-color 0.2s;
+    color: var(--color-text-light);
+    transition:
+        color 0.2s,
+        border-color 0.2s;
 }
 
 .tab-btn:hover {
-    color: #007bff;
+    color: var(--color-secondary);
 }
 
 .tab-btn.active {
     font-weight: bold;
-    color: #007bff;
-    border-bottom: 2px solid #007bff;
+    color: var(--color-secondary);
+    border-bottom: 2px solid var(--color-secondary);
 }
 
 /* Tabela urlopów i podsumowania */
-.leaves-table, .summary-table {
+.leaves-table,
+.summary-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    background-color: #fff;
+    margin-top: var(--spacing-lg);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background-color: var(--color-white);
 }
 
-.leaves-table th, .summary-table th {
-    background-color: #4CAF50; /* Główny kolor nagłówka */
-    color: white;
+.leaves-table th,
+.summary-table th {
+    background-color: var(--color-primary);
+    color: var(--color-white);
     padding: 12px 15px;
     text-align: left;
     font-weight: 600;
-    border: 1px solid #ddd;
+    border: 1px solid var(--color-border);
 }
 
-.leaves-table th:first-child, .summary-table th:first-child {
-    background-color: #6c757d; /* Kolor dla pierwszej kolumny */
+.leaves-table th:first-child,
+.summary-table th:first-child {
+    background-color: var(--bg-header);
+    z-index: 2;
+    /* Ensure it stays above sticky columns if any */
 }
 
-.leaves-table td, .summary-table td {
+.current-month-column {
+    background-color: rgba(var(--color-secondary-rgb), 0.05);
+}
+
+.leaves-table td,
+.summary-table td {
     padding: 12px 15px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--color-border);
     text-align: center;
 }
 
-.leaves-table tbody tr:hover, .summary-table tbody tr:hover {
+.leaves-table tbody tr:hover,
+.summary-table tbody tr:hover {
     background-color: #f1f1f1;
 }
 
@@ -68,34 +81,41 @@
     font-weight: bold;
     position: sticky;
     left: 0;
-    background-color: #f2f2f2;
+    background-color: var(--bg-header-light);
     z-index: 1;
 }
 
 .day-cell {
     min-width: 100px;
-    /* Usunięto stałą wysokość (height: 60px) */
     cursor: pointer;
     vertical-align: top;
     padding: 5px;
-    outline: none; /* Usunięcie domyślnego focusu */
+    outline: none;
     transition: box-shadow 0.2s;
 }
 
 .day-cell.active-cell {
-    box-shadow: inset 0 0 0 2px #007bff; /* Wyróżnienie aktywnej komórki */
+    box-shadow: inset 0 0 0 2px var(--color-secondary);
 }
 
 .leave-block {
     background-color: #ffab91;
-    color: #333;
-    padding: 2px 5px;
+    color: var(--color-text);
+    padding: 2px 6px;
     border-radius: 4px;
-    font-size: 0.8em;
-    margin-bottom: 2px;
+    font-size: 0.85em;
+    margin-bottom: 3px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    transition: transform 0.1s;
+}
+
+.leave-block:hover {
+    transform: scale(1.02);
+    z-index: 2;
+    position: relative;
 }
 
 .arrow {
@@ -109,7 +129,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0,0,0,0.5);
+    background-color: rgba(0, 0, 0, 0.5);
     display: none;
     justify-content: center;
     align-items: center;
@@ -119,29 +139,29 @@
 .modal-content {
     background-color: white;
     padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    border-radius: var(--border-radius);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
     width: 90%;
-    max-width: 500px; /* Domyślna maksymalna szerokość dla standardowych modali */
+    max-width: 500px;
 }
 
 /* Specjalna, szersza wersja dla modala z kalendarzem, używamy ID dla większej specyficzności */
 #calendarModal .modal-content.wide {
-    max-width: 1100px; /* Zmniejszona maksymalna szerokość */
+    max-width: 1100px;
     display: flex;
     flex-direction: column;
-    height: 90vh; /* Ograniczenie wysokości modalu */
+    height: 90vh;
 }
 
 .calendar-scroll-area {
     flex-grow: 1;
-    overflow-y: auto; /* Przewijanie tylko dla obszaru kalendarzy */
-    padding-right: 5px; /* Zmniejszone miejsce na pasek przewijania */
+    overflow-y: auto;
+    padding-right: 5px;
 }
 
 .modal-footer {
     flex-shrink: 0;
-    padding-top: 10px; /* Zmniejszony padding */
+    padding-top: 10px;
     border-top: 1px solid #eee;
     background-color: #fff;
 }
@@ -150,28 +170,31 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px; /* Zmniejszony margines */
-    overflow: hidden; /* Ukrywa wysuwające się kalendarze */
+    margin-bottom: 10px;
+    overflow: hidden;
 }
 
 .calendars-container {
     display: flex;
     flex-direction: row;
-    gap: 10px; /* Zmniejszony odstęp */
+    gap: 10px;
     flex: 1;
-    transition: transform 0.3s ease-in-out; /* Animacja przejścia */
+    transition: transform 0.3s ease-in-out;
 }
 
 /* Klasy do animacji */
 .slide-out-left {
     transform: translateX(-100%);
 }
+
 .slide-out-right {
     transform: translateX(100%);
 }
+
 .slide-in-from-left {
     transform: translateX(-100%);
 }
+
 .slide-in-from-right {
     transform: translateX(100%);
 }
@@ -184,18 +207,21 @@
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 2px; /* Zmniejszony odstęp */
+    gap: 2px;
 }
 
-.day-name, .day-cell-calendar {
+.day-name,
+.day-cell-calendar {
     text-align: center;
-    padding: 4px; /* Zmniejszony padding */
+    padding: 4px;
     border-radius: 4px;
 }
 
 .day-cell-calendar {
     cursor: pointer;
-    transition: background-color 0.2s, color 0.2s;
+    transition:
+        background-color 0.2s,
+        color 0.2s;
 }
 
 .day-cell-calendar:hover {
@@ -208,13 +234,11 @@
 }
 
 .day-cell-calendar.selected {
-    /* Kolor tła jest teraz ustawiany dynamicznie przez JS */
     color: white;
 }
 
 .day-cell-calendar.in-range {
-    /* Kolor tła jest teraz ustawiany dynamicznie przez JS */
-    opacity: 0.7; /* Lekka przezroczystość dla dni w zakresie */
+    opacity: 0.7;
     color: white;
     border-radius: 0;
 }
@@ -239,13 +263,13 @@
 .selection-mode-info {
     text-align: right;
     margin-top: 15px;
-    color: #6c757d;
+    color: var(--bg-break);
 }
 
 .selection-mode-info kbd {
     display: inline-block;
     padding: 3px 8px;
-    font-family: "Consolas", "Monaco", monospace;
+    font-family: 'Consolas', 'Monaco', monospace;
     font-size: 0.9em;
     color: #212529;
     background-color: #f8f9fa;
@@ -267,7 +291,7 @@
     display: none;
     background-color: white;
     border: 1px solid #ccc;
-    box-shadow: 2px 2px 5px rgba(0,0,0,0.15);
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.15);
     border-radius: 5px;
     z-index: 1001;
     padding: 5px 0;
@@ -292,19 +316,19 @@
 /* Nowe style dla płynnego przewijania kalendarza */
 .calendar-slider-viewport {
     flex: 1;
-    overflow: hidden; /* Ukrywa kalendarze, które są poza widokiem */
+    overflow: hidden;
 }
 
 .calendar-slider {
     display: flex;
     position: relative;
-    width: 200%; /* Domyślnie miejsce na dwa kalendarze */
+    width: 200%;
     left: 0;
-    transition: transform 0.4s ease-in-out; /* Definiuje animację przesuwania */
+    transition: transform 0.4s ease-in-out;
 }
 
 .calendar-wrapper {
-    width: 25%; /* Każdy z 4 potencjalnych kalendarzy (2 widoczne, 2 do animacji) zajmuje 1/4 */
+    width: 25%;
     box-sizing: border-box;
 }
 
@@ -333,9 +357,10 @@
     color: #495057;
 }
 
-#clearFiltersBtn {
+#clearFiltersBtn,
+.action-btn {
     padding: 8px 15px;
-    background-color: #dc3545; /* Czerwony kolor dla przycisku "Wyczyść" */
+    background-color: var(--color-danger);
     color: white;
     border: none;
     border-radius: 5px;
@@ -344,11 +369,20 @@
     transition: background-color 0.2s ease;
 }
 
-#clearFiltersBtn:hover {
-    background-color: #c82333;
+#clearFiltersBtn:hover,
+.action-btn:hover {
+    background-color: var(--color-danger-dark);
 }
 
-.leaves-legend { /* Teraz legenda jest częścią filtra */
+.action-btn.secondary {
+    background-color: var(--color-secondary);
+}
+
+.action-btn.secondary:hover {
+    background-color: var(--color-secondary-dark);
+}
+
+.leaves-legend {
     display: flex;
     flex-wrap: wrap;
     gap: 20px;
@@ -375,7 +409,7 @@
     transition: border-color 0.2s ease-in-out;
 }
 
-.leaves-filter-container .filter-checkbox:checked + .legend-color-box {
+.leaves-filter-container .filter-checkbox:checked+.legend-color-box {
     border-color: #333;
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.2);
 }
@@ -401,7 +435,7 @@
     background-color: #f8f9fa;
     border-radius: 6px;
     font-size: 0.9em;
-    color: #555;
+    color: var(--color-text-light);
 }
 
 .leave-type-legend .legend-item {
@@ -422,34 +456,58 @@
 /* --- Refactor for 12-Month View --- */
 
 #calendarModal .modal-content.wide {
-    max-width: 1200px; /* Increased width for 12 months */
+    max-width: 1200px;
 }
 
 .calendar-slider {
     display: grid;
-    grid-template-columns: repeat(4, 1fr); /* 4 months per row */
+    grid-template-columns: repeat(4, 1fr);
     gap: 25px;
     width: 100%;
-    transform: none !important; /* Override transform from slider view */
+    transform: none !important;
+}
+
+@media (max-width: 1200px) {
+    .calendar-slider {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .calendar-slider {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .calendar-slider {
+        grid-template-columns: 1fr;
+    }
+
+    #calendarModal .modal-content.wide {
+        padding: 10px;
+        width: 95%;
+    }
 }
 
 .calendar-wrapper {
-    width: 100%; /* Each wrapper takes full width of its grid cell */
+    width: 100%;
 }
 
 .calendar-header .nav-btn {
-    display: none; /* Hide month navigation buttons */
+    display: none;
 }
 
 .calendar-grid {
     gap: 4px;
 }
 
-.day-name, .day-cell-calendar {
+.day-name,
+.day-cell-calendar {
     padding: 5px;
-    font-size: 0.85em; /* Smaller font for compact view */
-    height: 30px; /* Explicit height */
-    width: 30px;  /* Explicit width */
+    font-size: 0.85em;
+    height: 30px;
+    width: 30px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -459,7 +517,7 @@
 /* --- Circular Selection --- */
 
 .day-cell-calendar.selected {
-    border-radius: 50% !important; /* Perfect circle */
+    border-radius: 50% !important;
     position: relative;
     z-index: 1;
 }
@@ -502,7 +560,28 @@
     font-size: 1em;
 }
 
-.leave-type-selector label {
-    font-size: 1.3em !important; /* Increased font size +2px from 1.2em */
+.leave-type-selector label,
+.year-selector label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 1.3em !important;
     font-weight: bold;
+}
+
+.modal-select {
+    padding: 8px 12px;
+    font-size: 1em;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background-color: var(--color-white);
+    color: var(--color-text);
+    cursor: pointer;
+    min-width: 120px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.modal-select:focus {
+    outline: none;
+    border-color: var(--color-secondary);
+    box-shadow: 0 0 0 2px rgba(var(--color-secondary-rgb), 0.2);
 }

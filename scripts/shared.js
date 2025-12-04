@@ -1,4 +1,6 @@
-const Shared = (() => {
+// scripts/shared.js
+
+export const Shared = (() => {
     const initialize = () => {
         const dateTimeText = document.getElementById('dateTimeText');
         const appHeader = document.getElementById('appHeader');
@@ -6,7 +8,15 @@ const Shared = (() => {
         const updateDateTimeHeader = () => {
             if (!dateTimeText) return;
             const now = new Date();
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            const options = {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            };
             dateTimeText.textContent = now.toLocaleDateString('pl-PL', options);
         };
 
@@ -23,13 +33,13 @@ const Shared = (() => {
                 { href: '#leaves', text: 'Urlopy', icon: 'fas fa-plane-departure' },
                 { href: '#changes', text: 'Harmonogram zmian', icon: 'fas fa-exchange-alt' },
                 { href: '#scrapped-pdfs', text: 'ISO', icon: 'fas fa-file-pdf', id: 'navLinkIso' }, // Dodano ID
-                { href: '#options', text: 'Opcje', icon: 'fas fa-cogs' }
+                { href: '#options', text: 'Opcje', icon: 'fas fa-cogs' },
             ];
-            
+
             const hamburger = document.createElement('div');
             hamburger.className = 'hamburger-menu';
             hamburger.innerHTML = '<i class="fas fa-bars"></i>';
-            
+
             const navPanel = document.createElement('div');
             navPanel.className = 'nav-panel';
 
@@ -38,17 +48,17 @@ const Shared = (() => {
             userInfoDiv.id = 'navPanelUserInfo'; // Dodaj ID dla łatwiejszej aktualizacji
             userInfoDiv.textContent = 'Zalogowano jako: Gość'; // Domyślny tekst
             navPanel.appendChild(userInfoDiv);
-            
+
             const ul = document.createElement('ul');
-            navLinks.forEach(link => {
+            navLinks.forEach((link) => {
                 const li = document.createElement('li');
                 const a = document.createElement('a');
                 a.href = link.href;
-                
+
                 const icon = document.createElement('i');
                 icon.className = link.icon;
                 a.appendChild(icon);
-                
+
                 const textSpan = document.createElement('span');
                 textSpan.textContent = ' ' + link.text;
                 a.appendChild(textSpan);
@@ -92,7 +102,7 @@ const Shared = (() => {
 
             const updateActiveLink = () => {
                 const currentHash = window.location.hash || '#schedule';
-                navPanel.querySelectorAll('a').forEach(a => {
+                navPanel.querySelectorAll('a').forEach((a) => {
                     if (a.getAttribute('href') === currentHash) {
                         a.classList.add('active');
                     } else {
@@ -106,9 +116,13 @@ const Shared = (() => {
                 navPanel.classList.toggle('visible');
                 hamburger.classList.toggle('active');
             });
-            
+
             document.addEventListener('click', (e) => {
-                if (navPanel.classList.contains('visible') && !navPanel.contains(e.target) && !hamburger.contains(e.target)) {
+                if (
+                    navPanel.classList.contains('visible') &&
+                    !navPanel.contains(e.target) &&
+                    !hamburger.contains(e.target)
+                ) {
                     navPanel.classList.remove('visible');
                     hamburger.classList.remove('active');
                 }
@@ -135,7 +149,7 @@ const Shared = (() => {
                 toast.classList.remove('show');
                 setTimeout(() => {
                     if (toast.parentNode === toastContainer) {
-                       toastContainer.removeChild(toast);
+                        toastContainer.removeChild(toast);
                     }
                 }, 500);
             }, duration);
@@ -175,18 +189,21 @@ const Shared = (() => {
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => {
-                firebase.auth().signOut().then(() => {
-                    window.location.hash = '#login'; // Przekieruj po wylogowaniu
-                    // Explicitly get elements to ensure they are correctly referenced
-                    const currentNavPanel = document.querySelector('.nav-panel');
-                    const currentHamburger = document.querySelector('.hamburger-menu');
-                    if (currentNavPanel) {
-                        currentNavPanel.classList.remove('visible'); // Ukryj menu po wylogowaniu
-                    }
-                    if (currentHamburger) {
-                        currentHamburger.classList.remove('active');
-                    }
-                });
+                firebase
+                    .auth()
+                    .signOut()
+                    .then(() => {
+                        window.location.hash = '#login'; // Przekieruj po wylogowaniu
+                        // Explicitly get elements to ensure they are correctly referenced
+                        const currentNavPanel = document.querySelector('.nav-panel');
+                        const currentHamburger = document.querySelector('.hamburger-menu');
+                        if (currentNavPanel) {
+                            currentNavPanel.classList.remove('visible'); // Ukryj menu po wylogowaniu
+                        }
+                        if (currentHamburger) {
+                            currentHamburger.classList.remove('active');
+                        }
+                    });
             });
         }
     };
@@ -216,11 +233,11 @@ const Shared = (() => {
     return {
         initialize,
         updateUserInfo,
-        setIsoLinkActive // Eksportuj nową metodę
+        setIsoLinkActive, // Eksportuj nową metodę
     };
 })();
 
-window.setSaveStatus = (status) => {
+export const setSaveStatus = (status) => {
     const statusElement = document.getElementById('saveStatus');
     if (!statusElement) return;
 
@@ -245,3 +262,7 @@ window.setSaveStatus = (status) => {
             break;
     }
 };
+
+// Backward compatibility
+window.Shared = Shared;
+window.setSaveStatus = setSaveStatus;

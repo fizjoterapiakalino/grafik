@@ -1,10 +1,27 @@
-const Options = (() => {
+// scripts/options.js
+import { db, auth } from './firebase-config.js';
+import { EmployeeManager } from './employee-manager.js';
+
+export const Options = (() => {
     // --- SELEKTORY ELEMENTÓW DOM ---
-    let loadingOverlay, employeeListContainer, employeeSearchInput, addEmployeeBtn,
-        detailsPlaceholder, detailsEditForm, employeeFirstNameInput, employeeLastNameInput,
-        employeeDisplayNameInput, employeeNumberInput, leaveEntitlementInput,
-        carriedOverLeaveInput, saveEmployeeBtn, deleteEmployeeBtn, employeeUidInput,
-        assignUidBtn, clearUidBtn, employeeIsHidden;
+    let loadingOverlay,
+        employeeListContainer,
+        employeeSearchInput,
+        addEmployeeBtn,
+        detailsPlaceholder,
+        detailsEditForm,
+        employeeFirstNameInput,
+        employeeLastNameInput,
+        employeeDisplayNameInput,
+        employeeNumberInput,
+        leaveEntitlementInput,
+        carriedOverLeaveInput,
+        saveEmployeeBtn,
+        deleteEmployeeBtn,
+        employeeUidInput,
+        assignUidBtn,
+        clearUidBtn,
+        employeeIsHidden;
 
     // --- ZMIENNE STANU APLIKACJI ---
     let selectedEmployeeIndex = null;
@@ -14,7 +31,7 @@ const Options = (() => {
 
     // --- NOWE FUNKCJE DLA KOPII ZAPASOWEJ ---
 
-    const getBackupDocRef = () => db.collection("backup").doc("latest");
+    const getBackupDocRef = () => db.collection('backup').doc('latest');
 
     const displayLastBackupDate = async () => {
         try {
@@ -25,41 +42,41 @@ const Options = (() => {
                     const date = backupData.backupDate.toDate();
                     lastBackupDateSpan.textContent = date.toLocaleString('pl-PL');
                 } else {
-                    lastBackupDateSpan.textContent = "Brak daty w kopii";
+                    lastBackupDateSpan.textContent = 'Brak daty w kopii';
                 }
             } else {
-                lastBackupDateSpan.textContent = "Nigdy";
+                lastBackupDateSpan.textContent = 'Nigdy';
             }
         } catch (error) {
-            console.error("Błąd podczas pobierania daty kopii zapasowej:", error);
-            lastBackupDateSpan.textContent = "Błąd odczytu";
+            console.error('Błąd podczas pobierania daty kopii zapasowej:', error);
+            lastBackupDateSpan.textContent = 'Błąd odczytu';
         }
     };
 
     const createBackup = async () => {
-        if (!confirm("Czy na pewno chcesz utworzyć nową kopię zapasową? Spowoduje to nadpisanie poprzedniej kopii.")) {
+        if (!confirm('Czy na pewno chcesz utworzyć nową kopię zapasową? Spowoduje to nadpisanie poprzedniej kopii.')) {
             return;
         }
         showLoading(true);
         try {
-            const scheduleRef = db.collection("schedules").doc("mainSchedule");
-            const leavesRef = db.collection("leaves").doc("mainLeaves");
+            const scheduleRef = db.collection('schedules').doc('mainSchedule');
+            const leavesRef = db.collection('leaves').doc('mainLeaves');
 
             const [scheduleDoc, leavesDoc] = await Promise.all([scheduleRef.get(), leavesRef.get()]);
 
             const backupData = {
                 backupDate: new Date(),
                 scheduleData: scheduleDoc.exists ? scheduleDoc.data() : {},
-                leavesData: leavesDoc.exists ? leavesDoc.data() : {}
+                leavesData: leavesDoc.exists ? leavesDoc.data() : {},
             };
 
             await getBackupDocRef().set(backupData);
 
             await displayLastBackupDate();
-            window.showToast("Kopia zapasowa utworzona pomyślnie!", 3000);
+            window.showToast('Kopia zapasowa utworzona pomyślnie!', 3000);
         } catch (error) {
-            console.error("Błąd podczas tworzenia kopii zapasowej:", error);
-            window.showToast("Wystąpił błąd podczas tworzenia kopii zapasowej.", 5000);
+            console.error('Błąd podczas tworzenia kopii zapasowej:', error);
+            window.showToast('Wystąpił błąd podczas tworzenia kopii zapasowej.', 5000);
         } finally {
             showLoading(false);
         }
@@ -68,7 +85,7 @@ const Options = (() => {
     const handleRestoreBackup = async () => {
         const backupDoc = await getBackupDocRef().get();
         if (!backupDoc.exists) {
-            window.showToast("Brak kopii zapasowej do przywrócenia.", 3000);
+            window.showToast('Brak kopii zapasowej do przywrócenia.', 3000);
             return;
         }
 
@@ -84,25 +101,25 @@ const Options = (() => {
             showLoading(true);
             try {
                 const backupData = backupDoc.data();
-                const scheduleRef = db.collection("schedules").doc("mainSchedule");
-                const leavesRef = db.collection("leaves").doc("mainLeaves");
+                const scheduleRef = db.collection('schedules').doc('mainSchedule');
+                const leavesRef = db.collection('leaves').doc('mainLeaves');
 
                 const batch = db.batch();
                 batch.set(scheduleRef, backupData.scheduleData || {});
                 batch.set(leavesRef, backupData.leavesData || {});
                 await batch.commit();
-                
-                window.showToast("Dane przywrócone pomyślnie! Odśwież stronę, aby zobaczyć zmiany.", 5000);
+
+                window.showToast('Dane przywrócone pomyślnie! Odśwież stronę, aby zobaczyć zmiany.', 5000);
             } catch (error) {
-                console.error("Błąd podczas przywracania danych:", error);
-                window.showToast("Wystąpił błąd podczas przywracania danych.", 5000);
+                console.error('Błąd podczas przywracania danych:', error);
+                window.showToast('Wystąpił błąd podczas przywracania danych.', 5000);
             } finally {
                 showLoading(false);
             }
         };
 
         const onInput = () => {
-            confirmBtn.disabled = confirmationInput.value.trim() !== "PRZYWRÓĆ";
+            confirmBtn.disabled = confirmationInput.value.trim() !== 'PRZYWRÓĆ';
         };
 
         const closeModal = () => {
@@ -113,34 +130,32 @@ const Options = (() => {
             cancelBtn.removeEventListener('click', closeModal);
             confirmationInput.removeEventListener('input', onInput);
         };
-        
+
         confirmBtn.addEventListener('click', onConfirm);
         cancelBtn.addEventListener('click', closeModal);
         confirmationInput.addEventListener('input', onInput);
     };
 
-
     // --- NAZWANE FUNKCJE OBSŁUGI ZDARZEŃ ---
     const handleAssignUid = () => {
-        const currentUser = firebase.auth().currentUser;
+        const currentUser = auth.currentUser;
         if (currentUser) {
             // Sprawdź, czy ten UID nie jest już przypisany do innego pracownika
             const allEmployees = EmployeeManager.getAll();
-            const existingEmployee = Object.values(allEmployees).find(emp => emp.uid === currentUser.uid);
+            const existingEmployee = Object.values(allEmployees).find((emp) => emp.uid === currentUser.uid);
             if (existingEmployee && existingEmployee.id !== selectedEmployeeIndex) {
                 window.showToast(`Ten użytkownik jest już przypisany do: ${existingEmployee.displayName}.`, 4000);
                 return;
             }
             employeeUidInput.value = currentUser.uid;
         } else {
-            window.showToast("Nie jesteś zalogowany.", 3000);
+            window.showToast('Nie jesteś zalogowany.', 3000);
         }
     };
 
     const handleClearUid = () => {
         employeeUidInput.value = '';
     };
-
 
     // --- FUNKCJE POMOCNICZE ---
     const showLoading = (show) => {
@@ -153,7 +168,7 @@ const Options = (() => {
         selectedEmployeeIndex = null;
         detailsPlaceholder.style.display = 'flex';
         detailsEditForm.style.display = 'none';
-        
+
         const activeItem = document.querySelector('.employee-list-item.active');
         if (activeItem) {
             activeItem.classList.remove('active');
@@ -170,11 +185,16 @@ const Options = (() => {
         }
 
         const sortedEmployees = Object.entries(employees)
-            .map(([index, data]) => ({ index: parseInt(index, 10), firstName: data.firstName, lastName: data.lastName, displayName: data.displayName || data.name }))
+            .map(([index, data]) => ({
+                index: parseInt(index, 10),
+                firstName: data.firstName,
+                lastName: data.lastName,
+                displayName: data.displayName || data.name,
+            }))
             .sort((a, b) => a.index - b.index);
 
         sortedEmployees.forEach(({ index, firstName, lastName, displayName }) => {
-            const nameToDisplay = (firstName && lastName) ? `${firstName} ${lastName}` : displayName;
+            const nameToDisplay = firstName && lastName ? `${firstName} ${lastName}` : displayName;
             if (!nameToDisplay) return;
 
             const item = document.createElement('div');
@@ -192,7 +212,7 @@ const Options = (() => {
         const employee = EmployeeManager.getById(index);
         if (!employee) return;
 
-        document.querySelectorAll('.employee-list-item').forEach(item => {
+        document.querySelectorAll('.employee-list-item').forEach((item) => {
             item.classList.toggle('active', item.dataset.employeeIndex == index);
         });
 
@@ -208,10 +228,10 @@ const Options = (() => {
         employeeIsHidden.checked = employee.isHidden || false;
         employeeUidInput.value = employee.uid || '';
     };
-    
+
     const filterEmployees = () => {
         const searchTerm = employeeSearchInput.value.toLowerCase();
-        document.querySelectorAll('.employee-list-item').forEach(item => {
+        document.querySelectorAll('.employee-list-item').forEach((item) => {
             const name = item.querySelector('span').textContent.toLowerCase();
             item.style.display = name.includes(searchTerm) ? 'flex' : 'none';
         });
@@ -220,21 +240,24 @@ const Options = (() => {
     // --- LOGIKA INTERAKCJI Z FIREBASE ---
     const handleAddEmployee = async () => {
         // Zastąpione przez formularz, ale zostawiam logikę dodawania na razie
-        const displayName = prompt("Wpisz nazwę wyświetlaną nowego pracownika:");
+        const displayName = prompt('Wpisz nazwę wyświetlaną nowego pracownika:');
         if (!displayName || displayName.trim() === '') {
-            window.showToast("Anulowano. Nazwa wyświetlana nie może być pusta.", 3000);
+            window.showToast('Anulowano. Nazwa wyświetlana nie może być pusta.', 3000);
             return;
         }
-        const entitlement = parseInt(prompt("Podaj wymiar urlopu (np. 26):", "26"), 10);
+        const entitlement = parseInt(prompt('Podaj wymiar urlopu (np. 26):', '26'), 10);
         if (isNaN(entitlement)) {
-            window.showToast("Anulowano. Wymiar urlopu musi być liczbą.", 3000);
+            window.showToast('Anulowano. Wymiar urlopu musi być liczbą.', 3000);
             return;
         }
 
         showLoading(true);
         try {
             const allEmployees = EmployeeManager.getAll();
-            const highestIndex = Object.keys(allEmployees).reduce((max, index) => Math.max(max, parseInt(index, 10)), -1);
+            const highestIndex = Object.keys(allEmployees).reduce(
+                (max, index) => Math.max(max, parseInt(index, 10)),
+                -1,
+            );
             const newIndex = highestIndex + 1;
 
             const newEmployee = {
@@ -243,19 +266,22 @@ const Options = (() => {
                 lastName: '',
                 employeeNumber: '', // Domyślna wartość dla nowego pracownika
                 leaveEntitlement: entitlement,
-                carriedOverLeave: 0
+                carriedOverLeave: 0,
             };
 
-            await db.collection("schedules").doc("mainSchedule").update({
-                [`employees.${newIndex}`]: newEmployee
-            });
+            await db
+                .collection('schedules')
+                .doc('mainSchedule')
+                .update({
+                    [`employees.${newIndex}`]: newEmployee,
+                });
 
             await EmployeeManager.load();
             renderEmployeeList();
-            window.showToast("Pracownik dodany pomyślnie!", 2000);
+            window.showToast('Pracownik dodany pomyślnie!', 2000);
         } catch (error) {
-            console.error("Błąd podczas dodawania pracownika:", error);
-            window.showToast("Wystąpił błąd podczas dodawania pracownika. Spróbuj ponownie.", 5000);
+            console.error('Błąd podczas dodawania pracownika:', error);
+            window.showToast('Wystąpił błąd podczas dodawania pracownika. Spróbuj ponownie.', 5000);
         } finally {
             showLoading(false);
         }
@@ -263,7 +289,7 @@ const Options = (() => {
 
     const handleSaveEmployee = async () => {
         if (selectedEmployeeIndex === null) {
-            window.showToast("Nie wybrano pracownika.", 3000);
+            window.showToast('Nie wybrano pracownika.', 3000);
             return;
         }
 
@@ -279,11 +305,11 @@ const Options = (() => {
         const newUid = employeeUidInput.value.trim();
 
         if (newDisplayName === '') {
-            window.showToast("Nazwa wyświetlana nie może być pusta.", 3000);
+            window.showToast('Nazwa wyświetlana nie może być pusta.', 3000);
             return;
         }
         if (isNaN(newEntitlement) || isNaN(newCarriedOver)) {
-            window.showToast("Wartości urlopu muszą być poprawnymi liczbami.", 3000);
+            window.showToast('Wartości urlopu muszą być poprawnymi liczbami.', 3000);
             return;
         }
 
@@ -296,7 +322,7 @@ const Options = (() => {
             carriedOverLeave: newCarriedOver,
             role: isAdmin ? 'admin' : 'user',
             isHidden: isHidden,
-            uid: newUid
+            uid: newUid,
         };
 
         showLoading(true);
@@ -310,7 +336,7 @@ const Options = (() => {
                 // Ta logika powinna być idealnie częścią transakcji,
                 // ale dla uproszczenia zostawiamy ją jako osobne wywołanie.
                 // W przyszłości można to zintegrować w EmployeeManager.
-                const leavesRef = db.collection("leaves").doc("mainLeaves");
+                const leavesRef = db.collection('leaves').doc('mainLeaves');
                 const leavesDoc = await leavesRef.get();
                 if (leavesDoc.exists && leavesDoc.data()[oldNameKey]) {
                     const leavesData = leavesDoc.data();
@@ -324,22 +350,23 @@ const Options = (() => {
             await EmployeeManager.load(); // Przeładuj dane, aby mieć pewność, że EmployeeManager ma aktualne dane
 
             // Zamiast przebudowywać całą listę, zaktualizuj tylko zmieniony element
-            const listItem = employeeListContainer.querySelector(`.employee-list-item[data-employee-index="${selectedEmployeeIndex}"]`);
+            const listItem = employeeListContainer.querySelector(
+                `.employee-list-item[data-employee-index="${selectedEmployeeIndex}"]`,
+            );
             if (listItem) {
-                const nameToDisplay = (newFirstName && newLastName) ? `${newFirstName} ${newLastName}` : newDisplayName;
+                const nameToDisplay = newFirstName && newLastName ? `${newFirstName} ${newLastName}` : newDisplayName;
                 listItem.querySelector('span').textContent = nameToDisplay;
             }
-            window.showToast("Dane pracownika zaktualizowane.", 2000);
+            window.showToast('Dane pracownika zaktualizowane.', 2000);
             // Nie ma potrzeby wywoływać handleEmployeeSelect, bo formularz już ma nowe dane
-
         } catch (error) {
-            console.error("Błąd podczas zapisywania zmian pracownika:", error);
-            window.showToast("Wystąpił błąd podczas zapisu. Spróbuj ponownie.", 5000);
+            console.error('Błąd podczas zapisywania zmian pracownika:', error);
+            window.showToast('Wystąpił błąd podczas zapisu. Spróbuj ponownie.', 5000);
         } finally {
             showLoading(false);
         }
     };
-    
+
     const handleDeleteEmployee = async () => {
         if (selectedEmployeeIndex === null) return;
 
@@ -361,17 +388,19 @@ const Options = (() => {
             try {
                 const FieldValue = firebase.firestore.FieldValue;
                 await db.runTransaction(async (transaction) => {
-                    const scheduleRef = db.collection("schedules").doc("mainSchedule");
-                    const leavesRef = db.collection("leaves").doc("mainLeaves");
+                    const scheduleRef = db.collection('schedules').doc('mainSchedule');
+                    const leavesRef = db.collection('leaves').doc('mainLeaves');
                     const scheduleDoc = await transaction.get(scheduleRef);
                     const leavesDoc = await transaction.get(leavesRef);
 
                     transaction.update(scheduleRef, { [`employees.${selectedEmployeeIndex}`]: FieldValue.delete() });
                     const scheduleData = scheduleDoc.data();
                     if (scheduleData && scheduleData.scheduleCells) {
-                        Object.keys(scheduleData.scheduleCells).forEach(time => {
+                        Object.keys(scheduleData.scheduleCells).forEach((time) => {
                             if (scheduleData.scheduleCells[time]?.[selectedEmployeeIndex]) {
-                                transaction.update(scheduleRef, { [`scheduleCells.${time}.${selectedEmployeeIndex}`]: FieldValue.delete() });
+                                transaction.update(scheduleRef, {
+                                    [`scheduleCells.${time}.${selectedEmployeeIndex}`]: FieldValue.delete(),
+                                });
                             }
                         });
                     }
@@ -383,10 +412,10 @@ const Options = (() => {
                 await EmployeeManager.load(); // Wymuś ponowne załadowanie danych
                 renderEmployeeList();
                 resetDetailsPanel();
-                window.showToast("Pracownik usunięty pomyślnie.", 2000);
+                window.showToast('Pracownik usunięty pomyślnie.', 2000);
             } catch (error) {
-                console.error("Błąd podczas usuwania pracownika:", error);
-                window.showToast("Wystąpił błąd. Spróbuj ponownie.", 5000);
+                console.error('Błąd podczas usuwania pracownika:', error);
+                window.showToast('Wystąpił błąd. Spróbuj ponownie.', 5000);
             } finally {
                 showLoading(false);
             }
@@ -404,7 +433,7 @@ const Options = (() => {
             cancelBtn.removeEventListener('click', closeModal);
             confirmationInput.removeEventListener('input', onInput);
         };
-        
+
         confirmBtn.addEventListener('click', onConfirm);
         cancelBtn.addEventListener('click', closeModal);
         confirmationInput.addEventListener('input', onInput);
@@ -443,8 +472,8 @@ const Options = (() => {
             renderEmployeeList();
             await displayLastBackupDate(); // Wyświetl datę kopii
         } catch (error) {
-            console.error("Błąd inicjalizacji strony opcji:", error);
-            window.showToast("Wystąpił krytyczny błąd inicjalizacji. Odśwież stronę.", 5000);
+            console.error('Błąd inicjalizacji strony opcji:', error);
+            window.showToast('Wystąpił krytyczny błąd inicjalizacji. Odśwież stronę.', 5000);
         } finally {
             showLoading(false);
         }
@@ -471,11 +500,14 @@ const Options = (() => {
         // Usuń nowe listenery
         createBackupBtn.removeEventListener('click', createBackup);
         restoreBackupBtn.removeEventListener('click', handleRestoreBackup);
-        console.log("Options module destroyed");
+        console.log('Options module destroyed');
     };
 
     return {
         init,
-        destroy
+        destroy,
     };
 })();
+
+// Backward compatibility
+window.Options = Options;
