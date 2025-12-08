@@ -1,6 +1,6 @@
 // scripts/leaves.js
 import { db } from './firebase-config.js';
-import { AppConfig, hideLoadingOverlay } from './common.js';
+import { AppConfig, hideLoadingOverlay, UndoManager } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
 import { LeavesSummary } from './leaves-summary.js';
 import { LeavesCareSummary } from './leaves-care-summary.js';
@@ -42,6 +42,12 @@ export const Leaves = (() => {
     let currentYear = new Date().getUTCFullYear();
     let activeCell = null;
     let activeFilters = new Set();
+
+    // Undo
+    let undoManager;
+    let appState = {
+        leaves: {}
+    };
 
     // --- Nazwane funkcje obsługi zdarzeń ---
     const _handleAppSearch = (e) => {
@@ -128,9 +134,40 @@ export const Leaves = (() => {
             openCalendarForCell(activeCell);
         }
 
+        if (event.ctrlKey && event.key === 'z') {
+            event.preventDefault();
+            undoLastAction();
+            return;
+        }
+
         if (event.key === 'Delete' || event.key === 'Backspace') {
             event.preventDefault();
             clearCellLeaves(activeCell);
+        }
+    };
+
+    const undoLastAction = () => {
+        const prevState = undoManager.undo();
+        if (prevState) {
+            // Restore functionality needs to be smart.
+            // Since we save partial updates to Firestore, we might need to restore full state.
+            // But here we rely on getAllLeavesData to refresh, or we can restore the local state and save it back.
+            // A simple approach: Restore local state object, then save *that entire object* to Firestore?
+            // "mainLeaves" doc contains all users.
+
+            // Actually, we should probably save the entire mainLeaves doc state in undo stack.
+            const restoredLeaves = prevState.leaves;
+
+            // We need to re-save this entire object to Firestore to be consistent?
+            // Yes, "Undo" in a multi-user app is tricky. 
+            // For now, let's assume last-write-wins and we overwrite with old state.
+
+            saveAllLeavesData(restoredLeaves).then(() => {
+                refreshCurrentView();
+                window.showToast('Cofnięto ostatnią zmianę.', 2000);
+            });
+        } else {
+            window.showToast('Brak akcji do cofnięcia.', 2000);
         }
     };
 
@@ -140,9 +177,19 @@ export const Leaves = (() => {
         return new Date(Date.UTC(year, month - 1, day));
     };
 
+    const refreshCurrentView = async () => {
+        if (monthlyViewBtn.classList.contains('active')) {
+            await showMonthlyView();
+        } else if (summaryViewBtn.classList.contains('active')) {
+            await showSummaryView();
+        } else if (careViewBtn.classList.contains('active')) {
+            await showCareView();
+        }
+    };
+
     const handleYearChange = async (e) => {
         currentYear = parseInt(e.target.value, 10);
-        await showMonthlyView(); // Re-render the monthly view for the new year
+        await refreshCurrentView();
     };
 
     const populateYearSelect = () => {
@@ -250,6 +297,14 @@ export const Leaves = (() => {
             generateLegendAndFilters();
             clearFiltersBtn = document.getElementById('clearFiltersBtn');
             setupEventListeners();
+
+            // Load initial data for UndoManager
+            const allLeaves = await getAllLeavesData();
+            appState.leaves = allLeaves;
+
+            undoManager = new UndoManager({ maxStates: 20 });
+            undoManager.initialize(appState);
+
             await showMonthlyView();
             highlightCurrentMonth();
 
@@ -296,6 +351,12 @@ export const Leaves = (() => {
             const allLeaves = await getAllLeavesData();
             const existingLeaves = allLeaves[employeeName] || [];
             const updatedLeaves = await CalendarModal.open(employeeName, existingLeaves, monthIndex, currentYear);
+
+            // Push state before saving changes
+            // Note: getAllLeavesData called above gives us the 'before' state of *all* leaves? 
+            // Yes, existingLeaves is just for one employee. We need full state.
+            appState.leaves = allLeaves; // Update local state with fresh data
+            undoManager.pushState(appState);
 
             await saveLeavesData(employeeName, updatedLeaves);
             renderSingleEmployeeLeaves(employeeName, updatedLeaves);
@@ -354,7 +415,7 @@ export const Leaves = (() => {
         if (currentYear !== thisYear) {
             currentYear = thisYear;
             yearSelect.value = currentYear;
-            await showMonthlyView();
+            await refreshCurrentView();
         } else {
             // If already on current year, just ensure highlight is correct (maybe re-render or just highlight)
             highlightCurrentMonth();
@@ -389,7 +450,7 @@ export const Leaves = (() => {
         leavesFilterContainer.style.display = 'none'; // Ukryj kontener filtrów
 
         const allLeaves = await getAllLeavesData();
-        LeavesSummary.render(leavesHeaderRow, leavesTableBody, allLeaves);
+        LeavesSummary.render(leavesHeaderRow, leavesTableBody, allLeaves, currentYear);
     };
 
     const showCareView = async () => {
@@ -402,7 +463,7 @@ export const Leaves = (() => {
         leavesFilterContainer.style.display = 'none'; // Ukryj kontener filtrów
 
         const allLeaves = await getAllLeavesData();
-        LeavesCareSummary.render(careViewContainer, allLeaves);
+        LeavesCareSummary.render(careViewContainer, allLeaves, currentYear);
     };
 
     const printLeavesTableToPdf = () => {
@@ -496,8 +557,7 @@ export const Leaves = (() => {
         const sortedEmployeeNames = Object.values(employees)
             .filter((emp) => !emp.isHidden)
             .map((emp) => emp.displayName || emp.name)
-            .filter(Boolean)
-            .sort();
+            .filter(Boolean);
         sortedEmployeeNames.forEach((name) => {
             const tr = document.createElement('tr');
             tr.dataset.employee = name;
@@ -622,6 +682,11 @@ export const Leaves = (() => {
         const monthToClear = parseInt(cell.dataset.month, 10);
         try {
             const allLeaves = await getAllLeavesData();
+
+            // Push state before modification
+            appState.leaves = allLeaves;
+            undoManager.pushState(appState);
+
             const employeeLeaves = allLeaves[employeeName] || [];
             const remainingLeaves = employeeLeaves.filter((leave) => {
                 const start = toUTCDate(leave.startDate);
@@ -633,6 +698,21 @@ export const Leaves = (() => {
         } catch (error) {
             console.error('Błąd podczas czyszczenia urlopów w komórce:', error);
             window.showToast('Wystąpił błąd podczas czyszczenia urlopów. Spróbuj ponownie.', 5000);
+        }
+    };
+
+    // Helper to save full state (for undo)
+    const saveAllLeavesData = async (allLeavesData) => {
+        try {
+            await db
+                .collection(AppConfig.firestore.collections.leaves)
+                .doc(AppConfig.firestore.docs.mainLeaves)
+                .set(allLeavesData); // Overwrite entire doc
+            // Update local appState to match
+            appState.leaves = allLeavesData;
+        } catch (error) {
+            console.error('Błąd podczas przywracania urlopów:', error);
+            throw error;
         }
     };
 

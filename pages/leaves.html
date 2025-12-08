@@ -1,13 +1,17 @@
-<div class="view-tabs">
-    <button id="monthlyViewBtn" class="tab-btn active">Widok Miesięczny</button>
-    <button id="summaryViewBtn" class="tab-btn">Podsumowanie Roczne</button>
-    <button id="careViewBtn" class="tab-btn">Opieka</button>
+<div class="leaves-header-controls">
+    <div class="view-tabs">
+        <button id="monthlyViewBtn" class="tab-btn active">Widok Miesięczny</button>
+        <button id="summaryViewBtn" class="tab-btn">Podsumowanie Roczne</button>
+        <button id="careViewBtn" class="tab-btn">Opieka</button>
+    </div>
+    <div class="year-selector-container">
+        <label for="yearSelect">Rok:</label>
+        <select id="yearSelect" class="year-select"></select>
+    </div>
 </div>
 
 <div id="leavesFilterContainer" class="leaves-filter-container"
     style="padding: 10px; background-color: #f8f9fa; border-radius: 5px; margin-bottom: 15px">
-    <label for="yearSelect">Rok:</label>
-    <select id="yearSelect" class="year-select"></select>
     <div id="leavesLegend" class="leaves-legend"></div>
     <button id="currentYearBtn" class="action-btn secondary" style="margin-left: auto;">Ten Rok</button>
     <button id="clearFiltersBtn" class="action-btn">Wyczyść filtry</button>
@@ -41,11 +45,7 @@
                     <option value="family_member_care">Opieka chorym członkiem rodziny</option>
                 </select>
             </div>
-            <div class="year-selector" style="text-align: left;">
-                <label for="modalYearSelect">Rok</label>
-                <select id="modalYearSelect" class="modal-select">
-                </select>
-            </div>
+
         </div>
         <div class="calendar-scroll-area">
             <div class="calendar-header">
@@ -71,7 +71,7 @@
             <div id="leaveTypeLegend" class="leave-type-legend"></div>
             <div class="modal-actions">
                 <button id="clearSelectionBtn" class="action-btn">Wyczyść</button>
-                <button id="applySelectionBtn" class="action-btn secondary">Zastosuj typ</button>
+
                 <button id="confirmSelectionBtn" class="action-btn confirm-btn">Zapisz i zamknij</button>
                 <button id="cancelSelectionBtn" class="action-btn cancel-btn">Anuluj</button>
             </div>

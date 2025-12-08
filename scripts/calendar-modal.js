@@ -7,7 +7,6 @@ export const CalendarModal = (() => {
         prevMonthBtn,
         nextMonthBtn,
         confirmBtn,
-        applyBtn,
         cancelBtn,
         clearSelectionBtn,
         startDatePreview,
@@ -15,8 +14,7 @@ export const CalendarModal = (() => {
         calendarSlider,
         workdaysCounter,
         leaveTypeSelect,
-        leaveTypeLegend,
-        modalYearSelect;
+        leaveTypeLegend;
 
     let currentEmployee = null;
     let currentYear = new Date().getUTCFullYear();
@@ -35,30 +33,7 @@ export const CalendarModal = (() => {
 
     // --- FUNKCJE WEWNĘTRZNE MODUŁU ---
 
-    const populateYearSelect = () => {
-        const currentYear = new Date().getUTCFullYear();
-        const startYear = currentYear - 5;
-        const endYear = currentYear + 5;
-
-        modalYearSelect.innerHTML = '';
-
-        for (let year = startYear; year <= endYear; year++) {
-            const option = document.createElement('option');
-            option.value = year;
-            option.textContent = year;
-            modalYearSelect.appendChild(option);
-        }
-    };
-
-    const handleYearChange = (e) => {
-        currentYear = parseInt(e.target.value, 10);
-        generateInitialCalendars();
-        // We might need to re-apply selections if they are valid for the new year, 
-        // but for simplicity, we might just keep the selection state or clear it if it doesn't make sense.
-        // The current implementation of singleSelectedDays stores full date strings (YYYY-MM-DD), 
-        // so they are tied to specific years. 
-        // If we change year, the selected days from previous year won't be visible on the new year calendar, which is correct.
-    };
+    // [REMOVED] populateYearSelect and handleYearChange were removed as year selector is gone.
 
     const toUTCDate = (dateString) => {
         const [year, month, day] = dateString.split('-').map(Number);
@@ -72,6 +47,9 @@ export const CalendarModal = (() => {
     const countWorkdaysInSet = (datesSet) => {
         let workdays = 0;
         datesSet.forEach((dateString) => {
+            // Check if the date belongs to the currently selected year
+            if (!dateString.startsWith(`${currentYear}-`)) return;
+
             const day = new Date(dateString + 'T00:00:00Z').getUTCDay();
             if (day !== 0 && day !== 6) {
                 workdays++;
@@ -89,18 +67,86 @@ export const CalendarModal = (() => {
     };
 
     const loadEmployeeLeavesForModal = (employeeLeaves) => {
-        dateToTypeMap.clear();
+        singleSelectedDays.clear(); // Clear manual selections
+        dateToTypeMap.clear();      // Clear mapping
+
         employeeLeaves.forEach((leave) => {
             const start = toUTCDate(leave.startDate);
             const end = toUTCDate(leave.endDate);
             for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+                // Ensure we only load leaves for the current year context if we want to avoid clutter,
+                // BUT the leaves data usually spans multiple years. 
+                // The calendar view filters by year, but here we load state.
+                // It is safer to load all, so they are preserved if we save back.
                 const dateString = toDateString(d);
-                singleSelectedDays.add(dateString);
                 dateToTypeMap.set(dateString, leave.type || 'vacation');
+
+                // IMPORTANT: Do NOT add to singleSelectedDays. 
+                // singleSelectedDays should only contain days the USER has clicked/selected in this session 
+                // or explicitly wants to change.
             }
         });
         generateInitialCalendars();
         updateSelectionPreview();
+    };
+
+    const getEasterDate = (year) => {
+        const a = year % 19;
+        const b = Math.floor(year / 100);
+        const c = year % 100;
+        const d = Math.floor(b / 4);
+        const e = b % 4;
+        const f = Math.floor((b + 8) / 25);
+        const g = Math.floor((b - f + 1) / 3);
+        const h = (19 * a + b - d - g + 15) % 30;
+        const i = Math.floor(c / 4);
+        const k = c % 4;
+        const l = (32 + 2 * e + 2 * i - h - k) % 7;
+        const m = Math.floor((a + 11 * h + 22 * l) / 451);
+        const month = Math.floor((h + l - 7 * m + 114) / 31) - 1; // 0-indexed month
+        const day = ((h + l - 7 * m + 114) % 31) + 1;
+        return new Date(Date.UTC(year, month, day));
+    };
+
+    const isHoliday = (date) => {
+        const year = date.getUTCFullYear();
+        const month = date.getUTCMonth(); // 0-11
+        const day = date.getUTCDate();
+
+        // Stałe święta
+        const fixedHolidays = [
+            '0-1',   // Nowy Rok
+            '0-6',   // Trzech Króli
+            '4-1',   // Święto Pracy (Maj 1)
+            '4-3',   // Święto Konstytucji 3 Maja
+            '7-15',  // Wniebowzięcie NMP (Sierpień 15)
+            '10-1',  // Wszystkich Świętych (Listopad 1)
+            '10-11', // Święto Niepodległości (Listopad 11)
+            '11-25', // Boże Narodzenie (Grudzień 25)
+            '11-26', // Drugi dzień świąt (Grudzień 26)
+        ];
+
+        if (fixedHolidays.includes(`${month}-${day}`)) return true;
+
+        // Wielkanoc (Ruchome)
+        const easter = getEasterDate(year);
+        const easterMonday = new Date(easter);
+        easterMonday.setUTCDate(easter.getUTCDate() + 1);
+
+        const bozeCialo = new Date(easter);
+        bozeCialo.setUTCDate(easter.getUTCDate() + 60);
+
+        const zieloneSwiatki = new Date(easter); // Zesłanie Ducha Świętego (7. niedziela po Wielkanocy, czyli +49 dni)
+        zieloneSwiatki.setUTCDate(easter.getUTCDate() + 49);
+
+        const checkDate = (d) => d.getUTCMonth() === month && d.getUTCDate() === day;
+
+        if (checkDate(easter)) return true;
+        if (checkDate(easterMonday)) return true;
+        if (checkDate(bozeCialo)) return true;
+        if (checkDate(zieloneSwiatki)) return true;
+
+        return false;
     };
 
     const createCalendar = (year, month) => {
@@ -121,7 +167,16 @@ export const CalendarModal = (() => {
             const dayCell = document.createElement('div');
             dayCell.className = 'day-cell-calendar';
             dayCell.textContent = i;
-            dayCell.dataset.date = toDateString(new Date(Date.UTC(year, month, i)));
+
+            const date = new Date(Date.UTC(year, month, i));
+            dayCell.dataset.date = toDateString(date);
+
+            // Add holiday class
+            if (isHoliday(date)) {
+                dayCell.classList.add('holiday');
+                dayCell.title = "Święto";
+            }
+
             grid.appendChild(dayCell);
         }
         calendarWrapper.appendChild(header);
@@ -311,24 +366,7 @@ export const CalendarModal = (() => {
         workdaysCounter.textContent = countWorkdaysInSet(singleSelectedDays);
     };
 
-    const applySelection = () => {
-        const selectedLeaveType = leaveTypeSelect.value;
-        const daysToApply = Array.from(singleSelectedDays);
 
-        if (daysToApply.length === 0) {
-            window.showToast('Nie zaznaczono żadnych dni.', 2000, 'warning');
-            return;
-        }
-
-        daysToApply.forEach(dateString => {
-            dateToTypeMap.set(dateString, selectedLeaveType);
-        });
-
-        // Clear selection but keep the modal open
-        resetSelection();
-        updateAllDayCells();
-        window.showToast('Zastosowano typ urlopu.', 1500, 'success');
-    };
 
     const confirmSelection = () => {
         // First, ensure any currently selected days are also applied (if user didn't click Apply first)
@@ -396,7 +434,6 @@ export const CalendarModal = (() => {
         calendarSlider.addEventListener('click', handleDayClick);
         calendarSlider.addEventListener('mouseover', handleDayMouseOver);
         confirmBtn.addEventListener('click', confirmSelection);
-        applyBtn.addEventListener('click', applySelection);
         cancelBtn.addEventListener('click', closeModal);
         clearSelectionBtn.addEventListener('click', () => {
             resetSelection();
@@ -408,7 +445,6 @@ export const CalendarModal = (() => {
         });
 
         leaveTypeSelect.addEventListener('change', updateLeaveTypeLegend);
-        modalYearSelect.addEventListener('change', handleYearChange);
     };
 
     const init = () => {
@@ -416,7 +452,6 @@ export const CalendarModal = (() => {
         prevMonthBtn = document.getElementById('prevMonthBtn');
         nextMonthBtn = document.getElementById('nextMonthBtn');
         confirmBtn = document.getElementById('confirmSelectionBtn');
-        applyBtn = document.getElementById('applySelectionBtn');
         cancelBtn = document.getElementById('cancelSelectionBtn');
         clearSelectionBtn = document.getElementById('clearSelectionBtn');
         startDatePreview = document.getElementById('startDatePreview');
@@ -426,11 +461,6 @@ export const CalendarModal = (() => {
         leaveTypeSelect = document.getElementById('leaveTypeSelect');
 
         leaveTypeLegend = document.getElementById('leaveTypeLegend');
-        modalYearSelect = document.getElementById('modalYearSelect');
-
-        if (modalYearSelect) {
-            populateYearSelect();
-        }
 
         if (modal) {
             // Only setup listeners if the modal exists on the page
@@ -442,10 +472,6 @@ export const CalendarModal = (() => {
     const open = (employeeName, existingLeaves, monthIndex, year) => {
         currentEmployee = employeeName;
         currentYear = year || new Date().getUTCFullYear();
-
-        if (modalYearSelect) {
-            modalYearSelect.value = currentYear;
-        }
 
         if (prevMonthBtn) prevMonthBtn.style.display = 'none';
         if (nextMonthBtn) nextMonthBtn.style.display = 'none';

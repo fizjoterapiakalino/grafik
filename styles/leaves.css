@@ -382,6 +382,17 @@
     background-color: var(--color-secondary-dark);
 }
 
+.action-btn.confirm-btn {
+    background-color: var(--color-success);
+    /* Green */
+    color: white;
+}
+
+.action-btn.confirm-btn:hover {
+    background-color: var(--color-primary-700);
+    /* Darker green */
+}
+
 .leaves-legend {
     display: flex;
     flex-wrap: wrap;
@@ -674,4 +685,46 @@
     tr {
         page-break-inside: avoid;
     }
+}
+
+/* New Header Layout */
+.leaves-header-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #ccc;
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: 5px;
+}
+
+.leaves-header-controls .view-tabs {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.year-selector-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.year-selector-container label {
+    margin-bottom: 0;
+    font-weight: bold;
+}
+
+/* Adjustments for filter container since year select is gone */
+.leaves-filter-container {
+    justify-content: flex-start;
+}
+
+/* Holiday Styling */
+.day-cell-calendar.holiday {
+    color: var(--color-danger);
+    font-weight: bold;
+}
+
+/* Ensure selected holiday looks good (keep text color white if selected) */
+.day-cell-calendar.selected.holiday {
+    color: white;
 }

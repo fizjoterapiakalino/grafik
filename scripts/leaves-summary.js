@@ -20,11 +20,15 @@ export const LeavesSummary = (() => {
      * @param {HTMLElement} tableHeader - Element <tr> nagłówka tabeli.
      * @param {HTMLElement} tableBody - Element <tbody> tabeli.
      * @param {object} allLeavesData - Obiekt z danymi urlopowymi wszystkich pracowników.
+     * @param {number} [year] - Rok, dla którego generowane jest podsumowanie.
      */
-    const render = (tableHeader, tableBody, allLeavesData) => {
+    const render = (tableHeader, tableBody, allLeavesData, year) => {
         const employees = EmployeeManager.getAll();
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // Normalizuj do północy dla spójnych porównań
+        const currentYear = year || new Date().getUTCFullYear();
+        const summaryDate = new Date(); // Do określenia czy urlop jest przeszły czy przyszły
+
+        const yearStart = new Date(Date.UTC(currentYear, 0, 1));
+        const yearEnd = new Date(Date.UTC(currentYear, 11, 31));
 
         // Wyczyść istniejącą zawartość tabeli
         tableHeader.innerHTML = '';
@@ -36,8 +40,8 @@ export const LeavesSummary = (() => {
             <th>Należny</th>
             <th>Zaległy</th>
             <th>Łącznie</th>
-            <th>Wykorzystano</th>
-            <th>Zaplanowano</th>
+            <th>Wykorzystano (${currentYear})</th>
+            <th>Zaplanowano (${currentYear})</th>
             <th>Pozostało</th>
         `;
 
@@ -58,15 +62,34 @@ export const LeavesSummary = (() => {
             let scheduledDays = 0;
 
             employeeLeaves.forEach((leave) => {
-                const leaveStartDate = new Date(leave.startDate + 'T00:00:00Z');
-                const leaveDuration = countWorkdays(leave.startDate, leave.endDate);
+                const leaveStart = new Date(leave.startDate + 'T00:00:00Z');
+                const leaveEnd = new Date(leave.endDate + 'T00:00:00Z');
 
-                // Jeśli urlop rozpoczyna się w przyszłości, jest "zaplanowany"
-                if (leaveStartDate > today) {
-                    scheduledDays += leaveDuration;
-                } else {
-                    // Jeśli rozpoczął się dzisiaj lub w przeszłości, jest "wykorzystany"
-                    usedDays += leaveDuration;
+                // Determine intersection with the current year
+                const start = leaveStart < yearStart ? yearStart : leaveStart;
+                const end = leaveEnd > yearEnd ? yearEnd : leaveEnd;
+
+                if (start <= end) {
+                    const days = countWorkdays(
+                        start.toISOString().split('T')[0],
+                        end.toISOString().split('T')[0]
+                    );
+
+                    // FIX: Only count days if leave type is 'vacation' (or missing, assuming default is vacation)
+                    // We should not subtract 'sick_child_care', 'child_care_art_188' etc. from entitlement.
+                    if (leave.type === 'vacation' || !leave.type) {
+                        if (start > summaryDate) {
+                            scheduledDays += days;
+                        } else if (end <= summaryDate) {
+                            usedDays += days;
+                        } else {
+                            if (leaveStart > summaryDate) {
+                                scheduledDays += days;
+                            } else {
+                                usedDays += days;
+                            }
+                        }
+                    }
                 }
             });
 
