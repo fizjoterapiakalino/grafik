@@ -21,7 +21,8 @@ export const Leaves = (() => {
         clearFiltersBtn,
         leavesFilterContainer,
         yearSelect,
-        currentYearBtn;
+        currentYearBtn,
+        printLeavesNavbarBtn;
 
     const months = [
         'Styczeń',
@@ -237,6 +238,7 @@ export const Leaves = (() => {
         leavesFilterContainer = document.getElementById('leavesFilterContainer');
         yearSelect = document.getElementById('yearSelect');
         currentYearBtn = document.getElementById('currentYearBtn');
+        printLeavesNavbarBtn = document.getElementById('printLeavesNavbarBtn');
 
         // Inicjalizacja modułów zależnych
         CalendarModal.init();
@@ -276,6 +278,7 @@ export const Leaves = (() => {
         clearFiltersBtn.removeEventListener('click', handleClearFilters);
         yearSelect.removeEventListener('change', handleYearChange);
         if (currentYearBtn) currentYearBtn.removeEventListener('click', handleCurrentYearClick);
+        if (printLeavesNavbarBtn) printLeavesNavbarBtn.removeEventListener('click', printLeavesTableToPdf);
 
         if (window.destroyContextMenu) {
             window.destroyContextMenu('contextMenu');
@@ -315,6 +318,9 @@ export const Leaves = (() => {
         }
         if (currentYearBtn) {
             currentYearBtn.addEventListener('click', handleCurrentYearClick);
+        }
+        if (printLeavesNavbarBtn) {
+            printLeavesNavbarBtn.addEventListener('click', printLeavesTableToPdf);
         }
     };
 
@@ -397,6 +403,83 @@ export const Leaves = (() => {
 
         const allLeaves = await getAllLeavesData();
         LeavesCareSummary.render(careViewContainer, allLeaves);
+    };
+
+    const printLeavesTableToPdf = () => {
+        const table = document.getElementById('leavesTable');
+        if (!table) return;
+
+        // Clone headers to avoid modifying the DOM or getting stuck with references
+        const headers = Array.from(table.querySelectorAll('thead th')).map((th, index) => ({
+            text: th.textContent,
+            style: 'tableHeader',
+            // Make the first column (Employee Name) a bit wider, others auto or fixed
+            width: index === 0 ? 100 : '*',
+        }));
+
+        // Extract body data
+        const body = Array.from(table.querySelectorAll('tbody tr')).map((row) => {
+            return Array.from(row.cells).map((cell, index) => {
+                // If it's a day cell with leave blocks, extract text
+                if (index > 0) {
+                    const blocks = Array.from(cell.querySelectorAll('.leave-block'));
+                    if (blocks.length > 0) {
+                        return blocks.map(b => b.textContent).join('\n');
+                    }
+                }
+                return cell.textContent.trim();
+            });
+        });
+
+        const docDefinition = {
+            pageOrientation: 'landscape',
+            pageSize: 'A3', // Use A3 for wide monthly view or A4 if enough
+            pageMargins: [20, 20, 20, 20],
+            content: [
+                { text: `Grafik Urlopów - ${currentYear}`, style: 'header' },
+                {
+                    style: 'tableExample',
+                    table: {
+                        headerRows: 1,
+                        // defined widths in headers object instead
+                        widths: headers.map(h => h.width),
+                        body: [
+                            headers,
+                            ...body
+                        ],
+                    },
+                    layout: {
+                        fillColor: function (rowIndex, node, columnIndex) {
+                            return rowIndex === 0 ? '#4CAF50' : null;
+                        },
+                        hLineWidth: function (i, node) { return 0.5; },
+                        vLineWidth: function (i, node) { return 0.5; },
+                    },
+                },
+            ],
+            styles: {
+                header: {
+                    fontSize: 18,
+                    bold: true,
+                    margin: [0, 0, 0, 10],
+                },
+                tableExample: {
+                    margin: [0, 5, 0, 15],
+                },
+                tableHeader: {
+                    bold: true,
+                    fontSize: 10,
+                    color: 'white',
+                    alignment: 'center'
+                },
+            },
+            defaultStyle: {
+                font: 'Roboto',
+                fontSize: 8 // Smaller font for big table
+            },
+        };
+
+        pdfMake.createPdf(docDefinition).download(`grafik-urlopow-${currentYear}.pdf`);
     };
 
     const generateTableHeaders = () => {
