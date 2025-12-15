@@ -344,13 +344,25 @@ export const Leaves = (() => {
 
     const openCalendarForCell = async (cell) => {
         if (!cell) return;
-        const employeeName = cell.closest('tr').dataset.employee;
+        const tr = cell.closest('tr');
+        const employeeName = tr.dataset.employee;
+        const employeeId = tr.dataset.id;
         const monthIndex = parseInt(cell.dataset.month, 10);
 
         try {
             const allLeaves = await getAllLeavesData();
             const existingLeaves = allLeaves[employeeName] || [];
-            const updatedLeaves = await CalendarModal.open(employeeName, existingLeaves, monthIndex, currentYear);
+
+            const leaveInfo = EmployeeManager.getLeaveInfoById(employeeId);
+            const totalLimit = (parseInt(leaveInfo.entitlement, 10) || 0) + (parseInt(leaveInfo.carriedOver, 10) || 0);
+
+            const updatedLeaves = await CalendarModal.open(
+                employeeName,
+                existingLeaves,
+                monthIndex,
+                currentYear,
+                { totalLimit: totalLimit }
+            );
 
             // Push state before saving changes
             // Note: getAllLeavesData called above gives us the 'before' state of *all* leaves? 
@@ -362,7 +374,9 @@ export const Leaves = (() => {
             renderSingleEmployeeLeaves(employeeName, updatedLeaves);
         } catch (error) {
             console.log('Operacja w kalendarzu została anulowana.', error);
-            window.showToast('Anulowano zmiany.', 2000);
+            if (error !== 'Modal closed without confirmation') {
+                window.showToast('Anulowano zmiany.', 2000);
+            }
         }
     };
 
@@ -554,13 +568,16 @@ export const Leaves = (() => {
 
     const generateTableRows = (employees) => {
         leavesTableBody.innerHTML = '';
-        const sortedEmployeeNames = Object.values(employees)
-            .filter((emp) => !emp.isHidden)
-            .map((emp) => emp.displayName || emp.name)
-            .filter(Boolean);
-        sortedEmployeeNames.forEach((name) => {
+        const sortedEmployees = Object.entries(employees)
+            .map(([id, emp]) => ({ ...emp, id }))
+            .filter((emp) => !emp.isHidden);
+
+        sortedEmployees.forEach((emp) => {
+            const name = emp.displayName || emp.name;
             const tr = document.createElement('tr');
             tr.dataset.employee = name;
+            tr.dataset.id = emp.id; // Store ID for lookup
+
             const nameTd = document.createElement('td');
             nameTd.textContent = name;
             nameTd.classList.add('employee-name-cell');
@@ -652,10 +669,15 @@ export const Leaves = (() => {
                 div.setAttribute('title', leaveTypeName);
                 div.style.backgroundColor = bgColor;
 
-                let text = '';
-                // Arrow if starts before this month
-                if (start < monthStart) text += `<span class="arrow">←</span> `;
+                // Continuity logic
+                if (start < monthStart) {
+                    div.classList.add('continues-left');
+                }
+                if (end > monthEnd) {
+                    div.classList.add('continues-right');
+                }
 
+                let text = '';
                 // Start day in this month
                 const displayStart = start > monthStart ? start.getUTCDate() : monthStart.getUTCDate();
                 text += `${displayStart}`;
@@ -666,9 +688,6 @@ export const Leaves = (() => {
                 if (displayStart !== displayEnd) {
                     text += `-${displayEnd}`;
                 }
-
-                // Arrow if ends after this month
-                if (end > monthEnd) text += ` <span class="arrow">→</span>`;
 
                 div.innerHTML = text;
                 cell.appendChild(div);

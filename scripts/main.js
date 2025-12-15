@@ -20,4 +20,9 @@ import './login.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     Router.init();
+
+    // Apply seasonal theme if applicable
+    import('./seasonal-themes.js').then(module => {
+        module.applySeasonalTheme();
+    }).catch(err => console.error('Failed to load seasonal themes', err));
 });

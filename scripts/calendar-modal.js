@@ -14,10 +14,11 @@ export const CalendarModal = (() => {
         calendarSlider,
         workdaysCounter,
         leaveTypeSelect,
-        leaveTypeLegend;
+        leaveTypeColorIndicator; // New variable
 
     let currentEmployee = null;
     let currentYear = new Date().getUTCFullYear();
+    let currentVacationLimit = 0; // New variable for limit
 
     let selectionStartDate = null;
     let hoverEndDate = null;
@@ -50,12 +51,40 @@ export const CalendarModal = (() => {
             // Check if the date belongs to the currently selected year
             if (!dateString.startsWith(`${currentYear}-`)) return;
 
-            const day = new Date(dateString + 'T00:00:00Z').getUTCDay();
-            if (day !== 0 && day !== 6) {
+            const date = new Date(dateString + 'T00:00:00Z');
+            const day = date.getUTCDay();
+            if (day !== 0 && day !== 6 && !isHoliday(date)) {
                 workdays++;
             }
         });
         return workdays;
+    };
+
+    const countVacationUsage = () => {
+        let used = 0;
+        const currentType = leaveTypeSelect.value;
+        const isVacationSelected = currentType === 'vacation';
+
+        // Count from applied map (excluding those currently being modified in singleSelectedDays)
+        dateToTypeMap.forEach((type, dateString) => {
+            if (singleSelectedDays.has(dateString)) return; // Will be counted in selection part if matches
+            if (type === 'vacation') {
+                const date = new Date(dateString + 'T00:00:00Z');
+                const day = date.getUTCDay();
+                if (day !== 0 && day !== 6 && !isHoliday(date)) used++;
+            }
+        });
+
+        // Count from current selection if it is vacation
+        if (isVacationSelected) {
+            singleSelectedDays.forEach(dateString => {
+                const date = new Date(dateString + 'T00:00:00Z');
+                const day = date.getUTCDay();
+                if (day !== 0 && day !== 6 && !isHoliday(date)) used++;
+            });
+        }
+
+        return used;
     };
 
     const resetSelection = () => {
@@ -212,7 +241,9 @@ export const CalendarModal = (() => {
 
     const updateDayCellSelection = (dayCell) => {
         const dateString = dayCell.dataset.date;
+        const isHoliday = dayCell.classList.contains('holiday');
         dayCell.className = 'day-cell-calendar';
+        if (isHoliday) dayCell.classList.add('holiday');
         dayCell.style.backgroundColor = '';
         dayCell.style.color = '';
 
@@ -250,25 +281,15 @@ export const CalendarModal = (() => {
         }
     };
 
-    const updateLeaveTypeLegend = () => {
-        if (!leaveTypeLegend || !leaveTypeSelect) return;
-
-        leaveTypeLegend.innerHTML = ''; // Clear existing legend
+    const updateLeaveTypeIndicator = () => {
+        if (!leaveTypeColorIndicator || !leaveTypeSelect) return;
 
         const selectedType = leaveTypeSelect.value;
+        const color = AppConfig.leaves.leaveTypeColors[selectedType] || AppConfig.leaves.leaveTypeColors.default;
 
-        // Create a legend item for the currently selected type
-        const selectedOption = leaveTypeSelect.querySelector(`option[value="${selectedType}"]`);
-        if (selectedOption) {
-            const key = selectedOption.value;
-            const color = AppConfig.leaves.leaveTypeColors[key] || AppConfig.leaves.leaveTypeColors.default;
-            const text = selectedOption.textContent;
-
-            const legendItem = document.createElement('div');
-            legendItem.className = 'legend-item';
-            legendItem.innerHTML = `<span class="legend-color-box" style="background-color: ${color};"></span> <strong>${text}</strong>`;
-            leaveTypeLegend.appendChild(legendItem);
-        }
+        leaveTypeColorIndicator.style.backgroundColor = color;
+        // Optionally update selection preview as count/limit display might depend on type
+        updateSelectionPreview();
     };
 
     const handleDayClick = (event) => {
@@ -289,6 +310,22 @@ export const CalendarModal = (() => {
             if (selectedArt188Days.length >= 2 && isAddingNewDay) {
                 window.showToast('Wykorzystano maksymalną liczbę 2 dni opieki nad zdrowym dzieckiem.', 3000, 'error');
                 return; // Zablokuj dodanie kolejnego dnia
+            }
+        }
+
+        // Walidacja limitu urlopu wypoczynkowego
+        if (leaveTypeSelect.value === 'vacation' && !singleSelectedDays.has(clickedDate) && !event.ctrlKey && !event.metaKey) {
+            const currentUsage = countVacationUsage();
+            // Estimate new additional day (check if it's a workday)
+            const d = new Date(clickedDate + 'T00:00:00Z');
+            const day = d.getUTCDay();
+            const isWorkDay = day !== 0 && day !== 6 && !isHoliday(d);
+
+            if (isWorkDay) {
+                if (currentUsage >= currentVacationLimit) {
+                    window.showToast(`Osiągnięto limit urlopu wypoczynkowego (${currentVacationLimit} dni).`, 3000, 'error');
+                    return;
+                }
             }
         }
 
@@ -363,7 +400,24 @@ export const CalendarModal = (() => {
         const dates = Array.from(singleSelectedDays).sort();
         startDatePreview.textContent = dates.length > 0 ? dates[0] : '-';
         endDatePreview.textContent = dates.length > 0 ? dates[dates.length - 1] : '-';
-        workdaysCounter.textContent = countWorkdaysInSet(singleSelectedDays);
+
+        let count = 0;
+        if (leaveTypeSelect.value === 'vacation') {
+            const used = countVacationUsage();
+            workdaysCounter.textContent = `${used} / ${currentVacationLimit}`;
+
+            const remaining = currentVacationLimit - used;
+            if (remaining <= 5) {
+                workdaysCounter.classList.add('limit-warning');
+            } else {
+                workdaysCounter.classList.remove('limit-warning');
+            }
+        } else {
+            // For other types, just show selected count (workdays)
+            count = countWorkdaysInSet(singleSelectedDays);
+            workdaysCounter.textContent = count;
+            workdaysCounter.classList.remove('limit-warning');
+        }
     };
 
 
@@ -444,7 +498,7 @@ export const CalendarModal = (() => {
             if (event.target === modal) closeModal();
         });
 
-        leaveTypeSelect.addEventListener('change', updateLeaveTypeLegend);
+        leaveTypeSelect.addEventListener('change', updateLeaveTypeIndicator);
     };
 
     const init = () => {
@@ -459,8 +513,10 @@ export const CalendarModal = (() => {
         calendarSlider = document.querySelector('.calendar-slider');
         workdaysCounter = document.getElementById('workdaysCounter');
         leaveTypeSelect = document.getElementById('leaveTypeSelect');
+        leaveTypeColorIndicator = document.getElementById('leaveTypeColorIndicator');
 
-        leaveTypeLegend = document.getElementById('leaveTypeLegend');
+        // leaveTypeLegend removal handled in HTML
+
 
         if (modal) {
             // Only setup listeners if the modal exists on the page
@@ -469,16 +525,17 @@ export const CalendarModal = (() => {
     };
 
 
-    const open = (employeeName, existingLeaves, monthIndex, year) => {
+    const open = (employeeName, existingLeaves, monthIndex, year, limits = {}) => {
         currentEmployee = employeeName;
         currentYear = year || new Date().getUTCFullYear();
+        currentVacationLimit = limits.totalLimit || 26; // Default to 26 if not provided
 
         if (prevMonthBtn) prevMonthBtn.style.display = 'none';
         if (nextMonthBtn) nextMonthBtn.style.display = 'none';
 
         resetSelection();
         loadEmployeeLeavesForModal(existingLeaves);
-        updateLeaveTypeLegend(); // Call this after leaveTypeSelect is potentially set
+        updateLeaveTypeIndicator();
         modal.style.display = 'flex';
         return new Promise((resolve, reject) => {
             _resolvePromise = resolve;

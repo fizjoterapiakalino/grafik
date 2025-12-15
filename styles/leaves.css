@@ -109,7 +109,37 @@
     overflow: hidden;
     text-overflow: ellipsis;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     transition: transform 0.1s;
+    position: relative;
+    z-index: 1;
+}
+
+.leave-block.continues-left {
+    margin-left: -15px;
+    /* Strong overlap */
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    padding-left: 15px;
+    /* Compensate for negative margin */
+    width: auto;
+    /* Allow expansion */
+}
+
+.leave-block.continues-right {
+    margin-right: -15px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    padding-right: 15px;
+    width: auto;
+}
+
+.leave-block.continues-left.continues-right {
+    margin-left: -15px;
+    margin-right: -15px;
+    width: auto;
+    padding-left: 15px;
+    padding-right: 15px;
 }
 
 .leave-block:hover {
@@ -535,22 +565,16 @@
 
 /* Remove border-radius from in-range cells to create a continuous bar */
 .day-cell-calendar.in-range {
-    border-radius: 0 !important;
+    border-radius: 50% !important;
 }
 
 /* Adjust start and end date to connect with the in-range bar */
 .day-cell-calendar.start-date {
-    border-top-right-radius: 0 !important;
-    border-bottom-right-radius: 0 !important;
-    border-top-left-radius: 50% !important;
-    border-bottom-left-radius: 50% !important;
+    border-radius: 50% !important;
 }
 
 .day-cell-calendar.end-date {
-    border-top-left-radius: 0 !important;
-    border-bottom-left-radius: 0 !important;
-    border-top-right-radius: 50% !important;
-    border-bottom-right-radius: 50% !important;
+    border-radius: 50% !important;
 }
 
 /* --- Date Summary and Label --- */
@@ -595,6 +619,15 @@
     outline: none;
     border-color: var(--color-secondary);
     box-shadow: 0 0 0 2px rgba(var(--color-secondary-rgb), 0.2);
+}
+
+.limit-warning {
+    color: var(--color-danger);
+    font-weight: bold;
+}
+
+.hidden-row {
+    display: none;
 }
 
 @media print {
@@ -722,9 +755,21 @@
 .day-cell-calendar.holiday {
     color: var(--color-danger);
     font-weight: bold;
+    border: 1px solid var(--color-danger);
+    border-radius: 50%;
+    background-color: #fff1f2;
+    /* Very light red */
 }
 
 /* Ensure selected holiday looks good (keep text color white if selected) */
 .day-cell-calendar.selected.holiday {
     color: white;
+    border-color: white;
+    /* Or transparent */
+    background-color: var(--color-danger);
+    /* Use red background for selected holiday? Or keep the selection color? */
+    /* Usually selection color (blue/green) overrides. */
+    /* But if it's a holiday, maybe we want to keep it distinct? */
+    /* Let's stick to default selection color but maybe indicated by borders? */
+    /* For now, let JS handle the background color for selection. */
 }
