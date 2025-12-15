@@ -3,8 +3,11 @@ import { EmployeeManager } from './employee-manager.js';
 import { AppConfig, countWorkdays } from './common.js';
 
 export const LeavesCareSummary = (() => {
-    const render = (container, allLeavesData) => {
+    const render = (container, allLeavesData, year) => {
         container.innerHTML = ''; // Wyczyść kontener
+        const currentYear = year || new Date().getUTCFullYear();
+        const yearStart = new Date(Date.UTC(currentYear, 0, 1));
+        const yearEnd = new Date(Date.UTC(currentYear, 11, 31));
 
         const table = document.createElement('table');
         table.className = 'summary-table';
@@ -13,9 +16,9 @@ export const LeavesCareSummary = (() => {
             <thead>
                 <tr>
                     <th>Pracownik</th>
-                    <th>Opieka (Dziecko zdrowe do 14 r.ż)</th>
-                    <th>Opieka (Dziecko chore)</th>
-                    <th>Opieka (Inny członek rodziny)</th>
+                    <th>Opieka (Dziecko zdrowe do 14 r.ż) [${currentYear}]</th>
+                    <th>Opieka (Dziecko chore) [${currentYear}]</th>
+                    <th>Opieka (Inny członek rodziny) [${currentYear}]</th>
                     <th>Suma wykorzystana</th>
                 </tr>
             </thead>
@@ -26,8 +29,7 @@ export const LeavesCareSummary = (() => {
         const sortedEmployeeNames = Object.values(employees)
             .filter((emp) => !emp.isHidden)
             .map((emp) => emp.displayName || emp.name)
-            .filter(Boolean)
-            .sort();
+            .filter(Boolean);
 
         sortedEmployeeNames.forEach((employeeName) => {
             const employeeLeaves = allLeavesData[employeeName] || [];
@@ -37,17 +39,30 @@ export const LeavesCareSummary = (() => {
             let usedFamilyMemberDays = 0;
 
             employeeLeaves.forEach((leave) => {
-                const days = countWorkdays(leave.startDate, leave.endDate);
-                switch (leave.type) {
-                    case 'child_care_art_188':
-                        usedArt188Days += days;
-                        break;
-                    case 'sick_child_care':
-                        usedSickChildDays += days;
-                        break;
-                    case 'family_member_care':
-                        usedFamilyMemberDays += days;
-                        break;
+                const leaveStart = new Date(leave.startDate + 'T00:00:00Z');
+                const leaveEnd = new Date(leave.endDate + 'T00:00:00Z');
+
+                // Determine intersection with the current year
+                const start = leaveStart < yearStart ? yearStart : leaveStart;
+                const end = leaveEnd > yearEnd ? yearEnd : leaveEnd;
+
+                if (start <= end) {
+                    const days = countWorkdays(
+                        start.toISOString().split('T')[0],
+                        end.toISOString().split('T')[0]
+                    );
+
+                    switch (leave.type) {
+                        case 'child_care_art_188':
+                            usedArt188Days += days;
+                            break;
+                        case 'sick_child_care':
+                            usedSickChildDays += days;
+                            break;
+                        case 'family_member_care':
+                            usedFamilyMemberDays += days;
+                            break;
+                    }
                 }
             });
 

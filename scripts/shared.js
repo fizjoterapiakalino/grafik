@@ -193,7 +193,7 @@ export const Shared = (() => {
                     .auth()
                     .signOut()
                     .then(() => {
-                        window.location.hash = '#login'; // Przekieruj po wylogowaniu
+                        // window.location.hash = '#login'; // REMOVED: Managed by Router via onAuthStateChanged
                         // Explicitly get elements to ensure they are correctly referenced
                         const currentNavPanel = document.querySelector('.nav-panel');
                         const currentHamburger = document.querySelector('.hamburger-menu');

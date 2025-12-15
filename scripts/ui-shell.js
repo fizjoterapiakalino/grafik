@@ -36,7 +36,8 @@ export const UIShell = (() => {
                         <button id="clearSearchButton" class="clear-search-btn" style="display: none;"><i class="fas fa-times"></i></button>
                     </div>
                     <button id="undoButton" class="undo-button" title="Cofnij (Ctrl+Z)" disabled><i class="fas fa-undo"></i></button>
-                    <button id="printChangesTable" class="action-btn" title="Drukuj Grafik"><i class="fas fa-print"></i></button>
+                    <button id="printChangesTable" class="action-btn" title="Drukuj Grafik Harmonogramu" style="display: none;"><i class="fas fa-print"></i></button>
+                    <button id="printLeavesNavbarBtn" class="action-btn" title="Drukuj Grafik Urlopów" style="display: none;"><i class="fas fa-file-pdf"></i></button>
                     <!-- Hamburger menu will be inserted here by shared.js -->
                 </div>
             </div>
@@ -135,12 +136,17 @@ export const UIShell = (() => {
             pageContent.innerHTML = pageHtml;
 
             const scheduleActionButtons = document.getElementById('scheduleActionButtons');
+            const printChangesTable = document.getElementById('printChangesTable');
+            const printLeavesNavbarBtn = document.getElementById('printLeavesNavbarBtn');
+
             if (scheduleActionButtons) {
-                if (pageName === 'schedule') {
-                    scheduleActionButtons.style.display = 'flex';
-                } else {
-                    scheduleActionButtons.style.display = 'none';
-                }
+                scheduleActionButtons.style.display = pageName === 'schedule' ? 'flex' : 'none';
+            }
+            if (printChangesTable) {
+                printChangesTable.style.display = pageName === 'schedule' ? 'inline-block' : 'none';
+            }
+            if (printLeavesNavbarBtn) {
+                printLeavesNavbarBtn.style.display = pageName === 'leaves' ? 'inline-block' : 'none';
             }
         } catch (error) {
             console.error(`Failed to load page content for ${pageName}:`, error);

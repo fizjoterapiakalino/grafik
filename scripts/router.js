@@ -90,7 +90,11 @@ export const Router = (() => {
 
         try {
             if (activeModule && typeof activeModule.destroy === 'function') {
-                activeModule.destroy();
+                try {
+                    activeModule.destroy();
+                } catch (err) {
+                    console.error('Error destroying module:', err);
+                }
                 activeModule = null;
             }
 

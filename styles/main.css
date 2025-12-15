@@ -263,20 +263,7 @@ body {
     margin-top: 20px;
 }
 
-.login-btn {
-    padding: 12px 25px;
-    background-color: #4caf50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: background-color 0.3s;
-}
 
-.login-btn:hover {
-    background-color: #45a049;
-}
 
 .login-error {
     color: #d8000c;

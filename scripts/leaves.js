@@ -1,6 +1,6 @@
 // scripts/leaves.js
 import { db } from './firebase-config.js';
-import { AppConfig, hideLoadingOverlay } from './common.js';
+import { AppConfig, hideLoadingOverlay, UndoManager } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
 import { LeavesSummary } from './leaves-summary.js';
 import { LeavesCareSummary } from './leaves-care-summary.js';
@@ -21,7 +21,8 @@ export const Leaves = (() => {
         clearFiltersBtn,
         leavesFilterContainer,
         yearSelect,
-        currentYearBtn;
+        currentYearBtn,
+        printLeavesNavbarBtn;
 
     const months = [
         'Styczeń',
@@ -41,6 +42,12 @@ export const Leaves = (() => {
     let currentYear = new Date().getUTCFullYear();
     let activeCell = null;
     let activeFilters = new Set();
+
+    // Undo
+    let undoManager;
+    let appState = {
+        leaves: {}
+    };
 
     // --- Nazwane funkcje obsługi zdarzeń ---
     const _handleAppSearch = (e) => {
@@ -127,9 +134,40 @@ export const Leaves = (() => {
             openCalendarForCell(activeCell);
         }
 
+        if (event.ctrlKey && event.key === 'z') {
+            event.preventDefault();
+            undoLastAction();
+            return;
+        }
+
         if (event.key === 'Delete' || event.key === 'Backspace') {
             event.preventDefault();
             clearCellLeaves(activeCell);
+        }
+    };
+
+    const undoLastAction = () => {
+        const prevState = undoManager.undo();
+        if (prevState) {
+            // Restore functionality needs to be smart.
+            // Since we save partial updates to Firestore, we might need to restore full state.
+            // But here we rely on getAllLeavesData to refresh, or we can restore the local state and save it back.
+            // A simple approach: Restore local state object, then save *that entire object* to Firestore?
+            // "mainLeaves" doc contains all users.
+
+            // Actually, we should probably save the entire mainLeaves doc state in undo stack.
+            const restoredLeaves = prevState.leaves;
+
+            // We need to re-save this entire object to Firestore to be consistent?
+            // Yes, "Undo" in a multi-user app is tricky. 
+            // For now, let's assume last-write-wins and we overwrite with old state.
+
+            saveAllLeavesData(restoredLeaves).then(() => {
+                refreshCurrentView();
+                window.showToast('Cofnięto ostatnią zmianę.', 2000);
+            });
+        } else {
+            window.showToast('Brak akcji do cofnięcia.', 2000);
         }
     };
 
@@ -139,9 +177,19 @@ export const Leaves = (() => {
         return new Date(Date.UTC(year, month - 1, day));
     };
 
+    const refreshCurrentView = async () => {
+        if (monthlyViewBtn.classList.contains('active')) {
+            await showMonthlyView();
+        } else if (summaryViewBtn.classList.contains('active')) {
+            await showSummaryView();
+        } else if (careViewBtn.classList.contains('active')) {
+            await showCareView();
+        }
+    };
+
     const handleYearChange = async (e) => {
         currentYear = parseInt(e.target.value, 10);
-        await showMonthlyView(); // Re-render the monthly view for the new year
+        await refreshCurrentView();
     };
 
     const populateYearSelect = () => {
@@ -237,6 +285,7 @@ export const Leaves = (() => {
         leavesFilterContainer = document.getElementById('leavesFilterContainer');
         yearSelect = document.getElementById('yearSelect');
         currentYearBtn = document.getElementById('currentYearBtn');
+        printLeavesNavbarBtn = document.getElementById('printLeavesNavbarBtn');
 
         // Inicjalizacja modułów zależnych
         CalendarModal.init();
@@ -248,6 +297,14 @@ export const Leaves = (() => {
             generateLegendAndFilters();
             clearFiltersBtn = document.getElementById('clearFiltersBtn');
             setupEventListeners();
+
+            // Load initial data for UndoManager
+            const allLeaves = await getAllLeavesData();
+            appState.leaves = allLeaves;
+
+            undoManager = new UndoManager({ maxStates: 20 });
+            undoManager.initialize(appState);
+
             await showMonthlyView();
             highlightCurrentMonth();
 
@@ -276,6 +333,7 @@ export const Leaves = (() => {
         clearFiltersBtn.removeEventListener('click', handleClearFilters);
         yearSelect.removeEventListener('change', handleYearChange);
         if (currentYearBtn) currentYearBtn.removeEventListener('click', handleCurrentYearClick);
+        if (printLeavesNavbarBtn) printLeavesNavbarBtn.removeEventListener('click', printLeavesTableToPdf);
 
         if (window.destroyContextMenu) {
             window.destroyContextMenu('contextMenu');
@@ -286,19 +344,39 @@ export const Leaves = (() => {
 
     const openCalendarForCell = async (cell) => {
         if (!cell) return;
-        const employeeName = cell.closest('tr').dataset.employee;
+        const tr = cell.closest('tr');
+        const employeeName = tr.dataset.employee;
+        const employeeId = tr.dataset.id;
         const monthIndex = parseInt(cell.dataset.month, 10);
 
         try {
             const allLeaves = await getAllLeavesData();
             const existingLeaves = allLeaves[employeeName] || [];
-            const updatedLeaves = await CalendarModal.open(employeeName, existingLeaves, monthIndex, currentYear);
+
+            const leaveInfo = EmployeeManager.getLeaveInfoById(employeeId);
+            const totalLimit = (parseInt(leaveInfo.entitlement, 10) || 0) + (parseInt(leaveInfo.carriedOver, 10) || 0);
+
+            const updatedLeaves = await CalendarModal.open(
+                employeeName,
+                existingLeaves,
+                monthIndex,
+                currentYear,
+                { totalLimit: totalLimit }
+            );
+
+            // Push state before saving changes
+            // Note: getAllLeavesData called above gives us the 'before' state of *all* leaves? 
+            // Yes, existingLeaves is just for one employee. We need full state.
+            appState.leaves = allLeaves; // Update local state with fresh data
+            undoManager.pushState(appState);
 
             await saveLeavesData(employeeName, updatedLeaves);
             renderSingleEmployeeLeaves(employeeName, updatedLeaves);
         } catch (error) {
             console.log('Operacja w kalendarzu została anulowana.', error);
-            window.showToast('Anulowano zmiany.', 2000);
+            if (error !== 'Modal closed without confirmation') {
+                window.showToast('Anulowano zmiany.', 2000);
+            }
         }
     };
 
@@ -315,6 +393,9 @@ export const Leaves = (() => {
         }
         if (currentYearBtn) {
             currentYearBtn.addEventListener('click', handleCurrentYearClick);
+        }
+        if (printLeavesNavbarBtn) {
+            printLeavesNavbarBtn.addEventListener('click', printLeavesTableToPdf);
         }
     };
 
@@ -348,7 +429,7 @@ export const Leaves = (() => {
         if (currentYear !== thisYear) {
             currentYear = thisYear;
             yearSelect.value = currentYear;
-            await showMonthlyView();
+            await refreshCurrentView();
         } else {
             // If already on current year, just ensure highlight is correct (maybe re-render or just highlight)
             highlightCurrentMonth();
@@ -383,7 +464,7 @@ export const Leaves = (() => {
         leavesFilterContainer.style.display = 'none'; // Ukryj kontener filtrów
 
         const allLeaves = await getAllLeavesData();
-        LeavesSummary.render(leavesHeaderRow, leavesTableBody, allLeaves);
+        LeavesSummary.render(leavesHeaderRow, leavesTableBody, allLeaves, currentYear);
     };
 
     const showCareView = async () => {
@@ -396,7 +477,84 @@ export const Leaves = (() => {
         leavesFilterContainer.style.display = 'none'; // Ukryj kontener filtrów
 
         const allLeaves = await getAllLeavesData();
-        LeavesCareSummary.render(careViewContainer, allLeaves);
+        LeavesCareSummary.render(careViewContainer, allLeaves, currentYear);
+    };
+
+    const printLeavesTableToPdf = () => {
+        const table = document.getElementById('leavesTable');
+        if (!table) return;
+
+        // Clone headers to avoid modifying the DOM or getting stuck with references
+        const headers = Array.from(table.querySelectorAll('thead th')).map((th, index) => ({
+            text: th.textContent,
+            style: 'tableHeader',
+            // Make the first column (Employee Name) a bit wider, others auto or fixed
+            width: index === 0 ? 100 : '*',
+        }));
+
+        // Extract body data
+        const body = Array.from(table.querySelectorAll('tbody tr')).map((row) => {
+            return Array.from(row.cells).map((cell, index) => {
+                // If it's a day cell with leave blocks, extract text
+                if (index > 0) {
+                    const blocks = Array.from(cell.querySelectorAll('.leave-block'));
+                    if (blocks.length > 0) {
+                        return blocks.map(b => b.textContent).join('\n');
+                    }
+                }
+                return cell.textContent.trim();
+            });
+        });
+
+        const docDefinition = {
+            pageOrientation: 'landscape',
+            pageSize: 'A3', // Use A3 for wide monthly view or A4 if enough
+            pageMargins: [20, 20, 20, 20],
+            content: [
+                { text: `Grafik Urlopów - ${currentYear}`, style: 'header' },
+                {
+                    style: 'tableExample',
+                    table: {
+                        headerRows: 1,
+                        // defined widths in headers object instead
+                        widths: headers.map(h => h.width),
+                        body: [
+                            headers,
+                            ...body
+                        ],
+                    },
+                    layout: {
+                        fillColor: function (rowIndex, node, columnIndex) {
+                            return rowIndex === 0 ? '#4CAF50' : null;
+                        },
+                        hLineWidth: function (i, node) { return 0.5; },
+                        vLineWidth: function (i, node) { return 0.5; },
+                    },
+                },
+            ],
+            styles: {
+                header: {
+                    fontSize: 18,
+                    bold: true,
+                    margin: [0, 0, 0, 10],
+                },
+                tableExample: {
+                    margin: [0, 5, 0, 15],
+                },
+                tableHeader: {
+                    bold: true,
+                    fontSize: 10,
+                    color: 'white',
+                    alignment: 'center'
+                },
+            },
+            defaultStyle: {
+                font: 'Roboto',
+                fontSize: 8 // Smaller font for big table
+            },
+        };
+
+        pdfMake.createPdf(docDefinition).download(`grafik-urlopow-${currentYear}.pdf`);
     };
 
     const generateTableHeaders = () => {
@@ -410,14 +568,16 @@ export const Leaves = (() => {
 
     const generateTableRows = (employees) => {
         leavesTableBody.innerHTML = '';
-        const sortedEmployeeNames = Object.values(employees)
-            .filter((emp) => !emp.isHidden)
-            .map((emp) => emp.displayName || emp.name)
-            .filter(Boolean)
-            .sort();
-        sortedEmployeeNames.forEach((name) => {
+        const sortedEmployees = Object.entries(employees)
+            .map(([id, emp]) => ({ ...emp, id }))
+            .filter((emp) => !emp.isHidden);
+
+        sortedEmployees.forEach((emp) => {
+            const name = emp.displayName || emp.name;
             const tr = document.createElement('tr');
             tr.dataset.employee = name;
+            tr.dataset.id = emp.id; // Store ID for lookup
+
             const nameTd = document.createElement('td');
             nameTd.textContent = name;
             nameTd.classList.add('employee-name-cell');
@@ -509,10 +669,15 @@ export const Leaves = (() => {
                 div.setAttribute('title', leaveTypeName);
                 div.style.backgroundColor = bgColor;
 
-                let text = '';
-                // Arrow if starts before this month
-                if (start < monthStart) text += `<span class="arrow">←</span> `;
+                // Continuity logic
+                if (start < monthStart) {
+                    div.classList.add('continues-left');
+                }
+                if (end > monthEnd) {
+                    div.classList.add('continues-right');
+                }
 
+                let text = '';
                 // Start day in this month
                 const displayStart = start > monthStart ? start.getUTCDate() : monthStart.getUTCDate();
                 text += `${displayStart}`;
@@ -523,9 +688,6 @@ export const Leaves = (() => {
                 if (displayStart !== displayEnd) {
                     text += `-${displayEnd}`;
                 }
-
-                // Arrow if ends after this month
-                if (end > monthEnd) text += ` <span class="arrow">→</span>`;
 
                 div.innerHTML = text;
                 cell.appendChild(div);
@@ -539,6 +701,11 @@ export const Leaves = (() => {
         const monthToClear = parseInt(cell.dataset.month, 10);
         try {
             const allLeaves = await getAllLeavesData();
+
+            // Push state before modification
+            appState.leaves = allLeaves;
+            undoManager.pushState(appState);
+
             const employeeLeaves = allLeaves[employeeName] || [];
             const remainingLeaves = employeeLeaves.filter((leave) => {
                 const start = toUTCDate(leave.startDate);
@@ -550,6 +717,21 @@ export const Leaves = (() => {
         } catch (error) {
             console.error('Błąd podczas czyszczenia urlopów w komórce:', error);
             window.showToast('Wystąpił błąd podczas czyszczenia urlopów. Spróbuj ponownie.', 5000);
+        }
+    };
+
+    // Helper to save full state (for undo)
+    const saveAllLeavesData = async (allLeavesData) => {
+        try {
+            await db
+                .collection(AppConfig.firestore.collections.leaves)
+                .doc(AppConfig.firestore.docs.mainLeaves)
+                .set(allLeavesData); // Overwrite entire doc
+            // Update local appState to match
+            appState.leaves = allLeavesData;
+        } catch (error) {
+            console.error('Błąd podczas przywracania urlopów:', error);
+            throw error;
         }
     };
 

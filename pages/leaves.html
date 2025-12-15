@@ -1,13 +1,17 @@
-<div class="view-tabs">
-    <button id="monthlyViewBtn" class="tab-btn active">Widok Miesięczny</button>
-    <button id="summaryViewBtn" class="tab-btn">Podsumowanie Roczne</button>
-    <button id="careViewBtn" class="tab-btn">Opieka</button>
+<div class="leaves-header-controls">
+    <div class="view-tabs">
+        <button id="monthlyViewBtn" class="tab-btn active">Widok Miesięczny</button>
+        <button id="summaryViewBtn" class="tab-btn">Podsumowanie Roczne</button>
+        <button id="careViewBtn" class="tab-btn">Opieka</button>
+    </div>
+    <div class="year-selector-container">
+        <label for="yearSelect">Rok:</label>
+        <select id="yearSelect" class="year-select"></select>
+    </div>
 </div>
 
 <div id="leavesFilterContainer" class="leaves-filter-container"
     style="padding: 10px; background-color: #f8f9fa; border-radius: 5px; margin-bottom: 15px">
-    <label for="yearSelect">Rok:</label>
-    <select id="yearSelect" class="year-select"></select>
     <div id="leavesLegend" class="leaves-legend"></div>
     <button id="currentYearBtn" class="action-btn secondary" style="margin-left: auto;">Ten Rok</button>
     <button id="clearFiltersBtn" class="action-btn">Wyczyść filtry</button>
@@ -34,18 +38,18 @@
         <div class="modal-controls" style="display: flex; gap: 20px; margin-bottom: 15px; align-items: flex-end;">
             <div class="leave-type-selector" style="text-align: left;">
                 <label for="leaveTypeSelect">Wybierz typ urlopu</label>
-                <select id="leaveTypeSelect" class="modal-select">
-                    <option value="vacation" selected>Wypoczynkowy</option>
-                    <option value="child_care_art_188">Opieka nad zdrowym dzieckiem</option>
-                    <option value="sick_child_care">Opieka nad chorym dzieckiem</option>
-                    <option value="family_member_care">Opieka chorym członkiem rodziny</option>
-                </select>
+                <div class="leave-type-input-group" style="display: flex; align-items: center; gap: 10px;">
+                    <span id="leaveTypeColorIndicator" class="color-indicator-box"
+                        style="display: inline-block; width: 24px; height: 24px; border-radius: 4px; border: 1px solid #ccc;"></span>
+                    <select id="leaveTypeSelect" class="modal-select" style="flex-grow: 1;">
+                        <option value="vacation" selected>Wypoczynkowy</option>
+                        <option value="child_care_art_188">Opieka nad zdrowym dzieckiem</option>
+                        <option value="sick_child_care">Opieka nad chorym dzieckiem</option>
+                        <option value="family_member_care">Opieka chorym członkiem rodziny</option>
+                    </select>
+                </div>
             </div>
-            <div class="year-selector" style="text-align: left;">
-                <label for="modalYearSelect">Rok</label>
-                <select id="modalYearSelect" class="modal-select">
-                </select>
-            </div>
+
         </div>
         <div class="calendar-scroll-area">
             <div class="calendar-header">
@@ -68,10 +72,10 @@
             <div class="selection-mode-info">
                 <p><kbd>Ctrl</kbd> + klik, aby zaznaczyć pojedyncze dni.</p>
             </div>
-            <div id="leaveTypeLegend" class="leave-type-legend"></div>
+            <!-- leaveTypeLegend removed as per request -->
             <div class="modal-actions">
                 <button id="clearSelectionBtn" class="action-btn">Wyczyść</button>
-                <button id="applySelectionBtn" class="action-btn secondary">Zastosuj typ</button>
+
                 <button id="confirmSelectionBtn" class="action-btn confirm-btn">Zapisz i zamknij</button>
                 <button id="cancelSelectionBtn" class="action-btn cancel-btn">Anuluj</button>
             </div>

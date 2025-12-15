@@ -61,6 +61,18 @@
     background-color: #fef2f2;
 }
 
+.cancel-btn.filled {
+    background-color: var(--color-danger);
+    color: var(--color-white);
+    border: none;
+}
+
+.cancel-btn.filled:hover {
+    background-color: #d32f2f;
+    /* Darker red */
+    color: var(--color-white);
+}
+
 /* --- Kalendarz Modal --- */
 .modal-overlay {
     position: fixed;

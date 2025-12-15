@@ -227,6 +227,14 @@ td.split-cell {
     height: 1px;
 }
 
+/* Fix dla Firefox: height: 1px powoduje, że wrapper ma 1px wysokości.
+   height: 100% pozwala dziecku rozszerzyć się na całą wysokość komórki. */
+@-moz-document url-prefix() {
+    td.split-cell {
+        height: 100%;
+    }
+}
+
 .split-cell-wrapper {
     display: flex;
     flex-direction: row;
