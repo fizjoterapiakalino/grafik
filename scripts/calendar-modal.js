@@ -1,5 +1,5 @@
 // scripts/calendar-modal.js
-import { AppConfig, months } from './common.js';
+import { AppConfig, months, isHoliday } from './common.js';
 
 export const CalendarModal = (() => {
     // --- SELEKTORY I ZMIENNE WEWNĘTRZNE MODUŁU ---
@@ -64,11 +64,12 @@ export const CalendarModal = (() => {
         let used = 0;
         const currentType = leaveTypeSelect.value;
         const isVacationSelected = currentType === 'vacation';
+        const yearPrefix = `${currentYear}-`;
 
         // Count from applied map (excluding those currently being modified in singleSelectedDays)
         dateToTypeMap.forEach((type, dateString) => {
             if (singleSelectedDays.has(dateString)) return; // Will be counted in selection part if matches
-            if (type === 'vacation') {
+            if (type === 'vacation' && dateString.startsWith(yearPrefix)) {
                 const date = new Date(dateString + 'T00:00:00Z');
                 const day = date.getUTCDay();
                 if (day !== 0 && day !== 6 && !isHoliday(date)) used++;
@@ -78,9 +79,11 @@ export const CalendarModal = (() => {
         // Count from current selection if it is vacation
         if (isVacationSelected) {
             singleSelectedDays.forEach(dateString => {
-                const date = new Date(dateString + 'T00:00:00Z');
-                const day = date.getUTCDay();
-                if (day !== 0 && day !== 6 && !isHoliday(date)) used++;
+                if (dateString.startsWith(yearPrefix)) {
+                    const date = new Date(dateString + 'T00:00:00Z');
+                    const day = date.getUTCDay();
+                    if (day !== 0 && day !== 6 && !isHoliday(date)) used++;
+                }
             });
         }
 
@@ -119,64 +122,6 @@ export const CalendarModal = (() => {
         updateSelectionPreview();
     };
 
-    const getEasterDate = (year) => {
-        const a = year % 19;
-        const b = Math.floor(year / 100);
-        const c = year % 100;
-        const d = Math.floor(b / 4);
-        const e = b % 4;
-        const f = Math.floor((b + 8) / 25);
-        const g = Math.floor((b - f + 1) / 3);
-        const h = (19 * a + b - d - g + 15) % 30;
-        const i = Math.floor(c / 4);
-        const k = c % 4;
-        const l = (32 + 2 * e + 2 * i - h - k) % 7;
-        const m = Math.floor((a + 11 * h + 22 * l) / 451);
-        const month = Math.floor((h + l - 7 * m + 114) / 31) - 1; // 0-indexed month
-        const day = ((h + l - 7 * m + 114) % 31) + 1;
-        return new Date(Date.UTC(year, month, day));
-    };
-
-    const isHoliday = (date) => {
-        const year = date.getUTCFullYear();
-        const month = date.getUTCMonth(); // 0-11
-        const day = date.getUTCDate();
-
-        // Stałe święta
-        const fixedHolidays = [
-            '0-1',   // Nowy Rok
-            '0-6',   // Trzech Króli
-            '4-1',   // Święto Pracy (Maj 1)
-            '4-3',   // Święto Konstytucji 3 Maja
-            '7-15',  // Wniebowzięcie NMP (Sierpień 15)
-            '10-1',  // Wszystkich Świętych (Listopad 1)
-            '10-11', // Święto Niepodległości (Listopad 11)
-            '11-25', // Boże Narodzenie (Grudzień 25)
-            '11-26', // Drugi dzień świąt (Grudzień 26)
-        ];
-
-        if (fixedHolidays.includes(`${month}-${day}`)) return true;
-
-        // Wielkanoc (Ruchome)
-        const easter = getEasterDate(year);
-        const easterMonday = new Date(easter);
-        easterMonday.setUTCDate(easter.getUTCDate() + 1);
-
-        const bozeCialo = new Date(easter);
-        bozeCialo.setUTCDate(easter.getUTCDate() + 60);
-
-        const zieloneSwiatki = new Date(easter); // Zesłanie Ducha Świętego (7. niedziela po Wielkanocy, czyli +49 dni)
-        zieloneSwiatki.setUTCDate(easter.getUTCDate() + 49);
-
-        const checkDate = (d) => d.getUTCMonth() === month && d.getUTCDate() === day;
-
-        if (checkDate(easter)) return true;
-        if (checkDate(easterMonday)) return true;
-        if (checkDate(bozeCialo)) return true;
-        if (checkDate(zieloneSwiatki)) return true;
-
-        return false;
-    };
 
     const createCalendar = (year, month) => {
         const calendarWrapper = document.createElement('div');
@@ -257,7 +202,9 @@ export const CalendarModal = (() => {
         const isApplied = dateToTypeMap.has(dateString);
 
         if (isSelected || isInRange || isApplied) {
-            const leaveType = isApplied ? dateToTypeMap.get(dateString) : leaveTypeSelect.value;
+            // Priority: Active selection/range > Applied (Database)
+            // This ensures user sees the color of the tool they are using even when overwriting
+            const leaveType = (isSelected || isInRange) ? leaveTypeSelect.value : dateToTypeMap.get(dateString);
             const color = AppConfig.leaves.leaveTypeColors[leaveType] || AppConfig.leaves.leaveTypeColors.default;
 
             dayCell.classList.add('selected');
@@ -313,6 +260,73 @@ export const CalendarModal = (() => {
             }
         }
 
+        // Walidacja dla "Wybicia" (schedule_pickup)
+        if (leaveTypeSelect.value === 'schedule_pickup') {
+            const date = new Date(clickedDate + 'T00:00:00Z');
+            const month = date.getUTCMonth();
+            const year = date.getUTCFullYear();
+
+            // Check for Saturday holiday in this month
+            let saturdayHolidaysCount = 0;
+            const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+            for (let d = 1; d <= daysInMonth; d++) {
+                const checkDate = new Date(Date.UTC(year, month, d));
+                if (checkDate.getUTCDay() === 6 && isHoliday(checkDate)) {
+                    saturdayHolidaysCount++;
+                }
+            }
+
+            if (saturdayHolidaysCount === 0) {
+                window.showToast('W tym miesiącu nie ma święta w sobotę. Wybicie niedostępne.', 3000, 'error');
+                return;
+            }
+
+            // Calculate currently used usages for this month
+            // Existing ones in map, excluding ones we are currently toggling (because singleSelectedDays overrides)
+            // Actually, simplified: Count existing map entries for this month + singleSelectedDays count?
+            // No, singleSelectedDays OVERRIDES map entries. 
+            // So: 
+            // 1. Identify all days in this month that WILL be 'schedule_pickup'
+            //    -> (Map entries that are 'schedule_pickup' AND NOT in singleSelectedDays)
+            //    -> PLUS (All entries in singleSelectedDays, since current tool is 'schedule_pickup')
+
+            // Check if we are ADDING or REMOVING? 
+            // If clicking an existing selected day -> Removing -> Count defaults decrease -> OK.
+            // If clicking a new day -> Adding -> Count increases.
+
+            if (!singleSelectedDays.has(clickedDate) && !event.ctrlKey && !event.metaKey) {
+                // Determine final count if we proceed
+                // Count from Map (excluding singleSelectedDays - which acts as overwrite buffer)
+                let currentPickupsCount = 0;
+                dateToTypeMap.forEach((type, dString) => {
+                    if (type !== 'schedule_pickup') return;
+                    if (singleSelectedDays.has(dString)) return; // Being overwritten
+
+                    // Check if in same month
+                    const dDate = new Date(dString + 'T00:00:00Z');
+                    if (dDate.getUTCFullYear() === year && dDate.getUTCMonth() === month) {
+                        currentPickupsCount++;
+                    }
+                });
+
+                // Count from Selection (all are 'schedule_pickup' because that's the active tool)
+                singleSelectedDays.forEach(dString => {
+                    const dDate = new Date(dString + 'T00:00:00Z');
+                    if (dDate.getUTCFullYear() === year && dDate.getUTCMonth() === month) {
+                        currentPickupsCount++;
+                    }
+                });
+
+                // Add the one we are about to click
+                currentPickupsCount++;
+
+                if (currentPickupsCount > saturdayHolidaysCount) {
+                    window.showToast(`Możesz odebrać tylko ${saturdayHolidaysCount} dzień/dni za święto w tym miesiącu.`, 3000, 'error');
+                    return;
+                }
+            }
+        }
+
         // Walidacja limitu urlopu wypoczynkowego
         if (leaveTypeSelect.value === 'vacation' && !singleSelectedDays.has(clickedDate) && !event.ctrlKey && !event.metaKey) {
             const currentUsage = countVacationUsage();
@@ -349,6 +363,79 @@ export const CalendarModal = (() => {
                 const endDate = toUTCDate(end);
 
                 // Ponowna walidacja dla zaznaczenia zakresu
+                if (leaveTypeSelect.value === 'schedule_pickup') {
+                    // Simulate the new state to check limits per month
+                    const simulatedSelection = new Set(singleSelectedDays);
+                    for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
+                        simulatedSelection.add(toDateString(d));
+                    }
+
+                    // Identify months affected by the range
+                    const affectedMonths = new Set();
+                    for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
+                        affectedMonths.add(`${d.getUTCFullYear()}-${d.getUTCMonth()}`);
+                    }
+
+                    for (const ym of affectedMonths) {
+                        const [y, m] = ym.split('-').map(Number);
+
+                        // 1. Get limit for this month
+                        let saturdayHolidaysCount = 0;
+                        const daysInMonth = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+                        for (let d = 1; d <= daysInMonth; d++) {
+                            const checkDate = new Date(Date.UTC(y, m, d));
+                            if (checkDate.getUTCDay() === 6 && isHoliday(checkDate)) {
+                                saturdayHolidaysCount++;
+                            }
+                        }
+
+                        if (saturdayHolidaysCount === 0) {
+                            window.showToast(`W miesiącu ${months[m]} nie ma święta w sobotę. Wybicie niedostępne.`, 4000, 'error');
+                            isRangeSelectionActive = false;
+                            selectionStartDate = null;
+                            hoverEndDate = null;
+                            updateAllDayCells();
+                            return;
+                        }
+
+                        // 2. Count usage in this month based on simulated state
+                        let count = 0;
+
+                        // Count from Map (only those NOT in simulatedSelection, to avoid double counting or counting overwritten ones)
+                        dateToTypeMap.forEach((type, dString) => {
+                            if (type !== 'schedule_pickup') return;
+                            if (simulatedSelection.has(dString)) return; // Covered by simulated set (which we assume is all pickup)
+
+                            const dDate = new Date(dString + 'T00:00:00Z');
+                            if (dDate.getUTCFullYear() === y && dDate.getUTCMonth() === m) {
+                                count++;
+                            }
+                        });
+
+                        // Count from simulated selection (all are assumed pickup as that's active tool)
+                        simulatedSelection.forEach(dString => {
+                            const dDate = new Date(dString + 'T00:00:00Z');
+                            if (dDate.getUTCFullYear() === y && dDate.getUTCMonth() === m) {
+                                count++;
+                            }
+                        });
+
+
+                        if (count > saturdayHolidaysCount) {
+                            window.showToast(
+                                `Przekroczono limit ${saturdayHolidaysCount} dni wybicia w miesiącu ${months[m]}.`,
+                                4000,
+                                'error'
+                            );
+                            isRangeSelectionActive = false;
+                            selectionStartDate = null;
+                            hoverEndDate = null;
+                            updateAllDayCells();
+                            return;
+                        }
+                    }
+                }
+
                 if (leaveTypeSelect.value === 'child_care_art_188') {
                     let tempDayCount = 0;
                     for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {

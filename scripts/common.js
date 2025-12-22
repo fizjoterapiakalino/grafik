@@ -39,6 +39,7 @@ export const AppConfig = {
             child_care_art_188: '#ffcc80',
             sick_child_care: '#f48fb1',
             family_member_care: '#cf93d9',
+            schedule_pickup: '#b39ddb', // Lavender
             default: '#e6ee9b',
         },
     },
@@ -126,7 +127,7 @@ export function searchAndHighlight(searchTerm, tableSelector, cellSelector) {
 }
 
 export class UndoManager {
-    constructor({ maxStates = 20, onUpdate = () => {} }) {
+    constructor({ maxStates = 20, onUpdate = () => { } }) {
         this.maxStates = maxStates;
         this.onUpdate = onUpdate;
         this.stack = [];
@@ -165,6 +166,66 @@ export class UndoManager {
     }
 }
 
+export function getEasterDate(year) {
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31) - 1; // 0-indexed month
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(Date.UTC(year, month, day));
+}
+
+export function isHoliday(date) {
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth(); // 0-11
+    const day = date.getUTCDate();
+
+    // Stałe święta
+    const fixedHolidays = [
+        '0-1',   // Nowy Rok
+        '0-6',   // Trzech Króli
+        '4-1',   // Święto Pracy (Maj 1)
+        '4-3',   // Święto Konstytucji 3 Maja
+        '7-15',  // Wniebowzięcie NMP (Sierpień 15)
+        '10-1',  // Wszystkich Świętych (Listopad 1)
+        '10-11', // Święto Niepodległości (Listopad 11)
+        '11-24', // Wigilia (Grudzień 24)
+        '11-25', // Boże Narodzenie (Grudzień 25)
+        '11-26', // Drugi dzień świąt (Grudzień 26)
+    ];
+
+    if (fixedHolidays.includes(`${month}-${day}`)) return true;
+
+    // Wielkanoc (Ruchome)
+    const easter = getEasterDate(year);
+    const easterMonday = new Date(easter);
+    easterMonday.setUTCDate(easter.getUTCDate() + 1);
+
+    const bozeCialo = new Date(easter);
+    bozeCialo.setUTCDate(easter.getUTCDate() + 60);
+
+    const zieloneSwiatki = new Date(easter); // Zesłanie Ducha Świętego (7. niedziela po Wielkanocy, czyli +49 dni)
+    zieloneSwiatki.setUTCDate(easter.getUTCDate() + 49);
+
+    const checkDate = (d) => d.getUTCMonth() === month && d.getUTCDate() === day;
+
+    if (checkDate(easter)) return true;
+    if (checkDate(easterMonday)) return true;
+    if (checkDate(bozeCialo)) return true;
+    if (checkDate(zieloneSwiatki)) return true;
+
+    return false;
+}
+
 export function countWorkdays(startDate, endDate) {
     let count = 0;
     const start = new Date(startDate + 'T00:00:00Z');
@@ -174,7 +235,7 @@ export function countWorkdays(startDate, endDate) {
 
     while (current <= end) {
         const day = current.getUTCDay(); // 0 = Niedziela, 1 = Poniedziałek, ..., 6 = Sobota
-        if (day !== 0 && day !== 6) {
+        if (day !== 0 && day !== 6 && !isHoliday(current)) {
             count++;
         }
         current.setUTCDate(current.getUTCDate() + 1);
@@ -189,5 +250,7 @@ window.showToast = showToast;
 window.hideLoadingOverlay = hideLoadingOverlay;
 window.capitalizeFirstLetter = capitalizeFirstLetter;
 window.searchAndHighlight = searchAndHighlight;
+window.isHoliday = isHoliday;
+window.getEasterDate = getEasterDate;
 window.UndoManager = UndoManager;
 window.countWorkdays = countWorkdays;

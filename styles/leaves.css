@@ -1,12 +1,12 @@
 /* Główny kontener dla widoku urlopów */
 .leaves-view-container {
     padding: var(--spacing-lg);
-    background-color: #f9f9f9;
+    background-color: var(--color-gray-50);
 }
 
 /* Styl dla zakładek przełączających widok */
 .view-tabs {
-    border-bottom: 2px solid #ccc;
+    border-bottom: 2px solid var(--color-gray-300);
     margin-bottom: var(--spacing-lg);
 }
 
@@ -40,23 +40,27 @@
     width: 100%;
     border-collapse: collapse;
     margin-top: var(--spacing-lg);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    background-color: var(--color-white);
+    box-shadow: var(--shadow-sm);
+    background-color: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    border: var(--glass-border);
+    border-radius: var(--border-radius);
+    /* Ensure radius is applied if border-collapse doesn't override */
 }
 
 .leaves-table th,
 .summary-table th {
-    background-color: var(--color-primary);
+    background-color: var(--color-primary-600);
     color: var(--color-white);
     padding: 12px 15px;
     text-align: left;
     font-weight: 600;
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--color-primary-700);
 }
 
 .leaves-table th:first-child,
 .summary-table th:first-child {
-    background-color: var(--bg-header);
+    background-color: var(--color-gray-800);
     z-index: 2;
     /* Ensure it stays above sticky columns if any */
 }
@@ -74,14 +78,14 @@
 
 .leaves-table tbody tr:hover,
 .summary-table tbody tr:hover {
-    background-color: #f1f1f1;
+    background-color: var(--color-gray-100);
 }
 
 .employee-name-cell {
     font-weight: bold;
     position: sticky;
     left: 0;
-    background-color: var(--bg-header-light);
+    background-color: var(--color-gray-100);
     z-index: 1;
 }
 
@@ -100,6 +104,7 @@
 
 .leave-block {
     background-color: #ffab91;
+    /* This might be dynamic based on user color, check logic */
     color: var(--color-text);
     padding: 2px 6px;
     border-radius: 4px;
@@ -108,22 +113,33 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sm);
     transition: transform 0.1s;
     position: relative;
     z-index: 1;
+    height: 24px;
+    line-height: 20px;
+    box-sizing: border-box;
+    display: block;
+}
+
+.leave-spacer {
+    height: 24px;
+    line-height: 20px;
+    box-sizing: border-box;
+    font-size: 0.85em;
+    margin-bottom: 3px;
+    padding: 2px 6px;
+    visibility: hidden;
+    display: block;
 }
 
 .leave-block.continues-left {
     margin-left: -15px;
-    /* Strong overlap */
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
     padding-left: 15px;
-    /* Compensate for negative margin */
     width: auto;
-    /* Allow expansion */
 }
 
 .leave-block.continues-right {
@@ -164,13 +180,14 @@
     justify-content: center;
     align-items: center;
     z-index: 1000;
+    backdrop-filter: blur(2px);
 }
 
 .modal-content {
-    background-color: white;
+    background-color: var(--color-white);
     padding: 20px;
     border-radius: var(--border-radius);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-lg);
     width: 90%;
     max-width: 500px;
 }
@@ -192,8 +209,8 @@
 .modal-footer {
     flex-shrink: 0;
     padding-top: 10px;
-    border-top: 1px solid #eee;
-    background-color: #fff;
+    border-top: 1px solid var(--color-gray-200);
+    background-color: var(--color-white);
 }
 
 .calendar-header {
@@ -255,21 +272,21 @@
 }
 
 .day-cell-calendar:hover {
-    background-color: #e9ecef;
+    background-color: var(--color-gray-200);
 }
 
 .day-cell-calendar.other-month {
-    color: #ccc;
+    color: var(--color-gray-400);
     cursor: default;
 }
 
 .day-cell-calendar.selected {
-    color: white;
+    color: var(--color-white);
 }
 
 .day-cell-calendar.in-range {
     opacity: 0.7;
-    color: white;
+    color: var(--color-white);
     border-radius: 0;
 }
 
@@ -286,7 +303,7 @@
 .selection-preview {
     margin-top: 20px;
     padding-top: 15px;
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--color-gray-200);
     text-align: center;
 }
 
@@ -301,11 +318,11 @@
     padding: 3px 8px;
     font-family: 'Consolas', 'Monaco', monospace;
     font-size: 0.9em;
-    color: #212529;
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
+    color: var(--color-text);
+    background-color: var(--color-gray-50);
+    border: 1px solid var(--color-gray-300);
     border-radius: 4px;
-    box-shadow: 0 2px 0 #ced4da;
+    box-shadow: 0 2px 0 var(--color-gray-300);
     position: relative;
     top: -1px;
 }
@@ -319,9 +336,9 @@
 #contextMenu {
     position: absolute;
     display: none;
-    background-color: white;
-    border: 1px solid #ccc;
-    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.15);
+    background-color: var(--color-white);
+    border: 1px solid var(--color-gray-300);
+    box-shadow: var(--shadow-md);
     border-radius: 5px;
     z-index: 1001;
     padding: 5px 0;
@@ -340,7 +357,7 @@
 }
 
 .context-menu-item:hover {
-    background-color: #f0f0f0;
+    background-color: var(--color-gray-100);
 }
 
 /* Nowe style dla płynnego przewijania kalendarza */
@@ -374,8 +391,8 @@
     gap: 20px;
     align-items: center;
     padding: 15px;
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background-color: var(--color-gray-50);
+    border: 1px solid var(--color-gray-300);
     border-radius: 5px;
     margin-bottom: 15px;
 }
@@ -384,44 +401,11 @@
     margin-right: 10px;
     font-weight: 600;
     font-size: 1em;
-    color: #495057;
+    color: var(--color-gray-700);
 }
 
-#clearFiltersBtn,
-.action-btn {
-    padding: 8px 15px;
-    background-color: var(--color-danger);
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 0.9em;
-    transition: background-color 0.2s ease;
-}
-
-#clearFiltersBtn:hover,
-.action-btn:hover {
-    background-color: var(--color-danger-dark);
-}
-
-.action-btn.secondary {
-    background-color: var(--color-secondary);
-}
-
-.action-btn.secondary:hover {
-    background-color: var(--color-secondary-dark);
-}
-
-.action-btn.confirm-btn {
-    background-color: var(--color-success);
-    /* Green */
-    color: white;
-}
-
-.action-btn.confirm-btn:hover {
-    background-color: var(--color-primary-700);
-    /* Darker green */
-}
+/* Removed redundant .action-btn styles - using components.css */
+/* Kept .leaves-legend and specific filter styles */
 
 .leaves-legend {
     display: flex;
@@ -473,7 +457,7 @@
     align-items: center;
     margin-bottom: 10px;
     padding: 8px;
-    background-color: #f8f9fa;
+    background-color: var(--color-gray-50);
     border-radius: 6px;
     font-size: 0.9em;
     color: var(--color-text-light);
@@ -491,7 +475,7 @@
     width: 18px;
     height: 18px;
     border-radius: 4px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--color-gray-300);
 }
 
 /* --- Refactor for 12-Month View --- */
@@ -586,7 +570,7 @@
     width: 100%;
     margin-bottom: 15px;
     padding: 10px;
-    background-color: #f8f9fa;
+    background-color: var(--color-gray-50);
     border-radius: 8px;
 }
 
@@ -720,12 +704,172 @@
     }
 }
 
+
+/* Responsive Card View for Mobile */
+@media screen and (max-width: 768px) {
+    .leaves-view-container {
+        padding: var(--spacing-sm);
+    }
+
+    /* Hide standard table headers */
+    .leaves-table thead,
+    .summary-table thead {
+        border: none;
+        clip: rect(0 0 0 0);
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        padding: 0;
+        position: absolute;
+        width: 1px;
+    }
+
+    .leaves-table,
+    .summary-table,
+    .leaves-table tbody,
+    .summary-table tbody,
+    .leaves-table tr,
+    .summary-table tr,
+    .leaves-table td,
+    .summary-table td {
+        display: block;
+    }
+
+    .leaves-table tr,
+    .summary-table tr {
+        background-color: var(--color-white);
+        border: 1px solid var(--color-gray-200);
+        margin-bottom: var(--spacing-md);
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow-sm);
+        padding: var(--spacing-sm);
+    }
+
+    /* Employee Name styling (Card Header) */
+    .leaves-table td.employee-name-cell,
+    .summary-table td:first-child {
+        font-size: 1.2em;
+        font-weight: bold;
+        text-align: left;
+        border: none;
+        border-bottom: 2px solid var(--color-gray-100);
+        margin-bottom: var(--spacing-sm);
+        padding-left: 0;
+        background-color: transparent;
+        position: static;
+        /* Disable sticky on mobile card view */
+        color: var(--color-primary-600);
+    }
+
+    /* Data cells */
+    .leaves-table td.day-cell,
+    .summary-table td:not(:first-child) {
+        border: none;
+        border-bottom: 1px solid var(--color-gray-100);
+        position: relative;
+        padding-left: 50%;
+        text-align: right;
+        min-height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .leaves-table td.day-cell:last-child {
+        border-bottom: none;
+    }
+
+    /* Hide empty months to save space on mobile */
+    .leaves-table td.day-cell:not(.has-content) {
+        display: none;
+    }
+
+    /* Label using data-label attribute */
+    .leaves-table td.day-cell::before,
+    .summary-table td:not(:first-child)::before {
+        content: attr(data-label);
+        font-weight: bold;
+        color: var(--color-gray-600);
+        text-align: left;
+        flex: 1;
+    }
+
+    /* Adjust leave blocks in card view */
+    .leave-block {
+        display: inline-block;
+        margin-left: 5px;
+        width: auto;
+    }
+
+    /* Layout adjustments for leave blocks inside the flex container */
+    .day-cell {
+        flex-wrap: wrap;
+        /* Allow wrapping if many leaves */
+    }
+
+    .day-cell>div {
+        flex: 0 0 auto;
+        /* Stop them from taking full width unless needed */
+    }
+
+    /* Summary Table specifics for labels */
+    .summary-table td:nth-of-type(2)::before {
+        content: "Należny";
+    }
+
+    .summary-table td:nth-of-type(3)::before {
+        content: "Zaległy";
+    }
+
+    .summary-table td:nth-of-type(4)::before {
+        content: "Łącznie";
+    }
+
+    .summary-table td:nth-of-type(5)::before {
+        content: "Wykorzystano";
+    }
+
+    .summary-table td:nth-of-type(6)::before {
+        content: "Zaplanowano";
+    }
+
+    .summary-table td:nth-of-type(7)::before {
+        content: "Pozostało";
+    }
+
+    /* Header Controls Stack */
+    .leaves-header-controls {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-md);
+    }
+
+    .year-selector-container {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    /* Filter Container Optimization */
+    .leaves-filter-container {
+        gap: 10px;
+        padding: 10px;
+    }
+
+    .leaves-legend {
+        gap: 10px;
+    }
+
+    .legend-item {
+        font-size: 0.85em;
+    }
+}
+
 /* New Header Layout */
 .leaves-header-controls {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 2px solid #ccc;
+    border-bottom: 2px solid var(--color-gray-300);
     margin-bottom: var(--spacing-lg);
     padding-bottom: 5px;
 }
@@ -744,6 +888,33 @@
 .year-selector-container label {
     margin-bottom: 0;
     font-weight: bold;
+    font-size: 1.1em;
+}
+
+.year-select {
+    padding: 10px 15px;
+    font-size: 1.2em;
+    font-weight: bold;
+    border: 2px solid var(--color-primary);
+    border-radius: var(--border-radius-sm);
+    background-color: var(--color-white);
+    color: var(--color-primary);
+    cursor: pointer;
+    min-width: 150px;
+    transition: all 0.2s ease-in-out;
+    box-shadow: var(--shadow-sm);
+}
+
+.year-select:hover {
+    border-color: var(--color-secondary);
+    color: var(--color-secondary);
+    box-shadow: var(--shadow-md);
+}
+
+.year-select:focus {
+    outline: none;
+    border-color: var(--color-secondary);
+    box-shadow: 0 0 0 3px rgba(var(--color-secondary-rgb), 0.2);
 }
 
 /* Adjustments for filter container since year select is gone */
@@ -755,21 +926,4 @@
 .day-cell-calendar.holiday {
     color: var(--color-danger);
     font-weight: bold;
-    border: 1px solid var(--color-danger);
-    border-radius: 50%;
-    background-color: #fff1f2;
-    /* Very light red */
-}
-
-/* Ensure selected holiday looks good (keep text color white if selected) */
-.day-cell-calendar.selected.holiday {
-    color: white;
-    border-color: white;
-    /* Or transparent */
-    background-color: var(--color-danger);
-    /* Use red background for selected holiday? Or keep the selection color? */
-    /* Usually selection color (blue/green) overrides. */
-    /* But if it's a holiday, maybe we want to keep it distinct? */
-    /* Let's stick to default selection color but maybe indicated by borders? */
-    /* For now, let JS handle the background color for selection. */
 }

@@ -53,6 +53,16 @@ export const EmployeeManager = (() => {
             entitlement: _employees[id]?.leaveEntitlement || 0,
             carriedOver: _employees[id]?.carriedOverLeave || 0,
         }),
+        compareEmployees: (empA, empB) => {
+            const getSortKey = (emp) => {
+                // Sort by First Name to match the "First Name Last Name" display
+                if (emp.firstName || emp.lastName) {
+                    return `${emp.firstName || ''} ${emp.lastName || ''}`.trim();
+                }
+                return (emp.displayName || emp.name || '').trim();
+            };
+            return getSortKey(empA).localeCompare(getSortKey(empB), 'pl', { sensitivity: 'base' });
+        },
         // Zwraca pracownika i jego indeks na podstawie UID
         getEmployeeByUid: (uid) => {
             if (!uid) return null;

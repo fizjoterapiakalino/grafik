@@ -1,12 +1,20 @@
 /* Globalne style aplikacji */
 html,
 body {
-    height: 100%;
+    height: 100vh;
     /* Upewnij się, że html i body zajmują całą wysokość okna */
     margin: 0;
     padding: 0;
-    overflow-x: hidden;
-    /* Zapobiegaj poziomemu przewijaniu */
+    overflow: hidden;
+    /* Zablokuj scrollowania całego okna */
+}
+
+/* App Root teraz też musi być flex containerem */
+#app-root {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
 }
 
 :root {
@@ -90,9 +98,14 @@ body {
     --border-radius: 10px;
     --border-radius-lg: 16px;
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 10px 10px -5px rgb(0 0 0 / 0.04);
+
+    /* Glassmorphism */
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --glass-border: 1px solid rgba(255, 255, 255, 0.3);
+    --glass-blur: blur(12px);
 
     /* Typography */
     --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
@@ -100,17 +113,21 @@ body {
 
 body {
     font-family: var(--font-sans);
-    background-color: #f4f4f4;
-    display: flex;
-    flex-direction: column;
-    /* Umożliwia przypięcie stopki do dołu body, jeśli byłaby poza nav-panel */
+    background: linear-gradient(135deg, #f6f8fb 0%, #eef2f7 100%);
+    /* Display: flex handled at top level now */
 }
 
+/* Moduł główny (treść) */
 .container {
-    padding-top: 20px;
-    margin: 0 20px 20px 20px;
-    flex-grow: 1;
-    /* Pozwól kontenerowi rosnąć i zajmować dostępną przestrzeń */
+    flex: 1;
+    /* Zajmij pozostałą przestrzeń */
+    overflow-y: auto;
+    /* Przewijaj tylko ten kontener */
+    overflow-x: hidden;
+    padding: 20px;
+    /* Padding zamiast marginesu, by scrollbar był przy krawędzi */
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* --- Ekran ładowania --- */
@@ -248,12 +265,27 @@ body {
     font-weight: bold;
 }
 
-.form-group input {
+.form-group input,
+.form-group select,
+.form-group textarea {
     width: 100%;
-    padding: 12px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    padding: var(--spacing-sm);
+    border: 1px solid var(--color-gray-300);
+    border-radius: var(--border-radius-sm);
     box-sizing: border-box;
+    font-size: 1em;
+    font-family: var(--font-sans);
+    transition:
+        border-color 0.2s,
+        box-shadow 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--color-secondary);
+    box-shadow: 0 0 0 3px rgba(var(--color-secondary-rgb), 0.2);
 }
 
 .form-actions {
