@@ -3,12 +3,17 @@
     justify-content: space-between;
     align-items: center;
     padding: 10px 20px;
-    background-color: var(--color-primary-600);
+    background-color: rgba(5, 150, 105, 0.85);
+    /* Emerald Green with opacity */
+    backdrop-filter: blur(10px);
     /* Emerald Green Header */
     color: var(--color-white);
-    position: sticky;
-    top: 0;
+    /* position: sticky removed - handled by flex layout */
     z-index: 1000;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    /* Ensure z-index context works reliably */
 }
 
 .banner-left-content {
@@ -34,6 +39,8 @@
     display: flex;
     align-items: center;
     gap: 15px;
+    margin-right: 50px;
+    /* Przestrzeń na fixed hamburger na desktopie */
 }
 
 .schedule-action-buttons {
@@ -198,11 +205,25 @@
     /* Red */
 }
 
-/* Hamburger Menu */
+/* Hamburger Menu - Fixed position to avoid backdrop-filter trapping */
 .hamburger-menu {
+    position: fixed;
+    top: 10px;
+    right: 20px;
+    z-index: 3000;
     font-size: 1.8em;
     cursor: pointer;
-    /* display: none; - Usunięto, aby menu było zawsze widoczne */
+    color: white;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, background-color 0.2s, bottom 0.3s, right 0.3s;
+}
+
+.hamburger-menu:hover {
+    color: var(--color-primary-200);
 }
 
 .nav-panel {
@@ -237,8 +258,18 @@
     list-style: none;
     padding: 0;
     margin: 0;
-    flex-grow: 1;
     overflow-y: auto;
+}
+
+.nav-panel .main-nav-list {
+    flex-grow: 1;
+    /* This list takes available space */
+}
+
+.nav-panel .logout-nav-list {
+    flex-grow: 0;
+    margin-top: auto;
+    /* Push to bottom if needed, though flex-grow on main list handles it */
 }
 
 .nav-panel li {
@@ -310,29 +341,30 @@
         display: block;
     }
 
+    .header-right-menu {
+        margin-right: 0;
+    }
+
     .hamburger-menu {
         display: flex;
-        /* Flex to center icon */
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
+        bottom: 30px;
+        right: 30px;
+        top: auto;
         width: 60px;
         height: 60px;
-        background-color: var(--color-primary);
+        background-color: var(--color-primary-600);
         border-radius: 50%;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-        align-items: center;
-        justify-content: center;
-        z-index: 2000;
-        /* Ensure it's above everything */
+        box-shadow: var(--shadow-xl);
         color: white;
-        transition:
-            transform 0.2s,
-            background-color 0.2s;
+    }
+
+    .hamburger-menu:hover {
+        color: white;
+        background-color: var(--color-primary-700);
     }
 
     .hamburger-menu:active {
-        transform: scale(0.95);
+        transform: scale(0.9);
     }
 
     .hamburger-menu i {

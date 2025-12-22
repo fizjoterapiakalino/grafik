@@ -85,17 +85,19 @@
     justify-content: center;
     align-items: center;
     z-index: 2000;
+    backdrop-filter: blur(4px);
 }
 
 .modal-content {
-    background-color: var(--color-white);
+    background-color: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
     padding: var(--spacing-lg);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-xl);
     transition: transform 0.3s ease-out;
     max-height: 90vh;
     overflow-y: auto;
-    border: 1px solid var(--color-gray-200);
+    border: var(--glass-border);
 }
 
 .calendar-header {

@@ -117,7 +117,7 @@ export const UIShell = (() => {
 
         try {
             // Load new CSS if it exists
-            const cssPath = `styles/${pageName}.css`;
+            const cssPath = `styles/${pageName}.css?v=${Date.now()}`;
             const cssResponse = await fetch(cssPath);
             if (cssResponse.ok) {
                 const newStylesheet = document.createElement('link');

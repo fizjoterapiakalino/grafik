@@ -1,6 +1,6 @@
 // scripts/changes.js
 import { db } from './firebase-config.js';
-import { AppConfig } from './common.js';
+import { AppConfig, isHoliday } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
 
 export const Changes = (() => {
@@ -10,28 +10,10 @@ export const Changes = (() => {
     };
     let activeCell = null;
 
-    const holidays = [
-        // Święta w 2025 roku
-        '2025-01-01',
-        '2025-01-06',
-        '2025-04-20',
-        '2025-04-21',
-        '2025-05-01',
-        '2025-05-03',
-        '2025-06-08',
-        '2025-06-19',
-        '2025-08-15',
-        '2025-11-01',
-        '2025-11-11',
-        '2025-12-25',
-        '2025-12-26',
-    ];
-
     const isWeekendOrHoliday = (date) => {
         const day = date.getUTCDay();
         if (day === 0 || day === 6) return true;
-        const dateString = date.toISOString().split('T')[0];
-        return holidays.includes(dateString);
+        return isHoliday(date);
     };
 
     const generateTwoWeekPeriods = (year) => {
@@ -145,7 +127,7 @@ export const Changes = (() => {
 
             for (const employeeId in employees) {
                 const employee = employees[employeeId];
-                if (employee.isHidden) continue;
+                if (employee.isHidden || employee.isScheduleOnly) continue;
 
                 const employeeName = employee.displayName || employee.name;
                 const employeeLeaves = allLeavesData[employeeName];
@@ -189,7 +171,7 @@ export const Changes = (() => {
         searchInput.value = ''; // Clear search input
 
         const allEmployees = Object.fromEntries(
-            Object.entries(EmployeeManager.getAll()).filter(([, employee]) => !employee.isHidden),
+            Object.entries(EmployeeManager.getAll()).filter(([, employee]) => !employee.isHidden && !employee.isScheduleOnly),
         );
         const period = cell.parentElement.dataset.startDate;
         const columnIndex = cell.cellIndex;

@@ -50,6 +50,7 @@ export const Shared = (() => {
             navPanel.appendChild(userInfoDiv);
 
             const ul = document.createElement('ul');
+            ul.className = 'main-nav-list';
             navLinks.forEach((link) => {
                 const li = document.createElement('li');
                 const a = document.createElement('a');
@@ -81,6 +82,7 @@ export const Shared = (() => {
 
             // Add logout button in a separate list to push it to the bottom
             const logoutUl = document.createElement('ul');
+            logoutUl.className = 'logout-nav-list';
             const logoutLi = document.createElement('li');
             logoutLi.id = 'logoutBtnContainer';
             logoutLi.style.display = 'none'; // Initially hidden
@@ -97,7 +99,7 @@ export const Shared = (() => {
             footerInfo.innerHTML = '<p>&copy; 2025 Fizjoterapia Kalinowa. Wszelkie prawa zastrzeżone.</p>';
             navPanel.appendChild(footerInfo);
 
-            headerRightMenu.appendChild(hamburger);
+            document.body.appendChild(hamburger);
             document.body.appendChild(navPanel);
 
             const updateActiveLink = () => {

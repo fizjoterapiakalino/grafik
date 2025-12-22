@@ -21,7 +21,8 @@ export const Options = (() => {
         employeeUidInput,
         assignUidBtn,
         clearUidBtn,
-        employeeIsHidden;
+        employeeIsHidden,
+        employeeIsScheduleOnly;
 
     // --- ZMIENNE STANU APLIKACJI ---
     let selectedEmployeeIndex = null;
@@ -226,6 +227,7 @@ export const Options = (() => {
         carriedOverLeaveInput.value = employee.carriedOverLeave || 0;
         document.getElementById('employeeRoleAdmin').checked = employee.role === 'admin';
         employeeIsHidden.checked = employee.isHidden || false;
+        employeeIsScheduleOnly.checked = employee.isScheduleOnly || false;
         employeeUidInput.value = employee.uid || '';
     };
 
@@ -322,6 +324,7 @@ export const Options = (() => {
             carriedOverLeave: newCarriedOver,
             role: isAdmin ? 'admin' : 'user',
             isHidden: isHidden,
+            isScheduleOnly: employeeIsScheduleOnly.checked,
             uid: newUid,
         };
 
@@ -460,6 +463,7 @@ export const Options = (() => {
         assignUidBtn = document.getElementById('assignUidBtn');
         clearUidBtn = document.getElementById('clearUidBtn');
         employeeIsHidden = document.getElementById('employeeIsHidden');
+        employeeIsScheduleOnly = document.getElementById('employeeIsScheduleOnly');
         // Nowe elementy dla kopii zapasowej
         createBackupBtn = document.getElementById('createBackupBtn');
         restoreBackupBtn = document.getElementById('restoreBackupBtn');

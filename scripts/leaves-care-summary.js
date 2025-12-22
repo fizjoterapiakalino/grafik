@@ -26,13 +26,19 @@ export const LeavesCareSummary = (() => {
 
         const tbody = document.createElement('tbody');
         const employees = EmployeeManager.getAll();
-        const sortedEmployeeNames = Object.values(employees)
-            .filter((emp) => !emp.isHidden)
-            .map((emp) => emp.displayName || emp.name)
-            .filter(Boolean);
 
-        sortedEmployeeNames.forEach((employeeName) => {
-            const employeeLeaves = allLeavesData[employeeName] || [];
+        // Convert to array of [id, emp] to have access to ID for full name lookup
+        // Filter and sort same as original logic (implied alphabetical or by index)
+        const sortedEmployees = Object.entries(employees)
+            .filter(([_, emp]) => !emp.isHidden && !emp.isScheduleOnly)
+            .sort(([, empA], [, empB]) => EmployeeManager.compareEmployees(empA, empB));
+
+        sortedEmployees.forEach(([id, emp]) => {
+            const employeeKey = emp.displayName || emp.name;
+            if (!employeeKey) return;
+
+            const fullName = EmployeeManager.getFullNameById(id);
+            const employeeLeaves = allLeavesData[employeeKey] || [];
 
             let usedArt188Days = 0;
             let usedSickChildDays = 0;
@@ -83,7 +89,7 @@ export const LeavesCareSummary = (() => {
             `;
 
             row.innerHTML = `
-                <td>${employeeName}</td>
+                <td>${fullName}</td>
                 <td style="${getCellStyle(art188Percentage)}">${usedArt188Days} / ${art188Limit} dni</td>
                 <td style="${getCellStyle(sickChildPercentage)}">${usedSickChildDays} / ${sickChildLimit} dni</td>
                 <td style="${getCellStyle(familyMemberPercentage)}">${usedFamilyMemberDays} / ${familyMemberLimit} dni</td>

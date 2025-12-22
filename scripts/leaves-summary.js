@@ -46,11 +46,13 @@ export const LeavesSummary = (() => {
         `;
 
         // Przetwórz dane i wygeneruj wiersze
-        for (const employeeId in employees) {
-            const employee = employees[employeeId];
-            if (employee.isHidden) continue;
-            const employeeDisplayName = employee.displayName || employee.name;
-            if (!employee || !employeeDisplayName) continue;
+        const sortedEmployees = Object.entries(employees)
+            .filter(([_, emp]) => !emp.isHidden && !emp.isScheduleOnly)
+            .sort(([, empA], [, empB]) => EmployeeManager.compareEmployees(empA, empB));
+
+        sortedEmployees.forEach(([employeeId, employee]) => {
+            const employeeDisplayName = employee.displayName || employee.name; // Keep for data lookup keys if needed
+            if (!employee) return;
 
             const employeeLeaves = allLeavesData[employeeDisplayName] || [];
 
@@ -97,7 +99,7 @@ export const LeavesSummary = (() => {
 
             const row = tableBody.insertRow();
             row.innerHTML = `
-                <td>${employeeDisplayName}</td>
+                <td>${EmployeeManager.getFullNameById(employeeId)}</td>
                 <td>${entitlement}</td>
                 <td>${carriedOver}</td>
                 <td><strong>${total}</strong></td>
@@ -105,7 +107,7 @@ export const LeavesSummary = (() => {
                 <td>${scheduledDays}</td>
                 <td style="background-color: ${getRemainingDaysColor(remaining)};"><strong>${remaining}</strong></td>
             `;
-        }
+        });
     };
 
     // Publiczne API modułu

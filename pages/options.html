@@ -11,7 +11,7 @@
         <div id="employeeListContainer" class="employee-list-container">
             <!-- Lista pracowników zostanie wstrzyknięta tutaj przez JS -->
         </div>
-        <button id="addEmployeeBtn" class="add-employee-button">
+        <button id="addEmployeeBtn" class="action-btn confirm-btn" style="width: 100%; margin-top: 15px;">
             <i class="fas fa-plus"></i> Dodaj nowego pracownika
         </button>
     </div>
@@ -56,6 +56,10 @@
             <div class="form-group form-group-checkbox">
                 <input type="checkbox" id="employeeIsHidden" />
                 <label for="employeeIsHidden">Ukryj w grafiku (zachowaj w systemie)</label>
+            </div>
+            <div class="form-group form-group-checkbox">
+                <input type="checkbox" id="employeeIsScheduleOnly" />
+                <label for="employeeIsScheduleOnly">Widoczny TYLKO w Grafiku (tzw. skoczek)</label>
             </div>
             <div class="form-group">
                 <label for="employeeUidInput">Przypisany Użytkownik (UID)</label>
