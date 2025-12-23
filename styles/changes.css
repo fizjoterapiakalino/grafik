@@ -89,3 +89,65 @@
     color: #a0a0a0;
     /* Wyszarzony tekst */
 }
+
+/* New Header Layout consistent with leaves page */
+.changes-header-controls {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    border-bottom: 2px solid var(--color-gray-300);
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: 5px;
+    margin-top: 12px;
+}
+
+.year-selector-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.year-selector-container label {
+    margin-bottom: 0;
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.year-select {
+    padding: 10px 15px;
+    font-size: 1.2em;
+    font-weight: bold;
+    border: 2px solid var(--color-primary-600);
+    border-radius: var(--border-radius-sm);
+    background-color: var(--color-white);
+    color: var(--color-primary-600);
+    cursor: pointer;
+    min-width: 150px;
+    transition: all 0.2s ease-in-out;
+    box-shadow: var(--shadow-sm);
+}
+
+.year-select:hover {
+    border-color: var(--color-primary-700);
+    color: var(--color-primary-700);
+    box-shadow: var(--shadow-md);
+}
+
+.year-select:focus {
+    outline: none;
+    border-color: var(--color-primary-700);
+    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.2);
+}
+
+@media (max-width: 768px) {
+    .changes-header-controls {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-md);
+    }
+
+    .year-selector-container {
+        width: 100%;
+        justify-content: space-between;
+    }
+}

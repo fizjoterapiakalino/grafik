@@ -439,19 +439,47 @@ export const Leaves = (() => {
     const highlightCurrentMonth = () => {
         // Remove existing highlights
         document.querySelectorAll('.current-month-column').forEach(el => el.classList.remove('current-month-column'));
+        document.querySelectorAll('.past-month-column').forEach(el => el.classList.remove('past-month-column'));
 
         const now = new Date();
-        if (currentYear === now.getUTCFullYear()) {
-            const currentMonthIndex = now.getUTCMonth();
-            // Highlight header (index + 1 because of employee name column)
-            if (leavesHeaderRow && leavesHeaderRow.children[currentMonthIndex + 1]) {
-                leavesHeaderRow.children[currentMonthIndex + 1].classList.add('current-month-column');
-            }
-            // Highlight cells
-            document.querySelectorAll(`td[data-month="${currentMonthIndex}"]`).forEach(cell => {
-                cell.classList.add('current-month-column');
+        const actualYear = now.getUTCFullYear();
+        const actualMonthIndex = now.getUTCMonth();
+
+        // Jeśli przeglądamy rok wcześniejszy niż obecny - wyszarzamy wszystkie miesiące
+        if (currentYear < actualYear) {
+            months.forEach((_, monthIndex) => {
+                _applyPastMonthHighlight(monthIndex);
             });
         }
+        // Jeśli przeglądamy rok obecny - wyszarzamy miesiące poprzednie i podświetlamy obecny
+        else if (currentYear === actualYear) {
+            months.forEach((_, monthIndex) => {
+                if (monthIndex < actualMonthIndex) {
+                    _applyPastMonthHighlight(monthIndex);
+                } else if (monthIndex === actualMonthIndex) {
+                    _applyCurrentMonthHighlight(monthIndex);
+                }
+            });
+        }
+        // Jeśli rok przyszły - nic nie wyszarzamy
+    };
+
+    const _applyCurrentMonthHighlight = (monthIndex) => {
+        if (leavesHeaderRow && leavesHeaderRow.children[monthIndex + 1]) {
+            leavesHeaderRow.children[monthIndex + 1].classList.add('current-month-column');
+        }
+        document.querySelectorAll(`td[data-month="${monthIndex}"]`).forEach(cell => {
+            cell.classList.add('current-month-column');
+        });
+    };
+
+    const _applyPastMonthHighlight = (monthIndex) => {
+        if (leavesHeaderRow && leavesHeaderRow.children[monthIndex + 1]) {
+            leavesHeaderRow.children[monthIndex + 1].classList.add('past-month-column');
+        }
+        document.querySelectorAll(`td[data-month="${monthIndex}"]`).forEach(cell => {
+            cell.classList.add('past-month-column');
+        });
     };
 
     const showSummaryView = async () => {

@@ -9,27 +9,76 @@ export const Changes = (() => {
         changesCells: {},
     };
     let activeCell = null;
+    let currentYear = new Date().getUTCFullYear();
+    let yearSelect;
+    let clipboard = null;
 
-    const isWeekendOrHoliday = (date) => {
+    const isWeekend = (date) => {
         const day = date.getUTCDay();
-        if (day === 0 || day === 6) return true;
-        return isHoliday(date);
+        return day === 0 || day === 6; // Niedziela lub Sobota
+    };
+
+    const handleAppSearch = (e) => {
+        const { searchTerm } = e.detail;
+        const lowerCaseSearchTerm = searchTerm.toLowerCase();
+        document.querySelectorAll('#changesTableBody tr').forEach((row) => {
+            const hasEmployee = Array.from(row.cells).some((cell, index) => {
+                if (index === 0) return false; // Skip period column
+                return cell.textContent.toLowerCase().includes(lowerCaseSearchTerm);
+            });
+            row.style.display = hasEmployee || lowerCaseSearchTerm === '' ? '' : 'none';
+        });
+    };
+
+    const copyCell = (cell) => {
+        if (!cell) return;
+        const period = cell.parentElement.dataset.startDate;
+        const columnIndex = cell.cellIndex;
+        const cellState = appState.changesCells[period]?.[columnIndex];
+
+        if (cellState && cellState.assignedEmployees) {
+            clipboard = [...cellState.assignedEmployees];
+            window.showToast('Skopiowano.');
+        } else {
+            clipboard = [];
+            window.showToast('Skopiowano pustą komórkę.');
+        }
+    };
+
+    const pasteCell = (cell) => {
+        if (!cell || !clipboard) return;
+
+        updateCellState(cell, (state) => {
+            state.assignedEmployees = [...clipboard];
+        });
+        window.showToast('Wklejono.');
+    };
+
+    const clearCell = (cell) => {
+        if (!cell) return;
+        updateCellState(cell, (state) => {
+            state.assignedEmployees = [];
+        });
+        window.showToast('Wyczyszczono.');
     };
 
     const generateTwoWeekPeriods = (year) => {
         const periods = [];
         let currentDate = new Date(Date.UTC(year, 0, 1));
+
+        // Idziemy wstecz do najbliższego poniedziałku, aby objąć tydzień w którym wypada 1 stycznia.
+        // To rozwiązuje problem przesunięcia o tydzień (np. start 30 grudnia zamiast 6 stycznia).
         while (currentDate.getUTCDay() !== 1) {
-            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+            currentDate.setUTCDate(currentDate.getUTCDate() - 1);
         }
 
-        while (currentDate.getUTCFullYear() === year) {
+        while (currentDate.getUTCFullYear() <= year) {
             const startDate = new Date(currentDate);
             let endDate = new Date(startDate);
             let workDaysCount = 0;
 
             while (workDaysCount < 10) {
-                if (!isWeekendOrHoliday(endDate)) {
+                if (!isWeekend(endDate)) {
                     workDaysCount++;
                 }
                 if (workDaysCount < 10) {
@@ -44,7 +93,7 @@ export const Changes = (() => {
 
             currentDate = new Date(endDate);
             currentDate.setUTCDate(currentDate.getUTCDate() + 1);
-            while (isWeekendOrHoliday(currentDate)) {
+            while (isWeekend(currentDate)) {
                 currentDate.setUTCDate(currentDate.getUTCDate() + 1);
             }
         }
@@ -198,14 +247,15 @@ export const Changes = (() => {
                 employeeEl.classList.add('selected-employee');
             }
 
-            if (allAssignedEmployeesInRow.has(id) && !assignedEmployees.has(id)) {
-                employeeEl.classList.add('disabled-employee');
-            }
+            // Removed uniqueness constraint to allow duplicate employees
+            // if (allAssignedEmployeesInRow.has(id) && !assignedEmployees.has(id)) {
+            //     employeeEl.classList.add('disabled-employee');
+            // }
 
             employeeEl.addEventListener('click', () => {
-                if (!employeeEl.classList.contains('disabled-employee')) {
-                    employeeEl.classList.toggle('selected-employee');
-                }
+                // if (!employeeEl.classList.contains('disabled-employee')) {
+                employeeEl.classList.toggle('selected-employee');
+                // }
             });
 
             employeeListDiv.appendChild(employeeEl);
@@ -267,7 +317,7 @@ export const Changes = (() => {
         try {
             await db
                 .collection(AppConfig.firestore.collections.schedules)
-                .doc('changesSchedule')
+                .doc(`changesSchedule_${currentYear}`)
                 .set(appState, { merge: true });
             window.setSaveStatus('saved');
         } catch (error) {
@@ -278,11 +328,13 @@ export const Changes = (() => {
 
     const loadChanges = async () => {
         try {
-            const docRef = db.collection(AppConfig.firestore.collections.schedules).doc('changesSchedule');
+            const docRef = db.collection(AppConfig.firestore.collections.schedules).doc(`changesSchedule_${currentYear}`);
             const doc = await docRef.get();
             if (doc.exists) {
                 const savedData = doc.data();
                 appState.changesCells = savedData.changesCells || {};
+            } else {
+                appState.changesCells = {}; // Reset if no data for the year
             }
         } catch (error) {
             console.error('Error loading changes from Firestore:', error);
@@ -367,39 +419,97 @@ export const Changes = (() => {
             },
         };
 
-        pdfMake.createPdf(docDefinition).download('grafik-zmian.pdf');
+        pdfMake.createPdf(docDefinition).download(`grafik-zmian-${currentYear}.pdf`);
     };
 
-    const init = async () => {
-        changesTableBody = document.getElementById('changesTableBody');
-        changesHeaderRow = document.getElementById('changesHeaderRow');
-        const printButton = document.getElementById('printChangesTable');
+    const populateYearSelect = () => {
+        const yearNow = new Date().getUTCFullYear();
+        const startYear = yearNow - 2;
+        const endYear = yearNow + 5;
 
-        if (!changesTableBody || !changesHeaderRow) {
-            console.error('Changes module: Required table elements not found. Aborting initialization.');
-            return;
+        yearSelect.innerHTML = '';
+
+        for (let year = startYear; year <= endYear; year++) {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            if (year === currentYear) {
+                option.selected = true;
+            }
+            yearSelect.appendChild(option);
         }
+        yearSelect.addEventListener('change', handleYearChange);
+    };
 
-        if (printButton) {
-            printButton.addEventListener('click', printChangesTableToPdf);
-        }
+    const handleYearChange = async (e) => {
+        currentYear = parseInt(e.target.value, 10);
+        await refreshView();
+    };
 
-        const currentYear = new Date().getUTCFullYear();
+    const refreshView = async () => {
         const periods = generateTwoWeekPeriods(currentYear);
         renderTable(periods);
-
-        await EmployeeManager.load();
         await loadChanges();
         renderChangesContent();
-
         const allLeaves = await getAllLeavesData();
         populateLeavesColumn(allLeaves);
     };
 
-    const destroy = () => {
+    const init = async () => {
+        // Małe opóźnienie i ponowna próba, jeśli elementy nie zostaną znalezione natychmiast
+        // (rozwiązuje specyficzne dla Firefox problemy z synchronizacją po innerHTML)
+        const getElements = () => {
+            changesTableBody = document.getElementById('changesTableBody');
+            changesHeaderRow = document.getElementById('changesHeaderRow');
+            yearSelect = document.getElementById('changesYearSelect');
+            return changesTableBody && changesHeaderRow && yearSelect;
+        };
+
+        if (!getElements()) {
+            // Pierwsza próba po 50ms
+            await new Promise((resolve) => setTimeout(resolve, 50));
+            if (!getElements()) {
+                // Druga próba po dodatkowych 100ms
+                await new Promise((resolve) => setTimeout(resolve, 100));
+                if (!getElements()) {
+                    const missing = [];
+                    if (!document.getElementById('changesTableBody')) missing.push('changesTableBody');
+                    if (!document.getElementById('changesHeaderRow')) missing.push('changesHeaderRow');
+                    if (!document.getElementById('changesYearSelect')) missing.push('changesYearSelect');
+
+                    console.error(`Changes module: Required elements not found (${missing.join(', ')}). Aborting initialization.`);
+                    return;
+                }
+            }
+        }
+
         const printButton = document.getElementById('printChangesTable');
         if (printButton) {
+            printButton.addEventListener('click', printChangesTableToPdf);
+        }
+
+        document.addEventListener('app:search', handleAppSearch);
+
+        populateYearSelect();
+        await refreshView();
+        await EmployeeManager.load();
+
+        const contextMenuItems = [
+            { id: 'ctxCopyCell', action: (cell) => copyCell(cell) },
+            { id: 'ctxPasteCell', action: (cell) => pasteCell(cell) },
+            { id: 'ctxClearCell', action: (cell) => clearCell(cell) },
+        ];
+        window.initializeContextMenu('changesContextMenu', '#changesTableBody td:not(.leaves-cell)', contextMenuItems);
+    };
+
+    const destroy = () => {
+        const printButton = document.getElementById('printChangesTable');
+        document.removeEventListener('app:search', handleAppSearch);
+        if (printButton) {
             printButton.removeEventListener('click', printChangesTableToPdf);
+        }
+        if (window.destroyContextMenu) {
+            window.destroyContextMenu('changesContextMenu');
         }
         console.log('Changes module destroyed');
     };

@@ -69,6 +69,15 @@
     background-color: rgba(var(--color-secondary-rgb), 0.05);
 }
 
+.past-month-column {
+    background-color: var(--color-gray-100);
+    opacity: 0.8;
+}
+
+.past-month-column .leave-block {
+    filter: grayscale(0.5) opacity(0.8);
+}
+
 .leaves-table td,
 .summary-table td {
     padding: 12px 15px;
@@ -872,6 +881,8 @@
     border-bottom: 2px solid var(--color-gray-300);
     margin-bottom: var(--spacing-lg);
     padding-bottom: 5px;
+    margin-top: 12px;
+    /* Restore gap to avoid touching the nav bar */
 }
 
 .leaves-header-controls .view-tabs {
