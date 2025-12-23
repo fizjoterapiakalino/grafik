@@ -881,6 +881,8 @@
     border-bottom: 2px solid var(--color-gray-300);
     margin-bottom: var(--spacing-lg);
     padding-bottom: 5px;
+    margin-top: 12px;
+    /* Restore gap to avoid touching the nav bar */
 }
 
 .leaves-header-controls .view-tabs {

@@ -136,7 +136,7 @@ export const Router = (() => {
             }
 
             if (route.init) {
-                route.init();
+                await route.init();
             }
             activeModule = route.getModule ? route.getModule() : null;
 

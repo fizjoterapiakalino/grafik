@@ -6,6 +6,7 @@ import { ScheduleUI } from './schedule-ui.js';
 import { ScheduleEvents } from './schedule-events.js';
 import { ScheduleData } from './schedule-data.js';
 import { ScheduleModals } from './schedule-modals.js';
+import { ScheduleLogic } from './schedule-logic.js';
 
 export const Schedule = (() => {
     let loadingOverlay;
@@ -205,8 +206,20 @@ export const Schedule = (() => {
                             // Use targetPart determined earlier
                             if (targetPart === 1) {
                                 cellState.content1 = newText;
+                                if (cellState.treatmentData1?.startDate) {
+                                    cellState.treatmentData1.endDate = ScheduleLogic.calculateEndDate(
+                                        cellState.treatmentData1.startDate,
+                                        cellState.treatmentData1.extensionDays,
+                                    );
+                                }
                             } else if (targetPart === 2) {
                                 cellState.content2 = newText;
+                                if (cellState.treatmentData2?.startDate) {
+                                    cellState.treatmentData2.endDate = ScheduleLogic.calculateEndDate(
+                                        cellState.treatmentData2.startDate,
+                                        cellState.treatmentData2.extensionDays,
+                                    );
+                                }
                             } else {
                                 // Fallback for safety, though targetPart should be set if isSplit and editing div
                                 const isFirstDiv = element === parentCell.querySelector('.split-cell-wrapper > div:first-child');
@@ -223,25 +236,35 @@ export const Schedule = (() => {
                         } else {
                             const oldContent = cellState.content || '';
                             if (oldContent.trim().toLowerCase() !== newText.trim().toLowerCase() && newText.trim() !== '') {
-                                // Content has changed, so reset the date and related info
-                                const today = new Date();
-                                const year = today.getFullYear();
-                                const month = String(today.getMonth() + 1).padStart(2, '0');
-                                const day = String(today.getDate()).padStart(2, '0');
-                                cellState.treatmentStartDate = `${year}-${month}-${day}`;
-                                cellState.additionalInfo = null;
-                                cellState.treatmentExtensionDays = 0;
-                                cellState.treatmentEndDate = null;
+                                // Content has changed, so ensure we have a start date
+                                if (!cellState.treatmentStartDate) {
+                                    const today = new Date();
+                                    const year = today.getFullYear();
+                                    const month = String(today.getMonth() + 1).padStart(2, '0');
+                                    const day = String(today.getDate()).padStart(2, '0');
+                                    cellState.treatmentStartDate = `${year}-${month}-${day}`;
+                                }
+                                cellState.additionalInfo = cellState.additionalInfo || null;
+                                cellState.treatmentExtensionDays = cellState.treatmentExtensionDays || 0;
+                                // Automatically re-calculate end date instead of setting to null
+                                cellState.treatmentEndDate = ScheduleLogic.calculateEndDate(
+                                    cellState.treatmentStartDate,
+                                    cellState.treatmentExtensionDays,
+                                );
                             }
                             cellState.content = newText;
                         }
-                        // Jeśli pacjent nie istnieje, komórka nie ma jeszcze daty i nie jest to operacja przeniesienia, ustaw datę
-                        if (!cellState.treatmentStartDate && !isMove && !cellState.isSplit) {
+                        // Jeśli pacjent nie istnieje, komórka nie ma jeszcze daty i nie jest to operacja przeniesienia, ustaw datę i wylicz koniec
+                        if (!cellState.treatmentStartDate && !isMove && !cellState.isSplit && cellState.content) {
                             const today = new Date();
                             const year = today.getFullYear();
                             const month = String(today.getMonth() + 1).padStart(2, '0');
                             const day = String(today.getDate()).padStart(2, '0');
                             cellState.treatmentStartDate = `${year}-${month}-${day}`;
+                            cellState.treatmentEndDate = ScheduleLogic.calculateEndDate(
+                                cellState.treatmentStartDate,
+                                0,
+                            );
                         }
                     });
                 }

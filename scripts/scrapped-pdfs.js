@@ -34,14 +34,31 @@ export const ScrappedPdfs = (() => {
             const typeCell = document.createElement('td');
             const badge = document.createElement('span');
             badge.className = 'doc-type-badge';
-            badge.textContent = linkData.type; // Safe from XSS
+
+            // Apply color class based on type
+            const typeLower = (linkData.type || '').toLowerCase();
+            if (typeLower.includes('nfz')) badge.classList.add('type-nfz');
+            else if (typeLower.includes('pisma')) badge.classList.add('type-pisma');
+            else if (typeLower.includes('akty prawne')) badge.classList.add('type-akty');
+            else if (typeLower.includes('komisja socjalna') || typeLower.includes('socjalne'))
+                badge.classList.add('type-socjalna');
+            else if (typeLower.includes('szkolenia') || typeLower.includes('szkoleń'))
+                badge.classList.add('type-szkolenia');
+            else if (typeLower.includes('iso')) badge.classList.add('type-iso');
+            else if (typeLower.includes('karty charakterystyki') || typeLower.includes('ulotki'))
+                badge.classList.add('type-med');
+            else if (typeLower.includes('druki') || typeLower.includes('wywieszki'))
+                badge.classList.add('type-druk');
+            else if (typeLower.includes('covid')) badge.classList.add('type-covid');
+
+            badge.textContent = linkData.type;
             typeCell.appendChild(badge);
             row.appendChild(typeCell);
 
             // Link cell
             const linkCell = document.createElement('td');
             const anchor = document.createElement('a');
-            anchor.href = linkData.url; // Still need to be careful with href if it can be javascript:, but usually scraper controls this
+            anchor.href = linkData.url;
             anchor.target = '_blank';
 
             // Icon
@@ -50,7 +67,7 @@ export const ScrappedPdfs = (() => {
             anchor.appendChild(icon);
 
             // Text
-            anchor.appendChild(document.createTextNode(` ${linkData.title}`)); // Safe from XSS
+            anchor.appendChild(document.createTextNode(` ${linkData.title}`));
 
             linkCell.appendChild(anchor);
             row.appendChild(linkCell);
@@ -86,37 +103,61 @@ export const ScrappedPdfs = (() => {
                 tableContainer.style.display = 'block';
             }
 
-            displayLinks(allLinksData);
+            // Apply initial filtering if search input has value
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput && searchInput.value.trim()) {
+                handleGlobalSearch({ detail: { searchTerm: searchInput.value.trim() } });
+            } else {
+                displayLinks(allLinksData);
+            }
         } catch (error) {
             console.error('Błąd podczas pobierania linków PDF:', error);
             container.textContent = 'Wystąpił błąd podczas ładowania linków.';
         }
     };
 
-    const initSearch = () => {
-        const searchInput = document.getElementById('pdfSearchInput');
-        if (!searchInput) return;
+    const initRefresh = () => {
+        const refreshBtn = document.getElementById('refreshPdfsBtn');
+        if (!refreshBtn) return;
 
-        searchInput.addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase();
-            const filteredLinks = allLinksData.filter(
-                (link) =>
-                    (link.title && link.title.toLowerCase().includes(searchTerm)) ||
-                    (link.type && link.type.toLowerCase().includes(searchTerm)) ||
-                    (link.date && link.date.toLowerCase().includes(searchTerm)),
-            );
-            displayLinks(filteredLinks);
+        refreshBtn.addEventListener('click', async () => {
+            if (refreshBtn.classList.contains('loading')) return;
+
+            refreshBtn.classList.add('loading');
+            const span = refreshBtn.querySelector('span');
+            const originalText = span ? span.textContent : 'Odśwież';
+            if (span) span.textContent = 'Ładowanie...';
+
+            try {
+                await fetchAndDisplayPdfLinks();
+            } finally {
+                refreshBtn.classList.remove('loading');
+                if (span) span.textContent = originalText;
+            }
         });
+    };
+
+    const handleGlobalSearch = (e) => {
+        const searchTerm = (e.detail.searchTerm || '').toLowerCase();
+        const filteredLinks = allLinksData.filter(
+            (link) =>
+                (link.title && link.title.toLowerCase().includes(searchTerm)) ||
+                (link.type && link.type.toLowerCase().includes(searchTerm)) ||
+                (link.date && link.date.toLowerCase().includes(searchTerm)),
+        );
+        displayLinks(filteredLinks);
     };
 
     const init = () => {
         const fetchPromise = fetchAndDisplayPdfLinks();
-        initSearch();
+        document.addEventListener('app:search', handleGlobalSearch);
+        initRefresh();
         return fetchPromise;
     };
 
     const destroy = () => {
         allLinksData = [];
+        document.removeEventListener('app:search', handleGlobalSearch);
     };
 
     return { init, destroy };

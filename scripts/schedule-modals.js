@@ -1,6 +1,7 @@
 // scripts/schedule-modals.js
 import { EmployeeManager } from './employee-manager.js';
 import { ScheduleUI } from './schedule-ui.js';
+import { ScheduleLogic } from './schedule-logic.js';
 
 export const ScheduleModals = (() => {
     const showDuplicateConfirmationDialog = (duplicateInfo, onMove, onAdd, onCancel) => {
@@ -93,24 +94,9 @@ export const ScheduleModals = (() => {
         extensionDaysInput.value = treatmentData.extensionDays || 0;
         additionalInfoTextarea.value = currentAdditionalInfo;
 
-        const calculateEndDate = (startDate, extensionDays) => {
-            if (!startDate) return '';
-            let endDate = new Date(startDate);
-            endDate.setDate(endDate.getDate() - 1);
-            let totalDays = 15 + parseInt(extensionDays || 0, 10);
-            let daysAdded = 0;
-            while (daysAdded < totalDays) {
-                endDate.setDate(endDate.getDate() + 1);
-                const dayOfWeek = endDate.getDay();
-                if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-                    daysAdded++;
-                }
-            }
-            return endDate.toISOString().split('T')[0];
-        };
 
         const updateEndDate = () => {
-            endDateInput.value = calculateEndDate(startDateInput.value, extensionDaysInput.value);
+            endDateInput.value = ScheduleLogic.calculateEndDate(startDateInput.value, extensionDaysInput.value);
         };
 
         updateEndDate();

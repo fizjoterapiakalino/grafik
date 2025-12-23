@@ -65,11 +65,23 @@ export const ScheduleLogic = (() => {
             );
 
             // Treatment End Markers for Split
-            const today = new Date().toISOString().split('T')[0];
-            if (cellData.treatmentData1?.endDate && cellData.treatmentData1.endDate <= today) {
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            // Part 1
+            let endDate1 = cellData.treatmentData1?.endDate ? cellData.treatmentData1.endDate.toString().trim() : null;
+            if (!endDate1 && cellData.treatmentData1?.startDate && cellData.content1) {
+                endDate1 = calculateEndDate(cellData.treatmentData1.startDate, cellData.treatmentData1.extensionDays || 0);
+            }
+            if (endDate1 && endDate1 <= todayStr) {
                 result.parts[0].classes.push('treatment-end-marker');
             }
-            if (cellData.treatmentData2?.endDate && cellData.treatmentData2.endDate <= today) {
+
+            // Part 2
+            let endDate2 = cellData.treatmentData2?.endDate ? cellData.treatmentData2.endDate.toString().trim() : null;
+            if (!endDate2 && cellData.treatmentData2?.startDate && cellData.content2) {
+                endDate2 = calculateEndDate(cellData.treatmentData2.startDate, cellData.treatmentData2.extensionDays || 0);
+            }
+            if (endDate2 && endDate2 <= todayStr) {
                 result.parts[1].classes.push('treatment-end-marker');
             }
 
@@ -90,8 +102,15 @@ export const ScheduleLogic = (() => {
         }
 
         // Treatment End Marker for Normal
-        const today = new Date().toISOString().split('T')[0];
-        if (cellData.treatmentEndDate && cellData.treatmentEndDate <= today) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        let endDateStr = cellData.treatmentEndDate ? cellData.treatmentEndDate.toString().trim() : null;
+
+        // Fallback: If endDate is missing but startDate is present, calculate it on the fly for the marker
+        if (!endDateStr && cellData.treatmentStartDate && cellData.content) {
+            endDateStr = calculateEndDate(cellData.treatmentStartDate, cellData.treatmentExtensionDays || 0);
+        }
+
+        if (endDateStr && endDateStr <= todayStr) {
             result.classes.push('treatment-end-marker');
         }
 
@@ -118,8 +137,28 @@ export const ScheduleLogic = (() => {
         return count;
     };
 
+    const calculateEndDate = (startDate, extensionDays) => {
+        if (!startDate) return '';
+        let endDate = new Date(startDate);
+        // Reset time to midnight to avoid issues with transitions or slightly different hours
+        endDate.setHours(12, 0, 0, 0);
+
+        endDate.setDate(endDate.getDate() - 1);
+        let totalDays = 15 + parseInt(extensionDays || 0, 10);
+        let daysAdded = 0;
+        while (daysAdded < totalDays) {
+            endDate.setDate(endDate.getDate() + 1);
+            const dayOfWeek = endDate.getDay();
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                daysAdded++;
+            }
+        }
+        return endDate.toISOString().split('T')[0];
+    };
+
     return {
         getCellDisplayData,
         calculatePatientCount,
+        calculateEndDate,
     };
 })();

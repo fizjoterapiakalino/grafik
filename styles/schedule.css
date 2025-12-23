@@ -4,9 +4,29 @@
 
 .table-container {
     width: 100%;
-    /* overflow: auto; removed to fix double scrollbar */
-    /* height: calc(100vh - 60px); removed to fix double scrollbar */
-    /* -webkit-overflow-scrolling: touch; removed as it depends on overflow */
+    overflow-x: auto;
+    position: relative;
+}
+
+/* Mask to hide rows scrolling through the 12px gap */
+.table-container::before {
+    content: '';
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 12px;
+    background-color: #f6f8fb;
+    /* Match body gradient start color */
+    display: block;
+    z-index: 110;
+    /* Above table header */
+    pointer-events: none;
+}
+
+/* Ensure container for schedule has padding for the gap */
+#page-content.container {
+    padding-top: 0;
 }
 
 .schedule-table {
@@ -38,16 +58,15 @@
     color: var(--color-white);
     cursor: pointer;
     position: sticky;
-    top: 0;
-    /* Stuck to top of container */
+    top: 12px;
+    /* Stuck 12px below top of scroll parent to preserve gap */
     z-index: 100;
     white-space: nowrap;
     border: 1px solid var(--color-primary-700);
-    box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4);
-    /* Stronger shadow for separation */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    /* Slightly stronger shadow */
     background-clip: padding-box;
     transform: translateZ(0);
-    /* Fix for painting issues */
 }
 
 .schedule-table thead th:nth-child(even) {
@@ -76,7 +95,7 @@
     position: sticky;
     left: 0;
     z-index: 90;
-    /* Higher than normal cells, lower than top-left header */
+    /* Lower than header (100) and top-left header (101) */
 }
 
 .schedule-table td.editable-cell {

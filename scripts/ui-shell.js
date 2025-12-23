@@ -127,8 +127,8 @@ export const UIShell = (() => {
                 document.head.appendChild(newStylesheet);
             }
 
-            // Load new HTML
-            const response = await fetch(`pages/${pageName}.html`);
+            // Load new HTML with cache buster
+            const response = await fetch(`pages/${pageName}.html?v=${Date.now()}`);
             if (!response.ok) {
                 throw new Error(`Could not load page: ${pageName}`);
             }
