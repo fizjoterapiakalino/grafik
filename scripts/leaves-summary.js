@@ -33,6 +33,7 @@ export const LeavesSummary = (() => {
         // Wyczyść istniejącą zawartość tabeli
         tableHeader.innerHTML = '';
         tableBody.innerHTML = '';
+        tableBody.dataset.year = currentYear; // Przechowuj rok w dataset dla event listenera
 
         // Wygeneruj nowy nagłówek dla podsumowania
         tableHeader.innerHTML = `
@@ -51,13 +52,14 @@ export const LeavesSummary = (() => {
             .sort(([, empA], [, empB]) => EmployeeManager.compareEmployees(empA, empB));
 
         sortedEmployees.forEach(([employeeId, employee]) => {
-            const employeeDisplayName = employee.displayName || employee.name; // Keep for data lookup keys if needed
+            const employeeDisplayName = employee.displayName || employee.name;
             if (!employee) return;
 
             const employeeLeaves = allLeavesData[employeeDisplayName] || [];
 
-            const entitlement = employee.leaveEntitlement || 0;
-            const carriedOver = employee.carriedOverLeave || 0;
+            const leaveInfo = EmployeeManager.getLeaveInfoById(employeeId, currentYear);
+            const entitlement = leaveInfo.entitlement;
+            const carriedOver = leaveInfo.carriedOver;
             const total = entitlement + carriedOver;
 
             let usedDays = 0;
@@ -77,8 +79,6 @@ export const LeavesSummary = (() => {
                         end.toISOString().split('T')[0]
                     );
 
-                    // FIX: Only count days if leave type is 'vacation' (or missing, assuming default is vacation)
-                    // We should not subtract 'sick_child_care', 'child_care_art_188' etc. from entitlement.
                     if (leave.type === 'vacation' || !leave.type) {
                         if (start > summaryDate) {
                             scheduledDays += days;
@@ -98,16 +98,68 @@ export const LeavesSummary = (() => {
             const remaining = total - usedDays - scheduledDays;
 
             const row = tableBody.insertRow();
+            row.dataset.employeeId = employeeId;
             row.innerHTML = `
                 <td>${EmployeeManager.getFullNameById(employeeId)}</td>
                 <td>${entitlement}</td>
-                <td>${carriedOver}</td>
-                <td><strong>${total}</strong></td>
+                <td class="editable-carried-over" contenteditable="true" 
+                    title="Kliknij, aby edytować urlop zaległy"
+                    style="cursor: pointer; background: #fffde7; font-weight: bold; text-align: center;">${carriedOver}</td>
+                <td class="total-leave"><strong>${total}</strong></td>
                 <td>${usedDays}</td>
                 <td>${scheduledDays}</td>
-                <td style="background-color: ${getRemainingDaysColor(remaining)};"><strong>${remaining}</strong></td>
+                <td class="remaining-leave" style="background-color: ${getRemainingDaysColor(remaining)};"><strong>${remaining}</strong></td>
             `;
         });
+
+        // Dodaj obsługę edycji (jeśli jeszcze nie ma - delegacja na tableBody)
+        if (!tableBody.dataset.listenerAttached) {
+            tableBody.addEventListener('blur', async (event) => {
+                if (event.target.classList.contains('editable-carried-over')) {
+                    const cell = event.target;
+                    const row = cell.closest('tr');
+                    const employeeId = row.dataset.employeeId;
+                    const newValue = parseInt(cell.textContent, 10);
+                    const yearForEdit = parseInt(tableBody.dataset.year, 10);
+
+                    if (isNaN(newValue) || newValue < 0) {
+                        window.showToast('Proszę podać poprawną liczbę dni.', 3000, 'error');
+                        const oldInfo = EmployeeManager.getLeaveInfoById(employeeId, yearForEdit);
+                        cell.textContent = oldInfo.carriedOver;
+                        return;
+                    }
+
+                    // Zapisz zmianę
+                    await EmployeeManager.updateCarriedOverLeave(employeeId, yearForEdit, newValue);
+
+                    // Zaktualizuj widok wiersza (jeśli chcemy bez pełnego renderowania)
+                    const leaveInfo = EmployeeManager.getLeaveInfoById(employeeId, yearForEdit);
+                    const total = leaveInfo.entitlement + newValue;
+
+                    // Ponowne obliczenie remaining (można to zrobić lepiej, ale tu upraszczamy)
+                    // Pobieramy dane z wiersza
+                    const used = parseInt(row.cells[4].textContent, 10);
+                    const scheduled = parseInt(row.cells[5].textContent, 10);
+                    const remaining = total - used - scheduled;
+
+                    row.querySelector('.total-leave').innerHTML = `<strong>${total}</strong>`;
+                    const remainingCell = row.querySelector('.remaining-leave');
+                    remainingCell.innerHTML = `<strong>${remaining}</strong>`;
+                    remainingCell.style.backgroundColor = getRemainingDaysColor(remaining);
+
+                    window.showToast(`Zaktualizowano urlop zaległy na rok ${yearForEdit}.`, 2000);
+                }
+            }, true); // useCapture for blur
+
+            tableBody.addEventListener('keydown', (event) => {
+                if (event.target.classList.contains('editable-carried-over') && event.key === 'Enter') {
+                    event.preventDefault();
+                    event.target.blur();
+                }
+            });
+
+            tableBody.dataset.listenerAttached = 'true';
+        }
     };
 
     // Publiczne API modułu

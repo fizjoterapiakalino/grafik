@@ -1,6 +1,7 @@
 // scripts/options.js
 import { db, auth } from './firebase-config.js';
 import { EmployeeManager } from './employee-manager.js';
+import { BackupService } from './backup-service.js';
 
 export const Options = (() => {
     // --- SELEKTORY ELEMENTÓW DOM ---
@@ -15,7 +16,6 @@ export const Options = (() => {
         employeeDisplayNameInput,
         employeeNumberInput,
         leaveEntitlementInput,
-        carriedOverLeaveInput,
         saveEmployeeBtn,
         deleteEmployeeBtn,
         employeeUidInput,
@@ -32,21 +32,13 @@ export const Options = (() => {
 
     // --- NOWE FUNKCJE DLA KOPII ZAPASOWEJ ---
 
-    const getBackupDocRef = () => db.collection('backup').doc('latest');
-
     const displayLastBackupDate = async () => {
         try {
-            const backupDoc = await getBackupDocRef().get();
-            if (backupDoc.exists) {
-                const backupData = backupDoc.data();
-                if (backupData.backupDate) {
-                    const date = backupData.backupDate.toDate();
-                    lastBackupDateSpan.textContent = date.toLocaleString('pl-PL');
-                } else {
-                    lastBackupDateSpan.textContent = 'Brak daty w kopii';
-                }
+            const date = await BackupService.getLastBackupDate();
+            if (date) {
+                lastBackupDateSpan.textContent = date.toLocaleString('pl-PL');
             } else {
-                lastBackupDateSpan.textContent = 'Nigdy';
+                lastBackupDateSpan.textContent = 'Nigdy lub błąd';
             }
         } catch (error) {
             console.error('Błąd podczas pobierania daty kopii zapasowej:', error);
@@ -60,33 +52,26 @@ export const Options = (() => {
         }
         showLoading(true);
         try {
-            const scheduleRef = db.collection('schedules').doc('mainSchedule');
-            const leavesRef = db.collection('leaves').doc('mainLeaves');
-
-            const [scheduleDoc, leavesDoc] = await Promise.all([scheduleRef.get(), leavesRef.get()]);
-
-            const backupData = {
-                backupDate: new Date(),
-                scheduleData: scheduleDoc.exists ? scheduleDoc.data() : {},
-                leavesData: leavesDoc.exists ? leavesDoc.data() : {},
-            };
-
-            await getBackupDocRef().set(backupData);
-
+            await BackupService.performBackup(false);
             await displayLastBackupDate();
-            window.showToast('Kopia zapasowa utworzona pomyślnie!', 3000);
         } catch (error) {
-            console.error('Błąd podczas tworzenia kopii zapasowej:', error);
-            window.showToast('Wystąpił błąd podczas tworzenia kopii zapasowej.', 5000);
+            // Error handling is inside performBackup mostly, but we catch top level just in case
+            console.error('Błąd w options.createBackup', error);
         } finally {
             showLoading(false);
         }
     };
 
     const handleRestoreBackup = async () => {
-        const backupDoc = await getBackupDocRef().get();
-        if (!backupDoc.exists) {
-            window.showToast('Brak kopii zapasowej do przywrócenia.', 3000);
+        try {
+            // Just check existence to determine toast message, actual data fetch in confirm
+            const date = await BackupService.getLastBackupDate();
+            if (!date) {
+                window.showToast('Brak kopii zapasowej do przywrócenia.', 3000);
+                return;
+            }
+        } catch (e) {
+            window.showToast('Błąd sprawdzania kopii.', 3000);
             return;
         }
 
@@ -101,7 +86,7 @@ export const Options = (() => {
             closeModal();
             showLoading(true);
             try {
-                const backupData = backupDoc.data();
+                const backupData = await BackupService.restoreBackup();
                 const scheduleRef = db.collection('schedules').doc('mainSchedule');
                 const leavesRef = db.collection('leaves').doc('mainLeaves');
 
@@ -224,7 +209,6 @@ export const Options = (() => {
         employeeDisplayNameInput.value = employee.displayName || employee.name;
         employeeNumberInput.value = employee.employeeNumber || ''; // Nowe pole
         leaveEntitlementInput.value = employee.leaveEntitlement || 26;
-        carriedOverLeaveInput.value = employee.carriedOverLeave || 0;
         document.getElementById('employeeRoleAdmin').checked = employee.role === 'admin';
         employeeIsHidden.checked = employee.isHidden || false;
         employeeIsScheduleOnly.checked = employee.isScheduleOnly || false;
@@ -301,7 +285,6 @@ export const Options = (() => {
         const newDisplayName = employeeDisplayNameInput.value.trim();
         const newEmployeeNumber = employeeNumberInput.value.trim();
         const newEntitlement = parseInt(leaveEntitlementInput.value, 10);
-        const newCarriedOver = parseInt(carriedOverLeaveInput.value, 10);
         const isAdmin = document.getElementById('employeeRoleAdmin').checked;
         const isHidden = employeeIsHidden.checked;
         const newUid = employeeUidInput.value.trim();
@@ -310,7 +293,7 @@ export const Options = (() => {
             window.showToast('Nazwa wyświetlana nie może być pusta.', 3000);
             return;
         }
-        if (isNaN(newEntitlement) || isNaN(newCarriedOver)) {
+        if (isNaN(newEntitlement)) {
             window.showToast('Wartości urlopu muszą być poprawnymi liczbami.', 3000);
             return;
         }
@@ -321,7 +304,6 @@ export const Options = (() => {
             displayName: newDisplayName,
             employeeNumber: newEmployeeNumber,
             leaveEntitlement: newEntitlement,
-            carriedOverLeave: newCarriedOver,
             role: isAdmin ? 'admin' : 'user',
             isHidden: isHidden,
             isScheduleOnly: employeeIsScheduleOnly.checked,
@@ -456,7 +438,6 @@ export const Options = (() => {
         employeeDisplayNameInput = document.getElementById('employeeDisplayNameInput');
         employeeNumberInput = document.getElementById('employeeNumberInput'); // Nowe pole
         leaveEntitlementInput = document.getElementById('leaveEntitlementInput');
-        carriedOverLeaveInput = document.getElementById('carriedOverLeaveInput');
         saveEmployeeBtn = document.getElementById('saveEmployeeBtn');
         deleteEmployeeBtn = document.getElementById('deleteEmployeeBtn');
         employeeUidInput = document.getElementById('employeeUidInput');

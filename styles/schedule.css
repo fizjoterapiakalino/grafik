@@ -1,7 +1,5 @@
 /* Style dla tabeli grafiku (schedule.html) */
 
-/* Style dla tabeli grafiku (schedule.html) */
-
 .table-container {
     width: 100%;
     overflow-x: auto;
@@ -53,8 +51,8 @@
     outline: none;
 }
 
-.schedule-table thead th {
-    background-color: var(--color-primary-600) !important;
+table.schedule-table thead tr th {
+    background-color: var(--color-primary-600);
     color: var(--color-white);
     cursor: pointer;
     position: sticky;
@@ -73,8 +71,8 @@
     background-color: var(--color-primary-700);
 }
 
-.schedule-table thead th:first-child {
-    background-color: var(--color-gray-800) !important;
+table.schedule-table thead tr th:first-child {
+    background-color: var(--color-gray-800);
     left: 0;
     z-index: 101;
     /* Higher than other headers */
@@ -121,9 +119,9 @@
 }
 
 /* --- Specjalne style komórek grafiku --- */
-/* Zwiększona specyficzność przez dodanie td, aby nadpisać .schedule-table td.editable-cell */
-.schedule-table td.break-cell {
-    background-color: var(--bg-break) !important;
+/* Zwiększona specyficzność przez dodanie tbody tr td aby nadpisać inne style */
+table.schedule-table tbody tr td.break-cell {
+    background-color: var(--bg-break);
     color: var(--color-white);
     font-weight: bold;
     text-align: center;
@@ -131,19 +129,19 @@
 }
 
 .pnf-text,
-td.split-cell>div.pnf-text>span {
+td.split-cell > div.pnf-text > span {
     color: var(--bg-pnf);
     font-weight: bold;
 }
 
 .massage-text,
-td.split-cell>div.massage-text>span {
+td.split-cell > div.massage-text > span {
     color: var(--bg-massage);
     font-weight: bold;
 }
 
 .every-other-day-text,
-td.split-cell>div.every-other-day-text>span {
+td.split-cell > div.every-other-day-text > span {
     color: var(--bg-every-other-day);
     font-weight: bold;
 }
@@ -267,7 +265,7 @@ td.split-cell {
     width: 100%;
 }
 
-.split-cell-wrapper>div {
+.split-cell-wrapper > div {
     flex: 1;
     display: flex;
     align-items: center;
@@ -283,31 +281,33 @@ td.split-cell {
     color: var(--color-text);
 }
 
-.split-cell-wrapper>div:last-child {
+.split-cell-wrapper > div:last-child {
     border-right: none;
 }
 
-.split-cell-wrapper>div:first-child {
+.split-cell-wrapper > div:first-child {
     border-right: 1px solid var(--color-border-dark);
 }
 
-.duplicate-highlight {
-    background-color: var(--color-warning) !important;
-    /* Pozostawione !important dla pewności nadpisania */
+/* Klasy podświetlenia - zwiększona specyficzność dla nadpisania stylów komórek */
+table.schedule-table tbody tr td.duplicate-highlight,
+table.schedule-table tbody tr td.duplicate-highlight.editable-cell {
+    background-color: var(--color-warning);
 }
 
-.search-highlight {
-    background-color: var(--bg-search-highlight) !important;
+table.schedule-table tbody tr td.search-highlight,
+table.schedule-table tbody tr td.search-highlight.editable-cell {
+    background-color: var(--bg-search-highlight);
     box-shadow: inset 0 0 0 2px var(--color-secondary);
 }
 
-.schedule-table tbody tr.current-time-row>td:not(.break-cell) {
-    background-color: #fffde7 !important;
+table.schedule-table tbody tr.current-time-row > td:not(.break-cell) {
+    background-color: #fffde7;
     /* Jasnożółte tło */
     font-weight: bold;
 }
 
-.schedule-table tbody tr.current-time-row>td:first-child {
+.schedule-table tbody tr.current-time-row > td:first-child {
     color: var(--color-text);
 }
 
@@ -333,7 +333,6 @@ td.current-time-highlight {
 }
 
 @keyframes bell-ring {
-
     0%,
     50%,
     100% {

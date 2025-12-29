@@ -59,7 +59,11 @@ export const ScheduleData = (() => {
         undoManager = new UndoManager({
             maxStates: AppConfig.undoManager.maxStates,
             onUpdate: (manager) => {
-                if (undoButtonElement) undoButtonElement.disabled = !manager.canUndo();
+                if (undoButtonElement) {
+                    const canUndo = manager.canUndo();
+                    undoButtonElement.disabled = !canUndo;
+                    undoButtonElement.classList.toggle('active', canUndo);
+                }
             },
         });
     };

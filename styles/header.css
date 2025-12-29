@@ -190,18 +190,7 @@
     /* Room for both X and magnifying glass */
 }
 
-.undo-button {
-    background: none;
-    border: none;
-    color: white;
-    font-size: 1.5em;
-    cursor: pointer;
-}
-
-.undo-button:disabled {
-    color: #666;
-    cursor: not-allowed;
-}
+/* undo-button class removed, replaced by action-icon-btn */
 
 .save-status {
     display: flex;

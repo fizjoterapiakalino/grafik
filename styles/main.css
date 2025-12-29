@@ -34,6 +34,10 @@ body {
 
     /* Secondary (Blue/Indigo - for accents/info) */
     --color-secondary-50: #eff6ff;
+    --color-secondary-100: #dbeafe;
+    --color-secondary-200: #bfdbfe;
+    --color-secondary-300: #93c5fd;
+    --color-secondary-400: #60a5fa;
     --color-secondary-500: #3b82f6;
     --color-secondary-rgb: 59, 130, 246;
     --color-secondary-600: #2563eb;

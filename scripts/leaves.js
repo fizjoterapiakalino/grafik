@@ -353,7 +353,7 @@ export const Leaves = (() => {
             const allLeaves = await getAllLeavesData();
             const existingLeaves = allLeaves[employeeName] || [];
 
-            const leaveInfo = EmployeeManager.getLeaveInfoById(employeeId);
+            const leaveInfo = EmployeeManager.getLeaveInfoById(employeeId, currentYear);
             const totalLimit = (parseInt(leaveInfo.entitlement, 10) || 0) + (parseInt(leaveInfo.carriedOver, 10) || 0);
 
             const updatedLeaves = await CalendarModal.open(

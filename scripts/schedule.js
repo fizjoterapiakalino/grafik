@@ -7,6 +7,7 @@ import { ScheduleEvents } from './schedule-events.js';
 import { ScheduleData } from './schedule-data.js';
 import { ScheduleModals } from './schedule-modals.js';
 import { ScheduleLogic } from './schedule-logic.js';
+import { safeCopy, safeBool } from './utils.js';
 
 export const Schedule = (() => {
     let loadingOverlay;
@@ -50,10 +51,6 @@ export const Schedule = (() => {
                     const updates = [];
                     const oldCellState = duplicate.cellData;
 
-                    // Helper to safely copy value or null
-                    const safeCopy = (val) => val === undefined ? null : val;
-                    const safeBool = (val) => val === undefined ? false : val;
-
                     let sourcePart = null; // 1 or 2 if split, null if not split
 
                     if (oldCellState.isSplit) {
@@ -71,28 +68,39 @@ export const Schedule = (() => {
                         updateFn: (cellState) => {
                             if (targetPart) {
                                 // Moving INTO a split cell part
-                                cellState[`content${targetPart}`] = safeCopy(sourcePart ? oldCellState[`content${sourcePart}`] : oldCellState.content);
+                                cellState[`content${targetPart}`] = safeCopy(
+                                    sourcePart ? oldCellState[`content${sourcePart}`] : oldCellState.content,
+                                );
 
                                 // Map flags
-                                cellState[`isMassage${targetPart}`] = safeBool(sourcePart ? oldCellState[`isMassage${sourcePart}`] : oldCellState.isMassage);
-                                cellState[`isPnf${targetPart}`] = safeBool(sourcePart ? oldCellState[`isPnf${sourcePart}`] : oldCellState.isPnf);
-                                cellState[`isEveryOtherDay${targetPart}`] = safeBool(sourcePart ? oldCellState[`isEveryOtherDay${sourcePart}`] : oldCellState.isEveryOtherDay);
+                                cellState[`isMassage${targetPart}`] = safeBool(
+                                    sourcePart ? oldCellState[`isMassage${sourcePart}`] : oldCellState.isMassage,
+                                );
+                                cellState[`isPnf${targetPart}`] = safeBool(
+                                    sourcePart ? oldCellState[`isPnf${sourcePart}`] : oldCellState.isPnf,
+                                );
+                                cellState[`isEveryOtherDay${targetPart}`] = safeBool(
+                                    sourcePart
+                                        ? oldCellState[`isEveryOtherDay${sourcePart}`]
+                                        : oldCellState.isEveryOtherDay,
+                                );
 
                                 // Map treatment data
-                                const treatmentData = sourcePart ? (oldCellState[`treatmentData${sourcePart}`] || {}) : {
-                                    startDate: oldCellState.treatmentStartDate,
-                                    extensionDays: oldCellState.treatmentExtensionDays,
-                                    endDate: oldCellState.treatmentEndDate,
-                                    additionalInfo: oldCellState.additionalInfo
-                                };
+                                const treatmentData = sourcePart
+                                    ? oldCellState[`treatmentData${sourcePart}`] || {}
+                                    : {
+                                          startDate: oldCellState.treatmentStartDate,
+                                          extensionDays: oldCellState.treatmentExtensionDays,
+                                          endDate: oldCellState.treatmentEndDate,
+                                          additionalInfo: oldCellState.additionalInfo,
+                                      };
 
                                 cellState[`treatmentData${targetPart}`] = {
                                     startDate: safeCopy(treatmentData.startDate),
                                     extensionDays: safeCopy(treatmentData.extensionDays),
                                     endDate: safeCopy(treatmentData.endDate),
-                                    additionalInfo: safeCopy(treatmentData.additionalInfo)
+                                    additionalInfo: safeCopy(treatmentData.additionalInfo),
                                 };
-
                             } else if (sourcePart) {
                                 // Moving FROM a split cell part TO a normal cell
                                 cellState.content = safeCopy(oldCellState[`content${sourcePart}`]);
@@ -121,7 +129,6 @@ export const Schedule = (() => {
                                 delete cellState.isEveryOtherDay2;
                                 delete cellState.treatmentData1;
                                 delete cellState.treatmentData2;
-
                             } else {
                                 // Moving from a normal cell TO a normal cell (full copy)
                                 cellState.content = safeCopy(oldCellState.content);
@@ -154,7 +161,7 @@ export const Schedule = (() => {
                                     cellState.treatmentData2 = JSON.parse(JSON.stringify(oldCellState.treatmentData2));
                                 }
                             }
-                        }
+                        },
                     });
 
                     // 2. Clear Source Cell (Duplicate)
@@ -170,7 +177,7 @@ export const Schedule = (() => {
                                 delete state[`isEveryOtherDay${sourcePart}`];
                                 delete state[`treatmentData${sourcePart}`];
 
-                                // If both parts are now empty, maybe un-split? 
+                                // If both parts are now empty, maybe un-split?
                                 // For now, let's leave it split but empty, or check if we should merge.
                                 // Logic: If other part is also empty, we can clear the whole cell.
                                 const otherPart = sourcePart === 1 ? 2 : 1;
@@ -190,7 +197,7 @@ export const Schedule = (() => {
                                     }
                                 }
                             }
-                        }
+                        },
                     });
 
                     ScheduleData.updateMultipleCells(updates);
@@ -222,7 +229,8 @@ export const Schedule = (() => {
                                 }
                             } else {
                                 // Fallback for safety, though targetPart should be set if isSplit and editing div
-                                const isFirstDiv = element === parentCell.querySelector('.split-cell-wrapper > div:first-child');
+                                const isFirstDiv =
+                                    element === parentCell.querySelector('.split-cell-wrapper > div:first-child');
                                 if (isFirstDiv) {
                                     cellState.content1 = newText;
                                 } else {
@@ -235,7 +243,10 @@ export const Schedule = (() => {
                             // }
                         } else {
                             const oldContent = cellState.content || '';
-                            if (oldContent.trim().toLowerCase() !== newText.trim().toLowerCase() && newText.trim() !== '') {
+                            if (
+                                oldContent.trim().toLowerCase() !== newText.trim().toLowerCase() &&
+                                newText.trim() !== ''
+                            ) {
                                 // Content has changed, so ensure we have a start date
                                 if (!cellState.treatmentStartDate) {
                                     const today = new Date();
@@ -435,7 +446,7 @@ export const Schedule = (() => {
                         additionalInfo: treatmentData.additionalInfo,
                         isMassage: realCellState[`isMassage${partIndex}`],
                         isPnf: realCellState[`isPnf${partIndex}`],
-                        isEveryOtherDay: realCellState[`isEveryOtherDay${partIndex}`]
+                        isEveryOtherDay: realCellState[`isEveryOtherDay${partIndex}`],
                     };
                 }
             }
@@ -447,9 +458,6 @@ export const Schedule = (() => {
                         // Create a temporary state object to capture updates
                         const tempState = { ...cellState };
                         updateFn(tempState);
-
-                        // Helper to safely copy value or null
-                        const safeCopy = (val) => (val === undefined ? null : val);
 
                         // Map back to real state
                         state[`content${partIndex}`] = safeCopy(tempState.content);
@@ -517,9 +525,6 @@ export const Schedule = (() => {
             const activePart = content1.trim() === '' ? 2 : 1;
 
             updateCellState(cell, (state) => {
-                // Helper to safely copy value or null
-                const safeCopy = (val) => (val === undefined ? null : val);
-
                 // Copy flags
                 state.isMassage = safeCopy(state[`isMassage${activePart}`]);
                 state.isPnf = safeCopy(state[`isPnf${activePart}`]);

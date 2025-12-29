@@ -52,7 +52,7 @@
             <!-- History entries will be injected here -->
         </div>
         <div class="modal-actions">
-            <button id="closeHistoryModal" class="action-btn">Zamknij</button>
+            <button id="closeHistoryModal" class="action-btn outline">Zamknij</button>
         </div>
     </div>
 </div>
@@ -86,8 +86,8 @@
             </div>
         </div>
         <div class="modal-actions">
-            <button id="savePatientInfoModal" class="action-btn confirm-btn">Zapisz</button>
-            <button id="closePatientInfoModal" class="action-btn cancel-btn filled">Anuluj</button>
+            <button id="savePatientInfoModal" class="action-btn primary">Zapisz</button>
+            <button id="closePatientInfoModal" class="action-btn outline">Anuluj</button>
         </div>
     </div>
 </div>
@@ -98,8 +98,8 @@
         <h2 class="modal-title">Potwierdź wprowadzenie danych</h2>
         <p id="numericConfirmationModalText">Czy na pewno chcesz wprowadzić ten ciąg cyfr?</p>
         <div class="modal-actions">
-            <button id="confirmNumericBtn" class="action-btn confirm-btn">Tak, wprowadź</button>
-            <button id="cancelNumericBtn" class="action-btn">Anuluj</button>
+            <button id="confirmNumericBtn" class="action-btn primary">Tak, wprowadź</button>
+            <button id="cancelNumericBtn" class="action-btn outline">Anuluj</button>
         </div>
     </div>
 </div>
@@ -108,9 +108,11 @@
     <div class="modal-content">
         <p id="duplicateModalText"></p>
         <div class="modal-buttons modal-actions">
-            <button id="moveEntryBtn" class="action-btn confirm-btn">Przenieś</button>
-            <button id="addAnywayBtn" class="action-btn">Dodaj mimo to</button>
-            <button id="cancelBtn" class="action-btn cancel-btn filled">Anuluj</button>
+            <div class="modal-buttons modal-actions">
+                <button id="moveEntryBtn" class="action-btn primary">Przenieś</button>
+                <button id="addAnywayBtn" class="action-btn secondary">Dodaj mimo to</button>
+                <button id="cancelBtn" class="action-btn outline">Anuluj</button>
+            </div>
         </div>
     </div>
 </div>
