@@ -1,5 +1,5 @@
 // scripts/options.js
-import { db, auth } from './firebase-config.js';
+import { db, auth, FieldValue } from './firebase-config.js';
 import { EmployeeManager } from './employee-manager.js';
 import { BackupService } from './backup-service.js';
 
@@ -87,12 +87,12 @@ export const Options = (() => {
             showLoading(true);
             try {
                 const backupData = await BackupService.restoreBackup();
-                const scheduleRef = db.collection('schedules').doc('mainSchedule');
-                const leavesRef = db.collection('leaves').doc('mainLeaves');
+                const scheduleDocWrapper = db.collection('schedules').doc('mainSchedule');
+                const leavesDocWrapper = db.collection('leaves').doc('mainLeaves');
 
                 const batch = db.batch();
-                batch.set(scheduleRef, backupData.scheduleData || {});
-                batch.set(leavesRef, backupData.leavesData || {});
+                batch.set(scheduleDocWrapper, backupData.scheduleData || {});
+                batch.set(leavesDocWrapper, backupData.leavesData || {});
                 await batch.commit();
 
                 window.showToast('Dane przywrócone pomyślnie! Odśwież stronę, aby zobaczyć zmiany.', 5000);
@@ -371,26 +371,27 @@ export const Options = (() => {
             closeModal();
             showLoading(true);
             try {
-                const FieldValue = firebase.firestore.FieldValue;
                 await db.runTransaction(async (transaction) => {
-                    const scheduleRef = db.collection('schedules').doc('mainSchedule');
-                    const leavesRef = db.collection('leaves').doc('mainLeaves');
-                    const scheduleDoc = await transaction.get(scheduleRef);
-                    const leavesDoc = await transaction.get(leavesRef);
+                    const scheduleDocWrapper = db.collection('schedules').doc('mainSchedule');
+                    const leavesDocWrapper = db.collection('leaves').doc('mainLeaves');
+                    const scheduleDoc = await transaction.get(scheduleDocWrapper);
+                    const leavesDoc = await transaction.get(leavesDocWrapper);
 
-                    transaction.update(scheduleRef, { [`employees.${selectedEmployeeIndex}`]: FieldValue.delete() });
+                    transaction.update(scheduleDocWrapper, {
+                        [`employees.${selectedEmployeeIndex}`]: FieldValue.delete(),
+                    });
                     const scheduleData = scheduleDoc.data();
                     if (scheduleData && scheduleData.scheduleCells) {
                         Object.keys(scheduleData.scheduleCells).forEach((time) => {
                             if (scheduleData.scheduleCells[time]?.[selectedEmployeeIndex]) {
-                                transaction.update(scheduleRef, {
+                                transaction.update(scheduleDocWrapper, {
                                     [`scheduleCells.${time}.${selectedEmployeeIndex}`]: FieldValue.delete(),
                                 });
                             }
                         });
                     }
                     if (leavesDoc.exists && leavesDoc.data()[employeeName]) {
-                        transaction.update(leavesRef, { [employeeName]: FieldValue.delete() });
+                        transaction.update(leavesDocWrapper, { [employeeName]: FieldValue.delete() });
                     }
                 });
 

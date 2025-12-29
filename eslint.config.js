@@ -9,6 +9,8 @@ module.exports = [
                 ...globals.browser,
                 ...globals.node,
                 ...globals.jest,
+                // pdfMake (ładowane przez script tags)
+                pdfMake: 'readonly',
             },
             sourceType: 'module',
             ecmaVersion: 2021,
@@ -20,7 +22,8 @@ module.exports = [
         rules: {
             'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
             'no-console': 'off',
-            'no-undef': 'off',
+            // Włączamy no-undef - wymusza deklarowanie wszystkich zmiennych
+            'no-undef': 'error',
         },
     },
 ];
