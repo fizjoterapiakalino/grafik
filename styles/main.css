@@ -337,36 +337,75 @@ body {
 }
 
 /* Pasek postępu dnia */
+#dayProgressContainer {
+    margin: 12px 0;
+}
+
 .day-progress-bar {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 16px;
-    margin-bottom: 8px;
+    gap: 16px;
+    padding: 12px 20px;
     background: var(--glass-bg);
     backdrop-filter: var(--glass-blur);
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-sm);
     transition: opacity 0.3s ease;
+    border: 1px solid var(--color-gray-200);
 }
 
 .day-progress-bar.outside-hours {
-    opacity: 0.5;
+    opacity: 0.6;
+}
+
+.day-progress-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 130px;
+}
+
+.day-progress-info-right {
+    text-align: right;
+    min-width: 140px;
+}
+
+.day-progress-label {
+    font-weight: 600;
+    color: var(--color-gray-700);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.day-progress-label i {
+    color: var(--color-primary-500);
+}
+
+.day-progress-elapsed,
+.day-progress-remaining {
+    color: var(--color-gray-500);
+}
+
+.day-progress-remaining strong {
+    color: var(--color-primary-600);
 }
 
 .day-progress-track {
     flex: 1;
-    height: 6px;
+    height: 8px;
     background: var(--color-gray-200);
-    border-radius: 3px;
+    border-radius: 4px;
     position: relative;
     overflow: visible;
+    min-width: 200px;
 }
 
 .day-progress-fill {
     height: 100%;
     background: linear-gradient(90deg, var(--color-primary-400), var(--color-primary-600));
-    border-radius: 3px;
+    border-radius: 4px;
     transition: width 0.5s ease;
 }
 
@@ -374,21 +413,26 @@ body {
     position: absolute;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: 14px;
-    height: 14px;
+    width: 18px;
+    height: 18px;
     background: var(--color-primary-600);
     border: 3px solid white;
     border-radius: 50%;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
     transition: left 0.5s ease;
+    cursor: pointer;
+}
+
+.day-progress-marker:hover {
+    transform: translate(-50%, -50%) scale(1.2);
+    box-shadow: 0 3px 10px rgba(16, 185, 129, 0.4);
 }
 
 .day-progress-time {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--color-gray-700);
-    min-width: 50px;
-    text-align: right;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--color-primary-700);
+    font-variant-numeric: tabular-nums;
 }
 
 /* Podświetlenie aktualnego wiersza czasowego */

@@ -46,7 +46,7 @@ export const Leaves = (() => {
     // Undo
     let undoManager;
     let appState = {
-        leaves: {}
+        leaves: {},
     };
 
     // --- Nazwane funkcje obsługi zdarzeń ---
@@ -59,6 +59,16 @@ export const Leaves = (() => {
     };
 
     const _handleTableDblClick = (event) => {
+        // Sprawdź czy dwuklik był na komórkę z nazwą pracownika
+        const nameCell = event.target.closest('.employee-name-cell');
+        if (nameCell) {
+            // Otwórz kalendarz dla pierwszego miesiąca (styczeń)
+            const row = nameCell.closest('tr');
+            const firstMonthCell = row.querySelector('.day-cell[data-month="0"]');
+            openCalendarForCell(firstMonthCell);
+            return;
+        }
+
         const targetCell = event.target.closest('.day-cell');
         openCalendarForCell(targetCell);
     };
@@ -159,7 +169,7 @@ export const Leaves = (() => {
             const restoredLeaves = prevState.leaves;
 
             // We need to re-save this entire object to Firestore to be consistent?
-            // Yes, "Undo" in a multi-user app is tricky. 
+            // Yes, "Undo" in a multi-user app is tricky.
             // For now, let's assume last-write-wins and we overwrite with old state.
 
             saveAllLeavesData(restoredLeaves).then(() => {
@@ -254,11 +264,11 @@ export const Leaves = (() => {
             }
         };
 
-        // Remove existing listener if any (though we are replacing the container content, 
+        // Remove existing listener if any (though we are replacing the container content,
         // it's safer to attach to the container which persists or is re-queried)
         // Since we are clearing innerHTML, we lose the listeners on children, but the container itself is stable?
         // Actually, in the original code, we were cloning the container to remove listeners.
-        // Let's stick to a simpler approach: just add the listener to the container once in init, 
+        // Let's stick to a simpler approach: just add the listener to the container once in init,
         // or ensure we don't add it multiple times.
 
         // Better approach: Attach listener to leavesFilterContainer ONCE in init, and delegate.
@@ -356,16 +366,12 @@ export const Leaves = (() => {
             const leaveInfo = EmployeeManager.getLeaveInfoById(employeeId, currentYear);
             const totalLimit = (parseInt(leaveInfo.entitlement, 10) || 0) + (parseInt(leaveInfo.carriedOver, 10) || 0);
 
-            const updatedLeaves = await CalendarModal.open(
-                employeeName,
-                existingLeaves,
-                monthIndex,
-                currentYear,
-                { totalLimit: totalLimit }
-            );
+            const updatedLeaves = await CalendarModal.open(employeeName, existingLeaves, monthIndex, currentYear, {
+                totalLimit: totalLimit,
+            });
 
             // Push state before saving changes
-            // Note: getAllLeavesData called above gives us the 'before' state of *all* leaves? 
+            // Note: getAllLeavesData called above gives us the 'before' state of *all* leaves?
             // Yes, existingLeaves is just for one employee. We need full state.
             appState.leaves = allLeaves; // Update local state with fresh data
             undoManager.pushState(appState);
@@ -438,8 +444,8 @@ export const Leaves = (() => {
 
     const highlightCurrentMonth = () => {
         // Remove existing highlights
-        document.querySelectorAll('.current-month-column').forEach(el => el.classList.remove('current-month-column'));
-        document.querySelectorAll('.past-month-column').forEach(el => el.classList.remove('past-month-column'));
+        document.querySelectorAll('.current-month-column').forEach((el) => el.classList.remove('current-month-column'));
+        document.querySelectorAll('.past-month-column').forEach((el) => el.classList.remove('past-month-column'));
 
         const now = new Date();
         const actualYear = now.getUTCFullYear();
@@ -468,7 +474,7 @@ export const Leaves = (() => {
         if (leavesHeaderRow && leavesHeaderRow.children[monthIndex + 1]) {
             leavesHeaderRow.children[monthIndex + 1].classList.add('current-month-column');
         }
-        document.querySelectorAll(`td[data-month="${monthIndex}"]`).forEach(cell => {
+        document.querySelectorAll(`td[data-month="${monthIndex}"]`).forEach((cell) => {
             cell.classList.add('current-month-column');
         });
     };
@@ -477,7 +483,7 @@ export const Leaves = (() => {
         if (leavesHeaderRow && leavesHeaderRow.children[monthIndex + 1]) {
             leavesHeaderRow.children[monthIndex + 1].classList.add('past-month-column');
         }
-        document.querySelectorAll(`td[data-month="${monthIndex}"]`).forEach(cell => {
+        document.querySelectorAll(`td[data-month="${monthIndex}"]`).forEach((cell) => {
             cell.classList.add('past-month-column');
         });
     };
@@ -527,7 +533,7 @@ export const Leaves = (() => {
                 if (index > 0) {
                     const blocks = Array.from(cell.querySelectorAll('.leave-block'));
                     if (blocks.length > 0) {
-                        return blocks.map(b => b.textContent).join('\n');
+                        return blocks.map((b) => b.textContent).join('\n');
                     }
                 }
                 return cell.textContent.trim();
@@ -545,18 +551,19 @@ export const Leaves = (() => {
                     table: {
                         headerRows: 1,
                         // defined widths in headers object instead
-                        widths: headers.map(h => h.width),
-                        body: [
-                            headers,
-                            ...body
-                        ],
+                        widths: headers.map((h) => h.width),
+                        body: [headers, ...body],
                     },
                     layout: {
                         fillColor: function (rowIndex, node, columnIndex) {
                             return rowIndex === 0 ? '#4CAF50' : null;
                         },
-                        hLineWidth: function (i, node) { return 0.5; },
-                        vLineWidth: function (i, node) { return 0.5; },
+                        hLineWidth: function (i, node) {
+                            return 0.5;
+                        },
+                        vLineWidth: function (i, node) {
+                            return 0.5;
+                        },
                     },
                 },
             ],
@@ -573,12 +580,12 @@ export const Leaves = (() => {
                     bold: true,
                     fontSize: 10,
                     color: 'white',
-                    alignment: 'center'
+                    alignment: 'center',
                 },
             },
             defaultStyle: {
                 font: 'Roboto',
-                fontSize: 8 // Smaller font for big table
+                fontSize: 8, // Smaller font for big table
             },
         };
 
@@ -610,6 +617,8 @@ export const Leaves = (() => {
             const nameTd = document.createElement('td');
             nameTd.textContent = EmployeeManager.getFullNameById(emp.id);
             nameTd.classList.add('employee-name-cell');
+            nameTd.style.cursor = 'pointer';
+            nameTd.setAttribute('title', 'Dwuklik aby otworzyć kalendarz');
             tr.appendChild(nameTd);
             months.forEach((_, monthIndex) => {
                 const monthTd = document.createElement('td');
@@ -650,9 +659,61 @@ export const Leaves = (() => {
         }
     };
 
+    /**
+     * Oblicza ilość zaplanowanych dni urlopu wypoczynkowego dla pracownika w danym roku
+     * i aktualizuje tooltip na jego komórce z nazwiskiem
+     */
+    const updateEmployeeTooltip = (employeeRow, leaves) => {
+        const employeeId = employeeRow.dataset.id;
+        const nameCell = employeeRow.querySelector('.employee-name-cell');
+        if (!nameCell || !employeeId) return;
+
+        // Pobierz limit urlopu
+        const leaveInfo = EmployeeManager.getLeaveInfoById(employeeId, currentYear);
+        const totalLimit = (parseInt(leaveInfo.entitlement, 10) || 0) + (parseInt(leaveInfo.carriedOver, 10) || 0);
+
+        // Oblicz zaplanowane dni (tylko urlop wypoczynkowy w bieżącym roku)
+        let plannedDays = 0;
+        leaves.forEach((leave) => {
+            if (leave.type !== 'vacation' && leave.type !== undefined) return; // Tylko wypoczynkowy
+            if (!leave.startDate || !leave.endDate) return;
+
+            const start = toUTCDate(leave.startDate);
+            const end = toUTCDate(leave.endDate);
+
+            // Ogranicz do bieżącego roku
+            const yearStart = new Date(Date.UTC(currentYear, 0, 1));
+            const yearEnd = new Date(Date.UTC(currentYear, 11, 31));
+
+            const effectiveStart = start < yearStart ? yearStart : start;
+            const effectiveEnd = end > yearEnd ? yearEnd : end;
+
+            if (effectiveStart > effectiveEnd) return;
+
+            // Policz dni robocze (bez weekendów)
+            let current = new Date(effectiveStart);
+            while (current <= effectiveEnd) {
+                const dayOfWeek = current.getUTCDay();
+                if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                    plannedDays++;
+                }
+                current.setUTCDate(current.getUTCDate() + 1);
+            }
+        });
+
+        // Ustaw tooltip
+        nameCell.setAttribute('title', `Zaplanowano: ${plannedDays} / ${totalLimit}\nDwuklik aby otworzyć kalendarz`);
+    };
+
     const renderAllEmployeeLeaves = (allLeaves) => {
         Object.keys(allLeaves).forEach((employeeName) => {
             renderSingleEmployeeLeaves(employeeName, allLeaves[employeeName] || []);
+        });
+
+        // Aktualizuj tooltipy po renderowaniu
+        leavesTableBody.querySelectorAll('tr[data-employee]').forEach((row) => {
+            const employeeName = row.dataset.employee;
+            updateEmployeeTooltip(row, allLeaves[employeeName] || []);
         });
     };
 
@@ -751,13 +812,16 @@ export const Leaves = (() => {
                 const leave = lanes[l] ? lanes[l][monthIndex] : null;
 
                 if (leave) {
-                    const bgColor = AppConfig.leaves.leaveTypeColors[leave.type] || AppConfig.leaves.leaveTypeColors.default;
+                    const bgColor =
+                        AppConfig.leaves.leaveTypeColors[leave.type] || AppConfig.leaves.leaveTypeColors.default;
                     const start = toUTCDate(leave.startDate);
                     const end = toUTCDate(leave.endDate);
 
                     const div = document.createElement('div');
                     div.classList.add('leave-block');
-                    const leaveOption = document.querySelector(`#leaveTypeSelect option[value="${leave.type || 'vacation'}"]`);
+                    const leaveOption = document.querySelector(
+                        `#leaveTypeSelect option[value="${leave.type || 'vacation'}"]`,
+                    );
                     const leaveTypeName = leaveOption ? leaveOption.textContent : 'Urlop';
 
                     div.setAttribute('title', leaveTypeName);

@@ -79,9 +79,9 @@ export const UXEnhancements = (() => {
      * Pokazuje aktualną pozycję dnia roboczego (7:00 - 18:00)
      */
     const initDayProgressBar = () => {
-        // Sprawdź czy jesteśmy na stronie harmonogramu
-        const tableContainer = document.querySelector('.table-container');
-        if (!tableContainer) return;
+        // Sprawdź czy jest dedykowany kontener
+        const progressContainer = document.getElementById('dayProgressContainer');
+        if (!progressContainer) return;
 
         // Utwórz pasek postępu
         let progressBar = document.getElementById('dayProgressBar');
@@ -90,18 +90,24 @@ export const UXEnhancements = (() => {
             progressBar.id = 'dayProgressBar';
             progressBar.className = 'day-progress-bar';
             progressBar.innerHTML = `
+                <div class="day-progress-info">
+                    <span class="day-progress-label">
+                        <i class="fas fa-clock"></i>
+                        Postęp dnia
+                    </span>
+                    <span class="day-progress-elapsed"></span>
+                </div>
                 <div class="day-progress-track">
                     <div class="day-progress-fill"></div>
-                    <div class="day-progress-marker"></div>
+                    <div class="day-progress-marker" title="Aktualny czas"></div>
                 </div>
-                <span class="day-progress-time"></span>
+                <div class="day-progress-info day-progress-info-right">
+                    <span class="day-progress-time"></span>
+                    <span class="day-progress-remaining"></span>
+                </div>
             `;
 
-            // Wstaw przed tabelą
-            const scheduleTable = document.querySelector('.schedule-table');
-            if (scheduleTable) {
-                scheduleTable.parentNode.insertBefore(progressBar, scheduleTable);
-            }
+            progressContainer.appendChild(progressBar);
         }
 
         updateDayProgress();
@@ -112,12 +118,14 @@ export const UXEnhancements = (() => {
     };
 
     /**
-     * Aktualizuje pozycję paska postępu
+     * Aktualizuje pozycję paska postępu i wszystkie informacje
      */
     const updateDayProgress = () => {
         const progressFill = document.querySelector('.day-progress-fill');
         const progressMarker = document.querySelector('.day-progress-marker');
         const progressTime = document.querySelector('.day-progress-time');
+        const progressElapsed = document.querySelector('.day-progress-elapsed');
+        const progressRemaining = document.querySelector('.day-progress-remaining');
 
         if (!progressFill || !progressMarker || !progressTime) return;
 
@@ -137,10 +145,59 @@ export const UXEnhancements = (() => {
         // Ogranicz do 0-100%
         progress = Math.max(0, Math.min(100, progress));
 
+        // Oblicz pozostały czas
+        const minutesRemaining = totalMinutes - minutesSinceStart;
+        const hoursRemaining = Math.floor(Math.max(0, minutesRemaining) / 60);
+        const minsRemaining = Math.max(0, minutesRemaining) % 60;
+
+        // Oblicz minięty czas
+        const hoursElapsed = Math.floor(Math.max(0, minutesSinceStart) / 60);
+        const minsElapsed = Math.max(0, minutesSinceStart) % 60;
+
         // Aktualizuj UI
         progressFill.style.width = `${progress}%`;
         progressMarker.style.left = `${progress}%`;
         progressTime.textContent = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
+
+        // Tooltip na wskaźniku
+        if (currentHour >= startHour && currentHour < endHour) {
+            progressMarker.setAttribute(
+                'title',
+                `Do końca zmiany: ${hoursRemaining}h ${minsRemaining}min\nMinęło: ${hoursElapsed}h ${minsElapsed}min`,
+            );
+        } else if (currentHour < startHour) {
+            const minsToStart = (startHour - currentHour) * 60 - currentMinute;
+            const hToStart = Math.floor(minsToStart / 60);
+            const mToStart = minsToStart % 60;
+            progressMarker.setAttribute('title', `Do rozpoczęcia: ${hToStart}h ${mToStart}min`);
+        } else {
+            progressMarker.setAttribute('title', 'Zmiana zakończona');
+        }
+
+        // Minięty czas
+        if (progressElapsed) {
+            if (currentHour >= startHour && currentHour < endHour) {
+                progressElapsed.innerHTML = `<small>Minęło: ${hoursElapsed}h ${minsElapsed}min</small>`;
+            } else if (currentHour < startHour) {
+                progressElapsed.innerHTML = `<small>Przed rozpoczęciem</small>`;
+            } else {
+                progressElapsed.innerHTML = `<small>Zmiana zakończona</small>`;
+            }
+        }
+
+        // Pozostały czas
+        if (progressRemaining) {
+            if (currentHour >= startHour && currentHour < endHour) {
+                progressRemaining.innerHTML = `<small>Pozostało: <strong>${hoursRemaining}h ${minsRemaining}min</strong></small>`;
+            } else if (currentHour < startHour) {
+                const minsToStart = (startHour - currentHour) * 60 - currentMinute;
+                const hToStart = Math.floor(minsToStart / 60);
+                const mToStart = minsToStart % 60;
+                progressRemaining.innerHTML = `<small>Start za: ${hToStart}h ${mToStart}min</small>`;
+            } else {
+                progressRemaining.innerHTML = `<small>Do jutra 7:00</small>`;
+            }
+        }
 
         // Pokaż/ukryj w zależności od czasu
         const progressBar = document.getElementById('dayProgressBar');
