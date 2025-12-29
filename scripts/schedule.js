@@ -6,6 +6,7 @@ import { ScheduleUI } from './schedule-ui.js';
 import { ScheduleEvents } from './schedule-events.js';
 import { ScheduleData } from './schedule-data.js';
 import { ScheduleModals } from './schedule-modals.js';
+import { UXEnhancements } from './ux-enhancements.js';
 import { ScheduleLogic } from './schedule-logic.js';
 import { safeCopy } from './utils.js';
 import {
@@ -466,6 +467,8 @@ export const Schedule = (() => {
             window.showToast('Wystąpił krytyczny błąd inicjalizacji. Odśwież stronę.', 5000);
         } finally {
             if (loadingOverlay) hideLoadingOverlay(loadingOverlay);
+            // Inicjalizuj ulepszenia UX dla harmonogramu (pasek postępu dnia)
+            UXEnhancements.initScheduleEnhancements();
         }
     };
 
