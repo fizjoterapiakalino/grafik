@@ -11,7 +11,7 @@
         <div id="employeeListContainer" class="employee-list-container">
             <!-- Lista pracowników zostanie wstrzyknięta tutaj przez JS -->
         </div>
-        <button id="addEmployeeBtn" class="action-btn confirm-btn" style="width: 100%; margin-top: 15px;">
+        <button id="addEmployeeBtn" class="action-btn primary" style="width: 100%; margin-top: 15px;">
             <i class="fas fa-plus"></i> Dodaj nowego pracownika
         </button>
     </div>
@@ -45,10 +45,7 @@
                 <label for="leaveEntitlementInput">Urlop należny w roku:</label>
                 <input type="number" id="leaveEntitlementInput" min="0" value="26" />
             </div>
-            <div class="form-group">
-                <label for="carriedOverLeaveInput">Urlop zaległy (z poprz. roku):</label>
-                <input type="number" id="carriedOverLeaveInput" min="0" value="0" />
-            </div>
+            <!-- Usunięto: Urlop zaległy (edytowany teraz w podsumowaniu rocznym na stronie urlopów) -->
             <div class="form-group form-group-checkbox">
                 <input type="checkbox" id="employeeRoleAdmin" />
                 <label for="employeeRoleAdmin">Administrator (pełny dostęp)</label>
@@ -66,17 +63,17 @@
                 <div class="uid-input-group">
                     <input type="text" id="employeeUidInput" readonly placeholder="Brak przypisanego użytkownika" />
                     <div class="uid-actions">
-                        <button id="assignUidBtn" class="action-btn uid-btn">Przypisz do mnie</button>
-                        <button id="clearUidBtn" class="action-btn uid-btn cancel-btn">
+                        <button id="assignUidBtn" class="action-btn secondary">Przypisz do mnie</button>
+                        <button id="clearUidBtn" class="action-btn danger">
                             <i class="fas fa-trash-alt"></i>
                         </button>
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button id="saveEmployeeBtn" class="action-btn confirm-btn">
+                    <button id="saveEmployeeBtn" class="action-btn primary">
                         <i class="fas fa-save"></i> Zapisz zmiany
                     </button>
-                    <button id="deleteEmployeeBtn" class="action-btn cancel-btn">
+                    <button id="deleteEmployeeBtn" class="action-btn danger">
                         <i class="fas fa-trash-alt"></i> Usuń pracownika
                     </button>
                 </div>
@@ -96,8 +93,8 @@
                 <input type="text" id="deleteConfirmationInput" autocomplete="off" />
             </div>
             <div class="modal-actions">
-                <button id="confirmDeleteBtn" class="action-btn cancel-btn" disabled>Usuń trwale</button>
-                <button id="cancelDeleteBtn" class="action-btn">Anuluj</button>
+                <button id="confirmDeleteBtn" class="action-btn danger" disabled>Usuń trwale</button>
+                <button id="cancelDeleteBtn" class="action-btn outline">Anuluj</button>
             </div>
         </div>
     </div>
@@ -105,8 +102,9 @@
     <div class="backup-container">
         <h2>Kopia zapasowa</h2>
         <div class="backup-controls">
-            <button id="createBackupBtn" class="action-btn"><i class="fas fa-save"></i> Utwórz kopię zapasową</button>
-            <button id="restoreBackupBtn" class="action-btn confirm-btn">
+            <button id="createBackupBtn" class="action-btn secondary"><i class="fas fa-save"></i> Utwórz kopię
+                zapasową</button>
+            <button id="restoreBackupBtn" class="action-btn outline">
                 <i class="fas fa-undo"></i> Przywróć z kopii zapasowej
             </button>
         </div>
@@ -128,8 +126,8 @@
                 <input type="text" id="restoreConfirmationInput" autocomplete="off" />
             </div>
             <div class="modal-actions">
-                <button id="confirmRestoreBtn" class="action-btn cancel-btn" disabled>Przywróć dane</button>
-                <button id="cancelRestoreBtn" class="action-btn">Anuluj</button>
+                <button id="confirmRestoreBtn" class="action-btn danger" disabled>Przywróć dane</button>
+                <button id="cancelRestoreBtn" class="action-btn outline">Anuluj</button>
             </div>
         </div>
     </div>

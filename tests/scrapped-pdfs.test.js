@@ -1,5 +1,14 @@
 import { ScrappedPdfs } from '../scripts/scrapped-pdfs.js';
 
+// Mock PdfService
+jest.mock('../scripts/pdf-service.js', () => ({
+    PdfService: {
+        fetchAndCachePdfLinks: jest.fn(),
+    },
+}));
+
+import { PdfService } from '../scripts/pdf-service.js';
+
 /**
  * @jest-environment jsdom
  */
@@ -26,8 +35,8 @@ describe('ScrappedPdfs', () => {
         tableContainer = document.getElementById('pdf-table-container');
         searchInput = document.getElementById('pdfSearchInput');
 
-        // Reset fetch mock
-        global.fetch = jest.fn();
+        // Reset mocks
+        jest.clearAllMocks();
     });
 
     afterEach(() => {
@@ -36,18 +45,15 @@ describe('ScrappedPdfs', () => {
     });
 
     test('should display loading message initially', () => {
-        global.fetch.mockImplementation(() => new Promise(() => {})); // Never resolves
+        PdfService.fetchAndCachePdfLinks.mockImplementation(() => new Promise(() => {})); // Never resolves
         ScrappedPdfs.init();
-        expect(container.textContent).toBe('Ładowanie linków...');
+        expect(container.textContent).toBe('Ładowanie dokumentów...');
     });
 
     test('should display links when fetch is successful', async () => {
         const mockData = [{ date: '2023-10-25', type: 'Grafik', title: 'Plan.pdf', url: 'http://example.com/1.pdf' }];
 
-        global.fetch.mockResolvedValue({
-            ok: true,
-            json: async () => mockData,
-        });
+        PdfService.fetchAndCachePdfLinks.mockResolvedValue(mockData);
 
         await ScrappedPdfs.init();
 
@@ -62,40 +68,33 @@ describe('ScrappedPdfs', () => {
     });
 
     test('should handle API errors gracefully', async () => {
-        global.fetch.mockRejectedValue(new Error('Network error'));
+        PdfService.fetchAndCachePdfLinks.mockRejectedValue(new Error('Network error'));
 
         await ScrappedPdfs.init();
 
-        expect(container.textContent).toBe('Wystąpił błąd podczas ładowania linków.');
+        expect(container.textContent).toBe('Wystąpił błąd podczas ładowania dokumentów.');
     });
 
     test('should handle empty results', async () => {
-        global.fetch.mockResolvedValue({
-            ok: true,
-            json: async () => [],
-        });
+        PdfService.fetchAndCachePdfLinks.mockResolvedValue([]);
 
         await ScrappedPdfs.init();
 
-        expect(container.textContent).toBe('Brak dostępnych linków PDF.');
+        expect(container.textContent).toBe('Brak dostępnych dokumentów.');
     });
 
-    test('should filter links based on search input', async () => {
+    test('should filter links based on search event', async () => {
         const mockData = [
             { date: '2023-10-25', type: 'Grafik', title: 'Plan A', url: '#' },
             { date: '2023-10-26', type: 'Zmiana', title: 'Plan B', url: '#' },
         ];
 
-        global.fetch.mockResolvedValue({
-            ok: true,
-            json: async () => mockData,
-        });
+        PdfService.fetchAndCachePdfLinks.mockResolvedValue(mockData);
 
         await ScrappedPdfs.init();
 
-        // Simulate typing 'Zmiana'
-        searchInput.value = 'zmiana';
-        searchInput.dispatchEvent(new Event('input'));
+        // Simulate search event (the module listens to 'app:search' custom event)
+        document.dispatchEvent(new CustomEvent('app:search', { detail: { searchTerm: 'zmiana' } }));
 
         const rows = tableBody.querySelectorAll('tr');
         expect(rows.length).toBe(1);
@@ -106,10 +105,7 @@ describe('ScrappedPdfs', () => {
     test('should prevent XSS injection in rendering', async () => {
         const mockData = [{ date: '2023-10-25', type: '<img src=x onerror=alert(1)>', title: '<b>Bold</b>', url: '#' }];
 
-        global.fetch.mockResolvedValue({
-            ok: true,
-            json: async () => mockData,
-        });
+        PdfService.fetchAndCachePdfLinks.mockResolvedValue(mockData);
 
         await ScrappedPdfs.init();
 

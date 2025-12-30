@@ -100,8 +100,6 @@ export const Schedule: ScheduleAPI = (() => {
             const employeeIndex = (parentCell as HTMLElement & { dataset: { employeeIndex?: string } }).dataset.employeeIndex || '';
             const time = (parentCell as HTMLElement & { dataset: { time?: string } }).dataset.time || '';
             const duplicate = this.findDuplicateEntry(newText, time, employeeIndex);
-
-            // Determine if we are editing a part of a split cell
             const targetPart = getTargetPart(element);
 
             const updateSchedule = (isMove = false): void => {
