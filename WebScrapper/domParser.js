@@ -1,27 +1,11 @@
-/**
- * DOM Parser dla dokumentów ISO/PDF
- *
- * Ta funkcja jest uruchamiana w kontekście przeglądarki (Puppeteer)
- * oraz w testach jednostkowych (jsdom).
- *
- * WYMOGI:
- * - Musi być 'czysta' i nie zależeć od zewnętrznych zmiennych domknięcia
- * - Musi działać zarówno w Node.js (przez Puppeteer) jak i w testach
- *
- * STRUKTURA PARSOWANEGO HTML:
- * Oczekiwana sekwencja węzłów:
- *   TextNode(data: "YYYY-MM-DD") -> <b>Typ dokumentu</b> -> <a href="url">Tytuł</a>
- *
- * @returns {Array<{date: string, type: string, title: string, url: string}>}
- */
+// Funkcja parsująca dokument
+// Ta funkcja będzie uruchamiana w kontekście przeglądarki (Puppeteer) oraz w testach (jsdom).
+// Musi być 'czysta' i nie zależeć od zewnętrznych zmiennych domknięcia.
+
 function parseDocumentsInBrowser() {
     const results = [];
     const container = document.querySelector('div#tresc');
-
-    if (!container) {
-        console.warn('parseDocumentsInBrowser: Nie znaleziono kontenera #tresc');
-        return [];
-    }
+    if (!container) return [];
 
     // Pobieramy wszystkie elementy (węzły) wewnątrz kontenera
     const nodes = Array.from(container.childNodes);
@@ -35,51 +19,33 @@ function parseDocumentsInBrowser() {
         return node.nodeType === Node.ELEMENT_NODE;
     });
 
-    // Regex dla formatu daty YYYY-MM-DD
-    const dateRegex = /(\d{4}-\d{2}-\d{2})/;
-
     for (let i = 0; i < meaningfulNodes.length; i++) {
         const currentNode = meaningfulNodes[i];
 
         // Krok 1: Szukamy węzła tekstowego, który zawiera datę
-        if (currentNode.nodeType === Node.TEXT_NODE && dateRegex.test(currentNode.textContent)) {
+        if (currentNode.nodeType === Node.TEXT_NODE && /\d{4}-\d{2}-\d{2}/.test(currentNode.textContent)) {
             // Krok 2: Sprawdzamy sekwencję: Data -> <b>Typ</b> -> <a>Link</a>
             // W meaningfulNodes powinny to być kolejne elementy: i+1 oraz i+2
             const typeNode = meaningfulNodes[i + 1];
             const linkNode = meaningfulNodes[i + 2];
 
-            // Walidacja sekwencji
-            const isValidSequence =
-                typeNode && typeNode.nodeName === 'B' && linkNode && linkNode.nodeName === 'A' && linkNode.href;
-
-            if (isValidSequence) {
-                const dateMatch = currentNode.textContent.match(dateRegex);
+            if (typeNode && typeNode.nodeName === 'B' && linkNode && linkNode.nodeName === 'A') {
+                const dateMatch = currentNode.textContent.match(/(\d{4}-\d{2}-\d{2})/);
 
                 if (dateMatch) {
-                    // Bezpieczne pobieranie tekstu (innerText dla przeglądarki, textContent dla jsdom)
-                    const getNodeText = (node) => {
-                        if (!node) return '';
-                        return (node.innerText || node.textContent || '').trim();
-                    };
-
                     results.push({
                         date: dateMatch[0],
-                        type: getNodeText(typeNode),
-                        title: getNodeText(linkNode),
+                        type: typeNode.innerText ? typeNode.innerText.trim() : typeNode.textContent.trim(),
+                        title: linkNode.innerText ? linkNode.innerText.trim() : linkNode.textContent.trim(),
                         url: linkNode.href,
                     });
-
-                    // Przeskakujemy przetworzone elementy (optymalizacja)
+                    // Przeskakujemy przetworzone elementy
                     i += 2;
                 }
             }
         }
     }
-
     return results;
 }
 
-// Export dla Node.js (testy)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = parseDocumentsInBrowser;
-}
+module.exports = parseDocumentsInBrowser;
