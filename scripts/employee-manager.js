@@ -49,10 +49,43 @@ export const EmployeeManager = (() => {
             return employee.lastName || '';
         },
         // Zwraca informacje urlopowe
-        getLeaveInfoById: (id) => ({
-            entitlement: _employees[id]?.leaveEntitlement || 0,
-            carriedOver: _employees[id]?.carriedOverLeave || 0,
-        }),
+        getLeaveInfoById: (id, year) => {
+            const employee = _employees[id];
+            if (!employee) return { entitlement: 0, carriedOver: 0 };
+
+            let carriedOver = 0;
+            // Sprawdź czy mamy wartość dla konkretnego roku
+            if (year && employee.carriedOverLeaveByYear && employee.carriedOverLeaveByYear[year] !== undefined) {
+                carriedOver = employee.carriedOverLeaveByYear[year];
+            } else {
+                // Fallback do starego pola (dla kompatybilności wstecznej)
+                carriedOver = employee.carriedOverLeave || 0;
+            }
+
+            return {
+                entitlement: employee.leaveEntitlement || 0,
+                carriedOver: carriedOver,
+            };
+        },
+        // Aktualizuje tylko urlop zaległy dla konkretnego roku
+        updateCarriedOverLeave: async function (id, year, value) {
+            if (!_employees[id]) return;
+
+            if (!_employees[id].carriedOverLeaveByYear) {
+                _employees[id].carriedOverLeaveByYear = {};
+            }
+            _employees[id].carriedOverLeaveByYear[year] = value;
+
+            try {
+                const docRef = db.collection('schedules').doc('mainSchedule');
+                const updateData = {};
+                updateData[`employees.${id}.carriedOverLeaveByYear.${year}`] = value;
+                await docRef.update(updateData);
+            } catch (error) {
+                console.error('Błąd podczas aktualizacji zaległego urlopu:', error);
+                window.showToast('Nie udało się zapisać zmiany urlopu zaległego.', 5000);
+            }
+        },
         compareEmployees: (empA, empB) => {
             const getSortKey = (emp) => {
                 // Sort by First Name to match the "First Name Last Name" display

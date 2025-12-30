@@ -1,6 +1,7 @@
 // scripts/schedule-data.js
 import { db } from './firebase-config.js';
 import { AppConfig, UndoManager } from './common.js';
+import { validateCellState, sanitizeCellState } from './data-validation.js';
 
 export const ScheduleData = (() => {
     let appState = {
@@ -59,7 +60,11 @@ export const ScheduleData = (() => {
         undoManager = new UndoManager({
             maxStates: AppConfig.undoManager.maxStates,
             onUpdate: (manager) => {
-                if (undoButtonElement) undoButtonElement.disabled = !manager.canUndo();
+                if (undoButtonElement) {
+                    const canUndo = manager.canUndo();
+                    undoButtonElement.disabled = !canUndo;
+                    undoButtonElement.classList.toggle('active', canUndo);
+                }
             },
         });
     };
@@ -112,6 +117,18 @@ export const ScheduleData = (() => {
         window.setSaveStatus('saving');
 
         try {
+            // Walidacja przed zapisem (opcjonalnie - logowanie błędów)
+            if (AppConfig.debug) {
+                for (const time of Object.keys(appState.scheduleCells)) {
+                    for (const empIdx of Object.keys(appState.scheduleCells[time])) {
+                        const validation = validateCellState(appState.scheduleCells[time][empIdx]);
+                        if (!validation.valid) {
+                            console.warn(`Walidacja komórki [${time}][${empIdx}]:`, validation.errors);
+                        }
+                    }
+                }
+            }
+
             await getScheduleDocRef().set(appState, { merge: true });
             window.setSaveStatus('saved');
             isSaving = false;
@@ -140,7 +157,13 @@ export const ScheduleData = (() => {
 
         updateFn(cellState);
 
-        appState.scheduleCells[time][employeeIndex] = cellState;
+        // Waliduj i sanityzuj stan komórki
+        const validation = validateCellState(cellState);
+        if (!validation.valid && AppConfig.debug) {
+            console.warn(`Walidacja komórki [${time}][${employeeIndex}]:`, validation.errors);
+        }
+
+        appState.scheduleCells[time][employeeIndex] = sanitizeCellState(cellState);
 
         notifyChange();
         saveSchedule();
@@ -161,7 +184,13 @@ export const ScheduleData = (() => {
 
             updateFn(cellState);
 
-            appState.scheduleCells[time][employeeIndex] = cellState;
+            // Waliduj i sanityzuj
+            const validation = validateCellState(cellState);
+            if (!validation.valid && AppConfig.debug) {
+                console.warn(`Walidacja komórki [${time}][${employeeIndex}]:`, validation.errors);
+            }
+
+            appState.scheduleCells[time][employeeIndex] = sanitizeCellState(cellState);
         });
 
         notifyChange();

@@ -6,7 +6,17 @@ import { ScheduleUI } from './schedule-ui.js';
 import { ScheduleEvents } from './schedule-events.js';
 import { ScheduleData } from './schedule-data.js';
 import { ScheduleModals } from './schedule-modals.js';
+import { UXEnhancements } from './ux-enhancements.js';
 import { ScheduleLogic } from './schedule-logic.js';
+import { safeCopy } from './utils.js';
+import {
+    getTargetPart,
+    getSourcePart,
+    createTargetUpdateFn,
+    createSourceClearFn,
+    updateCellContent,
+    initTreatmentData,
+} from './schedule-helpers.js';
 
 export const Schedule = (() => {
     let loadingOverlay;
@@ -30,254 +40,67 @@ export const Schedule = (() => {
     };
 
     const mainController = {
+        /**
+         * Przetwarza wyjście z trybu edycji komórki
+         * @param {HTMLElement} element - Edytowany element
+         * @param {string} newText - Nowy tekst wpisany przez użytkownika
+         */
         processExitEditMode(element, newText) {
             element.setAttribute('contenteditable', 'false');
-            const parentCell = element.closest('[data-time]'); // Changed from 'td' to support mobile cards
+            const parentCell = element.closest('[data-time]');
             if (!parentCell) return;
+
             const employeeIndex = parentCell.dataset.employeeIndex;
             const time = parentCell.dataset.time;
             const duplicate = this.findDuplicateEntry(newText, time, employeeIndex);
+            const targetPart = getTargetPart(element);
 
-            // Determine if we are editing a part of a split cell
-            let targetPart = null;
-            if (element.tagName === 'DIV' && element.parentNode.classList.contains('split-cell-wrapper')) {
-                targetPart = element === element.parentNode.children[0] ? 1 : 2;
-            }
-
+            /**
+             * Wykonuje aktualizację harmonogramu
+             * @param {boolean} isMove - Czy to operacja przeniesienia (z duplikatu)
+             */
             const updateSchedule = (isMove = false) => {
                 if (isMove && duplicate) {
-                    // Atomic move operation using updateMultipleCells
-                    const updates = [];
+                    // Atomowa operacja przeniesienia
                     const oldCellState = duplicate.cellData;
+                    const sourcePart = getSourcePart(oldCellState, newText);
 
-                    // Helper to safely copy value or null
-                    const safeCopy = (val) => val === undefined ? null : val;
-                    const safeBool = (val) => val === undefined ? false : val;
-
-                    let sourcePart = null; // 1 or 2 if split, null if not split
-
-                    if (oldCellState.isSplit) {
-                        if (oldCellState.content1?.toLowerCase() === newText.toLowerCase()) {
-                            sourcePart = 1;
-                        } else if (oldCellState.content2?.toLowerCase() === newText.toLowerCase()) {
-                            sourcePart = 2;
-                        }
-                    }
-
-                    // 1. Update Target Cell (Current Cell)
-                    updates.push({
-                        time: time,
-                        employeeIndex: employeeIndex,
-                        updateFn: (cellState) => {
-                            if (targetPart) {
-                                // Moving INTO a split cell part
-                                cellState[`content${targetPart}`] = safeCopy(sourcePart ? oldCellState[`content${sourcePart}`] : oldCellState.content);
-
-                                // Map flags
-                                cellState[`isMassage${targetPart}`] = safeBool(sourcePart ? oldCellState[`isMassage${sourcePart}`] : oldCellState.isMassage);
-                                cellState[`isPnf${targetPart}`] = safeBool(sourcePart ? oldCellState[`isPnf${sourcePart}`] : oldCellState.isPnf);
-                                cellState[`isEveryOtherDay${targetPart}`] = safeBool(sourcePart ? oldCellState[`isEveryOtherDay${sourcePart}`] : oldCellState.isEveryOtherDay);
-
-                                // Map treatment data
-                                const treatmentData = sourcePart ? (oldCellState[`treatmentData${sourcePart}`] || {}) : {
-                                    startDate: oldCellState.treatmentStartDate,
-                                    extensionDays: oldCellState.treatmentExtensionDays,
-                                    endDate: oldCellState.treatmentEndDate,
-                                    additionalInfo: oldCellState.additionalInfo
-                                };
-
-                                cellState[`treatmentData${targetPart}`] = {
-                                    startDate: safeCopy(treatmentData.startDate),
-                                    extensionDays: safeCopy(treatmentData.extensionDays),
-                                    endDate: safeCopy(treatmentData.endDate),
-                                    additionalInfo: safeCopy(treatmentData.additionalInfo)
-                                };
-
-                            } else if (sourcePart) {
-                                // Moving FROM a split cell part TO a normal cell
-                                cellState.content = safeCopy(oldCellState[`content${sourcePart}`]);
-                                cellState.isSplit = false; // Target should NOT be split
-
-                                // Map flags
-                                cellState.isMassage = safeBool(oldCellState[`isMassage${sourcePart}`]);
-                                cellState.isPnf = safeBool(oldCellState[`isPnf${sourcePart}`]);
-                                cellState.isEveryOtherDay = safeBool(oldCellState[`isEveryOtherDay${sourcePart}`]);
-
-                                // Map treatment data
-                                const treatmentData = oldCellState[`treatmentData${sourcePart}`] || {};
-                                cellState.treatmentStartDate = safeCopy(treatmentData.startDate);
-                                cellState.treatmentExtensionDays = safeCopy(treatmentData.extensionDays);
-                                cellState.treatmentEndDate = safeCopy(treatmentData.endDate);
-                                cellState.additionalInfo = safeCopy(treatmentData.additionalInfo);
-
-                                // Clear any split-specific fields on target if they existed
-                                delete cellState.content1;
-                                delete cellState.content2;
-                                delete cellState.isMassage1;
-                                delete cellState.isPnf1;
-                                delete cellState.isEveryOtherDay1;
-                                delete cellState.isMassage2;
-                                delete cellState.isPnf2;
-                                delete cellState.isEveryOtherDay2;
-                                delete cellState.treatmentData1;
-                                delete cellState.treatmentData2;
-
-                            } else {
-                                // Moving from a normal cell TO a normal cell (full copy)
-                                cellState.content = safeCopy(oldCellState.content);
-                                cellState.isSplit = safeBool(oldCellState.isSplit); // Should be false/undefined here but safe to copy
-
-                                cellState.content1 = safeCopy(oldCellState.content1);
-                                cellState.content2 = safeCopy(oldCellState.content2);
-
-                                cellState.isMassage = safeBool(oldCellState.isMassage);
-                                cellState.isPnf = safeBool(oldCellState.isPnf);
-                                cellState.isEveryOtherDay = safeBool(oldCellState.isEveryOtherDay);
-
-                                cellState.isMassage1 = safeBool(oldCellState.isMassage1);
-                                cellState.isPnf1 = safeBool(oldCellState.isPnf1);
-                                cellState.isEveryOtherDay1 = safeBool(oldCellState.isEveryOtherDay1);
-
-                                cellState.isMassage2 = safeBool(oldCellState.isMassage2);
-                                cellState.isPnf2 = safeBool(oldCellState.isPnf2);
-                                cellState.isEveryOtherDay2 = safeBool(oldCellState.isEveryOtherDay2);
-
-                                cellState.treatmentStartDate = safeCopy(oldCellState.treatmentStartDate);
-                                cellState.treatmentExtensionDays = safeCopy(oldCellState.treatmentExtensionDays);
-                                cellState.treatmentEndDate = safeCopy(oldCellState.treatmentEndDate);
-                                cellState.additionalInfo = safeCopy(oldCellState.additionalInfo);
-
-                                if (oldCellState.treatmentData1) {
-                                    cellState.treatmentData1 = JSON.parse(JSON.stringify(oldCellState.treatmentData1));
-                                }
-                                if (oldCellState.treatmentData2) {
-                                    cellState.treatmentData2 = JSON.parse(JSON.stringify(oldCellState.treatmentData2));
-                                }
-                            }
-                        }
-                    });
-
-                    // 2. Clear Source Cell (Duplicate)
-                    updates.push({
-                        time: duplicate.time,
-                        employeeIndex: duplicate.employeeIndex,
-                        updateFn: (state) => {
-                            if (sourcePart) {
-                                // Clear only the specific part
-                                state[`content${sourcePart}`] = '';
-                                delete state[`isMassage${sourcePart}`];
-                                delete state[`isPnf${sourcePart}`];
-                                delete state[`isEveryOtherDay${sourcePart}`];
-                                delete state[`treatmentData${sourcePart}`];
-
-                                // If both parts are now empty, maybe un-split? 
-                                // For now, let's leave it split but empty, or check if we should merge.
-                                // Logic: If other part is also empty, we can clear the whole cell.
-                                const otherPart = sourcePart === 1 ? 2 : 1;
-                                if (!state[`content${otherPart}`]) {
-                                    // Both empty, clear everything
-                                    for (const key in state) {
-                                        if (Object.prototype.hasOwnProperty.call(state, key)) {
-                                            delete state[key];
-                                        }
-                                    }
-                                }
-                            } else {
-                                // Clear all properties
-                                for (const key in state) {
-                                    if (Object.prototype.hasOwnProperty.call(state, key)) {
-                                        delete state[key];
-                                    }
-                                }
-                            }
-                        }
-                    });
+                    const updates = [
+                        // 1. Aktualizuj komórkę docelową
+                        {
+                            time: time,
+                            employeeIndex: employeeIndex,
+                            updateFn: createTargetUpdateFn(oldCellState, sourcePart, targetPart),
+                        },
+                        // 2. Wyczyść komórkę źródłową
+                        {
+                            time: duplicate.time,
+                            employeeIndex: duplicate.employeeIndex,
+                            updateFn: createSourceClearFn(sourcePart),
+                        },
+                    ];
 
                     ScheduleData.updateMultipleCells(updates);
                 } else {
-                    // Standard single cell update
+                    // Standardowa aktualizacja pojedynczej komórki
                     ScheduleData.updateCellState(time, employeeIndex, (cellState) => {
-                        if (newText.includes('/')) {
-                            const parts = newText.split('/', 2);
-                            cellState.isSplit = true;
-                            cellState.content1 = parts[0];
-                            cellState.content2 = parts[1];
-                        } else if (cellState.isSplit) {
-                            // Use targetPart determined earlier
-                            if (targetPart === 1) {
-                                cellState.content1 = newText;
-                                if (cellState.treatmentData1?.startDate) {
-                                    cellState.treatmentData1.endDate = ScheduleLogic.calculateEndDate(
-                                        cellState.treatmentData1.startDate,
-                                        cellState.treatmentData1.extensionDays,
-                                    );
-                                }
-                            } else if (targetPart === 2) {
-                                cellState.content2 = newText;
-                                if (cellState.treatmentData2?.startDate) {
-                                    cellState.treatmentData2.endDate = ScheduleLogic.calculateEndDate(
-                                        cellState.treatmentData2.startDate,
-                                        cellState.treatmentData2.extensionDays,
-                                    );
-                                }
-                            } else {
-                                // Fallback for safety, though targetPart should be set if isSplit and editing div
-                                const isFirstDiv = element === parentCell.querySelector('.split-cell-wrapper > div:first-child');
-                                if (isFirstDiv) {
-                                    cellState.content1 = newText;
-                                } else {
-                                    cellState.content2 = newText;
-                                }
-                            }
-                            // REMOVED: Auto-delete of isSplit when empty
-                            // if (!cellState.content1 && !cellState.content2) {
-                            //     delete cellState.isSplit;
-                            // }
-                        } else {
-                            const oldContent = cellState.content || '';
-                            if (oldContent.trim().toLowerCase() !== newText.trim().toLowerCase() && newText.trim() !== '') {
-                                // Content has changed, so ensure we have a start date
-                                if (!cellState.treatmentStartDate) {
-                                    const today = new Date();
-                                    const year = today.getFullYear();
-                                    const month = String(today.getMonth() + 1).padStart(2, '0');
-                                    const day = String(today.getDate()).padStart(2, '0');
-                                    cellState.treatmentStartDate = `${year}-${month}-${day}`;
-                                }
-                                cellState.additionalInfo = cellState.additionalInfo || null;
-                                cellState.treatmentExtensionDays = cellState.treatmentExtensionDays || 0;
-                                // Automatically re-calculate end date instead of setting to null
-                                cellState.treatmentEndDate = ScheduleLogic.calculateEndDate(
-                                    cellState.treatmentStartDate,
-                                    cellState.treatmentExtensionDays,
-                                );
-                            }
-                            cellState.content = newText;
-                        }
-                        // Jeśli pacjent nie istnieje, komórka nie ma jeszcze daty i nie jest to operacja przeniesienia, ustaw datę i wylicz koniec
-                        if (!cellState.treatmentStartDate && !isMove && !cellState.isSplit && cellState.content) {
-                            const today = new Date();
-                            const year = today.getFullYear();
-                            const month = String(today.getMonth() + 1).padStart(2, '0');
-                            const day = String(today.getDate()).padStart(2, '0');
-                            cellState.treatmentStartDate = `${year}-${month}-${day}`;
-                            cellState.treatmentEndDate = ScheduleLogic.calculateEndDate(
-                                cellState.treatmentStartDate,
-                                0,
-                            );
+                        updateCellContent(cellState, newText, targetPart, element, parentCell);
+
+                        // Inicjalizuj dane leczenia dla nowych wpisów
+                        if (!isMove) {
+                            initTreatmentData(cellState);
                         }
                     });
                 }
             };
 
+            // Pokaż dialog potwierdzenia jeśli znaleziono duplikat
             if (duplicate) {
                 ScheduleModals.showDuplicateConfirmationDialog(
                     duplicate,
                     () => updateSchedule(true),
                     () => updateSchedule(false),
-                    () => {
-                        ScheduleUI.render();
-                    },
+                    () => ScheduleUI.render(),
                 );
             } else {
                 updateSchedule(false);
@@ -435,7 +258,7 @@ export const Schedule = (() => {
                         additionalInfo: treatmentData.additionalInfo,
                         isMassage: realCellState[`isMassage${partIndex}`],
                         isPnf: realCellState[`isPnf${partIndex}`],
-                        isEveryOtherDay: realCellState[`isEveryOtherDay${partIndex}`]
+                        isEveryOtherDay: realCellState[`isEveryOtherDay${partIndex}`],
                     };
                 }
             }
@@ -447,9 +270,6 @@ export const Schedule = (() => {
                         // Create a temporary state object to capture updates
                         const tempState = { ...cellState };
                         updateFn(tempState);
-
-                        // Helper to safely copy value or null
-                        const safeCopy = (val) => (val === undefined ? null : val);
 
                         // Map back to real state
                         state[`content${partIndex}`] = safeCopy(tempState.content);
@@ -517,9 +337,6 @@ export const Schedule = (() => {
             const activePart = content1.trim() === '' ? 2 : 1;
 
             updateCellState(cell, (state) => {
-                // Helper to safely copy value or null
-                const safeCopy = (val) => (val === undefined ? null : val);
-
                 // Copy flags
                 state.isMassage = safeCopy(state[`isMassage${activePart}`]);
                 state.isPnf = safeCopy(state[`isPnf${activePart}`]);
@@ -650,6 +467,8 @@ export const Schedule = (() => {
             window.showToast('Wystąpił krytyczny błąd inicjalizacji. Odśwież stronę.', 5000);
         } finally {
             if (loadingOverlay) hideLoadingOverlay(loadingOverlay);
+            // Inicjalizuj ulepszenia UX dla harmonogramu (pasek postępu dnia)
+            UXEnhancements.initScheduleEnhancements();
         }
     };
 

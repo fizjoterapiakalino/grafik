@@ -164,7 +164,7 @@ export const ScheduleModals = (() => {
                                 <span>${new Date(entry.timestamp).toLocaleString('pl-PL')}</span>
                                 <span>przez: ${EmployeeManager.getEmployeeByUid(entry.userId)?.name || 'Nieznany'}</span>
                             </div>
-                            <button class="action-btn revert-btn" data-value="${entry.oldValue}">Przywróć</button>
+                            <button class="action-btn outline" data-value="${entry.oldValue}" title="Przywróć tę wartość"><i class="fas fa-undo"></i> Przywróć</button>
                         </li>
                     `,
                     )

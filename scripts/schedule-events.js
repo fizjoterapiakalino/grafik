@@ -2,6 +2,7 @@
 import { AppConfig } from './common.js';
 import { auth } from './firebase-config.js';
 import { initializeContextMenu, destroyContextMenu } from './context-menu.js';
+import { safeCopy, safeBool } from './utils.js';
 
 export const ScheduleEvents = (() => {
     let _dependencies = {};
@@ -37,7 +38,9 @@ export const ScheduleEvents = (() => {
                 // Check if we are clicking the same logical cell (even if element reference changed due to re-render)
                 const activeTd = activeCell.closest('td');
                 const targetTd = target.closest('td');
-                const isSameLogical = activeTd && targetTd &&
+                const isSameLogical =
+                    activeTd &&
+                    targetTd &&
                     activeTd.dataset.time === targetTd.dataset.time &&
                     activeTd.dataset.employeeIndex === targetTd.dataset.employeeIndex;
 
@@ -68,7 +71,6 @@ export const ScheduleEvents = (() => {
     };
 
     const _handleDocumentClick = (event) => {
-
         // Fix for mobile/general editing: If the target is no longer in the DOM (e.g. replaced by edit mode), ignore it.
         if (!document.body.contains(event.target)) {
             return;
@@ -208,8 +210,6 @@ export const ScheduleEvents = (() => {
         }
     };
 
-
-
     const _handleDragOver = (event) => {
         event.preventDefault();
         const dropTargetCell = event.target.closest('td.editable-cell');
@@ -247,10 +247,6 @@ export const ScheduleEvents = (() => {
             // Get source content to copy (read-only access to state)
             const sourceCellState = _dependencies.appState.scheduleCells[sourceTime]?.[sourceIndex] || {};
 
-            // Helper to safely copy value or null
-            const safeCopy = (val) => val === undefined ? null : val;
-            const safeBool = (val) => val === undefined ? false : val;
-
             const sourceContentString = sourceCellState.isSplit
                 ? `${sourceCellState.content1 || ''}/${sourceCellState.content2 || ''}`
                 : sourceCellState.content;
@@ -267,9 +263,9 @@ export const ScheduleEvents = (() => {
                     updateFn: (targetState) => {
                         if (targetPart && targetState.isSplit) {
                             // Dropping into a specific part of a split cell
-                            // We assume source is NOT split for simplicity in this specific interaction, 
+                            // We assume source is NOT split for simplicity in this specific interaction,
                             // OR we take the "content" if source is simple.
-                            // If source IS split, we might need to decide what to take. 
+                            // If source IS split, we might need to decide what to take.
                             // Current logic in _handleDrop (original) took everything.
                             // Let's assume we take the "primary" content or just 'content' if it was a simple drag.
                             // But wait, draggedCell is the element. If draggedCell was a split part, we should know.
@@ -281,7 +277,7 @@ export const ScheduleEvents = (() => {
                             // Simplified logic: If source is split, take combined? No, that's messy.
                             // Let's assume source is simple for now, or take content1 if split.
                             // Better: Check if dragged element was a part.
-                            // draggedCell is the TD. We don't track the specific div in draggedCell variable easily 
+                            // draggedCell is the TD. We don't track the specific div in draggedCell variable easily
                             // unless we updated _handleDragStart.
                             // For now, let's use the logic: If source is split, take content1/2 based on... nothing?
                             // Let's stick to: If source is split, we shouldn't be dragging "it" easily into a part without more logic.
@@ -295,11 +291,11 @@ export const ScheduleEvents = (() => {
                                 startDate: sourceCellState.treatmentStartDate,
                                 extensionDays: sourceCellState.treatmentExtensionDays,
                                 endDate: sourceCellState.treatmentEndDate,
-                                additionalInfo: sourceCellState.additionalInfo
+                                additionalInfo: sourceCellState.additionalInfo,
                             };
 
                             if (sourceCellState.isSplit) {
-                                // If dragging a split cell, this is ambiguous. 
+                                // If dragging a split cell, this is ambiguous.
                                 // For now, let's just take content1 as a fallback or block it.
                                 // Or maybe we just don't support dragging split cells INTO parts yet.
                                 // Let's assume source is simple.
@@ -315,7 +311,7 @@ export const ScheduleEvents = (() => {
                                 startDate: safeCopy(treatmentData.startDate),
                                 extensionDays: safeCopy(treatmentData.extensionDays),
                                 endDate: safeCopy(treatmentData.endDate),
-                                additionalInfo: safeCopy(treatmentData.additionalInfo)
+                                additionalInfo: safeCopy(treatmentData.additionalInfo),
                             };
 
                             // Clear top-level data to avoid ambiguity
@@ -327,16 +323,27 @@ export const ScheduleEvents = (() => {
                             targetState.isMassage = null;
                             targetState.isPnf = null;
                             targetState.isEveryOtherDay = null;
-
                         } else {
                             // Standard overwrite (target is not split, or we are dropping onto the cell container)
                             // Clear target content first
                             const contentKeys = [
-                                'content', 'content1', 'content2', 'isSplit',
-                                'isMassage', 'isPnf', 'isEveryOtherDay',
-                                'treatmentStartDate', 'treatmentExtensionDays', 'treatmentEndDate', 'additionalInfo',
-                                'treatmentData1', 'treatmentData2',
-                                'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2'
+                                'content',
+                                'content1',
+                                'content2',
+                                'isSplit',
+                                'isMassage',
+                                'isPnf',
+                                'isEveryOtherDay',
+                                'treatmentStartDate',
+                                'treatmentExtensionDays',
+                                'treatmentEndDate',
+                                'additionalInfo',
+                                'treatmentData1',
+                                'treatmentData2',
+                                'isMassage1',
+                                'isMassage2',
+                                'isPnf1',
+                                'isPnf2',
                             ];
                             for (const key of contentKeys) {
                                 delete targetState[key];
@@ -362,11 +369,23 @@ export const ScheduleEvents = (() => {
                         // So we clear the whole source TD.
 
                         const contentKeys = [
-                            'content', 'content1', 'content2', 'isSplit',
-                            'isMassage', 'isPnf', 'isEveryOtherDay',
-                            'treatmentStartDate', 'treatmentExtensionDays', 'treatmentEndDate', 'additionalInfo',
-                            'treatmentData1', 'treatmentData2',
-                            'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2'
+                            'content',
+                            'content1',
+                            'content2',
+                            'isSplit',
+                            'isMassage',
+                            'isPnf',
+                            'isEveryOtherDay',
+                            'treatmentStartDate',
+                            'treatmentExtensionDays',
+                            'treatmentEndDate',
+                            'additionalInfo',
+                            'treatmentData1',
+                            'treatmentData2',
+                            'isMassage1',
+                            'isMassage2',
+                            'isPnf1',
+                            'isPnf2',
                         ];
                         for (const key of contentKeys) {
                             sourceState[key] = null;
@@ -594,9 +613,6 @@ export const ScheduleEvents = (() => {
                 id: 'contextSplitCell',
                 action: (cell) =>
                     _dependencies.updateCellState(cell, (state) => {
-                        // Helper to safely copy value or null
-                        const safeCopy = (val) => val === undefined ? null : val;
-
                         // Migrate content
                         state.content1 = safeCopy(state.content || '');
                         state.content2 = '';
