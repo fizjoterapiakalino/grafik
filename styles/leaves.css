@@ -90,14 +90,6 @@
     background-color: var(--color-gray-100);
 }
 
-/* Zwiększona specyficzność dla focus state */
-table.leaves-table tbody tr td.editable-carried-over:focus,
-table.summary-table tbody tr td.editable-carried-over:focus {
-    outline: 2px solid var(--color-secondary);
-    background-color: var(--color-white);
-    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1);
-}
-
 .employee-name-cell {
     font-weight: bold;
     position: sticky;
@@ -451,7 +443,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     transition: border-color 0.2s ease-in-out;
 }
 
-.leaves-filter-container .filter-checkbox:checked + .legend-color-box {
+.leaves-filter-container .filter-checkbox:checked+.legend-color-box {
     border-color: #333;
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.2);
 }
@@ -501,14 +493,12 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     max-width: 1200px;
 }
 
-/* 12-month grid layout - override earlier flex styles */
-.calendar-slider-viewport .calendar-slider {
+.calendar-slider {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 25px;
     width: 100%;
-    transform: none;
-    transition: none;
+    transform: none !important;
 }
 
 @media (max-width: 1200px) {
@@ -559,25 +549,25 @@ table.summary-table tbody tr td.editable-carried-over:focus {
 }
 
 /* --- Circular Selection --- */
-/* Zwiększona specyficzność dla stylów selekcji kalendarza */
-.calendar-grid .day-cell-calendar.selected {
-    border-radius: 50%;
+
+.day-cell-calendar.selected {
+    border-radius: 50% !important;
     position: relative;
     z-index: 1;
 }
 
-/* Circular style for in-range cells */
-.calendar-grid .day-cell-calendar.in-range {
-    border-radius: 50%;
+/* Remove border-radius from in-range cells to create a continuous bar */
+.day-cell-calendar.in-range {
+    border-radius: 50% !important;
 }
 
-/* Adjust start and end date styling */
-.calendar-grid .day-cell-calendar.start-date {
-    border-radius: 50%;
+/* Adjust start and end date to connect with the in-range bar */
+.day-cell-calendar.start-date {
+    border-radius: 50% !important;
 }
 
-.calendar-grid .day-cell-calendar.end-date {
-    border-radius: 50%;
+.day-cell-calendar.end-date {
+    border-radius: 50% !important;
 }
 
 /* --- Date Summary and Label --- */
@@ -598,12 +588,11 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     font-size: 1em;
 }
 
-/* Zwiększona specyficzność dla etykiet selektorów */
-.calendar-selection-info .leave-type-selector label,
-.calendar-selection-info .year-selector label {
+.leave-type-selector label,
+.year-selector label {
     display: block;
     margin-bottom: 5px;
-    font-size: 1.3em;
+    font-size: 1.3em !important;
     font-weight: bold;
 }
 
@@ -616,9 +605,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     color: var(--color-text);
     cursor: pointer;
     min-width: 120px;
-    transition:
-        border-color 0.2s,
-        box-shadow 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .modal-select:focus {
@@ -651,7 +638,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     /* Hide non-printable elements */
     .app-header,
     .view-tabs,
-    .leaves-filter-container > *:not(.leaves-legend),
+    .leaves-filter-container>*:not(.leaves-legend),
     #contextMenu,
     #loadingOverlay,
     #toast-container,
@@ -660,7 +647,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     #clearFiltersBtn,
     #currentYearBtn,
     .year-select,
-    [for='yearSelect'] {
+    [for="yearSelect"] {
         display: none !important;
     }
 
@@ -725,6 +712,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
         page-break-inside: avoid;
     }
 }
+
 
 /* Responsive Card View for Mobile */
 @media screen and (max-width: 768px) {
@@ -828,34 +816,34 @@ table.summary-table tbody tr td.editable-carried-over:focus {
         /* Allow wrapping if many leaves */
     }
 
-    .day-cell > div {
+    .day-cell>div {
         flex: 0 0 auto;
         /* Stop them from taking full width unless needed */
     }
 
     /* Summary Table specifics for labels */
     .summary-table td:nth-of-type(2)::before {
-        content: 'Należny';
+        content: "Należny";
     }
 
     .summary-table td:nth-of-type(3)::before {
-        content: 'Zaległy';
+        content: "Zaległy";
     }
 
     .summary-table td:nth-of-type(4)::before {
-        content: 'Łącznie';
+        content: "Łącznie";
     }
 
     .summary-table td:nth-of-type(5)::before {
-        content: 'Wykorzystano';
+        content: "Wykorzystano";
     }
 
     .summary-table td:nth-of-type(6)::before {
-        content: 'Zaplanowano';
+        content: "Zaplanowano";
     }
 
     .summary-table td:nth-of-type(7)::before {
-        content: 'Pozostało';
+        content: "Pozostało";
     }
 
     /* Header Controls Stack */

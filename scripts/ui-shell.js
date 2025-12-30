@@ -35,9 +35,9 @@ export const UIShell = (() => {
                         <input type="text" id="searchInput" class="search-input" placeholder="Szukaj...">
                         <button id="clearSearchButton" class="clear-search-btn" style="display: none;"><i class="fas fa-times"></i></button>
                     </div>
-                    <button id="undoButton" class="action-icon-btn" title="Cofnij (Ctrl+Z)" disabled><i class="fas fa-undo"></i></button>
-                    <button id="printChangesTable" class="action-icon-btn active" title="Drukuj Grafik Harmonogramu" style="display: none;"><i class="fas fa-print"></i></button>
-                    <button id="printLeavesNavbarBtn" class="action-icon-btn active" title="Drukuj Grafik Urlopów" style="display: none;"><i class="fas fa-file-pdf"></i></button>
+                    <button id="undoButton" class="undo-button" title="Cofnij (Ctrl+Z)" disabled><i class="fas fa-undo"></i></button>
+                    <button id="printChangesTable" class="action-btn" title="Drukuj Grafik Harmonogramu" style="display: none;"><i class="fas fa-print"></i></button>
+                    <button id="printLeavesNavbarBtn" class="action-btn" title="Drukuj Grafik Urlopów" style="display: none;"><i class="fas fa-file-pdf"></i></button>
                     <!-- Hamburger menu will be inserted here by shared.js -->
                 </div>
             </div>
