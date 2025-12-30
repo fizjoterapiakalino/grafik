@@ -1,42 +1,74 @@
-// scripts/context-menu.js
+// scripts/context-menu.ts
 
-const contextMenuInstances = {};
+/**
+ * Konfiguracja elementu menu kontekstowego
+ */
+export interface ContextMenuItemConfig {
+    id: string;
+    class?: string;
+    action?: (target: HTMLElement, event?: MouseEvent) => void;
+    condition?: (target: HTMLElement) => boolean;
+    onShow?: (target: HTMLElement, event: MouseEvent) => void;
+}
 
-export const initializeContextMenu = (menuId, targetSelector, itemConfig) => {
-    const contextMenu = document.getElementById(menuId);
+/**
+ * Instancja menu kontekstowego
+ */
+interface ContextMenuInstance {
+    handleContextMenu: (event: MouseEvent) => void;
+    handleClickOutside: (event: MouseEvent) => void;
+    itemClickHandlers: Map<string, () => void>;
+    itemConfig: ContextMenuItemConfig[];
+}
+
+/**
+ * Rozszerzona definicja dla menu z dodatkowymi właściwościami
+ */
+interface ContextMenuElement extends HTMLElement {
+    contextEvent?: MouseEvent;
+}
+
+const contextMenuInstances: Record<string, ContextMenuInstance> = {};
+
+export const initializeContextMenu = (
+    menuId: string,
+    targetSelector: string,
+    itemConfig: ContextMenuItemConfig[]
+): void => {
+    const contextMenu = document.getElementById(menuId) as ContextMenuElement | null;
     if (!contextMenu) {
         console.error(`Context menu with id "${menuId}" not found.`);
         return;
     }
 
-    let currentTarget = null;
+    let currentTarget: HTMLElement | null = null;
 
-    const handleContextMenu = (event) => {
-        const target = event.target.closest(targetSelector);
+    const handleContextMenu = (event: MouseEvent): void => {
+        const target = (event.target as HTMLElement).closest(targetSelector) as HTMLElement | null;
         if (target) {
             event.preventDefault();
             contextMenu.contextEvent = event;
             currentTarget = target;
 
-            // New: Call onShow for items that have it
+            // Call onShow for items that have it
             itemConfig.forEach((item) => {
                 if (item.onShow) {
-                    item.onShow(currentTarget, event);
+                    item.onShow(currentTarget!, event);
                 }
             });
 
             itemConfig.forEach((item) => {
                 const element = document.getElementById(item.id);
                 if (element) {
-                    const shouldShow = item.condition ? item.condition(currentTarget) : true;
+                    const shouldShow = item.condition ? item.condition(currentTarget!) : true;
                     element.style.display = shouldShow ? 'flex' : 'none';
                 }
             });
 
             // Temporarily show to measure
             contextMenu.style.visibility = 'hidden';
-            contextMenu.style.display = 'block'; // Ensure it has dimensions
-            contextMenu.classList.add('visible'); // Add class if it affects styling/dimensions
+            contextMenu.style.display = 'block';
+            contextMenu.classList.add('visible');
 
             const { clientX: mouseX, clientY: mouseY } = event;
             const { innerWidth: windowWidth, innerHeight: windowHeight } = window;
@@ -46,44 +78,40 @@ export const initializeContextMenu = (menuId, targetSelector, itemConfig) => {
             let x = mouseX;
             let y = mouseY;
 
-            // Prevent going off-screen right
             if (x + menuWidth > windowWidth) {
                 x = windowWidth - menuWidth - 10;
             }
 
-            // Prevent going off-screen bottom
             if (y + menuHeight > windowHeight) {
                 y = windowHeight - menuHeight - 10;
             }
 
-            // Ensure not negative (top/left)
             if (x < 0) x = 10;
             if (y < 0) y = 10;
 
             contextMenu.style.left = `${x}px`;
             contextMenu.style.top = `${y}px`;
             contextMenu.style.visibility = 'visible';
-            // contextMenu.classList.add('visible'); // Already added above
         }
     };
 
-    const handleClickOutside = (event) => {
-        if (!contextMenu.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent): void => {
+        if (!contextMenu.contains(event.target as Node)) {
             contextMenu.classList.remove('visible');
-            contextMenu.style.display = 'none'; // Explicitly hide
+            contextMenu.style.display = 'none';
         }
     };
 
-    const itemClickHandlers = new Map();
+    const itemClickHandlers = new Map<string, () => void>();
     itemConfig.forEach((item) => {
         const element = document.getElementById(item.id);
         if (element) {
-            const handler = () => {
+            const handler = (): void => {
                 if (currentTarget && item.action) {
                     item.action(currentTarget, contextMenu.contextEvent);
                 }
                 contextMenu.classList.remove('visible');
-                contextMenu.style.display = 'none'; // Explicitly hide
+                contextMenu.style.display = 'none';
             };
             itemClickHandlers.set(item.id, handler);
             element.addEventListener('click', handler);
@@ -94,14 +122,13 @@ export const initializeContextMenu = (menuId, targetSelector, itemConfig) => {
     document.addEventListener('click', handleClickOutside);
 
     // Long Press Support for Mobile
-    let longPressTimer;
-    const LONG_PRESS_DURATION = 500; // ms
+    let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+    const LONG_PRESS_DURATION = 500;
 
-    const handleTouchStart = (event) => {
-        const target = event.target.closest(targetSelector);
+    const handleTouchStart = (event: TouchEvent): void => {
+        const target = (event.target as HTMLElement).closest(targetSelector) as HTMLElement | null;
         if (target) {
             longPressTimer = setTimeout(() => {
-                // Create a synthetic contextmenu event
                 const contextMenuEvent = new MouseEvent('contextmenu', {
                     bubbles: true,
                     cancelable: true,
@@ -114,13 +141,13 @@ export const initializeContextMenu = (menuId, targetSelector, itemConfig) => {
         }
     };
 
-    const handleTouchEnd = () => {
+    const handleTouchEnd = (): void => {
         if (longPressTimer) {
             clearTimeout(longPressTimer);
         }
     };
 
-    const handleTouchMove = () => {
+    const handleTouchMove = (): void => {
         if (longPressTimer) {
             clearTimeout(longPressTimer);
         }
@@ -129,7 +156,6 @@ export const initializeContextMenu = (menuId, targetSelector, itemConfig) => {
     document.addEventListener('touchstart', handleTouchStart, { passive: true });
     document.addEventListener('touchend', handleTouchEnd);
     document.addEventListener('touchmove', handleTouchMove);
-    document.addEventListener('click', handleClickOutside);
 
     contextMenuInstances[menuId] = {
         handleContextMenu,
@@ -139,7 +165,7 @@ export const initializeContextMenu = (menuId, targetSelector, itemConfig) => {
     };
 };
 
-export const destroyContextMenu = (menuId) => {
+export const destroyContextMenu = (menuId: string): void => {
     const instance = contextMenuInstances[menuId];
     if (instance) {
         document.removeEventListener('contextmenu', instance.handleContextMenu);
@@ -157,5 +183,12 @@ export const destroyContextMenu = (menuId) => {
 };
 
 // Backward compatibility
+declare global {
+    interface Window {
+        initializeContextMenu: typeof initializeContextMenu;
+        destroyContextMenu: typeof destroyContextMenu;
+    }
+}
+
 window.initializeContextMenu = initializeContextMenu;
 window.destroyContextMenu = destroyContextMenu;

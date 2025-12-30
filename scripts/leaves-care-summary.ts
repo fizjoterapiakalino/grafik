@@ -1,10 +1,21 @@
-// scripts/leaves-care-summary.js
+// scripts/leaves-care-summary.ts
 import { EmployeeManager } from './employee-manager.js';
 import { AppConfig, countWorkdays } from './common.js';
+import type { LeaveEntry } from './types';
 
-export const LeavesCareSummary = (() => {
-    const render = (container, allLeavesData, year) => {
-        container.innerHTML = ''; // Wyczyść kontener
+/**
+ * Interfejs publicznego API LeavesCareSummary
+ */
+interface LeavesCareSummaryAPI {
+    render(container: HTMLElement, allLeavesData: Record<string, LeaveEntry[]>, year?: number): void;
+}
+
+/**
+ * Moduł podsumowania opieki
+ */
+export const LeavesCareSummary: LeavesCareSummaryAPI = (() => {
+    const render = (container: HTMLElement, allLeavesData: Record<string, LeaveEntry[]>, year?: number): void => {
+        container.innerHTML = '';
         const currentYear = year || new Date().getUTCFullYear();
         const yearStart = new Date(Date.UTC(currentYear, 0, 1));
         const yearEnd = new Date(Date.UTC(currentYear, 11, 31));
@@ -27,10 +38,8 @@ export const LeavesCareSummary = (() => {
         const tbody = document.createElement('tbody');
         const employees = EmployeeManager.getAll();
 
-        // Convert to array of [id, emp] to have access to ID for full name lookup
-        // Filter and sort same as original logic (implied alphabetical or by index)
         const sortedEmployees = Object.entries(employees)
-            .filter(([_, emp]) => !emp.isHidden && !emp.isScheduleOnly)
+            .filter(([, emp]) => !emp.isHidden && !emp.isScheduleOnly)
             .sort(([, empA], [, empB]) => EmployeeManager.compareEmployees(empA, empB));
 
         sortedEmployees.forEach(([id, emp]) => {
@@ -48,7 +57,6 @@ export const LeavesCareSummary = (() => {
                 const leaveStart = new Date(leave.startDate + 'T00:00:00Z');
                 const leaveEnd = new Date(leave.endDate + 'T00:00:00Z');
 
-                // Determine intersection with the current year
                 const start = leaveStart < yearStart ? yearStart : leaveStart;
                 const end = leaveEnd > yearEnd ? yearEnd : leaveEnd;
 
@@ -83,7 +91,7 @@ export const LeavesCareSummary = (() => {
             const sickChildPercentage = (usedSickChildDays / sickChildLimit) * 100;
             const familyMemberPercentage = (usedFamilyMemberDays / familyMemberLimit) * 100;
 
-            const getCellStyle = (percentage) => `
+            const getCellStyle = (percentage: number): string => `
                 background: linear-gradient(to right, #e0f7fa ${percentage}%, transparent ${percentage}%);
                 color: #333;
             `;
@@ -102,10 +110,14 @@ export const LeavesCareSummary = (() => {
         container.appendChild(table);
     };
 
-    return {
-        render,
-    };
+    return { render };
 })();
 
 // Backward compatibility
+declare global {
+    interface Window {
+        LeavesCareSummary: LeavesCareSummaryAPI;
+    }
+}
+
 window.LeavesCareSummary = LeavesCareSummary;

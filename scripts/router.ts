@@ -1,20 +1,10 @@
-// scripts/router.js
+// scripts/router.ts
 import { UIShell } from './ui-shell.js';
 import { EmployeeManager } from './employee-manager.js';
-import { Shared } from './shared.js';
-import { auth } from './firebase-config.js';
+import { auth as authRaw } from './firebase-config.js';
 import { PdfService } from './pdf-service.js';
+import type { FirebaseAuthWrapper, FirebaseUser } from './types/firebase';
 
-// Dynamic imports to avoid circular dependencies and global pollution if possible,
-// though for now we keep the structure but remove hardcoded global checks where we can.
-// We will still check for existence if modules are loaded via script tags, but ideally we move towards full modules.
-// Since the project uses type="module", we can import them directly if needed, but the current architecture
-// seems to rely on side-effects or global registration for some modules (like Schedule).
-// For this refactor, we will assume modules are available or imported.
-
-// To fully remove globals, we would need to import Schedule, Leaves etc. here.
-// Let's try to import them dynamically or assume they are registered.
-// Given the current file structure, let's import them to ensure they are loaded.
 import { Schedule } from './schedule.js';
 import { Leaves } from './leaves.js';
 import { Changes } from './changes.js';
@@ -22,8 +12,37 @@ import { ScrappedPdfs } from './scrapped-pdfs.js';
 import { Options } from './options.js';
 import { Login } from './login.js';
 
-export const Router = (() => {
-    const routes = {
+const auth = authRaw as unknown as FirebaseAuthWrapper;
+
+/**
+ * Interfejs modułu strony
+ */
+interface PageModule {
+    init(): void | Promise<void>;
+    destroy?(): void;
+}
+
+/**
+ * Definicja trasy
+ */
+interface Route {
+    page: string;
+    init(): void | Promise<void>;
+    getModule(): PageModule;
+}
+
+/**
+ * Interfejs publicznego API Router
+ */
+interface RouterAPI {
+    init(): void;
+}
+
+/**
+ * Moduł routera
+ */
+export const Router: RouterAPI = (() => {
+    const routes: Record<string, Route> = {
         schedule: {
             page: 'schedule',
             init: () => Schedule.init(),
@@ -56,12 +75,12 @@ export const Router = (() => {
         },
     };
 
-    let activeModule = null;
-    let currentUser = null;
+    let activeModule: PageModule | null = null;
+    let currentUser: FirebaseUser | null = null;
     let isNavigating = false;
-    let lastUserUid = null;
+    let lastUserUid: string | null = null;
 
-    const init = () => {
+    const init = (): void => {
         UIShell.render();
         window.addEventListener('hashchange', navigate);
 
@@ -81,7 +100,7 @@ export const Router = (() => {
         PdfService.initRealtimeUpdates();
     };
 
-    const navigate = async () => {
+    const navigate = async (): Promise<void> => {
         if (isNavigating) {
             return;
         }
@@ -99,7 +118,7 @@ export const Router = (() => {
             }
 
             const pageName = window.location.hash.substring(1);
-            let targetPage;
+            let targetPage: string;
 
             if (currentUser) {
                 targetPage = pageName === 'login' || !pageName ? 'schedule' : pageName;
@@ -152,10 +171,5 @@ export const Router = (() => {
         }
     };
 
-    return {
-        init,
-    };
+    return { init };
 })();
-
-// Backward compatibility - keeping it for now as requested in plan, but marked for removal
-// window.Router = Router;

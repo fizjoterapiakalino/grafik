@@ -1,18 +1,55 @@
-// scripts/schedule-ui.js
+// scripts/schedule-ui.ts
 import { AppConfig, capitalizeFirstLetter } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
-import { Shared } from './shared.js';
-import { auth } from './firebase-config.js';
+import { auth as authRaw } from './firebase-config.js';
 import { ScheduleLogic } from './schedule-logic.js';
+import type { FirebaseAuthWrapper } from './types/firebase';
 
-export const ScheduleUI = (() => {
-    let _appState = null;
-    let _employeeTooltip = null; // Globalny element tooltipa
-    let _currentTimeInterval = null;
+const auth = authRaw as unknown as FirebaseAuthWrapper;
 
-    const _createEmployeeTooltip = () => {
-        if (document.getElementById('globalEmployeeTooltip')) {
-            _employeeTooltip = document.getElementById('globalEmployeeTooltip');
+/**
+ * Stan komórki
+ */
+interface CellData {
+    content?: string;
+    isSplit?: boolean;
+    isBreak?: boolean;
+    isMassage?: boolean;
+    isPnf?: boolean;
+    isEveryOtherDay?: boolean;
+    [key: string]: unknown;
+}
+
+/**
+ * Stan aplikacji
+ */
+interface AppState {
+    scheduleCells: Record<string, Record<string, CellData>>;
+}
+
+/**
+ * Interfejs publicznego API ScheduleUI
+ */
+interface ScheduleUIAPI {
+    initialize(appState: AppState): void;
+    render(): void;
+    getElementText(element: HTMLElement | null): string;
+    updatePatientCount(): void;
+    destroy(): void;
+}
+
+/**
+ * Moduł UI harmonogramu
+ */
+export const ScheduleUI: ScheduleUIAPI = (() => {
+    let _appState: AppState | null = null;
+    let _employeeTooltip: HTMLDivElement | null = null;
+    let _currentTimeInterval: ReturnType<typeof setInterval> | null = null;
+
+    const _createEmployeeTooltip = (): void => {
+        const existing = document.getElementById('globalEmployeeTooltip') as HTMLDivElement | null;
+        if (existing) {
+            _employeeTooltip = existing;
             return;
         }
 
@@ -22,12 +59,13 @@ export const ScheduleUI = (() => {
         document.body.appendChild(_employeeTooltip);
     };
 
-    const _showEmployeeTooltip = (event) => {
-        const th = event.currentTarget;
-        const fullName = th.dataset.fullName;
-        const employeeNumber = th.dataset.employeeNumber;
+    const _showEmployeeTooltip = (event: Event): void => {
+        if (!_employeeTooltip) return;
+        const th = event.currentTarget as HTMLTableCellElement;
+        const fullName = th.dataset.fullName || '';
+        const employeeNumber = th.dataset.employeeNumber || '';
 
-        _employeeTooltip.innerHTML = ''; // Clear previous content
+        _employeeTooltip.innerHTML = '';
 
         const nameP = document.createElement('p');
         nameP.textContent = fullName;
@@ -45,23 +83,24 @@ export const ScheduleUI = (() => {
 
         const rect = th.getBoundingClientRect();
         _employeeTooltip.style.left = `${rect.left + rect.width / 2}px`;
-        _employeeTooltip.style.top = `${rect.top - _employeeTooltip.offsetHeight - 10}px`; // 10px odstępu od góry nagłówka
+        _employeeTooltip.style.top = `${rect.top - _employeeTooltip.offsetHeight - 10}px`;
         _employeeTooltip.style.transform = 'translateX(-50%)';
         _employeeTooltip.style.display = 'block';
     };
 
-    const _hideEmployeeTooltip = () => {
-        _employeeTooltip.style.display = 'none';
+    const _hideEmployeeTooltip = (): void => {
+        if (_employeeTooltip) {
+            _employeeTooltip.style.display = 'none';
+        }
     };
 
-    const initialize = (appState) => {
+    const initialize = (appState: AppState): void => {
         _appState = appState;
-        _createEmployeeTooltip(); // Utwórz globalny tooltip przy inicjalizacji
+        _createEmployeeTooltip();
 
         let lastWidth = window.innerWidth;
 
         window.addEventListener('resize', () => {
-            // Only re-render if width changes (e.g. orientation change), ignoring height changes (keyboard open)
             if (window.innerWidth !== lastWidth) {
                 lastWidth = window.innerWidth;
                 renderTable();
@@ -69,9 +108,9 @@ export const ScheduleUI = (() => {
         });
     };
 
-    const getElementText = (element) => {
+    const getElementText = (element: HTMLElement | null): string => {
         if (!element || element.classList.contains('break-cell') || element.classList.contains('empty-slot')) return '';
-        const clone = element.cloneNode(true);
+        const clone = element.cloneNode(true) as HTMLElement;
         const icons = clone.querySelectorAll('.cell-icon');
         icons.forEach((icon) => icon.remove());
         const spans = clone.querySelectorAll('span');
@@ -81,16 +120,15 @@ export const ScheduleUI = (() => {
                 text += span.textContent + ' ';
             });
         } else {
-            text = clone.textContent;
+            text = clone.textContent || '';
         }
         return text.trim();
     };
 
-    const applyCellDataToDom = (cell, cellObj) => {
+    const applyCellDataToDom = (cell: HTMLTableCellElement, cellObj: CellData): void => {
         cell.className = 'editable-cell';
-        cell.innerHTML = ''; // Clear content safely
+        cell.innerHTML = '';
 
-        // Remove legacy data attributes just in case
         delete cell.dataset.isMassage;
         delete cell.dataset.isPnf;
         delete cell.dataset.isEveryOtherDay;
@@ -102,17 +140,14 @@ export const ScheduleUI = (() => {
 
         const displayData = ScheduleLogic.getCellDisplayData(cellObj);
 
-        // Apply Classes
         if (displayData.classes.length > 0) {
             cell.classList.add(...displayData.classes);
         }
 
-        // Apply Styles
         if (displayData.styles.backgroundColor) {
             cell.style.backgroundColor = displayData.styles.backgroundColor;
         }
 
-        // Apply Content
         if (displayData.isBreak) {
             cell.textContent = displayData.text;
         } else if (displayData.isSplit) {
@@ -131,7 +166,6 @@ export const ScheduleUI = (() => {
                     div.classList.add(...part.classes);
                 }
 
-                // Add data attributes for specific styling if needed by CSS
                 if (part.isMassage) div.dataset.isMassage = 'true';
                 if (part.isPnf) div.dataset.isPnf = 'true';
                 if (part.isEveryOtherDay) div.dataset.isEveryOtherDay = 'true';
@@ -144,44 +178,41 @@ export const ScheduleUI = (() => {
             span.textContent = displayData.text;
             cell.appendChild(span);
 
-            // Add data attributes for specific styling if needed by CSS
             if (cellObj.isMassage) cell.dataset.isMassage = 'true';
             if (cellObj.isPnf) cell.dataset.isPnf = 'true';
             if (cellObj.isEveryOtherDay) cell.dataset.isEveryOtherDay = 'true';
         }
     };
 
-    const refreshAllRowHeights = () => {
-        document.querySelectorAll('#mainScheduleTable tbody tr').forEach((row) => {
+    const refreshAllRowHeights = (): void => {
+        document.querySelectorAll<HTMLTableRowElement>('#mainScheduleTable tbody tr').forEach((row) => {
             row.style.height = 'auto';
         });
     };
 
-    const renderMobileView = (employeeIndices) => {
-        const container = document.getElementById('app-root'); // Or a specific container if exists
-        // Ideally we should have a specific container for the schedule content
-        // Let's assume we are appending to the main container or replacing the table
-
-        let mobileContainer = document.querySelector('.mobile-schedule-container');
+    const renderMobileView = (employeeIndices: string[]): void => {
+        let mobileContainer = document.querySelector('.mobile-schedule-container') as HTMLDivElement | null;
         if (!mobileContainer) {
             mobileContainer = document.createElement('div');
             mobileContainer.className = 'mobile-schedule-container';
             const table = document.getElementById('mainScheduleTable');
-            table.parentNode.insertBefore(mobileContainer, table);
+            if (table && table.parentNode) {
+                table.parentNode.insertBefore(mobileContainer, table);
+            }
         }
-        mobileContainer.innerHTML = ''; // Clear
+        mobileContainer.innerHTML = '';
         mobileContainer.style.display = 'flex';
 
-        const table = document.getElementById('mainScheduleTable');
-        table.style.display = 'none'; // Ensure table is hidden
+        const table = document.getElementById('mainScheduleTable') as HTMLTableElement | null;
+        if (table) table.style.display = 'none';
 
-        // For mobile, we usually focus on the logged-in user or the first selected employee
-        // If multiple employees, we might need a selector. For now, let's take the first one (Single User View logic)
         const employeeIndex = employeeIndices[0];
         if (employeeIndex === undefined) {
             mobileContainer.textContent = 'Brak danych pracownika do wyświetlenia.';
             return;
         }
+
+        if (!_appState) return;
 
         const employeeData = EmployeeManager.getById(employeeIndex);
         const header = document.createElement('h3');
@@ -201,21 +232,16 @@ export const ScheduleUI = (() => {
                 const card = document.createElement('div');
                 card.className = 'appointment-card';
 
-                // Header
                 const cardHeader = document.createElement('div');
                 cardHeader.className = 'card-header';
                 cardHeader.textContent = timeString;
                 card.appendChild(cardHeader);
 
-                // Body
                 const cardBody = document.createElement('div');
-                cardBody.className = 'card-body';
-
-                // Attributes for interaction (same as table cell)
+                cardBody.className = 'card-body editable-cell';
                 cardBody.setAttribute('data-time', timeString);
                 cardBody.setAttribute('data-employee-index', employeeIndex);
-                cardBody.setAttribute('tabindex', '0'); // Ensure focusable for better mobile support
-                cardBody.className += ' editable-cell'; // Reuse logic
+                cardBody.setAttribute('tabindex', '0');
 
                 if (displayData.text) {
                     cardBody.textContent = displayData.text;
@@ -223,11 +249,9 @@ export const ScheduleUI = (() => {
                     if (displayData.styles.backgroundColor)
                         cardBody.style.backgroundColor = displayData.styles.backgroundColor;
                 } else if (displayData.isSplit) {
-                    // Simplified split view for mobile - just stack them
                     const part1 = displayData.parts[0];
                     const part2 = displayData.parts[1];
                     cardBody.innerHTML = `<div>${part1.text}</div><div style="border-top:1px solid #ccc; margin-top:4px; padding-top:4px;">${part2.text}</div>`;
-                    // Note: Full split styling on mobile card might need more CSS, keeping it simple for now
                 } else {
                     cardBody.textContent = 'Wolny termin';
                     cardBody.classList.add('empty-slot');
@@ -239,14 +263,13 @@ export const ScheduleUI = (() => {
         }
     };
 
-    const renderTable = () => {
-        const mainTable = document.getElementById('mainScheduleTable');
-        if (!mainTable) return;
+    const renderTable = (): void => {
+        const mainTable = document.getElementById('mainScheduleTable') as HTMLTableElement | null;
+        if (!mainTable || !_appState) return;
 
-        // Check for mobile view
         const isMobile = window.innerWidth <= 768;
 
-        let employeeIndices = [];
+        let employeeIndices: string[] = [];
         let isSingleUserView = false;
         let isAdmin = false;
 
@@ -264,8 +287,6 @@ export const ScheduleUI = (() => {
                 if (employee) {
                     employeeIndices.push(employee.id);
                     isSingleUserView = true;
-                } else {
-                    // Handle unassigned
                 }
             }
         } else {
@@ -276,18 +297,16 @@ export const ScheduleUI = (() => {
             isSingleUserView = false;
         }
 
-        // Only switch to mobile view if NOT admin
         if (isMobile && !isAdmin) {
             renderMobileView(employeeIndices);
             return;
         }
 
-        // Desktop View Cleanup
-        const mobileContainer = document.querySelector('.mobile-schedule-container');
+        const mobileContainer = document.querySelector('.mobile-schedule-container') as HTMLElement | null;
         if (mobileContainer) mobileContainer.style.display = 'none';
         mainTable.style.display = 'table';
 
-        const tableHeaderRow = document.getElementById('tableHeaderRow');
+        const tableHeaderRow = document.getElementById('tableHeaderRow') as HTMLTableRowElement | null;
         const tbody = mainTable.querySelector('tbody');
 
         if (!tableHeaderRow || !tbody) {
@@ -295,7 +314,7 @@ export const ScheduleUI = (() => {
             return;
         }
 
-        tableHeaderRow.innerHTML = ''; // Clear header safely
+        tableHeaderRow.innerHTML = '';
         const thTime = document.createElement('th');
         thTime.textContent = 'Godz.';
         tableHeaderRow.appendChild(thTime);
@@ -309,11 +328,11 @@ export const ScheduleUI = (() => {
             const employeeData = EmployeeManager.getById(i);
             const displayName = employeeData?.displayName || employeeData?.name || `Pracownik ${parseInt(i) + 1}`;
             const fullName = EmployeeManager.getFullNameById(i);
-            const employeeNumber = employeeData?.employeeNumber || '';
+            const employeeNumber = (employeeData as { employeeNumber?: string })?.employeeNumber || '';
 
             th.setAttribute('data-employee-index', i);
             th.setAttribute('tabindex', '0');
-            th.classList.add('employee-header'); // Dodaj klasę dla identyfikacji
+            th.classList.add('employee-header');
 
             const span = document.createElement('span');
             span.textContent = capitalizeFirstLetter(displayName);
@@ -323,7 +342,6 @@ export const ScheduleUI = (() => {
             th.dataset.employeeNumber = employeeNumber;
             tableHeaderRow.appendChild(th);
 
-            // Dodaj event listenery dla nowego podejścia do tooltipa
             th.addEventListener('mouseover', _showEmployeeTooltip);
             th.addEventListener('mouseout', _hideEmployeeTooltip);
         }
@@ -337,7 +355,7 @@ export const ScheduleUI = (() => {
 
                 for (const i of employeeIndices) {
                     const cell = tr.insertCell();
-                    const cellData = _appState.scheduleCells[timeString]?.[i] || {};
+                    const cellData = _appState!.scheduleCells[timeString]?.[i] || {};
                     applyCellDataToDom(cell, cellData);
                     cell.setAttribute('data-time', timeString);
                     cell.setAttribute('data-employee-index', i);
@@ -348,47 +366,42 @@ export const ScheduleUI = (() => {
         }
         refreshAllRowHeights();
 
-        // Usuń ewentualny stary interwał, aby uniknąć duplikatów
         if (_currentTimeInterval) {
             clearInterval(_currentTimeInterval);
         }
 
-        // Ustaw nowy interwał, który będzie aktualizował podświetlenie
         _currentTimeInterval = setInterval(() => {
             const now = new Date();
             const hours = now.getHours();
             const minutes = now.getMinutes();
             const roundedMinutes = minutes < 30 ? '00' : '30';
-            const timeString = `${hours}:${roundedMinutes}`;
+            const currentTimeString = `${hours}:${roundedMinutes}`;
 
-            // Usuń podświetlenie ze wszystkich wierszy
             document.querySelectorAll('#mainScheduleTable tbody tr.current-time-row').forEach((row) => {
                 row.classList.remove('current-time-row');
             });
 
-            // Znajdź i podświetl nowy, właściwy wiersz
             const allTimeCells = document.querySelectorAll('#mainScheduleTable tbody td:first-child');
             for (const cell of allTimeCells) {
-                if (cell.textContent.trim() === timeString) {
-                    cell.parentElement.classList.add('current-time-row');
+                if ((cell as HTMLTableCellElement).textContent?.trim() === currentTimeString) {
+                    cell.parentElement?.classList.add('current-time-row');
                     break;
                 }
             }
-        }, 60000); // Uruchamiaj co minutę
+        }, 60000);
 
-        updatePatientCount(); // Zaktualizuj liczbę pacjentów po renderowaniu tabeli
+        updatePatientCount();
     };
 
-    const updatePatientCount = () => {
+    const updatePatientCount = (): void => {
         const patientCountElement = document.getElementById('patientCount');
-        if (!patientCountElement) return;
+        if (!patientCountElement || !_appState) return;
 
-        // Use pure logic instead of DOM scraping
         const therapyCount = ScheduleLogic.calculatePatientCount(_appState.scheduleCells);
         patientCountElement.textContent = `Terapie: ${therapyCount}`;
     };
 
-    const destroy = () => {
+    const destroy = (): void => {
         if (_currentTimeInterval) {
             clearInterval(_currentTimeInterval);
             _currentTimeInterval = null;
@@ -405,4 +418,10 @@ export const ScheduleUI = (() => {
 })();
 
 // Backward compatibility
+declare global {
+    interface Window {
+        ScheduleUI: ScheduleUIAPI;
+    }
+}
+
 window.ScheduleUI = ScheduleUI;

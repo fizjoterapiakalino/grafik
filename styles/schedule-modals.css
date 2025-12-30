@@ -1,4 +1,3 @@
-
 /* Duplicate Entry Modal */
 #duplicateModal {
     display: none;
@@ -31,37 +30,55 @@
 }
 
 #duplicateModal button {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: background-color 0.2s;
+    /* Inherit from .action-btn */
 }
 
 #duplicateModal #moveEntryBtn {
-    background-color: var(--color-primary-600);
+    /* Mapped to .action-btn.primary in HTML/JS or manually here if classes not added */
+    /* Forcing styles to match components.css if classes are not present in HTML */
+    background: linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%);
     color: white;
+    box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4);
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
 #duplicateModal #moveEntryBtn:hover {
-    background-color: var(--color-primary-700);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.5);
 }
 
 #duplicateModal #addAnywayBtn {
-    background-color: var(--color-secondary-600);
+    background: linear-gradient(135deg, var(--color-secondary-500) 0%, var(--color-secondary-600) 100%);
     color: white;
+    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.4);
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
 #duplicateModal #addAnywayBtn:hover {
-    background-color: var(--color-secondary-700);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.5);
 }
 
 #duplicateModal #cancelBtn {
-    background-color: #e5e7eb;
-    color: #374151;
+    background: transparent;
+    border: 1px solid var(--color-gray-300);
+    color: var(--color-gray-600);
+    padding: 10px 20px;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
 #duplicateModal #cancelBtn:hover {
-    background-color: #d1d5db;
+    background-color: var(--color-gray-50);
+    color: var(--color-gray-800);
+    border-color: var(--color-gray-400);
 }

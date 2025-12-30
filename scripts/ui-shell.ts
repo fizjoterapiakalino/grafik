@@ -1,9 +1,24 @@
-// scripts/ui-shell.js
+// scripts/ui-shell.ts
 import { Shared } from './shared.js';
 import { EmployeeManager } from './employee-manager.js';
+import type { FirebaseUser } from './types/firebase';
 
-export const UIShell = (() => {
-    const render = () => {
+/**
+ * Interfejs publicznego API UIShell
+ */
+interface UIShellAPI {
+    render(): void;
+    loadPage(pageName: string): Promise<void>;
+    updateUserState(user: FirebaseUser | null): void;
+    showLoading(): void;
+    hideLoading(): void;
+}
+
+/**
+ * Moduł UI Shell - główna powłoka aplikacji
+ */
+export const UIShell: UIShellAPI = (() => {
+    const render = (): void => {
         const appRoot = document.getElementById('app-root');
         if (!appRoot) {
             console.error('Fatal error: #app-root element not found.');
@@ -16,14 +31,14 @@ export const UIShell = (() => {
                 <p>Wczytywanie...</p>
             </div>
             <div id="toast-container"></div>
-            <div id="appHeader" class="app-header" style="display: none;"> <!-- Domyślnie ukryty -->
+            <div id="appHeader" class="app-header" style="display: none;">
                 <div class="banner-left-content">
                     <img src="logo.png" alt="Logo Kalinowa" class="banner-logo">
                     <span id="bannerTitleLink" class="banner-title">Grafik Kalinowa</span>
                 </div>
                 <div id="dateTimeText" class="date-time-text"></div>
                 <div class="header-right-menu">
-                    <div id="saveStatus" class="save-status"></div> <!-- Przeniesiony saveStatus na początek -->
+                    <div id="saveStatus" class="save-status"></div>
                     <div id="scheduleActionButtons" class="schedule-action-buttons">
                         <button id="btnPatientInfo" class="action-icon-btn" title="Informacje o pacjencie"><i class="fas fa-user-circle"></i></button>
                         <button id="btnAddBreak" class="action-icon-btn" title="Dodaj przerwę"><i class="fas fa-coffee"></i></button>
@@ -35,24 +50,23 @@ export const UIShell = (() => {
                         <input type="text" id="searchInput" class="search-input" placeholder="Szukaj...">
                         <button id="clearSearchButton" class="clear-search-btn" style="display: none;"><i class="fas fa-times"></i></button>
                     </div>
-                    <button id="undoButton" class="undo-button" title="Cofnij (Ctrl+Z)" disabled><i class="fas fa-undo"></i></button>
-                    <button id="printChangesTable" class="action-btn" title="Drukuj Grafik Harmonogramu" style="display: none;"><i class="fas fa-print"></i></button>
-                    <button id="printLeavesNavbarBtn" class="action-btn" title="Drukuj Grafik Urlopów" style="display: none;"><i class="fas fa-file-pdf"></i></button>
-                    <!-- Hamburger menu will be inserted here by shared.js -->
+                    <button id="undoButton" class="action-icon-btn" title="Cofnij (Ctrl+Z)" disabled><i class="fas fa-undo"></i></button>
+                    <button id="printChangesTable" class="action-icon-btn active" title="Drukuj Grafik Harmonogramu" style="display: none;"><i class="fas fa-print"></i></button>
+                    <button id="printLeavesNavbarBtn" class="action-icon-btn active" title="Drukuj Grafik Urlopów" style="display: none;"><i class="fas fa-file-pdf"></i></button>
                 </div>
             </div>
             <main id="page-content" class="container"></main>
         `;
 
-        // Initialize shared components like hamburger menu
+        // Initialize shared components
         Shared.initialize();
 
-        // Add event listener for banner title to navigate to schedule
+        // Banner title click navigation
         const bannerTitleLink = document.getElementById('bannerTitleLink');
         if (bannerTitleLink) {
-            bannerTitleLink.style.cursor = 'pointer'; // Indicate it's clickable
+            bannerTitleLink.style.cursor = 'pointer';
             bannerTitleLink.addEventListener('click', () => {
-                window.location.hash = 'schedule'; // Use hash navigation for SPA
+                window.location.hash = 'schedule';
             });
         }
 
@@ -63,16 +77,15 @@ export const UIShell = (() => {
             });
         }
 
-        window.addEventListener('iso-updates-available', (event) => {
-            const badge = document.querySelector('#btnIso .notification-badge');
+        window.addEventListener('iso-updates-available', () => {
+            const badge = document.querySelector('#btnIso .notification-badge') as HTMLElement | null;
             if (badge) {
                 badge.style.display = 'block';
-                // Optional: badge.textContent = event.detail.count;
             }
         });
 
         window.addEventListener('iso-updates-cleared', () => {
-            const badge = document.querySelector('#btnIso .notification-badge');
+            const badge = document.querySelector('#btnIso .notification-badge') as HTMLElement | null;
             if (badge) {
                 badge.style.display = 'none';
             }
@@ -80,11 +93,11 @@ export const UIShell = (() => {
 
         // Search Bar Toggle Logic
         const searchToggleBtn = document.getElementById('searchToggleBtn');
-        const searchInput = document.getElementById('searchInput');
+        const searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
         const searchContainer = document.querySelector('.search-container');
 
         if (searchToggleBtn && searchInput) {
-            searchToggleBtn.addEventListener('click', (e) => {
+            searchToggleBtn.addEventListener('click', (e: MouseEvent) => {
                 e.stopPropagation();
                 searchInput.classList.toggle('expanded');
                 if (searchInput.classList.contains('expanded')) {
@@ -92,15 +105,16 @@ export const UIShell = (() => {
                 }
             });
 
-            document.addEventListener('click', (e) => {
-                if (searchContainer && !searchContainer.contains(e.target)) {
+            document.addEventListener('click', (e: MouseEvent) => {
+                const target = e.target as Node;
+                if (searchContainer && !searchContainer.contains(target)) {
                     searchInput.classList.remove('expanded');
                 }
             });
         }
     };
 
-    const loadPage = async (pageName) => {
+    const loadPage = async (pageName: string): Promise<void> => {
         const pageContent = document.getElementById('page-content');
         const DYNAMIC_CSS_ID = 'page-specific-css';
 
@@ -155,22 +169,21 @@ export const UIShell = (() => {
         }
     };
 
-    const updateUserState = (user) => {
+    const updateUserState = (user: FirebaseUser | null): void => {
         const appHeader = document.getElementById('appHeader');
         const bannerTitle = document.querySelector('.banner-title');
         const logoutBtnContainer = document.getElementById('logoutBtnContainer');
 
+        if (!appHeader) return;
+
         if (user) {
-            // Użytkownik zalogowany
             const employee = EmployeeManager.getEmployeeByUid(user.uid);
             if (employee) {
-                // Użytkownik jest powiązany z pracownikiem -> widok uproszczony
                 appHeader.classList.add('user-view');
                 if (bannerTitle) {
                     bannerTitle.textContent = `Grafik Kalinowa - ${EmployeeManager.getNameById(employee.id)}`;
                 }
             } else {
-                // Użytkownik nie jest pracownikiem (np. admin) -> widok pełny
                 appHeader.classList.remove('user-view');
                 if (bannerTitle) {
                     bannerTitle.textContent = 'Grafik Kalinowa';
@@ -179,9 +192,8 @@ export const UIShell = (() => {
             if (logoutBtnContainer) {
                 logoutBtnContainer.style.display = 'block';
             }
-            Shared.updateUserInfo(employee ? employee.name : 'Admin'); // Aktualizuj informację o użytkowniku
+            Shared.updateUserInfo(employee ? employee.name || null : 'Admin');
         } else {
-            // Użytkownik wylogowany
             appHeader.classList.remove('user-view');
             if (bannerTitle) {
                 bannerTitle.textContent = 'Grafik Kalinowa';
@@ -189,18 +201,18 @@ export const UIShell = (() => {
             if (logoutBtnContainer) {
                 logoutBtnContainer.style.display = 'none';
             }
-            Shared.updateUserInfo('Gość'); // Resetuj informację o użytkowniku
+            Shared.updateUserInfo('Gość');
         }
     };
 
-    const showLoading = () => {
+    const showLoading = (): void => {
         const overlay = document.getElementById('loadingOverlay');
         if (overlay) {
             overlay.classList.remove('hidden');
         }
     };
 
-    const hideLoading = () => {
+    const hideLoading = (): void => {
         const overlay = document.getElementById('loadingOverlay');
         if (overlay) {
             overlay.classList.add('hidden');
@@ -210,11 +222,17 @@ export const UIShell = (() => {
     return {
         render,
         loadPage,
-        updateUserState, // Eksportuj nową metodę
+        updateUserState,
         showLoading,
         hideLoading,
     };
 })();
 
 // Backward compatibility
+declare global {
+    interface Window {
+        UIShell: UIShellAPI;
+    }
+}
+
 window.UIShell = UIShell;

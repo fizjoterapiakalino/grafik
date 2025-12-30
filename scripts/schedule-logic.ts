@@ -1,9 +1,84 @@
-// scripts/schedule-logic.js
+// scripts/schedule-logic.ts
 import { AppConfig, capitalizeFirstLetter } from './common.js';
 
-export const ScheduleLogic = (() => {
-    const getCellDisplayData = (cellData) => {
-        const result = {
+/**
+ * Dane leczenia dla części komórki
+ */
+interface TreatmentData {
+    startDate?: string;
+    extensionDays?: number;
+    endDate?: string;
+    gender?: string;
+}
+
+/**
+ * Dane komórki harmonogramu
+ */
+interface CellData {
+    content?: string;
+    content1?: string;
+    content2?: string;
+    isSplit?: boolean;
+    isBreak?: boolean;
+    isMassage?: boolean;
+    isPnf?: boolean;
+    isEveryOtherDay?: boolean;
+    isMassage1?: boolean;
+    isMassage2?: boolean;
+    isPnf1?: boolean;
+    isPnf2?: boolean;
+    isEveryOtherDay1?: boolean;
+    isEveryOtherDay2?: boolean;
+    treatmentStartDate?: string;
+    treatmentExtensionDays?: number;
+    treatmentEndDate?: string;
+    treatmentData1?: TreatmentData;
+    treatmentData2?: TreatmentData;
+}
+
+/**
+ * Dane części podzielonej komórki
+ */
+interface PartData {
+    text: string;
+    classes: string[];
+    isMassage: boolean;
+    isPnf: boolean;
+    isEveryOtherDay: boolean;
+}
+
+/**
+ * Wynik wyświetlania komórki
+ */
+interface CellDisplayData {
+    text: string;
+    classes: string[];
+    styles: Record<string, string>;
+    isSplit: boolean;
+    parts: PartData[];
+    isBreak: boolean;
+}
+
+/**
+ * Mapa komórek harmonogramu
+ */
+type ScheduleCells = Record<string, Record<string, CellData>>;
+
+/**
+ * Interfejs publicznego API ScheduleLogic
+ */
+interface ScheduleLogicAPI {
+    getCellDisplayData(cellData: CellData | null | undefined): CellDisplayData;
+    calculatePatientCount(scheduleCells: ScheduleCells | null | undefined): number;
+    calculateEndDate(startDate: string | undefined, extensionDays?: number): string;
+}
+
+/**
+ * Moduł logiki harmonogramu
+ */
+export const ScheduleLogic: ScheduleLogicAPI = (() => {
+    const getCellDisplayData = (cellData: CellData | null | undefined): CellDisplayData => {
+        const result: CellDisplayData = {
             text: '',
             classes: [],
             styles: {},
@@ -28,8 +103,13 @@ export const ScheduleLogic = (() => {
             result.styles.backgroundColor = AppConfig.schedule.contentCellColor;
             result.classes.push('split-cell');
 
-            const createPartData = (content, isMassage, isPnf, isEveryOtherDay, gender) => {
-                const part = {
+            const createPartData = (
+                content: string | undefined,
+                isMassage: boolean | undefined,
+                isPnf: boolean | undefined,
+                isEveryOtherDay: boolean | undefined
+            ): PartData => {
+                const part: PartData = {
                     text: capitalizeFirstLetter(content || ''),
                     classes: [],
                     isMassage: !!isMassage,
@@ -49,9 +129,8 @@ export const ScheduleLogic = (() => {
                     cellData.content1,
                     cellData.isMassage1,
                     cellData.isPnf1,
-                    cellData.isEveryOtherDay1,
-                    cellData.treatmentData1?.gender,
-                ),
+                    cellData.isEveryOtherDay1
+                )
             );
 
             result.parts.push(
@@ -59,16 +138,17 @@ export const ScheduleLogic = (() => {
                     cellData.content2,
                     cellData.isMassage2,
                     cellData.isPnf2,
-                    cellData.isEveryOtherDay2,
-                    cellData.treatmentData2?.gender,
-                ),
+                    cellData.isEveryOtherDay2
+                )
             );
 
             // Treatment End Markers for Split
             const todayStr = new Date().toISOString().split('T')[0];
 
             // Part 1
-            let endDate1 = cellData.treatmentData1?.endDate ? cellData.treatmentData1.endDate.toString().trim() : null;
+            let endDate1: string | null = cellData.treatmentData1?.endDate
+                ? cellData.treatmentData1.endDate.toString().trim()
+                : null;
             if (!endDate1 && cellData.treatmentData1?.startDate && cellData.content1) {
                 endDate1 = calculateEndDate(cellData.treatmentData1.startDate, cellData.treatmentData1.extensionDays || 0);
             }
@@ -77,7 +157,9 @@ export const ScheduleLogic = (() => {
             }
 
             // Part 2
-            let endDate2 = cellData.treatmentData2?.endDate ? cellData.treatmentData2.endDate.toString().trim() : null;
+            let endDate2: string | null = cellData.treatmentData2?.endDate
+                ? cellData.treatmentData2.endDate.toString().trim()
+                : null;
             if (!endDate2 && cellData.treatmentData2?.startDate && cellData.content2) {
                 endDate2 = calculateEndDate(cellData.treatmentData2.startDate, cellData.treatmentData2.extensionDays || 0);
             }
@@ -103,9 +185,10 @@ export const ScheduleLogic = (() => {
 
         // Treatment End Marker for Normal
         const todayStr = new Date().toISOString().split('T')[0];
-        let endDateStr = cellData.treatmentEndDate ? cellData.treatmentEndDate.toString().trim() : null;
+        let endDateStr: string | null = cellData.treatmentEndDate
+            ? cellData.treatmentEndDate.toString().trim()
+            : null;
 
-        // Fallback: If endDate is missing but startDate is present, calculate it on the fly for the marker
         if (!endDateStr && cellData.treatmentStartDate && cellData.content) {
             endDateStr = calculateEndDate(cellData.treatmentStartDate, cellData.treatmentExtensionDays || 0);
         }
@@ -117,7 +200,7 @@ export const ScheduleLogic = (() => {
         return result;
     };
 
-    const calculatePatientCount = (scheduleCells) => {
+    const calculatePatientCount = (scheduleCells: ScheduleCells | null | undefined): number => {
         let count = 0;
         if (!scheduleCells) return 0;
 
@@ -137,14 +220,13 @@ export const ScheduleLogic = (() => {
         return count;
     };
 
-    const calculateEndDate = (startDate, extensionDays) => {
+    const calculateEndDate = (startDate: string | undefined, extensionDays?: number): string => {
         if (!startDate) return '';
-        let endDate = new Date(startDate);
-        // Reset time to midnight to avoid issues with transitions or slightly different hours
+        const endDate = new Date(startDate);
         endDate.setHours(12, 0, 0, 0);
 
         endDate.setDate(endDate.getDate() - 1);
-        let totalDays = 15 + parseInt(extensionDays || 0, 10);
+        const totalDays = 15 + parseInt(String(extensionDays || 0), 10);
         let daysAdded = 0;
         while (daysAdded < totalDays) {
             endDate.setDate(endDate.getDate() + 1);

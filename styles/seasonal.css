@@ -88,78 +88,221 @@ body.theme-christmas .app-header::after {
     }
 }
 
-/* --- New Year Theme --- */
+/* --- New Year Theme (Sylwester) --- */
 body.theme-newyear {
-    --newyear-gold: #FFD700;
-    --newyear-silver: #C0C0C0;
-    --newyear-dark-blue: #000033;
-    --newyear-champagne: rgba(255, 230, 150, 0.6);
+    --newyear-gold: #ffd700;
+    --newyear-silver: #c0c0c0;
+    --newyear-dark: #0a0a23;
+    --newyear-pink: #ff69b4;
+    --newyear-purple: #9b59b6;
 }
 
-/* Party Disco Header */
+/* Party Header z PULSUJĄCYM gradientem */
 body.theme-newyear .app-header {
-    border-bottom: 3px solid transparent;
-    border-image: linear-gradient(90deg, #ff0000, #ffa500, #ffff00, #008000, #0000ff, #4b0082, #ee82ee) 1;
     position: relative;
     z-index: 1001;
     overflow: hidden;
+    border-bottom: none;
 }
 
-/* Dynamic Party Overlay on Header */
+/* Pulsujący gradient pod nagłówkiem */
 body.theme-newyear .app-header::before {
+    content: '';
+    position: absolute;
+    bottom: -3px;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(
+        90deg,
+        var(--newyear-gold),
+        var(--newyear-pink),
+        var(--newyear-purple),
+        #00ced1,
+        var(--newyear-gold)
+    );
+    background-size: 200% 100%;
+    animation: gradient-pulse 3s ease-in-out infinite;
+    z-index: 1000;
+}
+
+@keyframes gradient-pulse {
+    0%,
+    100% {
+        background-position: 0% 50%;
+        opacity: 0.8;
+    }
+
+    50% {
+        background-position: 100% 50%;
+        opacity: 1;
+    }
+}
+
+/* Błyszczące cekiny na nagłówku */
+body.theme-newyear .app-header::after {
     content: '';
     position: absolute;
     top: 0;
     left: 0;
-    width: 200%;
-    height: 100%;
-    background: linear-gradient(60deg,
-            rgba(255, 255, 255, 0) 20%,
-            rgba(255, 215, 0, 0.2) 40%,
-            rgba(255, 255, 255, 0) 60%);
-    animation: shine 3s infinite linear;
+    right: 0;
+    bottom: 0;
+    background-image:
+        radial-gradient(circle at 10% 20%, rgba(255, 215, 0, 0.3) 1px, transparent 2px),
+        radial-gradient(circle at 30% 60%, rgba(192, 192, 192, 0.3) 1px, transparent 2px),
+        radial-gradient(circle at 50% 30%, rgba(255, 215, 0, 0.2) 1px, transparent 2px),
+        radial-gradient(circle at 70% 70%, rgba(192, 192, 192, 0.3) 1px, transparent 2px),
+        radial-gradient(circle at 90% 40%, rgba(255, 215, 0, 0.25) 1px, transparent 2px);
+    background-size: 100px 40px;
+    animation: sparkle-shift 4s linear infinite;
     pointer-events: none;
     z-index: -1;
 }
 
-@keyframes shine {
+@keyframes sparkle-shift {
     0% {
-        transform: translateX(-100%);
+        background-position: 0 0;
     }
 
     100% {
-        transform: translateX(50%);
+        background-position: 100px 0;
     }
 }
 
-/* Add a pseudo-element for random confetti-like dots on header */
-body.theme-newyear .app-header::after {
+/* Konfetti - spadające z rotacją */
+.newyear-confetti {
+    position: absolute;
+    top: -20px;
+    font-size: 12px;
+    animation-name: confetti-fall;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    text-shadow: 0 0 3px currentColor;
+    z-index: 999;
+    pointer-events: none;
+}
+
+@keyframes confetti-fall {
+    0% {
+        top: -5%;
+        transform: rotate(0deg) translateX(0);
+        opacity: 1;
+    }
+
+    25% {
+        transform: rotate(calc(var(--rotation, 180deg) * 0.25)) translateX(20px);
+    }
+
+    50% {
+        transform: rotate(calc(var(--rotation, 180deg) * 0.5)) translateX(-15px);
+    }
+
+    75% {
+        transform: rotate(calc(var(--rotation, 180deg) * 0.75)) translateX(10px);
+    }
+
+    100% {
+        top: 100%;
+        transform: rotate(var(--rotation, 180deg)) translateX(0);
+        opacity: 0.3;
+    }
+}
+
+/* Iskry - migające gwiazdki */
+.newyear-sparkle {
+    position: absolute;
+    animation: sparkle-twinkle 2s ease-in-out infinite;
+    text-shadow:
+        0 0 8px currentColor,
+        0 0 15px currentColor;
+    z-index: 998;
+    pointer-events: none;
+}
+
+@keyframes sparkle-twinkle {
+    0%,
+    100% {
+        opacity: 0.2;
+        transform: scale(0.8);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.3);
+    }
+}
+
+/* Fajerwerki - rakieta lecąca w górę */
+.newyear-firework {
+    position: absolute;
+    bottom: 0;
+    width: 4px;
+    height: 4px;
+    background: var(--firework-color, #ffd700);
+    border-radius: 50%;
+    box-shadow:
+        0 0 6px var(--firework-color, #ffd700),
+        0 0 12px var(--firework-color, #ffd700);
+    animation: firework-launch 1.5s ease-out forwards;
+    z-index: 1001;
+    pointer-events: none;
+}
+
+/* Ślad za rakietą */
+.newyear-firework::after {
     content: '';
     position: absolute;
     bottom: 0;
-    left: 0;
-    right: 0;
-    height: 100%;
-    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.2) 1px, transparent 1px);
-    background-size: 20px 20px;
-    opacity: 0.5;
-    pointer-events: none;
-    z-index: -1;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    height: 20px;
+    background: linear-gradient(to top, transparent, var(--firework-color, #ffd700));
+    opacity: 0.6;
 }
 
-/* Champagne Bubbles Animation */
-.champagne-bubble {
+@keyframes firework-launch {
+    0% {
+        bottom: -10px;
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    80% {
+        opacity: 1;
+    }
+
+    100% {
+        bottom: var(--end-y, 30vh);
+        opacity: 0;
+        transform: scale(0.5);
+    }
+}
+
+/* Cząsteczki eksplozji */
+.newyear-explosion-particle {
     position: absolute;
-    bottom: -20px;
-    background-color: var(--newyear-champagne);
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.8), 0 0 2px rgba(255, 215, 0, 0.5);
-    z-index: 1000;
+    animation: explosion-burst 1.5s ease-out forwards;
+    z-index: 1002;
     pointer-events: none;
-    /* Animation removed here, applied inline/JS for randomization */
 }
 
-/* Separate Keyframes for Rise and Pop */
+@keyframes explosion-burst {
+    0% {
+        transform: translate(0, 0) scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(var(--translate-x, 0), var(--translate-y, -60px)) scale(0.3);
+        opacity: 0;
+    }
+}
+
+/* Zachowaj stare style bąbelków dla kompatybilności */
 @keyframes rise-and-pop {
     0% {
         bottom: -20px;
@@ -187,4 +330,107 @@ body.theme-newyear .app-header::after {
         opacity: 0;
         /* POP */
     }
+}
+
+/* --- Easter Theme --- */
+body.theme-easter {
+    --easter-pink: #ffb6c1;
+    --easter-lavender: #e6e6fa;
+    --easter-mint: #98fb98;
+    --easter-yellow: #fffacd;
+    --easter-peach: #ffdab9;
+}
+
+/* Easter Header - Pastelowa wstążka */
+body.theme-easter .app-header {
+    border-bottom: 3px solid transparent;
+    border-image: linear-gradient(
+            90deg,
+            var(--easter-pink),
+            var(--easter-lavender),
+            var(--easter-mint),
+            var(--easter-yellow),
+            var(--easter-peach),
+            var(--easter-pink)
+        )
+        1;
+    position: relative;
+    z-index: 1001;
+}
+
+body.theme-easter .app-header::after {
+    content: '';
+    position: absolute;
+    bottom: -12px;
+    left: 0;
+    width: 100%;
+    height: 18px;
+    pointer-events: none;
+    z-index: 1000;
+
+    /* Wielkanocne jajka */
+    background-image:
+        radial-gradient(ellipse 8px 10px at 12px 8px, var(--easter-pink) 90%, transparent 100%),
+        radial-gradient(ellipse 6px 8px at 35px 9px, var(--easter-lavender) 90%, transparent 100%),
+        radial-gradient(ellipse 7px 9px at 55px 7px, var(--easter-mint) 90%, transparent 100%),
+        radial-gradient(ellipse 8px 10px at 75px 8px, var(--easter-yellow) 90%, transparent 100%);
+
+    background-size: 90px 18px;
+    background-repeat: repeat-x;
+}
+
+/* Wielkanocne elementy - jajka, zajączki, motylki */
+.easter-item {
+    position: absolute;
+    top: -30px;
+    font-size: 1.2em;
+    animation-name: easter-fall, easter-flutter;
+    animation-duration: 10s, 2s;
+    animation-timing-function: linear, ease-in-out;
+    animation-iteration-count: infinite, infinite;
+    animation-play-state: running, running;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.15));
+}
+
+@keyframes easter-fall {
+    0% {
+        top: -10%;
+    }
+
+    100% {
+        top: 100%;
+    }
+}
+
+@keyframes easter-flutter {
+    0% {
+        transform: translateX(0px) rotate(0deg);
+    }
+
+    25% {
+        transform: translateX(calc(30px * var(--sway-direction, 1))) rotate(5deg);
+    }
+
+    50% {
+        transform: translateX(0px) rotate(0deg);
+    }
+
+    75% {
+        transform: translateX(calc(-30px * var(--sway-direction, 1))) rotate(-5deg);
+    }
+
+    100% {
+        transform: translateX(0px) rotate(0deg);
+    }
+}
+
+/* Lekkie pastelowe tło dla całej strony podczas Wielkanocy */
+body.theme-easter {
+    background: linear-gradient(
+        135deg,
+        rgba(255, 182, 193, 0.05) 0%,
+        rgba(230, 230, 250, 0.05) 50%,
+        rgba(152, 251, 152, 0.05) 100%
+    );
 }

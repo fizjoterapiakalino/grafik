@@ -1,6 +1,65 @@
-// scripts/common.js
+// scripts/common.ts
 
-export const AppConfig = {
+/**
+ * Konfiguracja aplikacji
+ */
+interface ScheduleConfig {
+    startHour: number;
+    endHour: number;
+    breakText: string;
+    defaultCellColor: string;
+    contentCellColor: string;
+}
+
+interface ChangesConfig {
+    employeeColors: string[];
+}
+
+interface CareLimits {
+    child_care_art_188: number;
+    sick_child_care: number;
+    family_member_care: number;
+}
+
+interface LeaveTypeColors {
+    vacation: string;
+    child_care_art_188: string;
+    sick_child_care: string;
+    family_member_care: string;
+    schedule_pickup: string;
+    default: string;
+}
+
+interface LeavesConfig {
+    careLimits: CareLimits;
+    leaveTypeColors: LeaveTypeColors;
+}
+
+interface FirestoreConfig {
+    collections: {
+        schedules: string;
+        leaves: string;
+    };
+    docs: {
+        mainSchedule: string;
+        mainLeaves: string;
+    };
+}
+
+interface UndoConfig {
+    maxStates: number;
+}
+
+export interface AppConfigType {
+    schedule: ScheduleConfig;
+    changes: ChangesConfig;
+    leaves: LeavesConfig;
+    firestore: FirestoreConfig;
+    undoManager: UndoConfig;
+    debug?: boolean;
+}
+
+export const AppConfig: AppConfigType = {
     schedule: {
         startHour: 7,
         endHour: 17,
@@ -39,7 +98,7 @@ export const AppConfig = {
             child_care_art_188: '#ffcc80',
             sick_child_care: '#f48fb1',
             family_member_care: '#cf93d9',
-            schedule_pickup: '#b39ddb', // Lavender
+            schedule_pickup: '#b39ddb',
             default: '#e6ee9b',
         },
     },
@@ -58,7 +117,7 @@ export const AppConfig = {
     },
 };
 
-export const months = [
+export const months: readonly string[] = [
     'Styczeń',
     'Luty',
     'Marzec',
@@ -71,11 +130,15 @@ export const months = [
     'Październik',
     'Listopad',
     'Grudzień',
-];
+] as const;
 
-export function showToast(message, duration = 3000) {
+/**
+ * Wyświetla powiadomienie toast
+ */
+export function showToast(message: string, duration: number = 3000): void {
     const container = document.getElementById('toast-container');
     if (!container) return;
+
     const toast = document.createElement('div');
     toast.className = 'toast';
     toast.textContent = message;
@@ -95,29 +158,43 @@ export function showToast(message, duration = 3000) {
     }, duration);
 }
 
-export function hideLoadingOverlay(overlay) {
+/**
+ * Ukrywa overlay ładowania
+ */
+export function hideLoadingOverlay(overlay: HTMLElement | null): void {
     if (overlay) {
         overlay.style.display = 'none';
     }
 }
 
-export function capitalizeFirstLetter(string) {
-    if (!string) return '';
-    return string.charAt(0).toUpperCase() + string.slice(1);
+/**
+ * Zamienia pierwszą literę na wielką
+ */
+export function capitalizeFirstLetter(str: string): string {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-export function searchAndHighlight(searchTerm, tableSelector, cellSelector) {
+/**
+ * Wyszukuje i podświetla tekst w tabeli
+ */
+export function searchAndHighlight(
+    searchTerm: string,
+    tableSelector: string,
+    cellSelector: string
+): void {
     const table = document.querySelector(tableSelector);
     if (!table) return;
+
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
 
     // Pokaż wszystkie wiersze przed rozpoczęciem wyszukiwania
-    table.querySelectorAll('tbody tr').forEach((row) => {
+    table.querySelectorAll<HTMLTableRowElement>('tbody tr').forEach((row) => {
         row.style.display = '';
     });
 
-    table.querySelectorAll(cellSelector).forEach((cell) => {
-        const cellText = cell.textContent.toLowerCase();
+    table.querySelectorAll<HTMLElement>(cellSelector).forEach((cell) => {
+        const cellText = cell.textContent?.toLowerCase() || '';
         if (searchTerm && cellText.includes(lowerCaseSearchTerm)) {
             cell.classList.add('search-highlight');
         } else {
@@ -126,21 +203,37 @@ export function searchAndHighlight(searchTerm, tableSelector, cellSelector) {
     });
 }
 
-export class UndoManager {
-    constructor({ maxStates = 20, onUpdate = () => { } }) {
+/**
+ * Interfejs dla callback'u UndoManager
+ */
+interface UndoManagerOptions<T> {
+    maxStates?: number;
+    onUpdate?: (manager: UndoManager<T>) => void;
+}
+
+/**
+ * Manager cofania zmian
+ */
+export class UndoManager<T = unknown> {
+    private maxStates: number;
+    private onUpdate: (manager: UndoManager<T>) => void;
+    private stack: T[];
+    private currentIndex: number;
+
+    constructor({ maxStates = 20, onUpdate = () => { } }: UndoManagerOptions<T> = {}) {
         this.maxStates = maxStates;
         this.onUpdate = onUpdate;
         this.stack = [];
         this.currentIndex = -1;
     }
 
-    initialize(initialState) {
+    initialize(initialState: T): void {
         this.stack = [JSON.parse(JSON.stringify(initialState))];
         this.currentIndex = 0;
         this.onUpdate(this);
     }
 
-    pushState(state) {
+    pushState(state: T): void {
         if (this.currentIndex < this.stack.length - 1) {
             this.stack = this.stack.slice(0, this.currentIndex + 1);
         }
@@ -152,7 +245,7 @@ export class UndoManager {
         this.onUpdate(this);
     }
 
-    undo() {
+    undo(): T | null {
         if (this.canUndo()) {
             this.currentIndex--;
             this.onUpdate(this);
@@ -161,12 +254,15 @@ export class UndoManager {
         return null;
     }
 
-    canUndo() {
+    canUndo(): boolean {
         return this.currentIndex > 0;
     }
 }
 
-export function getEasterDate(year) {
+/**
+ * Oblicza datę Wielkanocy dla danego roku
+ */
+export function getEasterDate(year: number): Date {
     const a = year % 19;
     const b = Math.floor(year / 100);
     const c = year % 100;
@@ -184,7 +280,10 @@ export function getEasterDate(year) {
     return new Date(Date.UTC(year, month, day));
 }
 
-export function isHoliday(date) {
+/**
+ * Sprawdza czy data jest świętem państwowym w Polsce
+ */
+export function isHoliday(date: Date): boolean {
     const year = date.getUTCFullYear();
     const month = date.getUTCMonth(); // 0-11
     const day = date.getUTCDate();
@@ -213,10 +312,11 @@ export function isHoliday(date) {
     const bozeCialo = new Date(easter);
     bozeCialo.setUTCDate(easter.getUTCDate() + 60);
 
-    const zieloneSwiatki = new Date(easter); // Zesłanie Ducha Świętego (7. niedziela po Wielkanocy, czyli +49 dni)
+    const zieloneSwiatki = new Date(easter);
     zieloneSwiatki.setUTCDate(easter.getUTCDate() + 49);
 
-    const checkDate = (d) => d.getUTCMonth() === month && d.getUTCDate() === day;
+    const checkDate = (d: Date): boolean =>
+        d.getUTCMonth() === month && d.getUTCDate() === day;
 
     if (checkDate(easter)) return true;
     if (checkDate(easterMonday)) return true;
@@ -226,15 +326,18 @@ export function isHoliday(date) {
     return false;
 }
 
-export function countWorkdays(startDate, endDate) {
+/**
+ * Liczy dni robocze między datami (bez weekendów i świąt)
+ */
+export function countWorkdays(startDate: string, endDate: string): number {
     let count = 0;
     const start = new Date(startDate + 'T00:00:00Z');
     const end = new Date(endDate + 'T00:00:00Z');
 
-    let current = new Date(start);
+    const current = new Date(start);
 
     while (current <= end) {
-        const day = current.getUTCDay(); // 0 = Niedziela, 1 = Poniedziałek, ..., 6 = Sobota
+        const day = current.getUTCDay(); // 0 = Niedziela, 6 = Sobota
         if (day !== 0 && day !== 6 && !isHoliday(current)) {
             count++;
         }
@@ -243,7 +346,22 @@ export function countWorkdays(startDate, endDate) {
     return count;
 }
 
-// Backward compatibility
+// Backward compatibility - przypisanie do window
+declare global {
+    interface Window {
+        AppConfig: AppConfigType;
+        months: readonly string[];
+        showToast: typeof showToast;
+        hideLoadingOverlay: typeof hideLoadingOverlay;
+        capitalizeFirstLetter: typeof capitalizeFirstLetter;
+        searchAndHighlight: typeof searchAndHighlight;
+        isHoliday: typeof isHoliday;
+        getEasterDate: typeof getEasterDate;
+        UndoManager: typeof UndoManager;
+        countWorkdays: typeof countWorkdays;
+    }
+}
+
 window.AppConfig = AppConfig;
 window.months = months;
 window.showToast = showToast;

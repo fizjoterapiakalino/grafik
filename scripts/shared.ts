@@ -1,14 +1,41 @@
-// scripts/shared.js
+// scripts/shared.ts
 
-export const Shared = (() => {
-    const initialize = () => {
+/**
+ * Link nawigacyjny
+ */
+interface NavLink {
+    href: string;
+    text: string;
+    icon: string;
+    id?: string;
+}
+
+/**
+ * Status zapisu
+ */
+export type SaveStatus = 'saving' | 'saved' | 'error';
+
+/**
+ * Interfejs publicznego API Shared
+ */
+interface SharedAPI {
+    initialize(): void;
+    updateUserInfo(userName: string | null): void;
+    setIsoLinkActive(isActive: boolean): void;
+}
+
+/**
+ * Moduł współdzielonych funkcji UI
+ */
+export const Shared: SharedAPI = (() => {
+    const initialize = (): void => {
         const dateTimeText = document.getElementById('dateTimeText');
         const appHeader = document.getElementById('appHeader');
 
-        const updateDateTimeHeader = () => {
+        const updateDateTimeHeader = (): void => {
             if (!dateTimeText) return;
             const now = new Date();
-            const options = {
+            const options: Intl.DateTimeFormatOptions = {
                 weekday: 'long',
                 year: 'numeric',
                 month: 'long',
@@ -20,7 +47,9 @@ export const Shared = (() => {
             dateTimeText.textContent = now.toLocaleDateString('pl-PL', options);
         };
 
-        const generateHamburgerMenu = () => {
+        const generateHamburgerMenu = (): void => {
+            if (!appHeader) return;
+
             let headerRightMenu = appHeader.querySelector('.header-right-menu');
             if (!headerRightMenu) {
                 headerRightMenu = document.createElement('div');
@@ -28,11 +57,11 @@ export const Shared = (() => {
                 appHeader.appendChild(headerRightMenu);
             }
 
-            const navLinks = [
+            const navLinks: NavLink[] = [
                 { href: '#schedule', text: 'Grafik', icon: 'fas fa-calendar-alt' },
                 { href: '#leaves', text: 'Urlopy', icon: 'fas fa-plane-departure' },
                 { href: '#changes', text: 'Harmonogram zmian', icon: 'fas fa-exchange-alt' },
-                { href: '#scrapped-pdfs', text: 'ISO', icon: 'fas fa-file-pdf', id: 'navLinkIso' }, // Dodano ID
+                { href: '#scrapped-pdfs', text: 'ISO', icon: 'fas fa-file-pdf', id: 'navLinkIso' },
                 { href: '#options', text: 'Opcje', icon: 'fas fa-cogs' },
             ];
 
@@ -45,8 +74,8 @@ export const Shared = (() => {
 
             const userInfoDiv = document.createElement('div');
             userInfoDiv.className = 'user-info';
-            userInfoDiv.id = 'navPanelUserInfo'; // Dodaj ID dla łatwiejszej aktualizacji
-            userInfoDiv.textContent = 'Zalogowano jako: Gość'; // Domyślny tekst
+            userInfoDiv.id = 'navPanelUserInfo';
+            userInfoDiv.textContent = 'Zalogowano jako: Gość';
             navPanel.appendChild(userInfoDiv);
 
             const ul = document.createElement('ul');
@@ -67,12 +96,10 @@ export const Shared = (() => {
                 li.appendChild(a);
                 ul.appendChild(li);
 
-                // Dodaj ID do elementu <a> dla linku ISO
                 if (link.id) {
                     a.id = link.id;
                 }
 
-                // Ukryj menu po kliknięciu linku
                 a.addEventListener('click', () => {
                     navPanel.classList.remove('visible');
                     hamburger.classList.remove('active');
@@ -80,19 +107,19 @@ export const Shared = (() => {
             });
             navPanel.appendChild(ul);
 
-            // Add logout button in a separate list to push it to the bottom
+            // Add logout button
             const logoutUl = document.createElement('ul');
             logoutUl.className = 'logout-nav-list';
             const logoutLi = document.createElement('li');
             logoutLi.id = 'logoutBtnContainer';
-            logoutLi.style.display = 'none'; // Initially hidden
+            logoutLi.style.display = 'none';
             const logoutA = document.createElement('a');
             logoutA.href = '#';
             logoutA.id = 'logoutBtn';
             logoutA.innerHTML = '<i class="fas fa-sign-out-alt"></i> <span>Wyloguj</span>';
             logoutLi.appendChild(logoutA);
             logoutUl.appendChild(logoutLi);
-            navPanel.appendChild(logoutUl); // Dodaj nową listę bezpośrednio do panelu
+            navPanel.appendChild(logoutUl);
 
             const footerInfo = document.createElement('div');
             footerInfo.className = 'footer-info';
@@ -102,7 +129,7 @@ export const Shared = (() => {
             document.body.appendChild(hamburger);
             document.body.appendChild(navPanel);
 
-            const updateActiveLink = () => {
+            const updateActiveLink = (): void => {
                 const currentHash = window.location.hash || '#schedule';
                 navPanel.querySelectorAll('a').forEach((a) => {
                     if (a.getAttribute('href') === currentHash) {
@@ -113,17 +140,18 @@ export const Shared = (() => {
                 });
             };
 
-            hamburger.addEventListener('click', (e) => {
+            hamburger.addEventListener('click', (e: MouseEvent) => {
                 e.stopPropagation();
                 navPanel.classList.toggle('visible');
                 hamburger.classList.toggle('active');
             });
 
-            document.addEventListener('click', (e) => {
+            document.addEventListener('click', (e: MouseEvent) => {
+                const target = e.target as Node;
                 if (
                     navPanel.classList.contains('visible') &&
-                    !navPanel.contains(e.target) &&
-                    !hamburger.contains(e.target)
+                    !navPanel.contains(target) &&
+                    !hamburger.contains(target)
                 ) {
                     navPanel.classList.remove('visible');
                     hamburger.classList.remove('active');
@@ -131,10 +159,10 @@ export const Shared = (() => {
             });
 
             window.addEventListener('hashchange', updateActiveLink);
-            updateActiveLink(); // Set on initial load
+            updateActiveLink();
         };
 
-        window.showToast = (message, duration = 3000) => {
+        window.showToast = (message: string, duration: number = 3000): void => {
             let toastContainer = document.getElementById('toast-container');
             if (!toastContainer) {
                 toastContainer = document.createElement('div');
@@ -151,19 +179,20 @@ export const Shared = (() => {
                 toast.classList.remove('show');
                 setTimeout(() => {
                     if (toast.parentNode === toastContainer) {
-                        toastContainer.removeChild(toast);
+                        toastContainer!.removeChild(toast);
                     }
                 }, 500);
             }, duration);
         };
 
-        const setupGlobalEventListeners = () => {
-            const searchInput = document.getElementById('searchInput');
+        const setupGlobalEventListeners = (): void => {
+            const searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
             const clearSearchButton = document.getElementById('clearSearchButton');
 
             if (searchInput) {
-                searchInput.addEventListener('input', (e) => {
-                    const searchTerm = e.target.value.trim();
+                searchInput.addEventListener('input', (e: Event) => {
+                    const target = e.target as HTMLInputElement;
+                    const searchTerm = target.value.trim();
                     document.dispatchEvent(new CustomEvent('app:search', { detail: { searchTerm } }));
                     if (clearSearchButton) {
                         clearSearchButton.style.display = searchTerm ? 'block' : 'none';
@@ -191,43 +220,42 @@ export const Shared = (() => {
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => {
-                firebase
-                    .auth()
-                    .signOut()
-                    .then(() => {
-                        // window.location.hash = '#login'; // REMOVED: Managed by Router via onAuthStateChanged
-                        // Explicitly get elements to ensure they are correctly referenced
+                // Use window.firebase for backward compatibility
+                const firebase = (window as unknown as { firebase?: { auth(): { signOut(): Promise<void> } } }).firebase;
+                if (firebase) {
+                    firebase.auth().signOut().then(() => {
                         const currentNavPanel = document.querySelector('.nav-panel');
                         const currentHamburger = document.querySelector('.hamburger-menu');
                         if (currentNavPanel) {
-                            currentNavPanel.classList.remove('visible'); // Ukryj menu po wylogowaniu
+                            currentNavPanel.classList.remove('visible');
                         }
                         if (currentHamburger) {
                             currentHamburger.classList.remove('active');
                         }
                     });
+                }
             });
         }
     };
 
-    const updateUserInfo = (userName) => {
+    const updateUserInfo = (userName: string | null): void => {
         const userInfoElement = document.getElementById('navPanelUserInfo');
         if (userInfoElement) {
             userInfoElement.textContent = `Zalogowano jako: ${userName || 'Gość'}`;
         }
     };
 
-    const setIsoLinkActive = (isActive) => {
-        const isoLink = document.getElementById('navLinkIso');
+    const setIsoLinkActive = (isActive: boolean): void => {
+        const isoLink = document.getElementById('navLinkIso') as HTMLAnchorElement | null;
         if (isoLink) {
             if (isActive) {
                 isoLink.classList.remove('disabled');
-                isoLink.style.pointerEvents = 'auto'; // Przywróć interaktywność
-                isoLink.style.opacity = '1'; // Przywróć normalną przezroczystość
+                isoLink.style.pointerEvents = 'auto';
+                isoLink.style.opacity = '1';
             } else {
                 isoLink.classList.add('disabled');
-                isoLink.style.pointerEvents = 'none'; // Wyłącz interaktywność
-                isoLink.style.opacity = '0.5'; // Ustaw ciemniejszy wygląd
+                isoLink.style.pointerEvents = 'none';
+                isoLink.style.opacity = '0.5';
             }
         }
     };
@@ -235,11 +263,14 @@ export const Shared = (() => {
     return {
         initialize,
         updateUserInfo,
-        setIsoLinkActive, // Eksportuj nową metodę
+        setIsoLinkActive,
     };
 })();
 
-export const setSaveStatus = (status) => {
+/**
+ * Ustawia status zapisu w UI
+ */
+export const setSaveStatus = (status: SaveStatus): void => {
     const statusElement = document.getElementById('saveStatus');
     if (!statusElement) return;
 
@@ -266,5 +297,12 @@ export const setSaveStatus = (status) => {
 };
 
 // Backward compatibility
+declare global {
+    interface Window {
+        Shared: SharedAPI;
+        setSaveStatus: typeof setSaveStatus;
+    }
+}
+
 window.Shared = Shared;
 window.setSaveStatus = setSaveStatus;

@@ -1,42 +1,83 @@
-// scripts/changes.js
-import { db } from './firebase-config.js';
-import { AppConfig, isHoliday } from './common.js';
+// scripts/changes.ts
+import { db as dbRaw } from './firebase-config.js';
+import { AppConfig } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
+import type { FirestoreDbWrapper } from './types/firebase';
 
-export const Changes = (() => {
-    let changesTableBody, changesHeaderRow;
-    let appState = {
-        changesCells: {},
-    };
-    let activeCell = null;
+const db = dbRaw as unknown as FirestoreDbWrapper;
+
+// pdfMake type declaration (external library)
+declare const pdfMake: {
+    createPdf(docDefinition: unknown): { download(filename: string): void };
+};
+
+/**
+ * Stan komórki w harmonogramie zmian
+ */
+interface ChangesCellState {
+    assignedEmployees?: string[];
+}
+
+/**
+ * Stan aplikacji
+ */
+interface AppState {
+    changesCells: Record<string, Record<number, ChangesCellState>>;
+}
+
+/**
+ * Okres dwutygodniowy
+ */
+interface Period {
+    start: string;
+    end: string;
+}
+
+/**
+ * Interfejs publicznego API Changes
+ */
+interface ChangesAPI {
+    init(): Promise<void>;
+    destroy(): void;
+}
+
+/**
+ * Moduł harmonogramu zmian
+ */
+export const Changes: ChangesAPI = (() => {
+    let changesTableBody: HTMLElement | null = null;
+    let changesHeaderRow: HTMLElement | null = null;
+    let appState: AppState = { changesCells: {} };
+
     let currentYear = new Date().getUTCFullYear();
-    let yearSelect;
-    let clipboard = null;
+    let yearSelect: HTMLSelectElement | null = null;
+    let clipboard: string[] | null = null;
 
-    const isWeekend = (date) => {
+    const isWeekend = (date: Date): boolean => {
         const day = date.getUTCDay();
-        return day === 0 || day === 6; // Niedziela lub Sobota
+        return day === 0 || day === 6;
     };
 
-    const handleAppSearch = (e) => {
-        const { searchTerm } = e.detail;
+    const handleAppSearch = (e: Event): void => {
+        const { searchTerm } = (e as CustomEvent<{ searchTerm: string }>).detail;
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
         document.querySelectorAll('#changesTableBody tr').forEach((row) => {
-            const hasEmployee = Array.from(row.cells).some((cell, index) => {
-                if (index === 0) return false; // Skip period column
-                return cell.textContent.toLowerCase().includes(lowerCaseSearchTerm);
+            const hasEmployee = Array.from((row as HTMLTableRowElement).cells).some((cell, index) => {
+                if (index === 0) return false;
+                return cell.textContent?.toLowerCase().includes(lowerCaseSearchTerm) || false;
             });
-            row.style.display = hasEmployee || lowerCaseSearchTerm === '' ? '' : 'none';
+            (row as HTMLElement).style.display = hasEmployee || lowerCaseSearchTerm === '' ? '' : 'none';
         });
     };
 
-    const copyCell = (cell) => {
+    const copyCell = (cell: HTMLTableCellElement): void => {
         if (!cell) return;
-        const period = cell.parentElement.dataset.startDate;
+        const period = (cell.parentElement as HTMLTableRowElement).dataset.startDate;
+        if (!period) return;
         const columnIndex = cell.cellIndex;
         const cellState = appState.changesCells[period]?.[columnIndex];
 
-        if (cellState && cellState.assignedEmployees) {
+        if (cellState?.assignedEmployees) {
             clipboard = [...cellState.assignedEmployees];
             window.showToast('Skopiowano.');
         } else {
@@ -45,16 +86,16 @@ export const Changes = (() => {
         }
     };
 
-    const pasteCell = (cell) => {
+    const pasteCell = (cell: HTMLTableCellElement): void => {
         if (!cell || !clipboard) return;
 
         updateCellState(cell, (state) => {
-            state.assignedEmployees = [...clipboard];
+            state.assignedEmployees = [...clipboard!];
         });
         window.showToast('Wklejono.');
     };
 
-    const clearCell = (cell) => {
+    const clearCell = (cell: HTMLTableCellElement): void => {
         if (!cell) return;
         updateCellState(cell, (state) => {
             state.assignedEmployees = [];
@@ -62,12 +103,10 @@ export const Changes = (() => {
         window.showToast('Wyczyszczono.');
     };
 
-    const generateTwoWeekPeriods = (year) => {
-        const periods = [];
+    const generateTwoWeekPeriods = (year: number): Period[] => {
+        const periods: Period[] = [];
         let currentDate = new Date(Date.UTC(year, 0, 1));
 
-        // Idziemy wstecz do najbliższego poniedziałku, aby objąć tydzień w którym wypada 1 stycznia.
-        // To rozwiązuje problem przesunięcia o tydzień (np. start 30 grudnia zamiast 6 stycznia).
         while (currentDate.getUTCDay() !== 1) {
             currentDate.setUTCDate(currentDate.getUTCDate() - 1);
         }
@@ -100,23 +139,18 @@ export const Changes = (() => {
         return periods;
     };
 
-    const renderTable = (periods) => {
+    const renderTable = (periods: Period[]): void => {
+        if (!changesHeaderRow || !changesTableBody) return;
+
         changesHeaderRow.innerHTML = '';
         const headers = [
-            'Okres',
-            'HYDRO 7:00-14:30',
-            'MASAŻ 7-14:30',
-            'FIZYKO 7-14:30',
-            'SALA 7-14:30',
-            'MASAŻ 10:30-18:00',
-            'FIZYKO 10:30-18:00',
-            'SALA 10:30-18:00',
-            'URLOPY',
+            'Okres', 'HYDRO 7:00-14:30', 'MASAŻ 7-14:30', 'FIZYKO 7-14:30', 'SALA 7-14:30',
+            'MASAŻ 10:30-18:00', 'FIZYKO 10:30-18:00', 'SALA 10:30-18:00', 'URLOPY',
         ];
         headers.forEach((headerText) => {
             const th = document.createElement('th');
             th.textContent = headerText;
-            changesHeaderRow.appendChild(th);
+            changesHeaderRow!.appendChild(th);
         });
 
         changesTableBody.innerHTML = '';
@@ -128,19 +162,12 @@ export const Changes = (() => {
             const end = new Date(period.end);
             tr.innerHTML = `
                 <td>${start.getUTCDate()}.${(start.getUTCMonth() + 1).toString().padStart(2, '0')} - ${end.getUTCDate()}.${(end.getUTCMonth() + 1).toString().padStart(2, '0')}</td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                 <td class="leaves-cell"></td>
             `;
-            changesTableBody.appendChild(tr);
+            changesTableBody!.appendChild(tr);
         });
 
-        // Make cells editable
         document.querySelectorAll('#changesTableBody td').forEach((cell) => {
             if (!cell.classList.contains('leaves-cell')) {
                 cell.addEventListener('click', handleCellClick);
@@ -148,13 +175,11 @@ export const Changes = (() => {
         });
     };
 
-    const getAllLeavesData = async () => {
+    const getAllLeavesData = async (): Promise<Record<string, unknown>> => {
         try {
-            const docRef = db
-                .collection(AppConfig.firestore.collections.leaves)
-                .doc(AppConfig.firestore.docs.mainLeaves);
-            const doc = await docRef.get();
-            return doc.exists ? doc.data() : {};
+            const docRef = db.collection(AppConfig.firestore.collections.leaves).doc(AppConfig.firestore.docs.mainLeaves);
+            const docSnap = await docRef.get();
+            return docSnap.exists ? (docSnap.data() as Record<string, unknown>) || {} : {};
         } catch (error) {
             console.error('Błąd podczas ładowania danych o urlopach z Firestore:', error);
             window.showToast('Wystąpił błąd podczas ładowania danych o urlopach. Spróbuj ponownie.', 5000);
@@ -162,16 +187,24 @@ export const Changes = (() => {
         }
     };
 
-    const populateLeavesColumn = (allLeavesData) => {
+    interface LeaveEntry {
+        startDate: string;
+        endDate: string;
+        type: string;
+    }
+
+    const populateLeavesColumn = (allLeavesData: Record<string, unknown>): void => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
         document.querySelectorAll('#changesTableBody tr').forEach((row) => {
-            const periodStart = new Date(row.dataset.startDate);
-            const periodEnd = new Date(row.dataset.endDate);
-            const leavesCell = row.querySelector('.leaves-cell');
-            let leavesHtml = '';
+            const tr = row as HTMLTableRowElement;
+            const periodStart = new Date(tr.dataset.startDate || '');
+            const periodEnd = new Date(tr.dataset.endDate || '');
+            const leavesCell = tr.querySelector('.leaves-cell');
+            if (!leavesCell) return;
 
+            let leavesHtml = '';
             const employees = EmployeeManager.getAll();
 
             for (const employeeId in employees) {
@@ -179,7 +212,8 @@ export const Changes = (() => {
                 if (employee.isHidden || employee.isScheduleOnly) continue;
 
                 const employeeName = employee.displayName || employee.name;
-                const employeeLeaves = allLeavesData[employeeName];
+                if (!employeeName) continue;
+                const employeeLeaves = allLeavesData[employeeName] as LeaveEntry[] | undefined;
 
                 if (Array.isArray(employeeLeaves)) {
                     employeeLeaves.forEach((leave) => {
@@ -188,7 +222,6 @@ export const Changes = (() => {
 
                         if (leave.type === 'vacation' && !(leaveEnd < periodStart || leaveStart > periodEnd)) {
                             const lastName = EmployeeManager.getLastNameById(employeeId);
-                            // Fallback to full name if last name is not available
                             leavesHtml += `${lastName || employeeName}<br>`;
                         }
                     });
@@ -197,47 +230,38 @@ export const Changes = (() => {
             leavesCell.innerHTML = leavesHtml;
 
             if (periodEnd < today) {
-                row.classList.add('past-period');
+                tr.classList.add('past-period');
             }
         });
     };
 
-    const handleCellClick = (event) => {
-        const cell = event.target.closest('td');
+    const handleCellClick = (event: Event): void => {
+        const cell = (event.target as HTMLElement).closest('td') as HTMLTableCellElement | null;
         if (!cell) return;
-        activeCell = cell;
         openEmployeeSelectionModal(cell);
     };
 
-    const openEmployeeSelectionModal = (cell) => {
+    const openEmployeeSelectionModal = (cell: HTMLTableCellElement): void => {
         const modal = document.getElementById('employeeSelectionModal');
         const employeeListDiv = document.getElementById('employeeList');
         const saveBtn = document.getElementById('saveEmployeeSelection');
         const cancelBtn = document.getElementById('cancelEmployeeSelection');
-        const searchInput = document.getElementById('employeeSearchInput');
+        const searchInput = document.getElementById('employeeSearchInput') as HTMLInputElement | null;
 
-        employeeListDiv.innerHTML = ''; // Clear list
-        searchInput.value = ''; // Clear search input
+        if (!modal || !employeeListDiv || !saveBtn || !cancelBtn || !searchInput) return;
+
+        employeeListDiv.innerHTML = '';
+        searchInput.value = '';
 
         const allEmployees = Object.fromEntries(
-            Object.entries(EmployeeManager.getAll()).filter(([, employee]) => !employee.isHidden && !employee.isScheduleOnly),
+            Object.entries(EmployeeManager.getAll()).filter(([, employee]) => !employee.isHidden && !employee.isScheduleOnly)
         );
-        const period = cell.parentElement.dataset.startDate;
+        const period = (cell.parentElement as HTMLTableRowElement).dataset.startDate || '';
         const columnIndex = cell.cellIndex;
         const cellState = appState.changesCells[period]?.[columnIndex] || {};
         const assignedEmployees = new Set(cellState.assignedEmployees || []);
 
-        const allAssignedEmployeesInRow = new Set();
-        if (appState.changesCells[period]) {
-            Object.values(appState.changesCells[period]).forEach((cellData) => {
-                if (cellData.assignedEmployees) {
-                    cellData.assignedEmployees.forEach((id) => allAssignedEmployeesInRow.add(id));
-                }
-            });
-        }
-
         for (const id in allEmployees) {
-            const employee = allEmployees[id];
             const employeeEl = document.createElement('div');
             employeeEl.classList.add('employee-list-item');
             employeeEl.textContent = EmployeeManager.getFullNameById(id);
@@ -247,46 +271,38 @@ export const Changes = (() => {
                 employeeEl.classList.add('selected-employee');
             }
 
-            // Removed uniqueness constraint to allow duplicate employees
-            // if (allAssignedEmployeesInRow.has(id) && !assignedEmployees.has(id)) {
-            //     employeeEl.classList.add('disabled-employee');
-            // }
-
             employeeEl.addEventListener('click', () => {
-                // if (!employeeEl.classList.contains('disabled-employee')) {
                 employeeEl.classList.toggle('selected-employee');
-                // }
             });
 
             employeeListDiv.appendChild(employeeEl);
         }
 
-        const filterEmployees = () => {
+        const filterEmployees = (): void => {
             const searchTerm = searchInput.value.toLowerCase();
             employeeListDiv.querySelectorAll('.employee-list-item').forEach((item) => {
-                if (item.textContent.toLowerCase().includes(searchTerm)) {
-                    item.style.display = '';
-                } else {
-                    item.style.display = 'none';
-                }
+                const el = item as HTMLElement;
+                el.style.display = el.textContent?.toLowerCase().includes(searchTerm) ? '' : 'none';
             });
         };
 
         searchInput.addEventListener('input', filterEmployees);
-
         modal.style.display = 'flex';
 
-        const closeModal = () => {
+        const closeModal = (): void => {
             modal.style.display = 'none';
             saveBtn.onclick = null;
             cancelBtn.onclick = null;
             searchInput.removeEventListener('input', filterEmployees);
         };
 
-        saveBtn.onclick = () => {
-            const selectedEmployees = [];
+        saveBtn.onclick = (): void => {
+            const selectedEmployees: string[] = [];
             employeeListDiv.querySelectorAll('.selected-employee').forEach((el) => {
-                selectedEmployees.push(el.dataset.employeeId);
+                const empEl = el as HTMLElement;
+                if (empEl.dataset.employeeId) {
+                    selectedEmployees.push(empEl.dataset.employeeId);
+                }
             });
 
             updateCellState(cell, (state) => {
@@ -299,9 +315,10 @@ export const Changes = (() => {
         cancelBtn.onclick = closeModal;
     };
 
-    const updateCellState = (cell, updateFn) => {
+    const updateCellState = (cell: HTMLTableCellElement, updateFn: (state: ChangesCellState) => void): void => {
         if (!cell) return;
-        const period = cell.parentElement.dataset.startDate;
+        const period = (cell.parentElement as HTMLTableRowElement).dataset.startDate;
+        if (!period) return;
         const columnIndex = cell.cellIndex;
         if (!appState.changesCells[period]) appState.changesCells[period] = {};
         let cellState = appState.changesCells[period][columnIndex] || {};
@@ -309,14 +326,12 @@ export const Changes = (() => {
         updateFn(cellState);
 
         appState.changesCells[period][columnIndex] = cellState;
-
         renderChangesAndSave();
     };
 
-    const saveChanges = async () => {
+    const saveChanges = async (): Promise<void> => {
         try {
-            await db
-                .collection(AppConfig.firestore.collections.schedules)
+            await db.collection(AppConfig.firestore.collections.schedules)
                 .doc(`changesSchedule_${currentYear}`)
                 .set(appState, { merge: true });
             window.setSaveStatus('saved');
@@ -326,27 +341,28 @@ export const Changes = (() => {
         }
     };
 
-    const loadChanges = async () => {
+    const loadChanges = async (): Promise<void> => {
         try {
             const docRef = db.collection(AppConfig.firestore.collections.schedules).doc(`changesSchedule_${currentYear}`);
-            const doc = await docRef.get();
-            if (doc.exists) {
-                const savedData = doc.data();
-                appState.changesCells = savedData.changesCells || {};
+            const docSnap = await docRef.get();
+            if (docSnap.exists) {
+                const savedData = docSnap.data() as AppState | undefined;
+                appState.changesCells = savedData?.changesCells || {};
             } else {
-                appState.changesCells = {}; // Reset if no data for the year
+                appState.changesCells = {};
             }
         } catch (error) {
             console.error('Error loading changes from Firestore:', error);
         }
     };
 
-    const renderChangesContent = () => {
+    const renderChangesContent = (): void => {
         document.querySelectorAll('#changesTableBody tr').forEach((row) => {
-            const period = row.dataset.startDate;
-            Array.from(row.cells).forEach((cell, index) => {
+            const tr = row as HTMLTableRowElement;
+            const period = tr.dataset.startDate || '';
+            Array.from(tr.cells).forEach((cell, index) => {
                 if (appState.changesCells[period]?.[index]?.assignedEmployees) {
-                    const employeeNames = appState.changesCells[period][index].assignedEmployees
+                    const employeeNames = appState.changesCells[period][index].assignedEmployees!
                         .map((id) => EmployeeManager.getFullNameById(id))
                         .join('<br>');
                     cell.innerHTML = employeeNames;
@@ -355,25 +371,27 @@ export const Changes = (() => {
         });
     };
 
-    const renderChangesAndSave = () => {
+    const renderChangesAndSave = (): void => {
         renderChangesContent();
         saveChanges();
     };
 
-    const printChangesTableToPdf = () => {
+    const printChangesTableToPdf = (): void => {
         const table = document.getElementById('changesTable');
+        if (!table) return;
+
         const tableHeaders = Array.from(table.querySelectorAll('thead th')).map((th) => ({
-            text: th.textContent,
+            text: th.textContent || '',
             style: 'tableHeader',
         }));
 
         const tableBody = Array.from(table.querySelectorAll('tbody tr')).map((row) => {
-            return Array.from(row.cells).map((cell, cellIndex) => {
+            const tr = row as HTMLTableRowElement;
+            return Array.from(tr.cells).map((cell, cellIndex) => {
                 if (cellIndex === 0 || cellIndex === 8) {
-                    // Kolumna Okres i Urlopy
                     return cell.innerHTML.replace(/<br\s*[/]?>>/gi, '\n');
                 }
-                const period = row.dataset.startDate;
+                const period = tr.dataset.startDate || '';
                 const cellState = appState.changesCells[period]?.[cellIndex];
                 if (cellState?.assignedEmployees) {
                     return cellState.assignedEmployees.map((id) => EmployeeManager.getLastNameById(id)).join('\n');
@@ -388,41 +406,27 @@ export const Changes = (() => {
                 { text: 'Grafik Zmian', style: 'header' },
                 {
                     style: 'tableExample',
-                    table: {
-                        headerRows: 1,
-                        body: [tableHeaders, ...tableBody],
-                    },
+                    table: { headerRows: 1, body: [tableHeaders, ...tableBody] },
                     layout: {
-                        fillColor: function (rowIndex, node, columnIndex) {
+                        fillColor: function (rowIndex: number) {
                             return rowIndex === 0 ? '#4CAF50' : null;
                         },
                     },
                 },
             ],
             styles: {
-                header: {
-                    fontSize: 18,
-                    bold: true,
-                    margin: [0, 0, 0, 10],
-                },
-                tableExample: {
-                    margin: [0, 5, 0, 15],
-                },
-                tableHeader: {
-                    bold: true,
-                    fontSize: 10,
-                    color: 'white',
-                },
+                header: { fontSize: 18, bold: true, margin: [0, 0, 0, 10] },
+                tableExample: { margin: [0, 5, 0, 15] },
+                tableHeader: { bold: true, fontSize: 10, color: 'white' },
             },
-            defaultStyle: {
-                font: 'Roboto', // pdfmake uses Roboto by default which supports Polish characters
-            },
+            defaultStyle: { font: 'Roboto' },
         };
 
         pdfMake.createPdf(docDefinition).download(`grafik-zmian-${currentYear}.pdf`);
     };
 
-    const populateYearSelect = () => {
+    const populateYearSelect = (): void => {
+        if (!yearSelect) return;
         const yearNow = new Date().getUTCFullYear();
         const startYear = yearNow - 2;
         const endYear = yearNow + 5;
@@ -431,8 +435,8 @@ export const Changes = (() => {
 
         for (let year = startYear; year <= endYear; year++) {
             const option = document.createElement('option');
-            option.value = year;
-            option.textContent = year;
+            option.value = String(year);
+            option.textContent = String(year);
             if (year === currentYear) {
                 option.selected = true;
             }
@@ -441,12 +445,12 @@ export const Changes = (() => {
         yearSelect.addEventListener('change', handleYearChange);
     };
 
-    const handleYearChange = async (e) => {
-        currentYear = parseInt(e.target.value, 10);
+    const handleYearChange = async (e: Event): Promise<void> => {
+        currentYear = parseInt((e.target as HTMLSelectElement).value, 10);
         await refreshView();
     };
 
-    const refreshView = async () => {
+    const refreshView = async (): Promise<void> => {
         const periods = generateTwoWeekPeriods(currentYear);
         renderTable(periods);
         await loadChanges();
@@ -455,29 +459,20 @@ export const Changes = (() => {
         populateLeavesColumn(allLeaves);
     };
 
-    const init = async () => {
-        // Małe opóźnienie i ponowna próba, jeśli elementy nie zostaną znalezione natychmiast
-        // (rozwiązuje specyficzne dla Firefox problemy z synchronizacją po innerHTML)
-        const getElements = () => {
+    const init = async (): Promise<void> => {
+        const getElements = (): boolean => {
             changesTableBody = document.getElementById('changesTableBody');
             changesHeaderRow = document.getElementById('changesHeaderRow');
-            yearSelect = document.getElementById('changesYearSelect');
-            return changesTableBody && changesHeaderRow && yearSelect;
+            yearSelect = document.getElementById('changesYearSelect') as HTMLSelectElement | null;
+            return !!(changesTableBody && changesHeaderRow && yearSelect);
         };
 
         if (!getElements()) {
-            // Pierwsza próba po 50ms
             await new Promise((resolve) => setTimeout(resolve, 50));
             if (!getElements()) {
-                // Druga próba po dodatkowych 100ms
                 await new Promise((resolve) => setTimeout(resolve, 100));
                 if (!getElements()) {
-                    const missing = [];
-                    if (!document.getElementById('changesTableBody')) missing.push('changesTableBody');
-                    if (!document.getElementById('changesHeaderRow')) missing.push('changesHeaderRow');
-                    if (!document.getElementById('changesYearSelect')) missing.push('changesYearSelect');
-
-                    console.error(`Changes module: Required elements not found (${missing.join(', ')}). Aborting initialization.`);
+                    console.error('Changes module: Required elements not found. Aborting initialization.');
                     return;
                 }
             }
@@ -495,14 +490,14 @@ export const Changes = (() => {
         await EmployeeManager.load();
 
         const contextMenuItems = [
-            { id: 'ctxCopyCell', action: (cell) => copyCell(cell) },
-            { id: 'ctxPasteCell', action: (cell) => pasteCell(cell) },
-            { id: 'ctxClearCell', action: (cell) => clearCell(cell) },
+            { id: 'ctxCopyCell', action: (cell: HTMLElement) => copyCell(cell as HTMLTableCellElement) },
+            { id: 'ctxPasteCell', action: (cell: HTMLElement) => pasteCell(cell as HTMLTableCellElement) },
+            { id: 'ctxClearCell', action: (cell: HTMLElement) => clearCell(cell as HTMLTableCellElement) },
         ];
         window.initializeContextMenu('changesContextMenu', '#changesTableBody td:not(.leaves-cell)', contextMenuItems);
     };
 
-    const destroy = () => {
+    const destroy = (): void => {
         const printButton = document.getElementById('printChangesTable');
         document.removeEventListener('app:search', handleAppSearch);
         if (printButton) {
@@ -514,11 +509,14 @@ export const Changes = (() => {
         console.log('Changes module destroyed');
     };
 
-    return {
-        init,
-        destroy,
-    };
+    return { init, destroy };
 })();
 
 // Backward compatibility
+declare global {
+    interface Window {
+        Changes: ChangesAPI;
+    }
+}
+
 window.Changes = Changes;

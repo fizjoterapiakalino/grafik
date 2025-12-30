@@ -1,7 +1,23 @@
-const Migration = (() => {
-    const runMigration = async () => {
-        const sourceDocId = '2025-08-08'; // Dokument źródłowy z danymi
-        const targetDocId = 'mainSchedule'; // Dokument docelowy
+// scripts/migration.ts
+import { db as dbRaw } from './firebase-config.js';
+import type { FirestoreDbWrapper } from './types/firebase';
+
+const db = dbRaw as unknown as FirestoreDbWrapper;
+
+/**
+ * Interfejs publicznego API Migration
+ */
+interface MigrationAPI {
+    init(): void;
+}
+
+/**
+ * Moduł migracji danych
+ */
+export const Migration: MigrationAPI = (() => {
+    const runMigration = async (): Promise<void> => {
+        const sourceDocId = '2025-08-08';
+        const targetDocId = 'mainSchedule';
 
         const sourceRef = db.collection('schedules').doc(sourceDocId);
         const targetRef = db.collection('schedules').doc(targetDocId);
@@ -17,8 +33,8 @@ const Migration = (() => {
                 return;
             }
 
-            const sourceData = sourceDoc.data();
-            const scheduleCellsToMigrate = sourceData.scheduleCells;
+            const sourceData = sourceDoc.data() as Record<string, unknown> | undefined;
+            const scheduleCellsToMigrate = sourceData?.scheduleCells;
 
             if (!scheduleCellsToMigrate) {
                 console.error(`Dokument źródłowy '${sourceDocId}' nie zawiera pola 'scheduleCells'!`);
@@ -27,10 +43,8 @@ const Migration = (() => {
             }
 
             await targetRef.set(
-                {
-                    scheduleCells: scheduleCellsToMigrate,
-                },
-                { merge: true },
+                { scheduleCells: scheduleCellsToMigrate },
+                { merge: true }
             );
 
             console.log('Migracja zakończona pomyślnie!');
@@ -41,7 +55,7 @@ const Migration = (() => {
         }
     };
 
-    const init = () => {
+    const init = (): void => {
         const migrateButton = document.getElementById('runMigrationButton');
         if (migrateButton) {
             migrateButton.addEventListener('click', runMigration);
@@ -50,7 +64,5 @@ const Migration = (() => {
         }
     };
 
-    return {
-        init,
-    };
+    return { init };
 })();

@@ -1,7 +1,10 @@
-// scripts/main.js
+// scripts/main.ts
 import { Router } from './router.js';
-import './firebase-config.js'; // Ensure Firebase is initialized
+import { BackupScheduler } from './backup-scheduler.js';
+import { UXEnhancements } from './ux-enhancements.js';
+import './firebase-config.js';
 import './common.js';
+import './utils.js';
 import './shared.js';
 import './employee-manager.js';
 import './ui-shell.js';
@@ -20,9 +23,13 @@ import './login.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     Router.init();
+    BackupScheduler.init();
+    UXEnhancements.init();
 
     // Apply seasonal theme if applicable
-    import('./seasonal-themes.js').then(module => {
-        module.applySeasonalTheme();
-    }).catch(err => console.error('Failed to load seasonal themes', err));
+    import('./seasonal-themes.js')
+        .then((module) => {
+            module.applySeasonalTheme();
+        })
+        .catch((err) => console.error('Failed to load seasonal themes', err));
 });

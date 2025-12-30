@@ -1,13 +1,28 @@
-// scripts/login.js
+// scripts/login.ts
 import { auth } from './firebase-config.js';
+import type { FirebaseAuthWrapper } from './types/firebase';
 
-export const Login = (() => {
-    let loginForm = null; // Zmienna do przechowywania referencji do formularza
+// Type assertion dla auth
+const typedAuth = auth as unknown as FirebaseAuthWrapper;
 
-    const handleSubmit = async (e) => {
+/**
+ * Interfejs publicznego API Login
+ */
+interface LoginAPI {
+    init(): void;
+    destroy(): void;
+}
+
+/**
+ * Moduł logowania
+ */
+export const Login: LoginAPI = (() => {
+    let loginForm: HTMLFormElement | null = null;
+
+    const handleSubmit = async (e: Event): Promise<void> => {
         e.preventDefault();
-        const emailInput = document.getElementById('emailInput');
-        const passwordInput = document.getElementById('passwordInput');
+        const emailInput = document.getElementById('emailInput') as HTMLInputElement | null;
+        const passwordInput = document.getElementById('passwordInput') as HTMLInputElement | null;
         const loginError = document.getElementById('loginError');
 
         if (!emailInput || !passwordInput || !loginError) {
@@ -20,8 +35,7 @@ export const Login = (() => {
         const password = passwordInput.value;
 
         try {
-            await auth.signInWithEmailAndPassword(email, password);
-            // Po udanym logowaniu, router automatycznie przekieruje
+            await typedAuth.signInWithEmailAndPassword(email, password);
             window.location.hash = '#schedule';
         } catch (error) {
             console.error('Błąd logowania:', error);
@@ -29,8 +43,8 @@ export const Login = (() => {
         }
     };
 
-    const init = () => {
-        loginForm = document.getElementById('loginForm');
+    const init = (): void => {
+        loginForm = document.getElementById('loginForm') as HTMLFormElement | null;
         if (loginForm) {
             loginForm.addEventListener('submit', handleSubmit);
         } else {
@@ -38,7 +52,7 @@ export const Login = (() => {
         }
     };
 
-    const destroy = () => {
+    const destroy = (): void => {
         if (loginForm) {
             loginForm.removeEventListener('submit', handleSubmit);
             loginForm = null;
@@ -50,4 +64,10 @@ export const Login = (() => {
 })();
 
 // Backward compatibility
+declare global {
+    interface Window {
+        Login: LoginAPI;
+    }
+}
+
 window.Login = Login;

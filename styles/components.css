@@ -1,368 +1,118 @@
-/* Style dla reużywalnych komponentów UI */
+/* styles/components.css */
 
-/* --- Przyciski --- */
-.undo-button {
+/* --- Buttons --- */
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px;
+    font-family: var(--font-sans);
+    font-size: 0.95em;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: var(--border-radius-sm);
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
     background-color: var(--color-white);
     color: var(--color-gray-700);
-    border: 1px solid var(--color-gray-300);
-    padding: var(--spacing-sm) var(--spacing-md);
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    font-size: 0.9em;
-    font-weight: 500;
-    box-shadow: var(--shadow-sm);
-    transition: all 0.2s ease;
 }
 
-.undo-button:hover {
-    background-color: var(--color-gray-50);
-    border-color: var(--color-gray-400);
+.action-btn:hover {
+    transform: translateY(-2px);
     box-shadow: var(--shadow-md);
 }
 
-.undo-button:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-}
-
-.action-btn {
-    padding: var(--spacing-sm) var(--spacing-md);
-    border: none;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    margin-left: var(--spacing-sm);
-    font-weight: 600;
-    transition:
-        background-color 0.2s,
-        transform 0.1s;
+.action-btn:active {
+    transform: translateY(0);
     box-shadow: var(--shadow-sm);
 }
 
-.action-btn:active {
-    transform: translateY(1px);
+.action-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
-.confirm-btn {
-    background-color: var(--color-primary-600);
-    color: var(--color-white);
+/* Primary Button */
+.action-btn.primary,
+button[type="submit"] {
+    background: linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%);
+    color: white;
+    box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4), 0 2px 4px -1px rgba(16, 185, 129, 0.2);
 }
 
-.confirm-btn:hover {
-    background-color: var(--color-primary-700);
+.action-btn.primary:hover,
+button[type="submit"]:hover {
+    background: linear-gradient(135deg, var(--color-primary-400) 0%, var(--color-primary-500) 100%);
+    box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.5), 0 4px 6px -2px rgba(16, 185, 129, 0.3);
 }
 
-.cancel-btn {
-    background-color: var(--color-white);
-    color: var(--color-danger);
-    border: 1px solid var(--color-danger);
+/* Secondary Button (Standard Action) */
+.action-btn.secondary {
+    background: linear-gradient(135deg, var(--color-secondary-500) 0%, var(--color-secondary-600) 100%);
+    color: white;
+    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.4);
 }
 
-.cancel-btn:hover {
-    background-color: #fef2f2;
+.action-btn.secondary:hover {
+    background: linear-gradient(135deg, var(--color-secondary-400) 0%, var(--color-secondary-500) 100%);
+    box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.5);
 }
 
-.cancel-btn.filled {
-    background-color: var(--color-danger);
-    color: var(--color-white);
-    border: none;
+/* Danger Button */
+.action-btn.danger {
+    background: linear-gradient(135deg, var(--color-danger) 0%, var(--color-danger-dark) 100%);
+    color: white;
+    box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.4);
 }
 
-.cancel-btn.filled:hover {
-    background-color: #d32f2f;
-    /* Darker red */
-    color: var(--color-white);
+.action-btn.danger:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.5);
 }
 
-/* --- Kalendarz Modal --- */
+/* Outline/Ghost Button */
+.action-btn.outline {
+    background: transparent;
+    border: 1px solid var(--color-gray-300);
+    color: var(--color-gray-600);
+    box-shadow: none;
+}
+
+.action-btn.outline:hover {
+    border-color: var(--color-gray-400);
+    background-color: var(--color-gray-50);
+    color: var(--color-gray-800);
+}
+
+/* --- Modals (Reused across app) --- */
 .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.6);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 2000;
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(5px);
+    background-color: rgba(0, 0, 0, 0.4);
+    /* Slightly lighter background for modern feel */
 }
 
 .modal-content {
-    background-color: var(--glass-bg);
-    backdrop-filter: var(--glass-blur);
-    padding: var(--spacing-lg);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-xl);
-    transition: transform 0.3s ease-out;
-    max-height: 90vh;
-    overflow-y: auto;
-    border: var(--glass-border);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    animation: modalSlideUp 0.3s ease-out;
 }
 
-.calendar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 5px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid #eee;
-}
+@keyframes modalSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
 
-.calendar-header h2 {
-    margin: 0;
-    font-size: 0.9em;
-    font-weight: 600;
-}
-
-.nav-btn {
-    background: #f7f7f7;
-    border: 1px solid var(--color-border);
-    border-radius: 50%;
-    width: 28px;
-    height: 28px;
-    cursor: pointer;
-    font-weight: bold;
-    color: var(--color-text);
-    transition:
-        background-color 0.2s,
-        box-shadow 0.2s;
-}
-
-.nav-btn:hover {
-    background-color: #e9e9e9;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.calendar-selection-preview {
-    text-align: center;
-    margin-bottom: 10px;
-    padding: 5px;
-    background-color: #f8f9fa;
-    border-radius: 6px;
-    font-size: 0.8em;
-    color: var(--color-text-light);
-    min-height: 18px;
-}
-
-.calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 1px;
-}
-
-.day-name,
-.day-cell-calendar {
-    text-align: center;
-    padding: 4px 2px;
-}
-
-.day-name {
-    font-weight: bold;
-    color: #666;
-    font-size: 0.7em;
-}
-
-.day-cell-calendar {
-    cursor: pointer;
-    border-radius: 50%;
-    border: 2px solid transparent;
-    transition:
-        background-color 0.2s,
-        color 0.2s,
-        border-color 0.2s;
-}
-
-.day-cell-calendar:hover {
-    background-color: #e9f5ff;
-}
-
-.day-cell-calendar.other-month {
-    color: #ccc;
-    cursor: default;
-}
-
-.day-cell-calendar.other-month:hover {
-    background-color: transparent;
-}
-
-.day-cell-calendar.today {
-    border-color: var(--color-secondary);
-    font-weight: bold;
-}
-
-.day-cell-calendar.in-range {
-    background-color: #d4eaff;
-    color: var(--color-secondary-dark);
-    border-radius: 0;
-}
-
-.day-cell-calendar.start-date,
-.day-cell-calendar.end-date {
-    background-color: var(--color-secondary);
-    color: var(--color-white);
-    font-weight: bold;
-}
-
-.day-cell-calendar.start-date {
-    border-top-left-radius: 50%;
-    border-bottom-left-radius: 50%;
-}
-
-.day-cell-calendar.end-date {
-    border-top-right-radius: 50%;
-    border-bottom-right-radius: 50%;
-}
-
-.day-cell-calendar.start-date.end-date {
-    border-radius: 50%;
-}
-
-.day-cell-calendar.empty {
-    cursor: default;
-    background-color: transparent !important;
-}
-
-.modal-actions {
-    margin-top: 20px;
-    text-align: right;
-}
-
-/* --- Style dla przeciągania i upuszczania --- */
-.is-dragging {
-    opacity: 0.4;
-    border: 2px dashed #000;
-}
-
-.drag-over-target {
-    background-color: #d1ffd1 !important;
-    border: 2px dashed var(--color-primary);
-}
-
-/* --- Pole wyszukiwania --- */
-.search-input {
-    padding: var(--spacing-sm) var(--spacing-md);
-    padding-left: 35px;
-    border: 1px solid var(--color-gray-300);
-    border-radius: var(--border-radius-sm);
-    font-size: 0.9em;
-    width: 180px;
-    transition: all 0.3s ease;
-    background-color: var(--color-white);
-    color: var(--color-text);
-}
-
-.search-input:focus {
-    outline: none;
-    border-color: var(--color-primary-500);
-    box-shadow: 0 0 0 3px var(--color-primary-100);
-    width: 240px;
-}
-
-.search-container {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.search-icon {
-    position: absolute;
-    left: 8px;
-    color: #888;
-}
-
-.clear-search-btn {
-    position: absolute;
-    right: 5px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    font-size: 1.2em;
-    color: #888;
-    padding: 0 5px;
-    line-height: 1;
-}
-
-.clear-search-btn:hover {
-    color: var(--color-text);
-}
-
-.search-highlight {
-    background-color: #a2f2a2;
-    border-radius: 2px;
-}
-
-/* --- Modal Informacji o Pacjencie --- */
-.modal-title {
-    margin-top: 0;
-    margin-bottom: 20px;
-    font-size: 1.5em;
-    color: var(--color-text);
-    text-align: center;
-}
-
-.modal-body .form-group {
-    margin-bottom: 15px;
-}
-
-.modal-body label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: bold;
-    color: var(--color-text-light);
-}
-
-.modal-body input[type='text'],
-.modal-body input[type='date'] {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    box-sizing: border-box;
-}
-
-.modal-body input[readonly] {
-    background-color: #f2f2f2;
-    cursor: not-allowed;
-}
-
-/* History Modal */
-.history-list {
-    list-style-type: none;
-    padding: 0;
-    margin: 0;
-}
-
-.history-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-    border-bottom: 1px solid #eee;
-}
-
-.history-item:last-child {
-    border-bottom: none;
-}
-
-.history-value {
-    font-weight: bold;
-    flex-grow: 1;
-}
-
-.history-meta {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    font-size: 0.8em;
-    color: #666;
-    margin-left: 15px;
-    min-width: 120px;
-}
-
-.history-item .revert-btn {
-    margin-left: 15px;
-    padding: 5px 10px;
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
