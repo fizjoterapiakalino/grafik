@@ -13,7 +13,7 @@ const port = process.env.PORT || 3000;
 const corsOptions = {
     origin: process.env.ALLOWED_ORIGINS
         ? process.env.ALLOWED_ORIGINS.split(',')
-        : ['http://localhost:8000', 'https://fizjoterapiakalino.github.io'],
+        : ['http://localhost:8000', 'http://localhost:3000', 'https://fizjoterapiakalino.github.io'],
     optionsSuccessStatus: 200,
 };
 app.use(cors(corsOptions));
