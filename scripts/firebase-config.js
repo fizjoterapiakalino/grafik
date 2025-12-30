@@ -34,17 +34,36 @@ import {
     createUserWithEmailAndPassword,
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
-// Testowa Baza Danych
-const firebaseConfig = {
-  apiKey: 'AIzaSyDNY67dtYOw5z8rDqs_7rfSixsMDDukQEw',
-  authDomain: 'grafikkalinowa.firebaseapp.com',
-  databaseURL: 'https://grafikkalinowa-default-rtdb.europe-west1.firebasedatabase.app',
-  projectId: 'grafikkalinowa',
-  storageBucket: 'grafikkalinowa.firebasestorage.app',
-  messagingSenderId: '531819524737',
-  appId: '1:531819524737:web:bb3f279ef99419095e1380',
-  measurementId: 'G-5X744M8VG5',
+// Testowa Baza Danych (dla localhost / development)
+const testFirebaseConfig = {
+    apiKey: 'AIzaSyDNY67dtYOw5z8rDqs_7rfSixsMDDukQEw',
+    authDomain: 'grafikkalinowa.firebaseapp.com',
+    databaseURL: 'https://grafikkalinowa-default-rtdb.europe-west1.firebasedatabase.app',
+    projectId: 'grafikkalinowa',
+    storageBucket: 'grafikkalinowa.firebasestorage.app',
+    messagingSenderId: '531819524737',
+    appId: '1:531819524737:web:bb3f279ef99419095e1380',
+    measurementId: 'G-5X744M8VG5',
 };
+
+// Produkcyjna Baza Danych (dla GitHub Pages)
+const prodFirebaseConfig = {
+    apiKey: 'AIzaSyCdPhCgZeFYv3fLrd9Xc4AVwBu70cCvlVQ',
+    authDomain: 'grafikkalinowa-c1b41.firebaseapp.com',
+    projectId: 'grafikkalinowa-c1b41',
+    storageBucket: 'grafikkalinowa-c1b41.firebasestorage.app',
+    messagingSenderId: '59665168961',
+    appId: '1:59665168961:web:166b1816b1981b2babe4c0',
+    measurementId: 'G-RXBFWH2CXN',
+};
+
+// Automatyczne wykrywanie środowiska
+const isLocalDevelopment = typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname === '');
+
+const firebaseConfig = isLocalDevelopment ? testFirebaseConfig : prodFirebaseConfig;
 
 // Inicjalizacja Firebase
 const app = initializeApp(firebaseConfig);
@@ -264,4 +283,6 @@ if (typeof window !== 'undefined') {
     };
 }
 
-console.log('Firebase v10.7.1 (modular) initialized with v8 compatibility layer');
+const environmentType = isLocalDevelopment ? 'TESTOWA (localhost)' : 'PRODUKCYJNA (GitHub Pages)';
+console.log(`Firebase v10.7.1 (modular) initialized with v8 compatibility layer`);
+console.log(`🔥 Aktywna baza danych: ${environmentType} (${firebaseConfig.projectId})`);
