@@ -1,298 +1,82 @@
-// scripts/seasonal-themes.js
-/**
- * Moduł zarządzający sezonowymi motywami aplikacji
- *
- * Aby dodać nowy motyw:
- * 1. Dodaj definicję w SEASONAL_THEMES
- * 2. Dodaj funkcję createXxxOverlay w OVERLAY_CREATORS
- * 3. Dodaj style CSS w styles/seasonal.css
- */
+export function applySeasonalTheme() {
+    console.log('Checking seasonal theme...');
+    const now = new Date();
+    const month = now.getMonth(); // 0-11
+    const day = now.getDate(); // 1-31
 
-import { getEasterDate } from './common.js';
+    let theme = null;
 
-/**
- * Konfiguracja dostępnych motywów sezonowych
- * Każdy motyw ma metodę isActive(date) sprawdzającą czy jest aktywny
- */
-const SEASONAL_THEMES = {
-    christmas: {
-        name: 'christmas',
-        description: 'Motyw świąteczny z płatkami śniegu',
-        /**
-         * Aktywny: 1-26 grudnia
-         */
-        isActive: (date) => {
-            const month = date.getMonth();
-            const day = date.getDate();
-            return month === 11 && day >= 1 && day <= 26;
-        },
-    },
-    newyear: {
-        name: 'newyear',
-        description: 'Motyw noworoczny z bąbelkami szampana',
-        /**
-         * Aktywny: 27 grudnia - 15 stycznia
-         */
-        isActive: (date) => {
-            const month = date.getMonth();
-            const day = date.getDate();
-            return (month === 11 && day >= 27) || (month === 0 && day <= 15);
-        },
-    },
-    easter: {
-        name: 'easter',
-        description: 'Motyw wielkanocny',
-        /**
-         * Aktywny: 7 dni przed Wielkanocą do 2 dni po
-         * Wielkanoc jest ruchoma, więc używamy funkcji getEasterDate
-         */
-        isActive: (date) => {
-            const year = date.getFullYear();
-            const easter = getEasterDate(year);
+    // December: 11
+    // January: 0
 
-            // 7 dni przed Wielkanocą
-            const easterStart = new Date(easter);
-            easterStart.setDate(easter.getDate() - 7);
-
-            // 2 dni po Wielkanocy (Poniedziałek Wielkanocny + 1)
-            const easterEnd = new Date(easter);
-            easterEnd.setDate(easter.getDate() + 2);
-
-            return date >= easterStart && date <= easterEnd;
-        },
-    },
-};
-
-/**
- * Funkcje tworzące overlay dla każdego motywu
- */
-const OVERLAY_CREATORS = {
-    christmas: (overlay) => {
-        const snowflakeCount = 20;
-        for (let i = 0; i < snowflakeCount; i++) {
-            const flake = document.createElement('div');
-            flake.className = 'snowflake';
-            flake.textContent = '❄';
-            flake.style.left = Math.random() * 100 + 'vw';
-            flake.style.animationDuration = Math.random() * 5 + 5 + 's';
-            flake.style.animationDelay = Math.random() * 5 + 's';
-            flake.style.fontSize = Math.random() * 10 + 10 + 'px';
-            flake.style.opacity = Math.random() * 0.5 + 0.2;
-            overlay.appendChild(flake);
-        }
-    },
-
-    newyear: (overlay) => {
-        // Konfetti - kolorowe paski i kółka
-        const confettiCount = 25;
-        const confettiColors = ['#FFD700', '#C0C0C0', '#FF4444', '#9B59B6', '#00CED1', '#FF69B4'];
-        const confettiShapes = ['●', '■', '▬', '★'];
-
-        for (let i = 0; i < confettiCount; i++) {
-            const confetti = document.createElement('div');
-            confetti.className = 'newyear-confetti';
-            confetti.textContent = confettiShapes[Math.floor(Math.random() * confettiShapes.length)];
-            confetti.style.left = Math.random() * 100 + 'vw';
-            confetti.style.color = confettiColors[Math.floor(Math.random() * confettiColors.length)];
-            confetti.style.fontSize = Math.random() * 8 + 8 + 'px';
-            confetti.style.animationDuration = Math.random() * 6 + 8 + 's';
-            confetti.style.animationDelay = Math.random() * 10 + 's';
-            confetti.style.setProperty('--rotation', Math.random() * 720 - 360 + 'deg');
-            overlay.appendChild(confetti);
-        }
-
-        // Iskry - złote i srebrne błyski
-        const sparkleCount = 15;
-        for (let i = 0; i < sparkleCount; i++) {
-            const sparkle = document.createElement('div');
-            sparkle.className = 'newyear-sparkle';
-            sparkle.textContent = '✦';
-            sparkle.style.left = Math.random() * 100 + 'vw';
-            sparkle.style.top = Math.random() * 80 + 10 + 'vh';
-            sparkle.style.color = Math.random() > 0.5 ? '#FFD700' : '#C0C0C0';
-            sparkle.style.fontSize = Math.random() * 10 + 8 + 'px';
-            sparkle.style.animationDelay = Math.random() * 5 + 's';
-            overlay.appendChild(sparkle);
-        }
-
-        // Fajerwerki - eksplozje strzałowe
-        const fireworkColors = ['#FFD700', '#FF4444', '#00CED1', '#FF69B4', '#9B59B6', '#00FF00'];
-        const fireworkCount = 4; // Ilość fajerwerków jednocześnie
-
-        const createFirework = () => {
-            const firework = document.createElement('div');
-            firework.className = 'newyear-firework';
-
-            // Losowa pozycja startu (dół ekranu)
-            const startX = Math.random() * 80 + 10; // 10-90% szerokości
-            firework.style.left = startX + 'vw';
-
-            // Losowa pozycja eksplozji (góra ekranu)
-            const endY = Math.random() * 40 + 10; // 10-50% od góry
-            firework.style.setProperty('--end-y', endY + 'vh');
-
-            // Losowy kolor
-            const color = fireworkColors[Math.floor(Math.random() * fireworkColors.length)];
-            firework.style.setProperty('--firework-color', color);
-
-            // Losowe opóźnienie
-            const delay = Math.random() * 8;
-            firework.style.animationDelay = delay + 's';
-
-            overlay.appendChild(firework);
-
-            // Utwórz eksplozję po dotarciu rakiety
-            setTimeout(
-                () => {
-                    createExplosion(startX, endY, color, overlay);
-                },
-                (delay + 1.5) * 1000,
-            ); // 1.5s to czas lotu rakiety
-        };
-
-        const createExplosion = (x, y, color, container) => {
-            const particleCount = 12;
-            const distance = 80; // px
-
-            for (let i = 0; i < particleCount; i++) {
-                const particle = document.createElement('div');
-                particle.className = 'newyear-explosion-particle';
-                particle.style.left = x + 'vw';
-                particle.style.top = y + 'vh';
-                particle.style.backgroundColor = color;
-                particle.style.boxShadow = `0 0 6px ${color}, 0 0 10px ${color}`;
-
-                // Kierunek eksplozji - oblicz w JavaScript
-                const angle = ((i / particleCount) * 360 * Math.PI) / 180;
-                const translateX = Math.cos(angle) * distance;
-                const translateY = Math.sin(angle) * distance;
-
-                particle.style.setProperty('--translate-x', translateX + 'px');
-                particle.style.setProperty('--translate-y', translateY + 'px');
-
-                container.appendChild(particle);
-
-                // Usuń cząstkę po animacji
-                setTimeout(() => particle.remove(), 1500);
-            }
-        };
-
-        // Uruchom początkowe fajerwerki
-        for (let i = 0; i < fireworkCount; i++) {
-            createFirework();
-        }
-
-        // Powtarzaj fajerwerki co jakiś czas
-        setInterval(() => {
-            createFirework();
-        }, 3000);
-    },
-
-    easter: (overlay) => {
-        // Wielkanocne jajka i motylki
-        const symbols = ['🥚', '🐣', '🐰', '🌷', '🦋', '🌸'];
-        const itemCount = 25;
-
-        for (let i = 0; i < itemCount; i++) {
-            const item = document.createElement('div');
-            item.className = 'easter-item';
-            item.textContent = symbols[Math.floor(Math.random() * symbols.length)];
-
-            item.style.left = Math.random() * 100 + 'vw';
-            item.style.animationDuration = Math.random() * 8 + 6 + 's';
-            item.style.animationDelay = Math.random() * 8 + 's';
-            item.style.fontSize = Math.random() * 12 + 14 + 'px';
-            item.style.opacity = Math.random() * 0.4 + 0.3;
-
-            // Losowy kierunek ruchu (w lewo lub prawo podczas spadania)
-            const swayDirection = Math.random() > 0.5 ? 1 : -1;
-            item.style.setProperty('--sway-direction', swayDirection);
-
-            overlay.appendChild(item);
-        }
-    },
-};
-
-/**
- * Określa aktywny motyw dla danej daty
- * @param {Date} date - Data do sprawdzenia
- * @returns {Object|null} - Obiekt motywu lub null
- */
-export function getActiveTheme(date = new Date()) {
-    // Sprawdzaj motywy w kolejności priorytetu
-    const themeOrder = ['christmas', 'newyear', 'easter'];
-
-    for (const themeName of themeOrder) {
-        const theme = SEASONAL_THEMES[themeName];
-        if (theme && theme.isActive(date)) {
-            return theme;
-        }
+    // Christmas: Dec 1 - Dec 26
+    if (month === 11 && day >= 1 && day <= 26) {
+        theme = 'christmas';
+    }
+    // New Year / Winter: Dec 27 - Jan 15
+    else if ((month === 11 && day >= 27) || (month === 0 && day <= 15)) {
+        theme = 'newyear';
     }
 
-    return null;
+    if (theme) {
+        console.log(`Applying theme: ${theme}`);
+        document.body.classList.add(`theme-${theme}`);
+        createSeasonalOverlay(theme);
+    } else {
+        console.log('No seasonal theme active.');
+    }
 }
 
-/**
- * Tworzy overlay sezonowy
- * @param {string} themeName - Nazwa motywu
- */
-function createSeasonalOverlay(themeName) {
-    // Usuń istniejący overlay
+function createSeasonalOverlay(theme) {
     const existingOverlay = document.querySelector('.seasonal-overlay');
     if (existingOverlay) existingOverlay.remove();
 
     const overlay = document.createElement('div');
     overlay.className = 'seasonal-overlay';
 
-    // Wywołaj odpowiednią funkcję tworzącą overlay
-    const creator = OVERLAY_CREATORS[themeName];
-    if (creator) {
-        creator(overlay);
+    if (theme === 'christmas') {
+        // Create snowflakes
+        const snowflakeCount = 20; // Keep it readable, not a blizzard
+        for (let i = 0; i < snowflakeCount; i++) {
+            const flake = document.createElement('div');
+            flake.className = 'snowflake';
+            flake.textContent = '❄';
+            flake.style.left = Math.random() * 100 + 'vw';
+            flake.style.animationDuration = (Math.random() * 5 + 5) + 's'; // 5-10s
+            flake.style.animationDelay = Math.random() * 5 + 's';
+            flake.style.fontSize = (Math.random() * 10 + 10) + 'px';
+            flake.style.opacity = Math.random() * 0.5 + 0.2; // Semi-transparent
+            overlay.appendChild(flake);
+        }
+    } else if (theme === 'newyear') {
+        // Create champagne bubbles
+        const bubbleCount = 40; // Increased count
+        for (let i = 0; i < bubbleCount; i++) {
+            const bubble = document.createElement('div');
+            bubble.className = 'champagne-bubble';
+
+            // Randomize position and size
+            bubble.style.left = (Math.random() * 100) + 'vw';
+
+            const size = Math.random() * 10 + 5; // 5px to 15px
+            bubble.style.width = size + 'px';
+            bubble.style.height = size + 'px';
+
+            // Randomize variables for CSS
+            const duration = (Math.random() * 5 + 5); // 5-10s
+            bubble.style.animation = `rise-and-pop ${duration}s linear infinite`;
+            bubble.style.animationDelay = (Math.random() * 10) + 's';
+
+            // Set CSS custom properties for random behavior
+            const sway = (Math.random() * 40 - 20) + 'px'; // -20px to 20px
+            const popHeight = (Math.random() * 40 + 40) + '%'; // Pops between 40% and 80% screen height
+
+            bubble.style.setProperty('--sway-amount', sway);
+            bubble.style.setProperty('--pop-height', popHeight);
+
+            overlay.appendChild(bubble);
+        }
     }
 
     document.body.appendChild(overlay);
-}
-
-/**
- * Aplikuje sezonowy motyw do strony
- * Eksportowana funkcja główna
- */
-export function applySeasonalTheme() {
-    console.log('Checking seasonal theme...');
-
-    const theme = getActiveTheme();
-
-    if (theme) {
-        console.log(`Applying theme: ${theme.name}`);
-        document.body.classList.add(`theme-${theme.name}`);
-        createSeasonalOverlay(theme.name);
-    } else {
-        console.log('No seasonal theme active.');
-    }
-}
-
-/**
- * Usuwa aktywny motyw sezonowy
- */
-export function removeSeasonalTheme() {
-    // Usuń klasy motywów z body
-    Object.keys(SEASONAL_THEMES).forEach((themeName) => {
-        document.body.classList.remove(`theme-${themeName}`);
-    });
-
-    // Usuń overlay
-    const overlay = document.querySelector('.seasonal-overlay');
-    if (overlay) overlay.remove();
-}
-
-/**
- * Zwraca listę dostępnych motywów (do debugowania/testowania)
- */
-export function getAvailableThemes() {
-    return Object.entries(SEASONAL_THEMES).map(([key, theme]) => ({
-        key,
-        name: theme.name,
-        description: theme.description,
-        isCurrentlyActive: theme.isActive(new Date()),
-    }));
 }
