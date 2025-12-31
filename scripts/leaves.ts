@@ -744,7 +744,21 @@ export const Leaves: LeavesAPI = (() => {
                     const leaveOption = document.querySelector(`#leaveTypeSelect option[value="${leave.type || 'vacation'}"]`);
                     const leaveTypeName = leaveOption ? leaveOption.textContent : 'Urlop';
 
-                    div.setAttribute('title', leaveTypeName || 'Urlop');
+                    // Format dates for display
+                    const formatDate = (d: Date): string => {
+                        return `${d.getUTCDate().toString().padStart(2, '0')}.${(d.getUTCMonth() + 1).toString().padStart(2, '0')}.${d.getUTCFullYear()}`;
+                    };
+
+                    // Check if leave spans multiple months
+                    const isMultiMonth = start.getUTCMonth() !== end.getUTCMonth() || start.getUTCFullYear() !== end.getUTCFullYear();
+
+                    // Enhanced tooltip with full date range for multi-month leaves
+                    let tooltipText = leaveTypeName || 'Urlop';
+                    if (isMultiMonth) {
+                        tooltipText = `${leaveTypeName}: ${formatDate(start)} - ${formatDate(end)}`;
+                        div.setAttribute('data-full-range', `${formatDate(start)} - ${formatDate(end)}`);
+                    }
+                    div.setAttribute('title', tooltipText);
                     div.style.backgroundColor = bgColor;
 
                     if (start < monthStart) div.classList.add('continues-left');
@@ -759,7 +773,19 @@ export const Leaves: LeavesAPI = (() => {
                         text += `-${displayEnd}`;
                     }
 
-                    div.innerHTML = text;
+                    // Create text span for proper centering
+                    const textSpan = document.createElement('span');
+                    textSpan.textContent = text;
+                    div.appendChild(textSpan);
+
+                    // Add date badge for multi-month leaves (shows on hover)
+                    if (isMultiMonth && (start < monthStart || end > monthEnd)) {
+                        const badge = document.createElement('span');
+                        badge.className = 'leave-date-badge';
+                        badge.textContent = `${formatDate(start)} → ${formatDate(end)}`;
+                        div.appendChild(badge);
+                    }
+
                     cell.appendChild(div);
                     cell.classList.add('has-content');
                 } else {

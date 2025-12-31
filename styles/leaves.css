@@ -119,70 +119,250 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     box-shadow: inset 0 0 0 2px var(--color-secondary);
 }
 
+/* ==========================================
+   Timeline Ribbon - Leave Block Styles
+   ========================================== */
+
 .leave-block {
-    background-color: #ffab91;
-    /* This might be dynamic based on user color, check logic */
+    /* Base styling */
     color: var(--color-text);
-    padding: 2px 6px;
-    border-radius: 4px;
+    padding: 2px 10px;
+    border-radius: 6px;
     font-size: 0.85em;
+    font-weight: 500;
     margin-bottom: 3px;
     white-space: nowrap;
-    overflow: hidden;
+    overflow: visible;
     text-overflow: ellipsis;
-    box-shadow: var(--shadow-sm);
-    transition: transform 0.1s;
     position: relative;
     z-index: 1;
-    height: 24px;
-    line-height: 20px;
+    height: 26px;
+    line-height: 22px;
     box-sizing: border-box;
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    /* Enhanced shadow for depth */
+    box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.15),
+        0 1px 2px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+
+    /* Smooth transitions */
+    transition:
+        transform 0.15s ease-out,
+        box-shadow 0.15s ease-out,
+        z-index 0s;
+
+    /* Text shadow for better readability */
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+}
+
+/* Gradient overlay for ribbon effect */
+.leave-block::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(to bottom,
+            rgba(255, 255, 255, 0.25) 0%,
+            rgba(255, 255, 255, 0.05) 100%);
+    border-radius: 6px 6px 0 0;
+    pointer-events: none;
 }
 
 .leave-spacer {
-    height: 24px;
-    line-height: 20px;
+    height: 26px;
+    line-height: 22px;
     box-sizing: border-box;
     font-size: 0.85em;
     margin-bottom: 3px;
-    padding: 2px 6px;
+    padding: 2px 10px;
     visibility: hidden;
     display: block;
 }
 
+/* ==========================================
+   Continuation Styles - Left Side
+   ========================================== */
 .leave-block.continues-left {
-    margin-left: -15px;
+    margin-left: -16px;
+    padding-left: 20px;
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
-    padding-left: 15px;
-    width: auto;
+
+    /* Chevron/arrow effect on left edge */
+    clip-path: polygon(8px 0%,
+            100% 0%,
+            100% 100%,
+            8px 100%,
+            0% 50%);
 }
 
+/* Left continuation indicator arrow */
+.leave-block.continues-left::after {
+    content: '◂';
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.7em;
+    opacity: 0.7;
+    color: inherit;
+    text-shadow: none;
+}
+
+/* Adjust gradient for left continuation */
+.leave-block.continues-left::before {
+    border-radius: 0 6px 0 0;
+    clip-path: polygon(8px 0%,
+            100% 0%,
+            100% 50%,
+            8px 50%,
+            0% 25%);
+}
+
+/* ==========================================
+   Continuation Styles - Right Side
+   ========================================== */
 .leave-block.continues-right {
-    margin-right: -15px;
+    margin-right: -16px;
+    padding-right: 20px;
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
-    padding-right: 15px;
-    width: auto;
+
+    /* Chevron/arrow effect on right edge */
+    clip-path: polygon(0% 0%,
+            calc(100% - 8px) 0%,
+            100% 50%,
+            calc(100% - 8px) 100%,
+            0% 100%);
 }
 
+/* Right continuation indicator arrow */
+.leave-block.continues-right .continuation-arrow-right {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.7em;
+    opacity: 0.7;
+    color: inherit;
+}
+
+/* Adjust gradient for right continuation */
+.leave-block.continues-right::before {
+    border-radius: 6px 0 0 0;
+    clip-path: polygon(0% 0%,
+            calc(100% - 8px) 0%,
+            100% 25%,
+            calc(100% - 8px) 50%,
+            0% 50%);
+}
+
+/* ==========================================
+   Both Sides Continuation (Middle Segment)
+   ========================================== */
 .leave-block.continues-left.continues-right {
-    margin-left: -15px;
-    margin-right: -15px;
-    width: auto;
-    padding-left: 15px;
-    padding-right: 15px;
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+    border-radius: 0;
+
+    /* Double chevron - flows through */
+    clip-path: polygon(8px 0%,
+            calc(100% - 8px) 0%,
+            100% 50%,
+            calc(100% - 8px) 100%,
+            8px 100%,
+            0% 50%);
 }
 
+/* Gradient for middle segment */
+.leave-block.continues-left.continues-right::before {
+    border-radius: 0;
+    clip-path: polygon(8px 0%,
+            calc(100% - 8px) 0%,
+            100% 25%,
+            calc(100% - 8px) 50%,
+            8px 50%,
+            0% 25%);
+}
+
+/* ==========================================
+   Hover Effects
+   ========================================== */
 .leave-block:hover {
-    transform: scale(1.02);
-    z-index: 2;
-    position: relative;
+    transform: translateY(-2px) scale(1.02);
+    z-index: 10;
+    box-shadow:
+        0 6px 12px rgba(0, 0, 0, 0.2),
+        0 3px 6px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
+/* Pulsing animation for multi-month leaves */
+@keyframes ribbon-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.85;
+    }
+}
+
+.leave-block.continues-left:hover,
+.leave-block.continues-right:hover {
+    animation: ribbon-pulse 1.5s ease-in-out infinite;
+}
+
+/* ==========================================
+   Tooltip Enhancement for Date Range
+   ========================================== */
+.leave-block[data-full-range]::after {
+    content: none;
+    /* Override arrow if tooltip exists */
+}
+
+.leave-block.continues-left[data-full-range]::after,
+.leave-block.continues-right[data-full-range]::after {
+    content: '◂';
+}
+
+/* Date range badge for continuation blocks */
+.leave-date-badge {
+    position: absolute;
+    bottom: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.75);
+    color: white;
+    font-size: 0.65em;
+    padding: 2px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 100;
+}
+
+.leave-block:hover .leave-date-badge {
+    opacity: 1;
+}
+
+/* Arrow styling (legacy support) */
 .arrow {
     font-weight: bold;
+    font-size: 0.8em;
+    opacity: 0.8;
 }
 
 /* Modal kalendarza */
@@ -451,7 +631,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     transition: border-color 0.2s ease-in-out;
 }
 
-.leaves-filter-container .filter-checkbox:checked + .legend-color-box {
+.leaves-filter-container .filter-checkbox:checked+.legend-color-box {
     border-color: #333;
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.2);
 }
@@ -651,7 +831,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     /* Hide non-printable elements */
     .app-header,
     .view-tabs,
-    .leaves-filter-container > *:not(.leaves-legend),
+    .leaves-filter-container>*:not(.leaves-legend),
     #contextMenu,
     #loadingOverlay,
     #toast-container,
@@ -828,7 +1008,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
         /* Allow wrapping if many leaves */
     }
 
-    .day-cell > div {
+    .day-cell>div {
         flex: 0 0 auto;
         /* Stop them from taking full width unless needed */
     }
