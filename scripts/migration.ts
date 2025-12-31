@@ -1,4 +1,5 @@
 // scripts/migration.ts
+import { debugLog } from './common.js';
 import { db as dbRaw } from './firebase-config.js';
 import type { FirestoreDbWrapper } from './types/firebase';
 
@@ -47,7 +48,7 @@ export const Migration: MigrationAPI = (() => {
                 { merge: true }
             );
 
-            console.log('Migracja zakończona pomyślnie!');
+            debugLog('Migracja zakończona pomyślnie!');
             window.showToast('Dane grafiku zostały pomyślnie przeniesione do mainSchedule!', 5000);
         } catch (error) {
             console.error('Wystąpił błąd podczas migracji:', error);

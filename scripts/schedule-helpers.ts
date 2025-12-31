@@ -6,42 +6,7 @@
 
 import { safeCopy, safeBool } from './utils.js';
 import { ScheduleLogic } from './schedule-logic.js';
-
-/**
- * Stan komórki harmonogramu
- */
-interface CellState {
-    content?: string;
-    content1?: string;
-    content2?: string;
-    isSplit?: boolean;
-    isMassage?: boolean;
-    isPnf?: boolean;
-    isEveryOtherDay?: boolean;
-    isMassage1?: boolean;
-    isMassage2?: boolean;
-    isPnf1?: boolean;
-    isPnf2?: boolean;
-    isEveryOtherDay1?: boolean;
-    isEveryOtherDay2?: boolean;
-    treatmentStartDate?: string;
-    treatmentExtensionDays?: number;
-    treatmentEndDate?: string;
-    additionalInfo?: string | null;
-    treatmentData1?: TreatmentData;
-    treatmentData2?: TreatmentData;
-    [key: string]: unknown;
-}
-
-/**
- * Dane leczenia
- */
-interface TreatmentData {
-    startDate?: string;
-    extensionDays?: number;
-    endDate?: string;
-    additionalInfo?: string | null;
-}
+import type { CellState, TreatmentData } from './types/index.js';
 
 /**
  * Określa numer części podzielonej komórki (1 lub 2) na podstawie elementu DOM
@@ -268,7 +233,7 @@ const updateSplitCellPart = (
 
     const treatmentData = cellState[`treatmentData${part}`] as TreatmentData | undefined;
     if (treatmentData?.startDate) {
-        treatmentData.endDate = ScheduleLogic.calculateEndDate(treatmentData.startDate, treatmentData.extensionDays);
+        treatmentData.endDate = ScheduleLogic.calculateEndDate(treatmentData.startDate, treatmentData.extensionDays ?? undefined);
     }
 };
 

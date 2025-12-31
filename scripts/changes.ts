@@ -1,4 +1,5 @@
 // scripts/changes.ts
+import { debugLog } from './common.js';
 import { db as dbRaw } from './firebase-config.js';
 import { AppConfig } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
@@ -506,7 +507,7 @@ export const Changes: ChangesAPI = (() => {
         if (window.destroyContextMenu) {
             window.destroyContextMenu('changesContextMenu');
         }
-        console.log('Changes module destroyed');
+        debugLog('Changes module destroyed');
     };
 
     return { init, destroy };

@@ -1,48 +1,9 @@
 // scripts/schedule-events.ts
+import { debugLog } from './common.js';
 import { AppConfig } from './common.js';
 import { initializeContextMenu, destroyContextMenu } from './context-menu.js';
 import { safeCopy, safeBool } from './utils.js';
-
-/**
- * Stan komórki harmonogramu
- */
-interface CellState {
-    content?: string | null;
-    content1?: string | null;
-    content2?: string | null;
-    isSplit?: boolean | null;
-    isBreak?: boolean | null;
-    isMassage?: boolean | null;
-    isPnf?: boolean | null;
-    isEveryOtherDay?: boolean | null;
-    isMassage1?: boolean | null;
-    isMassage2?: boolean | null;
-    isPnf1?: boolean | null;
-    isPnf2?: boolean | null;
-    isEveryOtherDay1?: boolean | null;
-    isEveryOtherDay2?: boolean | null;
-    treatmentStartDate?: string | null;
-    treatmentExtensionDays?: number | null;
-    treatmentEndDate?: string | null;
-    additionalInfo?: string | null;
-    treatmentData1?: TreatmentData | null;
-    treatmentData2?: TreatmentData | null;
-    history?: HistoryEntry[];
-    [key: string]: unknown;
-}
-
-interface TreatmentData {
-    startDate?: string | null;
-    extensionDays?: number | null;
-    endDate?: string | null;
-    additionalInfo?: string | null;
-}
-
-interface HistoryEntry {
-    oldValue: string;
-    timestamp: string;
-    userId: string;
-}
+import type { CellState } from './types/index.js';
 
 interface AppState {
     scheduleCells: Record<string, Record<string, CellState>>;
@@ -808,7 +769,7 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
         destroyContextMenu('contextMenu');
 
         activeCell = null;
-        console.log('ScheduleEvents destroyed');
+        debugLog('ScheduleEvents destroyed');
     };
 
     return {

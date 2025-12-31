@@ -1,10 +1,12 @@
 // scripts/leaves.ts
+import { debugLog } from './common.js';
 import { db as dbRaw } from './firebase-config.js';
 import { AppConfig, hideLoadingOverlay, UndoManager } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
 import { LeavesSummary } from './leaves-summary.js';
 import { LeavesCareSummary } from './leaves-care-summary.js';
 import { CalendarModal } from './calendar-modal.js';
+import { toUTCDate } from './utils.js';
 import type { FirestoreDbWrapper } from './types/firebase';
 import type { Employee, LeaveEntry } from './types';
 
@@ -173,11 +175,6 @@ export const Leaves: LeavesAPI = (() => {
         }
     };
 
-    const toUTCDate = (dateString: string): Date => {
-        const [year, month, day] = dateString.split('-').map(Number);
-        return new Date(Date.UTC(year, month - 1, day));
-    };
-
     const refreshCurrentView = async (): Promise<void> => {
         if (monthlyViewBtn?.classList.contains('active')) {
             await showMonthlyView();
@@ -323,8 +320,10 @@ export const Leaves: LeavesAPI = (() => {
         if (window.destroyContextMenu) {
             window.destroyContextMenu('contextMenu');
         }
+
+        CalendarModal.destroy();
         activeCell = null;
-        console.log('Leaves module destroyed');
+        debugLog('Leaves module destroyed');
     };
 
     const openCalendarForCell = async (cell: HTMLTableCellElement | null): Promise<void> => {
@@ -351,7 +350,7 @@ export const Leaves: LeavesAPI = (() => {
             await saveLeavesData(employeeName, updatedLeaves);
             renderSingleEmployeeLeaves(employeeName, updatedLeaves);
         } catch (error) {
-            console.log('Operacja w kalendarzu została anulowana.', error);
+            debugLog('Operacja w kalendarzu została anulowana.', error);
             if (error !== 'Modal closed without confirmation') {
                 window.showToast('Anulowano zmiany.', 2000);
             }

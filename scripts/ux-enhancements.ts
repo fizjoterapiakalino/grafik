@@ -1,4 +1,6 @@
 // scripts/ux-enhancements.ts
+import { debugLog } from './common.js';
+
 /**
  * Moduł ulepszeń UX
  * - Skróty klawiszowe
@@ -82,7 +84,7 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
             }
         });
 
-        console.log('UXEnhancements: Skróty klawiszowe zainicjowane');
+        debugLog('UXEnhancements: Skróty klawiszowe zainicjowane');
     };
 
     /**
@@ -283,7 +285,7 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
             observer.observe(pageContent, { childList: true });
         }
 
-        console.log('UXEnhancements: Animacje przejść zainicjowane');
+        debugLog('UXEnhancements: Animacje przejść zainicjowane');
     };
 
     /**
@@ -292,7 +294,7 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
     const init = (): void => {
         initKeyboardShortcuts();
         initPageTransitions();
-        console.log('UXEnhancements: Moduł zainicjowany');
+        debugLog('UXEnhancements: Moduł zainicjowany');
     };
 
     /**

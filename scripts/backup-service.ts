@@ -1,4 +1,5 @@
 // scripts/backup-service.ts
+import { debugLog } from './common.js';
 import { db as dbRaw } from './firebase-config.js';
 import type { FirestoreDbWrapper } from './types/firebase';
 
@@ -55,7 +56,7 @@ export const BackupService: BackupServiceAPI = (() => {
             if (!silent) {
                 window.showToast('Kopia zapasowa utworzona pomyślnie!', 3000);
             } else {
-                console.log('Automatyczna kopia zapasowa została wykonana.');
+                debugLog('Automatyczna kopia zapasowa została wykonana.');
             }
 
             return true;

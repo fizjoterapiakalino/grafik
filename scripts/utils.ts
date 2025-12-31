@@ -1,41 +1,10 @@
 // scripts/utils.ts
 // Centralne funkcje pomocnicze używane w całej aplikacji
 
-/**
- * Dane leczenia dla pojedynczej komórki lub części split
- */
-export interface TreatmentData {
-    startDate?: string | null;
-    extensionDays?: number | null;
-    endDate?: string | null;
-    additionalInfo?: string | null;
-}
+import type { TreatmentData, CellState } from './types/index.js';
 
-/**
- * Stan komórki z danymi zawartości
- */
-export interface CellState {
-    content?: string | null;
-    content1?: string | null;
-    content2?: string | null;
-    isSplit?: boolean | null;
-    isMassage?: boolean | null;
-    isMassage1?: boolean | null;
-    isMassage2?: boolean | null;
-    isPnf?: boolean | null;
-    isPnf1?: boolean | null;
-    isPnf2?: boolean | null;
-    isEveryOtherDay?: boolean | null;
-    isEveryOtherDay1?: boolean | null;
-    isEveryOtherDay2?: boolean | null;
-    treatmentStartDate?: string | null;
-    treatmentExtensionDays?: number | null;
-    treatmentEndDate?: string | null;
-    additionalInfo?: string | null;
-    treatmentData1?: TreatmentData | null;
-    treatmentData2?: TreatmentData | null;
-    [key: string]: unknown; // Allow dynamic access
-}
+// Re-eksportuj typy dla kompatybilności wstecznej
+export type { TreatmentData, CellState } from './types/index.js';
 
 /**
  * Bezpiecznie kopiuje wartość, zwracając null jeśli wartość jest undefined.
@@ -143,4 +112,65 @@ export const copyTreatmentData = (
         );
         target.additionalInfo = safeCopy(treatmentData.additionalInfo);
     }
+};
+
+// ==========================================
+// Funkcje pomocnicze dla dat UTC
+// ==========================================
+
+/**
+ * Konwertuje string daty (YYYY-MM-DD) na obiekt Date w UTC.
+ * Ważne: używaj tej funkcji zamiast new Date(string) aby uniknąć
+ * problemów ze strefami czasowymi.
+ * 
+ * @param dateString - Data w formacie YYYY-MM-DD
+ * @returns Obiekt Date z czasem 00:00:00 UTC
+ * 
+ * @example
+ * toUTCDate('2025-12-31') // Date: 2025-12-31T00:00:00.000Z
+ */
+export const toUTCDate = (dateString: string): Date => {
+    const [year, month, day] = dateString.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day));
+};
+
+/**
+ * Konwertuje obiekt Date na string w formacie YYYY-MM-DD.
+ * Używa UTC aby uniknąć problemów ze strefami czasowymi.
+ * 
+ * @param date - Obiekt Date
+ * @returns String w formacie YYYY-MM-DD
+ * 
+ * @example
+ * toDateString(new Date(Date.UTC(2025, 11, 31))) // '2025-12-31'
+ */
+export const toDateString = (date: Date): string => {
+    return date.toISOString().split('T')[0];
+};
+
+/**
+ * Formatuje datę do formatu DD.MM.YYYY (polski format wyświetlania).
+ * 
+ * @param date - Obiekt Date
+ * @returns String w formacie DD.MM.YYYY
+ * 
+ * @example
+ * formatDatePL(new Date(Date.UTC(2025, 11, 31))) // '31.12.2025'
+ */
+export const formatDatePL = (date: Date): string => {
+    const day = date.getUTCDate().toString().padStart(2, '0');
+    const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+    const year = date.getUTCFullYear();
+    return `${day}.${month}.${year}`;
+};
+
+/**
+ * Sprawdza czy dany dzień jest dniem roboczym (Pn-Pt).
+ * 
+ * @param date - Obiekt Date
+ * @returns true jeśli dzień roboczy, false jeśli weekend
+ */
+export const isWorkday = (date: Date): boolean => {
+    const day = date.getUTCDay();
+    return day !== 0 && day !== 6;
 };

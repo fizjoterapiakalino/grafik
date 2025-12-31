@@ -3,41 +3,9 @@ import { db as dbRaw } from './firebase-config.js';
 import { AppConfig, UndoManager } from './common.js';
 import { validateCellState, sanitizeCellState } from './data-validation.js';
 import type { FirestoreDbWrapper } from './types/firebase';
+import type { CellState, ScheduleHistoryEntry, ScheduleAppState } from './types/index.js';
 
 const db = dbRaw as unknown as FirestoreDbWrapper;
-
-/**
- * Wpis historii komórki
- */
-interface HistoryEntry {
-    oldValue: string;
-    timestamp: string;
-    userId: string | null;
-}
-
-/**
- * Stan komórki harmonogramu
- */
-interface CellState {
-    content?: string;
-    content1?: string;
-    content2?: string;
-    isSplit?: boolean;
-    history?: HistoryEntry[];
-    [key: string]: unknown;
-}
-
-/**
- * Mapa komórek harmonogramu
- */
-type ScheduleCells = Record<string, Record<string, CellState>>;
-
-/**
- * Stan aplikacji
- */
-interface AppState {
-    scheduleCells: ScheduleCells;
-}
 
 /**
  * Aktualizacja komórki
@@ -58,11 +26,11 @@ interface ScheduleDataAPI {
     saveSchedule(): Promise<void>;
     updateCellState(time: string, employeeIndex: string, updateFn: (state: CellState) => void): void;
     updateMultipleCells(updates: CellUpdate[]): void;
-    getCurrentTableState(): AppState;
+    getCurrentTableState(): ScheduleAppState;
     getCellState(time: string, employeeIndex: string): CellState | undefined;
     undo(): void;
     destroy(): void;
-    getAppState(): AppState;
+    getAppState(): ScheduleAppState;
     pushCurrentState(): void;
 }
 
@@ -70,7 +38,7 @@ interface ScheduleDataAPI {
  * Moduł danych harmonogramu
  */
 export const ScheduleData: ScheduleDataAPI = (() => {
-    let appState: AppState = {
+    let appState: ScheduleAppState = {
         scheduleCells: {},
     };
     let undoManager: InstanceType<typeof UndoManager>;
@@ -99,7 +67,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
             return;
         }
 
-        const historyEntry: HistoryEntry = {
+        const historyEntry: ScheduleHistoryEntry = {
             oldValue: oldContent,
             timestamp: new Date().toISOString(),
             userId: currentUserId,
@@ -144,7 +112,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
         unsubscribeSchedule = docRef.onSnapshot(
             (doc) => {
                 if (doc.exists) {
-                    const savedData = doc.data() as AppState | undefined;
+                    const savedData = doc.data() as ScheduleAppState | undefined;
                     if (savedData?.scheduleCells && Object.keys(savedData.scheduleCells).length > 0) {
                         appState.scheduleCells = savedData.scheduleCells;
                     } else {
@@ -214,7 +182,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
         const oldContent = cellState.isSplit
             ? `${cellState.content1 || ''}/${cellState.content2 || ''}`
             : cellState.content;
-        _updateCellHistory(cellState, oldContent);
+        _updateCellHistory(cellState, oldContent ?? undefined);
 
         updateFn(cellState);
 
@@ -239,7 +207,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
             const oldContent = cellState.isSplit
                 ? `${cellState.content1 || ''}/${cellState.content2 || ''}`
                 : cellState.content;
-            _updateCellHistory(cellState, oldContent);
+            _updateCellHistory(cellState, oldContent ?? undefined);
 
             updateFn(cellState);
 
@@ -255,14 +223,14 @@ export const ScheduleData: ScheduleDataAPI = (() => {
         saveSchedule();
     };
 
-    const getCurrentTableState = (): AppState => JSON.parse(JSON.stringify(appState));
+    const getCurrentTableState = (): ScheduleAppState => JSON.parse(JSON.stringify(appState));
 
     const getCellState = (time: string, employeeIndex: string): CellState | undefined => {
         return appState.scheduleCells[time]?.[employeeIndex];
     };
 
     const undo = (): void => {
-        const prevState = undoManager.undo() as AppState | null;
+        const prevState = undoManager.undo() as ScheduleAppState | null;
         if (prevState) {
             appState.scheduleCells = prevState.scheduleCells;
             notifyChange();
@@ -276,7 +244,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
         }
     };
 
-    const getAppState = (): AppState => appState;
+    const getAppState = (): ScheduleAppState => appState;
 
     const pushCurrentState = (): void => {
         undoManager.pushState(getCurrentTableState());

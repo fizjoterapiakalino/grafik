@@ -1,4 +1,5 @@
 // scripts/context-menu.ts
+import { debugLog } from './common.js';
 
 /**
  * Konfiguracja elementu menu kontekstowego
@@ -178,7 +179,7 @@ export const destroyContextMenu = (menuId: string): void => {
             }
         });
         delete contextMenuInstances[menuId];
-        console.log(`Context menu ${menuId} destroyed.`);
+        debugLog(`Context menu ${menuId} destroyed.`);
     }
 };
 

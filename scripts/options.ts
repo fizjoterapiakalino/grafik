@@ -1,4 +1,5 @@
 // scripts/options.ts
+import { debugLog } from './common.js';
 import { db as dbRaw, auth as authRaw, FieldValue } from './firebase-config.js';
 import { EmployeeManager } from './employee-manager.js';
 import { BackupService } from './backup-service.js';
@@ -493,7 +494,7 @@ export const Options: OptionsAPI = (() => {
         clearUidBtn?.removeEventListener('click', handleClearUid);
         createBackupBtn?.removeEventListener('click', createBackup);
         restoreBackupBtn?.removeEventListener('click', handleRestoreBackup);
-        console.log('Options module destroyed');
+        debugLog('Options module destroyed');
     };
 
     return { init, destroy };

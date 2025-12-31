@@ -115,6 +115,48 @@ export const AppConfig: AppConfigType = {
     undoManager: {
         maxStates: 20,
     },
+    debug: false, // Ustaw na true dla trybu deweloperskiego
+};
+
+/**
+ * Funkcja pomocnicza do warunkowego logowania (tylko w trybie debug)
+ */
+export const debugLog = (...args: unknown[]): void => {
+    if (AppConfig.debug) {
+        console.log('[DEBUG]', ...args);
+    }
+};
+
+/**
+ * Debounce - opóźnia wykonanie funkcji do momentu, gdy użytkownik
+ * przestanie wywoływać akcję przez określony czas.
+ * 
+ * @param fn - Funkcja do wywołania
+ * @param delay - Opóźnienie w milisekundach (domyślnie 300ms)
+ * @returns Nowa funkcja z debounce
+ * 
+ * @example
+ * const debouncedSearch = debounce((term: string) => {
+ *   console.log('Searching for:', term);
+ * }, 300);
+ * 
+ * input.addEventListener('input', (e) => debouncedSearch(e.target.value));
+ */
+export const debounce = <T extends (...args: Parameters<T>) => void>(
+    fn: T,
+    delay: number = 300
+): ((...args: Parameters<T>) => void) => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    return (...args: Parameters<T>): void => {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+        timeoutId = setTimeout(() => {
+            fn(...args);
+            timeoutId = null;
+        }, delay);
+    };
 };
 
 export const months: readonly string[] = [
