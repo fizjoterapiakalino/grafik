@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 export default defineConfig({
     // Ustawienie bazy dla GitHub Pages (nazwa repozytorium)
@@ -10,6 +11,26 @@ export default defineConfig({
 
     // Katalog publiczny (statyczne assety)
     publicDir: 'public',
+
+    // Pluginy
+    plugins: [
+        viteStaticCopy({
+            targets: [
+                {
+                    src: 'pages/*',
+                    dest: 'pages',
+                },
+                {
+                    src: 'styles/*',
+                    dest: 'styles',
+                },
+                {
+                    src: 'logo.png',
+                    dest: '.',
+                },
+            ],
+        }),
+    ],
 
     // Konfiguracja serwera deweloperskiego
     server: {
