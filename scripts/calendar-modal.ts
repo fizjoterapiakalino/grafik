@@ -1,5 +1,7 @@
 // scripts/calendar-modal.ts
+import { debugLog } from './common.js';
 import { AppConfig, months, isHoliday } from './common.js';
+import { toUTCDate, toDateString } from './utils.js';
 
 /**
  * Granice urlopowe
@@ -32,6 +34,7 @@ interface LeaveInput {
  */
 interface CalendarModalAPI {
     init(): void;
+    destroy(): void;
     open(
         employeeName: string,
         existingLeaves: LeaveInput[],
@@ -69,15 +72,6 @@ export const CalendarModal: CalendarModalAPI = (() => {
 
     let _resolvePromise: ((value: LeaveResult[]) => void) | null = null;
     let _rejectPromise: ((reason: string) => void) | null = null;
-
-    const toUTCDate = (dateString: string): Date => {
-        const [year, month, day] = dateString.split('-').map(Number);
-        return new Date(Date.UTC(year, month - 1, day));
-    };
-
-    const toDateString = (date: Date): string => {
-        return date.toISOString().split('T')[0];
-    };
 
     const countWorkdaysInSet = (datesSet: Set<string>): number => {
         let workdays = 0;
@@ -415,6 +409,17 @@ export const CalendarModal: CalendarModalAPI = (() => {
         _rejectPromise = null;
     };
 
+    // Handler referencje dla poprawnego usuwania listenerów
+    const handleClearSelection = (): void => {
+        resetSelection();
+        updateAllDayCells();
+        updateSelectionPreview();
+    };
+
+    const handleModalBackdropClick = (event: Event): void => {
+        if (event.target === modal) closeModal();
+    };
+
     const setupEventListeners = (): void => {
         if (!calendarSlider || !confirmBtn || !cancelBtn || !clearSelectionBtn || !modal || !leaveTypeSelect) return;
 
@@ -422,16 +427,22 @@ export const CalendarModal: CalendarModalAPI = (() => {
         calendarSlider.addEventListener('mouseover', handleDayMouseOver);
         confirmBtn.addEventListener('click', confirmSelection);
         cancelBtn.addEventListener('click', closeModal);
-        clearSelectionBtn.addEventListener('click', () => {
-            resetSelection();
-            updateAllDayCells();
-            updateSelectionPreview();
-        });
-        modal.addEventListener('click', (event) => {
-            if (event.target === modal) closeModal();
-        });
+        clearSelectionBtn.addEventListener('click', handleClearSelection);
+        modal.addEventListener('click', handleModalBackdropClick);
 
         leaveTypeSelect.addEventListener('change', updateLeaveTypeIndicator);
+    };
+
+    const removeEventListeners = (): void => {
+        if (calendarSlider) {
+            calendarSlider.removeEventListener('click', handleDayClick);
+            calendarSlider.removeEventListener('mouseover', handleDayMouseOver);
+        }
+        if (confirmBtn) confirmBtn.removeEventListener('click', confirmSelection);
+        if (cancelBtn) cancelBtn.removeEventListener('click', closeModal);
+        if (clearSelectionBtn) clearSelectionBtn.removeEventListener('click', handleClearSelection);
+        if (modal) modal.removeEventListener('click', handleModalBackdropClick);
+        if (leaveTypeSelect) leaveTypeSelect.removeEventListener('change', updateLeaveTypeIndicator);
     };
 
     const init = (): void => {
@@ -477,7 +488,26 @@ export const CalendarModal: CalendarModalAPI = (() => {
         });
     };
 
-    return { init, open };
+    const destroy = (): void => {
+        removeEventListeners();
+        modal = null;
+        prevMonthBtn = null;
+        nextMonthBtn = null;
+        confirmBtn = null;
+        cancelBtn = null;
+        clearSelectionBtn = null;
+        startDatePreview = null;
+        endDatePreview = null;
+        calendarSlider = null;
+        workdaysCounter = null;
+        leaveTypeSelect = null;
+        leaveTypeColorIndicator = null;
+        _resolvePromise = null;
+        _rejectPromise = null;
+        debugLog('CalendarModal destroyed');
+    };
+
+    return { init, open, destroy };
 })();
 
 // Backward compatibility

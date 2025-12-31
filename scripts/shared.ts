@@ -1,4 +1,5 @@
 // scripts/shared.ts
+import { debounce } from './common.js';
 
 /**
  * Link nawigacyjny
@@ -190,13 +191,22 @@ export const Shared: SharedAPI = (() => {
             const clearSearchButton = document.getElementById('clearSearchButton');
 
             if (searchInput) {
+                // Debounced search - czeka 250ms po ostatnim naciśnięciu klawisza
+                const debouncedSearch = debounce((searchTerm: string) => {
+                    document.dispatchEvent(new CustomEvent('app:search', { detail: { searchTerm } }));
+                }, 250);
+
                 searchInput.addEventListener('input', (e: Event) => {
                     const target = e.target as HTMLInputElement;
                     const searchTerm = target.value.trim();
-                    document.dispatchEvent(new CustomEvent('app:search', { detail: { searchTerm } }));
+
+                    // Natychmiastowa aktualizacja UI (przycisk czyszczenia)
                     if (clearSearchButton) {
                         clearSearchButton.style.display = searchTerm ? 'block' : 'none';
                     }
+
+                    // Opóźnione wyszukiwanie
+                    debouncedSearch(searchTerm);
                 });
             }
 
@@ -206,6 +216,7 @@ export const Shared: SharedAPI = (() => {
                         searchInput.value = '';
                         searchInput.focus();
                     }
+                    // Czyszczenie nie wymaga debounce - wykonaj natychmiast
                     document.dispatchEvent(new CustomEvent('app:search', { detail: { searchTerm: '' } }));
                     clearSearchButton.style.display = 'none';
                 });

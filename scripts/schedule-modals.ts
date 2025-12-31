@@ -2,6 +2,7 @@
 import { EmployeeManager } from './employee-manager.js';
 import { ScheduleUI } from './schedule-ui.js';
 import { ScheduleLogic } from './schedule-logic.js';
+import type { CellState } from './types/index.js';
 
 /**
  * Informacja o duplikacie
@@ -9,31 +10,6 @@ import { ScheduleLogic } from './schedule-logic.js';
 interface DuplicateInfo {
     employeeIndex: string;
     time: string;
-}
-
-/**
- * Stan komórki
- */
-interface CellState {
-    content?: string;
-    content1?: string;
-    content2?: string;
-    isSplit?: boolean;
-    treatmentStartDate?: string;
-    treatmentExtensionDays?: number;
-    treatmentEndDate?: string;
-    additionalInfo?: string;
-    history?: HistoryEntry[];
-    [key: string]: unknown;
-}
-
-/**
- * Wpis historii
- */
-interface HistoryEntry {
-    oldValue: string;
-    timestamp: string;
-    userId: string;
 }
 
 /**
@@ -242,7 +218,7 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
                             <div class="history-value">${entry.oldValue || '(pusty)'}</div>
                             <div class="history-meta">
                                 <span>${new Date(entry.timestamp).toLocaleString('pl-PL')}</span>
-                                <span>przez: ${EmployeeManager.getEmployeeByUid(entry.userId)?.name || 'Nieznany'}</span>
+                                <span>przez: ${EmployeeManager.getEmployeeByUid(entry.userId ?? '')?.name || 'Nieznany'}</span>
                             </div>
                             <button class="action-btn outline revert-btn" data-value="${entry.oldValue}" title="Przywróć tę wartość"><i class="fas fa-undo"></i> Przywróć</button>
                         </li>

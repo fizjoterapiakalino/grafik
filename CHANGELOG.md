@@ -2,6 +2,31 @@
 
 Wszystkie istotne zmiany w projekcie będą dokumentowane w tym pliku.
 
+## [2.1.0] - 2025-12-31
+
+### Dodano (Added)
+- **Automatyzacja wdrożeń**: Dodano workflow GitHub Actions do automatycznej publikacji aplikacji na GitHub Pages.
+- **Dynamiczna konfiguracja Firebase**: System automatycznie przełącza się między bazą testową a produkcyjną w zależności od środowiska.
+
+### Zmieniono (Changed)
+- **Logika wyświetlania urlopów**: Poprawiono system nakładek (overlay) dla urlopów trwających na przełomie miesięcy, unikając nakładania się elementów.
+
+### Refaktoryzacja
+- **Konsolidacja typów**: Przeniesiono zduplikowane interfejsy `CellState`, `TreatmentData` i `ScheduleHistoryEntry` z 6 plików do scentralizowanego modułu `types/index.ts`. Eliminuje to niespójności i ułatwia konserwację kodu.
+- **Centralizacja logowania**: Zamieniono 24 wystąpienia `console.log` na warunkową funkcję `debugLog`. Logi są teraz wyświetlane tylko gdy `AppConfig.debug = true`, co eliminuje niepotrzebne komunikaty w środowisku produkcyjnym.
+- **CalendarModal.destroy()**: Dodano metodę `destroy()` do `CalendarModal` która poprawnie usuwa wszystkie event listenery. Zapobiega to wyciekom pamięci przy przełączaniu stron.
+- **Debounce dla wyszukiwania**: Dodano funkcję `debounce` do `common.ts` i zastosowano ją w wyszukiwarce. Redukuje to liczbę wywołań filtrowania podczas szybkiego wpisywania tekstu.
+- **Wspólne funkcje dat**: Dodano `toUTCDate`, `toDateString`, `formatDatePL`, `isWorkday` do `utils.ts`. Eliminuje to duplikacje w `leaves.ts` i `calendar-modal.ts`.
+
+## [2.0.0] - 2025-12-30
+
+### Dodano (Added)
+- **Migracja na TypeScript**: Przepisanie całego projektu na TypeScript w celu zapewnienia większego bezpieczeństwa typów i łatwiejszej konserwacji.
+- **Narzędzie budowania Vite**: Przejście na Vite, co znacząco skróciło czas ładowania w trybie deweloperskim i poprawiło optymalizację wersji produkcyjnej.
+- **Modularna Architektura**: Rozbicie głównych skryptów na mniejsze komponenty (np. `schedule-data.ts`, `schedule-ui.ts`, `schedule-events.ts`).
+- **Usprawnienia Backend**: Wprowadzenie automatycznych backupów i rozbudowanego zarządzania pracownikami.
+
+
 ## [1.1.0] - 2025-12-20
 
 ### Dodano (Added)

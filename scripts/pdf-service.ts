@@ -1,4 +1,5 @@
 // scripts/pdf-service.ts
+import { debugLog } from './common.js';
 import { Shared } from './shared.js';
 
 /**
@@ -53,7 +54,7 @@ export const PdfService: PdfServiceAPI = (() => {
         if (currentCount > seenCount) {
             const newCount = currentCount - seenCount;
             window.dispatchEvent(new CustomEvent('iso-updates-available', { detail: { count: newCount } }));
-            console.log(`${newCount} nowych dokumentów ISO od ostatniej wizyty.`);
+            debugLog(`${newCount} nowych dokumentów ISO od ostatniej wizyty.`);
         } else {
             window.dispatchEvent(new CustomEvent('iso-updates-cleared'));
         }
@@ -137,7 +138,7 @@ export const PdfService: PdfServiceAPI = (() => {
 
             const cached = getCachedData();
             if (cached && cached.length > 0) {
-                console.log('Używam cache jako fallback');
+                debugLog('Używam cache jako fallback');
                 Shared.setIsoLinkActive(true);
                 return cached;
             }
@@ -165,11 +166,11 @@ export const PdfService: PdfServiceAPI = (() => {
             sse = new EventSource(`${RENDER_API_BASE_URL}/api/events`);
 
             sse.addEventListener('connected', () => {
-                console.log('Połączono z PDF Scraper SSE');
+                debugLog('Połączono z PDF Scraper SSE');
             });
 
             sse.addEventListener('scrapingComplete', (event) => {
-                console.log('Otrzymano zdarzenie scrapingComplete:', event.data);
+                debugLog('Otrzymano zdarzenie scrapingComplete:', event.data);
                 window.showToast('Nowe dokumenty ISO dostępne!', 5000);
                 fetchAndCachePdfLinks(true);
             });
@@ -181,7 +182,7 @@ export const PdfService: PdfServiceAPI = (() => {
 
                 if (!isDestroyed) {
                     sseReconnectTimeout = setTimeout(() => {
-                        console.log('Próba ponownego połączenia SSE...');
+                        debugLog('Próba ponownego połączenia SSE...');
                         initRealtimeUpdates();
                     }, SSE_RECONNECT_DELAY_MS);
                 }

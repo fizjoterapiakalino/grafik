@@ -1,4 +1,5 @@
 // scripts/changes.ts
+import { debugLog } from './common.js';
 import { db as dbRaw } from './firebase-config.js';
 import { AppConfig } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
@@ -380,46 +381,81 @@ export const Changes: ChangesAPI = (() => {
         const table = document.getElementById('changesTable');
         if (!table) return;
 
-        const tableHeaders = Array.from(table.querySelectorAll('thead th')).map((th) => ({
+        const tableHeaders = Array.from(table.querySelectorAll('thead th')).map((th, index) => ({
             text: th.textContent || '',
             style: 'tableHeader',
+            fillColor: index === 0 ? '#1e293b' : '#059669', // Slate-800 i Emerald-600
+            color: '#ffffff'
         }));
 
         const tableBody = Array.from(table.querySelectorAll('tbody tr')).map((row) => {
             const tr = row as HTMLTableRowElement;
             return Array.from(tr.cells).map((cell, cellIndex) => {
+                let textContent = '';
                 if (cellIndex === 0 || cellIndex === 8) {
-                    return cell.innerHTML.replace(/<br\s*[/]?>>/gi, '\n');
+                    textContent = cell.innerHTML.replace(/<br\s*[/]?>/gi, '\n');
+                } else {
+                    const period = tr.dataset.startDate || '';
+                    const cellState = appState.changesCells[period]?.[cellIndex];
+                    if (cellState?.assignedEmployees) {
+                        textContent = cellState.assignedEmployees.map((id) => EmployeeManager.getLastNameById(id)).join('\n');
+                    }
                 }
-                const period = tr.dataset.startDate || '';
-                const cellState = appState.changesCells[period]?.[cellIndex];
-                if (cellState?.assignedEmployees) {
-                    return cellState.assignedEmployees.map((id) => EmployeeManager.getLastNameById(id)).join('\n');
-                }
-                return '';
+
+                return {
+                    text: textContent,
+                    fillColor: cellIndex === 0 ? '#f8fafc' : null,
+                    alignment: cellIndex === 0 ? 'left' : 'center'
+                };
             });
         });
 
         const docDefinition = {
             pageOrientation: 'landscape',
+            pageSize: 'A3',
+            pageMargins: [20, 20, 20, 20],
             content: [
-                { text: 'Grafik Zmian', style: 'header' },
+                { text: `Grafik Zmian - ${currentYear}`, style: 'header' },
                 {
                     style: 'tableExample',
-                    table: { headerRows: 1, body: [tableHeaders, ...tableBody] },
+                    table: {
+                        headerRows: 1,
+                        widths: ['auto', '*', '*', '*', '*', '*', '*', '*', '*'],
+                        body: [tableHeaders, ...tableBody]
+                    },
                     layout: {
-                        fillColor: function (rowIndex: number) {
-                            return rowIndex === 0 ? '#4CAF50' : null;
-                        },
+                        hLineWidth: function () { return 0.5; },
+                        vLineWidth: function () { return 0.5; },
+                        hLineColor: function () { return '#cbd5e1'; }, // Slate-300
+                        vLineColor: function () { return '#cbd5e1'; },
+                        paddingLeft: function () { return 6; },
+                        paddingRight: function () { return 6; },
+                        paddingTop: function () { return 4; },
+                        paddingBottom: function () { return 4; }
                     },
                 },
             ],
             styles: {
-                header: { fontSize: 18, bold: true, margin: [0, 0, 0, 10] },
-                tableExample: { margin: [0, 5, 0, 15] },
-                tableHeader: { bold: true, fontSize: 10, color: 'white' },
+                header: {
+                    fontSize: 22,
+                    bold: true,
+                    margin: [0, 0, 0, 15],
+                    color: '#0f172a'
+                },
+                tableExample: {
+                    margin: [0, 5, 0, 15]
+                },
+                tableHeader: {
+                    bold: true,
+                    fontSize: 10,
+                    alignment: 'center'
+                },
             },
-            defaultStyle: { font: 'Roboto' },
+            defaultStyle: {
+                font: 'Roboto',
+                fontSize: 9,
+                color: '#334155'
+            },
         };
 
         pdfMake.createPdf(docDefinition).download(`grafik-zmian-${currentYear}.pdf`);
@@ -506,7 +542,7 @@ export const Changes: ChangesAPI = (() => {
         if (window.destroyContextMenu) {
             window.destroyContextMenu('changesContextMenu');
         }
-        console.log('Changes module destroyed');
+        debugLog('Changes module destroyed');
     };
 
     return { init, destroy };

@@ -1,4 +1,5 @@
 // scripts/seasonal-themes.ts
+import { debugLog } from './common.js';
 /**
  * Moduł zarządzający sezonowymi motywami aplikacji
  *
@@ -30,6 +31,11 @@ interface SeasonalTheme {
 type OverlayCreator = (overlay: HTMLElement) => void;
 
 /**
+ * Przechowuje ID intervalu fajerwerków do wyczyszczenia
+ */
+let fireworkIntervalId: number | null = null;
+
+/**
  * Konfiguracja dostępnych motywów sezonowych
  */
 const SEASONAL_THEMES: Record<ThemeName, SeasonalTheme> = {
@@ -48,7 +54,8 @@ const SEASONAL_THEMES: Record<ThemeName, SeasonalTheme> = {
         isActive: (date: Date): boolean => {
             const month = date.getMonth();
             const day = date.getDate();
-            return (month === 11 && day >= 27) || (month === 0 && day <= 15);
+            // Aktywny od 27 grudnia do 2 stycznia
+            return (month === 11 && day >= 27) || (month === 0 && day <= 2);
         },
     },
     easter: {
@@ -89,42 +96,37 @@ const OVERLAY_CREATORS: Record<ThemeName, OverlayCreator> = {
     },
 
     newyear: (overlay: HTMLElement): void => {
-        const confettiCount = 25;
         const confettiColors = ['#FFD700', '#C0C0C0', '#FF4444', '#9B59B6', '#00CED1', '#FF69B4'];
         const confettiShapes = ['●', '■', '▬', '★'];
+        const fireworkColors = ['#FFD700', '#FF4444', '#00CED1', '#FF69B4', '#9B59B6', '#00FF00'];
 
-        for (let i = 0; i < confettiCount; i++) {
+        /**
+         * Tworzy pojedyncze konfetti, które usuwa się po zakończeniu animacji
+         */
+        const createConfetti = (): void => {
             const confetti = document.createElement('div');
             confetti.className = 'newyear-confetti';
             confetti.textContent = confettiShapes[Math.floor(Math.random() * confettiShapes.length)];
             confetti.style.left = Math.random() * 100 + 'vw';
             confetti.style.color = confettiColors[Math.floor(Math.random() * confettiColors.length)];
             confetti.style.fontSize = Math.random() * 8 + 8 + 'px';
-            confetti.style.animationDuration = Math.random() * 6 + 8 + 's';
-            confetti.style.animationDelay = Math.random() * 10 + 's';
+
+            const duration = Math.random() * 6 + 8; // 8-14s
+            confetti.style.animationDuration = duration + 's';
             confetti.style.setProperty('--rotation', Math.random() * 720 - 360 + 'deg');
+
             overlay.appendChild(confetti);
-        }
 
-        const sparkleCount = 15;
-        for (let i = 0; i < sparkleCount; i++) {
-            const sparkle = document.createElement('div');
-            sparkle.className = 'newyear-sparkle';
-            sparkle.textContent = '✦';
-            sparkle.style.left = Math.random() * 100 + 'vw';
-            sparkle.style.top = Math.random() * 80 + 10 + 'vh';
-            sparkle.style.color = Math.random() > 0.5 ? '#FFD700' : '#C0C0C0';
-            sparkle.style.fontSize = Math.random() * 10 + 8 + 'px';
-            sparkle.style.animationDelay = Math.random() * 5 + 's';
-            overlay.appendChild(sparkle);
-        }
+            // Usuń element po zakończeniu animacji
+            setTimeout(() => confetti.remove(), duration * 1000);
+        };
 
-        const fireworkColors = ['#FFD700', '#FF4444', '#00CED1', '#FF69B4', '#9B59B6', '#00FF00'];
-        const fireworkCount = 4;
-
-        const createExplosion = (x: number, y: number, color: string, container: HTMLElement): void => {
-            const particleCount = 12;
-            const distance = 80;
+        /**
+         * Tworzy eksplozję fajerwerków
+         */
+        const createExplosion = (x: number, y: number, color: string): void => {
+            const particleCount = 10; // Zmniejszono z 12
+            const distance = 70; // Zmniejszono z 80
 
             for (let i = 0; i < particleCount; i++) {
                 const particle = document.createElement('div');
@@ -132,7 +134,7 @@ const OVERLAY_CREATORS: Record<ThemeName, OverlayCreator> = {
                 particle.style.left = x + 'vw';
                 particle.style.top = y + 'vh';
                 particle.style.backgroundColor = color;
-                particle.style.boxShadow = `0 0 6px ${color}, 0 0 10px ${color}`;
+                particle.style.boxShadow = `0 0 6px ${color}`;
 
                 const angle = ((i / particleCount) * 360 * Math.PI) / 180;
                 const translateX = Math.cos(angle) * distance;
@@ -141,12 +143,15 @@ const OVERLAY_CREATORS: Record<ThemeName, OverlayCreator> = {
                 particle.style.setProperty('--translate-x', translateX + 'px');
                 particle.style.setProperty('--translate-y', translateY + 'px');
 
-                container.appendChild(particle);
+                overlay.appendChild(particle);
 
                 setTimeout(() => particle.remove(), 1500);
             }
         };
 
+        /**
+         * Tworzy pojedynczy fajerwerk
+         */
         const createFirework = (): void => {
             const firework = document.createElement('div');
             firework.className = 'newyear-firework';
@@ -160,26 +165,55 @@ const OVERLAY_CREATORS: Record<ThemeName, OverlayCreator> = {
             const color = fireworkColors[Math.floor(Math.random() * fireworkColors.length)];
             firework.style.setProperty('--firework-color', color);
 
-            const delay = Math.random() * 8;
-            firework.style.animationDelay = delay + 's';
-
             overlay.appendChild(firework);
 
-            setTimeout(
-                () => {
-                    createExplosion(startX, endY, color, overlay);
-                },
-                (delay + 1.5) * 1000
-            );
+            // Eksplozja po 1.5s (czas animacji wznoszenia)
+            setTimeout(() => {
+                createExplosion(startX, endY, color);
+                firework.remove(); // Usuń fajerwerk po eksplozji
+            }, 1500);
         };
 
-        for (let i = 0; i < fireworkCount; i++) {
-            createFirework();
+        // Stwórz początkowe konfetti (mniej niż wcześniej)
+        const initialConfettiCount = 15; // Zmniejszono z 25
+        for (let i = 0; i < initialConfettiCount; i++) {
+            // Rozłóż początkowe konfetti w czasie
+            setTimeout(() => createConfetti(), Math.random() * 5000);
         }
 
-        setInterval(() => {
-            createFirework();
-        }, 3000);
+        // Stwórz statyczne sparkle (te nie zużywają dużo zasobów - tylko migają)
+        const sparkleCount = 10; // Zmniejszono z 15
+        for (let i = 0; i < sparkleCount; i++) {
+            const sparkle = document.createElement('div');
+            sparkle.className = 'newyear-sparkle';
+            sparkle.textContent = '✦';
+            sparkle.style.left = Math.random() * 100 + 'vw';
+            sparkle.style.top = Math.random() * 80 + 10 + 'vh';
+            sparkle.style.color = Math.random() > 0.5 ? '#FFD700' : '#C0C0C0';
+            sparkle.style.fontSize = Math.random() * 10 + 8 + 'px';
+            sparkle.style.animationDelay = Math.random() * 5 + 's';
+            overlay.appendChild(sparkle);
+        }
+
+        // Początkowe fajerwerki (mniej)
+        const initialFireworkCount = 2; // Zmniejszono z 4
+        for (let i = 0; i < initialFireworkCount; i++) {
+            setTimeout(() => createFirework(), i * 2000);
+        }
+
+        // Cykliczne tworzenie nowych konfetti i fajerwerków
+        fireworkIntervalId = window.setInterval(() => {
+            // Dodaj nowe konfetti (1-2 na raz)
+            const newConfettiCount = Math.floor(Math.random() * 2) + 1;
+            for (let i = 0; i < newConfettiCount; i++) {
+                createConfetti();
+            }
+
+            // Czasami dodaj fajerwerk (50% szans)
+            if (Math.random() > 0.5) {
+                createFirework();
+            }
+        }, 4000); // Co 4 sekundy zamiast 3
     },
 
     easter: (overlay: HTMLElement): void => {
@@ -243,16 +277,16 @@ function createSeasonalOverlay(themeName: ThemeName): void {
  * Aplikuje sezonowy motyw do strony
  */
 export function applySeasonalTheme(): void {
-    console.log('Checking seasonal theme...');
+    debugLog('Checking seasonal theme...');
 
     const theme = getActiveTheme();
 
     if (theme) {
-        console.log(`Applying theme: ${theme.name}`);
+        debugLog(`Applying theme: ${theme.name}`);
         document.body.classList.add(`theme-${theme.name}`);
         createSeasonalOverlay(theme.name);
     } else {
-        console.log('No seasonal theme active.');
+        debugLog('No seasonal theme active.');
     }
 }
 
@@ -260,6 +294,12 @@ export function applySeasonalTheme(): void {
  * Usuwa aktywny motyw sezonowy
  */
 export function removeSeasonalTheme(): void {
+    // Wyczyść interval fajerwerków, aby uniknąć wycieku pamięci
+    if (fireworkIntervalId !== null) {
+        clearInterval(fireworkIntervalId);
+        fireworkIntervalId = null;
+    }
+
     (Object.keys(SEASONAL_THEMES) as ThemeName[]).forEach((themeName) => {
         document.body.classList.remove(`theme-${themeName}`);
     });

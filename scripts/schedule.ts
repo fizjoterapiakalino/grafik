@@ -1,4 +1,5 @@
 // scripts/schedule.ts
+import { debugLog } from './common.js';
 import { auth as authRaw } from './firebase-config.js';
 import { AppConfig, capitalizeFirstLetter, hideLoadingOverlay } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
@@ -17,43 +18,9 @@ import {
     initTreatmentData,
 } from './schedule-helpers.js';
 import type { FirebaseAuthWrapper, FirebaseUser } from './types/firebase';
+import type { CellState, TreatmentData } from './types/index.js';
 
 const auth = authRaw as unknown as FirebaseAuthWrapper;
-
-/**
- * Stan komórki
- */
-interface CellState {
-    content?: string | null;
-    content1?: string | null;
-    content2?: string | null;
-    isSplit?: boolean | null;
-    isBreak?: boolean | null;
-    isMassage?: boolean | null;
-    isPnf?: boolean | null;
-    isEveryOtherDay?: boolean | null;
-    isMassage1?: boolean | null;
-    isMassage2?: boolean | null;
-    isPnf1?: boolean | null;
-    isPnf2?: boolean | null;
-    isEveryOtherDay1?: boolean | null;
-    isEveryOtherDay2?: boolean | null;
-    treatmentStartDate?: string | null;
-    treatmentExtensionDays?: number | null;
-    treatmentEndDate?: string | null;
-    additionalInfo?: string | null;
-    treatmentData1?: TreatmentData | null;
-    treatmentData2?: TreatmentData | null;
-    history?: unknown[];
-    [key: string]: unknown;
-}
-
-interface TreatmentData {
-    startDate?: string | null;
-    extensionDays?: number | null;
-    endDate?: string | null;
-    additionalInfo?: string | null;
-}
 
 interface DuplicateInfo {
     time: string;
@@ -483,7 +450,7 @@ export const Schedule: ScheduleAPI = (() => {
         ScheduleEvents.destroy();
         ScheduleData.destroy();
         ScheduleUI.destroy();
-        console.log('Schedule module destroyed');
+        debugLog('Schedule module destroyed');
     };
 
     return {

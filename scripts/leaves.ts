@@ -1,10 +1,12 @@
 // scripts/leaves.ts
+import { debugLog } from './common.js';
 import { db as dbRaw } from './firebase-config.js';
 import { AppConfig, hideLoadingOverlay, UndoManager } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
 import { LeavesSummary } from './leaves-summary.js';
 import { LeavesCareSummary } from './leaves-care-summary.js';
 import { CalendarModal } from './calendar-modal.js';
+import { toUTCDate } from './utils.js';
 import type { FirestoreDbWrapper } from './types/firebase';
 import type { Employee, LeaveEntry } from './types';
 
@@ -173,11 +175,6 @@ export const Leaves: LeavesAPI = (() => {
         }
     };
 
-    const toUTCDate = (dateString: string): Date => {
-        const [year, month, day] = dateString.split('-').map(Number);
-        return new Date(Date.UTC(year, month - 1, day));
-    };
-
     const refreshCurrentView = async (): Promise<void> => {
         if (monthlyViewBtn?.classList.contains('active')) {
             await showMonthlyView();
@@ -323,8 +320,10 @@ export const Leaves: LeavesAPI = (() => {
         if (window.destroyContextMenu) {
             window.destroyContextMenu('contextMenu');
         }
+
+        CalendarModal.destroy();
         activeCell = null;
-        console.log('Leaves module destroyed');
+        debugLog('Leaves module destroyed');
     };
 
     const openCalendarForCell = async (cell: HTMLTableCellElement | null): Promise<void> => {
@@ -351,7 +350,7 @@ export const Leaves: LeavesAPI = (() => {
             await saveLeavesData(employeeName, updatedLeaves);
             renderSingleEmployeeLeaves(employeeName, updatedLeaves);
         } catch (error) {
-            console.log('Operacja w kalendarzu została anulowana.', error);
+            debugLog('Operacja w kalendarzu została anulowana.', error);
             if (error !== 'Modal closed without confirmation') {
                 window.showToast('Anulowano zmiany.', 2000);
             }
@@ -482,22 +481,61 @@ export const Leaves: LeavesAPI = (() => {
         const table = document.getElementById('leavesTable');
         if (!table) return;
 
-        const headers = Array.from(table.querySelectorAll('thead th')).map((th, index) => ({
-            text: th.textContent || '',
-            style: 'tableHeader',
-            width: index === 0 ? 100 : '*',
-        }));
+        const headers = Array.from(table.querySelectorAll('thead th')).map((th, index) => {
+            return {
+                text: th.textContent || '',
+                style: 'tableHeader',
+                fillColor: index === 0 ? '#1e293b' : '#059669', // Slate-800 i Emerald-600
+                color: '#ffffff'
+            };
+        });
 
         const body = Array.from(table.querySelectorAll('tbody tr')).map((row) => {
             const tr = row as HTMLTableRowElement;
             return Array.from(tr.cells).map((cell, index) => {
-                if (index > 0) {
-                    const blocks = Array.from(cell.querySelectorAll('.leave-block'));
-                    if (blocks.length > 0) {
-                        return blocks.map((b) => b.textContent || '').join('\n');
-                    }
+                if (index === 0) {
+                    return {
+                        text: (cell.textContent || '').trim(),
+                        style: 'employeeName',
+                        fillColor: '#f1f5f9' // Slate-100
+                    };
                 }
-                return (cell.textContent || '').trim();
+
+                const blocks = Array.from(cell.querySelectorAll('.leave-block'));
+                if (blocks.length > 0) {
+                    // Helper functions
+                    const getBlockText = (b: Element) => {
+                        // Find the first text node or the text span (not the badge)
+                        const clone = b.cloneNode(true) as HTMLElement;
+                        const badge = clone.querySelector('.leave-date-badge');
+                        if (badge) badge.remove();
+                        return clone.textContent?.trim() || '';
+                    };
+
+                    // Ujednolicony kolor dla wydruku (Slate-200 tło, Slate-800 tekst)
+                    const printBlockColor = '#e2e8f0';
+                    const printTextColor = '#1e293b';
+
+                    // ZAWSZE używamy zagnieżdżonej tabeli, aby uzyskać spójny wygląd "bloków"
+                    // niezależnie czy jest jeden urlop czy wiele w danym miesiącu.
+                    return {
+                        table: {
+                            widths: ['*'],
+                            body: blocks.map(b => [{
+                                text: getBlockText(b),
+                                fillColor: printBlockColor,
+                                color: printTextColor,
+                                alignment: 'center',
+                                margin: [0, 2, 0, 2],
+                                fontSize: 8
+                            }])
+                        },
+                        layout: 'noBorders',
+                        // Margines zewnętrzny dla całej grupy bloków w komórce
+                        margin: [0, 1, 0, 1]
+                    };
+                }
+                return { text: '', fillColor: null };
             });
         });
 
@@ -511,24 +549,49 @@ export const Leaves: LeavesAPI = (() => {
                     style: 'tableExample',
                     table: {
                         headerRows: 1,
-                        widths: headers.map((h) => h.width),
+                        // Pierwsza kolumna stała, reszta rozciągnięta
+                        widths: ['auto', '*', '*', '*', '*', '*', '*', '*', '*', '*', '*', '*', '*'],
                         body: [headers, ...body],
                     },
                     layout: {
-                        fillColor: function (rowIndex: number) {
-                            return rowIndex === 0 ? '#4CAF50' : null;
-                        },
                         hLineWidth: function () { return 0.5; },
                         vLineWidth: function () { return 0.5; },
+                        hLineColor: function () { return '#cbd5e1'; }, // Slate-300
+                        vLineColor: function () { return '#cbd5e1'; },
+                        paddingLeft: function () { return 8; },
+                        paddingRight: function () { return 8; },
+                        paddingTop: function () { return 6; },
+                        paddingBottom: function () { return 6; }
                     },
                 },
             ],
             styles: {
-                header: { fontSize: 18, bold: true, margin: [0, 0, 0, 10] },
-                tableExample: { margin: [0, 5, 0, 15] },
-                tableHeader: { bold: true, fontSize: 10, color: 'white', alignment: 'center' },
+                header: {
+                    fontSize: 22,
+                    bold: true,
+                    margin: [0, 0, 0, 15],
+                    color: '#0f172a' // Slate-900
+                },
+                tableExample: {
+                    margin: [0, 5, 0, 15]
+                },
+                tableHeader: {
+                    bold: true,
+                    fontSize: 11,
+                    alignment: 'center',
+                    margin: [0, 5, 0, 5]
+                },
+                employeeName: {
+                    bold: true,
+                    fontSize: 10,
+                    color: '#1e293b'
+                }
             },
-            defaultStyle: { font: 'Roboto', fontSize: 8 },
+            defaultStyle: {
+                font: 'Roboto',
+                fontSize: 9,
+                color: '#334155' // Slate-700
+            },
         };
 
         pdfMake.createPdf(docDefinition).download(`grafik-urlopow-${currentYear}.pdf`);
@@ -744,8 +807,23 @@ export const Leaves: LeavesAPI = (() => {
                     const leaveOption = document.querySelector(`#leaveTypeSelect option[value="${leave.type || 'vacation'}"]`);
                     const leaveTypeName = leaveOption ? leaveOption.textContent : 'Urlop';
 
-                    div.setAttribute('title', leaveTypeName || 'Urlop');
+                    // Format dates for display
+                    const formatDate = (d: Date): string => {
+                        return `${d.getUTCDate().toString().padStart(2, '0')}.${(d.getUTCMonth() + 1).toString().padStart(2, '0')}.${d.getUTCFullYear()}`;
+                    };
+
+                    // Check if leave spans multiple months
+                    const isMultiMonth = start.getUTCMonth() !== end.getUTCMonth() || start.getUTCFullYear() !== end.getUTCFullYear();
+
+                    // Enhanced tooltip with full date range for multi-month leaves
+                    let tooltipText = leaveTypeName || 'Urlop';
+                    if (isMultiMonth) {
+                        tooltipText = `${leaveTypeName}: ${formatDate(start)} - ${formatDate(end)}`;
+                        div.setAttribute('data-full-range', `${formatDate(start)} - ${formatDate(end)}`);
+                    }
+                    div.setAttribute('title', tooltipText);
                     div.style.backgroundColor = bgColor;
+                    div.setAttribute('data-color', bgColor);
 
                     if (start < monthStart) div.classList.add('continues-left');
                     if (end > monthEnd) div.classList.add('continues-right');
@@ -759,7 +837,19 @@ export const Leaves: LeavesAPI = (() => {
                         text += `-${displayEnd}`;
                     }
 
-                    div.innerHTML = text;
+                    // Create text span for proper centering
+                    const textSpan = document.createElement('span');
+                    textSpan.textContent = text;
+                    div.appendChild(textSpan);
+
+                    // Add date badge for multi-month leaves (shows on hover)
+                    if (isMultiMonth && (start < monthStart || end > monthEnd)) {
+                        const badge = document.createElement('span');
+                        badge.className = 'leave-date-badge';
+                        badge.textContent = `${formatDate(start)} → ${formatDate(end)}`;
+                        div.appendChild(badge);
+                    }
+
                     cell.appendChild(div);
                     cell.classList.add('has-content');
                 } else {

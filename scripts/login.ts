@@ -1,4 +1,5 @@
 // scripts/login.ts
+import { debugLog } from './common.js';
 import { auth } from './firebase-config.js';
 import type { FirebaseAuthWrapper } from './types/firebase';
 
@@ -57,7 +58,7 @@ export const Login: LoginAPI = (() => {
             loginForm.removeEventListener('submit', handleSubmit);
             loginForm = null;
         }
-        console.log('Login module destroyed');
+        debugLog('Login module destroyed');
     };
 
     return { init, destroy };

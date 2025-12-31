@@ -1,4 +1,5 @@
 // scripts/backup-scheduler.ts
+import { debugLog } from './common.js';
 import { BackupService } from './backup-service.js';
 
 /**
@@ -36,12 +37,12 @@ export const BackupScheduler: BackupSchedulerAPI = (() => {
                     lastBackupMonth === now.getMonth() &&
                     lastBackupYear === now.getFullYear()
                 ) {
-                    console.log('Automatyczny backup na dzisiaj już został wykonany.');
+                    debugLog('Automatyczny backup na dzisiaj już został wykonany.');
                     return;
                 }
             }
 
-            console.log('Rozpoczynanie automatycznego backupu...');
+            debugLog('Rozpoczynanie automatycznego backupu...');
             await BackupService.performBackup(true); // true = silent mode
         }
     };
@@ -49,7 +50,7 @@ export const BackupScheduler: BackupSchedulerAPI = (() => {
     const init = (): void => {
         // Sprawdź co 60 sekund
         intervalId = setInterval(checkAndRunBackup, 60000);
-        console.log('BackupScheduler: Zainicjowano sprawdzanie harmonogramu kopii zapasowej.');
+        debugLog('BackupScheduler: Zainicjowano sprawdzanie harmonogramu kopii zapasowej.');
 
         // Sprawdź natychmiast po uruchomieniu
         checkAndRunBackup();
