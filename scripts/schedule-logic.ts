@@ -1,5 +1,5 @@
 // scripts/schedule-logic.ts
-import { AppConfig, capitalizeFirstLetter } from './common.js';
+import { AppConfig, capitalizeFirstLetter, isHoliday } from './common.js';
 
 /**
  * Dane leczenia dla części komórki
@@ -222,16 +222,16 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
 
     const calculateEndDate = (startDate: string | undefined, extensionDays?: number): string => {
         if (!startDate) return '';
-        const endDate = new Date(startDate);
-        endDate.setHours(12, 0, 0, 0);
+        const endDate = new Date(startDate + 'T12:00:00Z');
 
-        endDate.setDate(endDate.getDate() - 1);
+        endDate.setUTCDate(endDate.getUTCDate() - 1);
         const totalDays = 15 + parseInt(String(extensionDays || 0), 10);
         let daysAdded = 0;
         while (daysAdded < totalDays) {
-            endDate.setDate(endDate.getDate() + 1);
-            const dayOfWeek = endDate.getDay();
-            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            endDate.setUTCDate(endDate.getUTCDate() + 1);
+            const dayOfWeek = endDate.getUTCDay();
+            // Pomijamy weekendy (sobota=6, niedziela=0) oraz polskie święta
+            if (dayOfWeek !== 0 && dayOfWeek !== 6 && !isHoliday(endDate)) {
                 daysAdded++;
             }
         }

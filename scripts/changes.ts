@@ -3,14 +3,17 @@ import { debugLog } from './common.js';
 import { db as dbRaw } from './firebase-config.js';
 import { AppConfig } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
+import {
+    PdfColors,
+    PdfStyles,
+    PdfDefaultStyle,
+    PdfTableLayoutCompact,
+    PdfPageConfig,
+    PdfHeaderColors,
+} from './pdf-config.js';
 import type { FirestoreDbWrapper } from './types/firebase';
 
 const db = dbRaw as unknown as FirestoreDbWrapper;
-
-// pdfMake type declaration (external library)
-declare const pdfMake: {
-    createPdf(docDefinition: unknown): { download(filename: string): void };
-};
 
 /**
  * Stan komórki w harmonogramie zmian
@@ -53,6 +56,7 @@ export const Changes: ChangesAPI = (() => {
     let currentYear = new Date().getUTCFullYear();
     let yearSelect: HTMLSelectElement | null = null;
     let clipboard: string[] | null = null;
+    let activeCell: HTMLTableCellElement | null = null;
 
     const isWeekend = (date: Date): boolean => {
         const day = date.getUTCDay();
@@ -90,10 +94,45 @@ export const Changes: ChangesAPI = (() => {
     const pasteCell = (cell: HTMLTableCellElement): void => {
         if (!cell || !clipboard) return;
 
-        updateCellState(cell, (state) => {
-            state.assignedEmployees = [...clipboard!];
-        });
-        window.showToast('Wklejono.');
+        const row = cell.parentElement as HTMLTableRowElement;
+        const period = row.dataset.startDate || '';
+        const columnIndex = cell.cellIndex;
+
+        // Zbierz pracowników już przypisanych w innych komórkach tego wiersza
+        const employeesInOtherCells = new Set<string>();
+        const periodCells = appState.changesCells[period] || {};
+        for (const colIdx in periodCells) {
+            if (Number(colIdx) !== columnIndex) {
+                const otherCellEmployees = periodCells[Number(colIdx)]?.assignedEmployees || [];
+                otherCellEmployees.forEach((empId: string) => employeesInOtherCells.add(empId));
+            }
+        }
+
+        // Sprawdź czy któryś z wklejanych pracowników jest już przypisany gdzie indziej
+        const conflictingEmployees = clipboard.filter(empId => employeesInOtherCells.has(empId));
+
+        if (conflictingEmployees.length > 0) {
+            // Filtruj pracowników - wklej tylko tych, którzy nie są w innych komórkach
+            const validEmployees = clipboard.filter(empId => !employeesInOtherCells.has(empId));
+
+            if (validEmployees.length === 0) {
+                window.showToast('Wszyscy pracownicy są już przypisani w innych kolumnach tego okresu.', 3000);
+                return;
+            }
+
+            // Wklej tylko dozwolonych pracowników
+            const skippedNames = conflictingEmployees.map(id => EmployeeManager.getLastNameById(id)).join(', ');
+            updateCellState(cell, (state) => {
+                state.assignedEmployees = [...validEmployees];
+            });
+            window.showToast(`Wklejono. Pominięto już przypisanych: ${skippedNames}`, 3000);
+        } else {
+            // Wszyscy pracownicy są dozwoleni
+            updateCellState(cell, (state) => {
+                state.assignedEmployees = [...clipboard!];
+            });
+            window.showToast('Wklejono.');
+        }
     };
 
     const clearCell = (cell: HTMLTableCellElement): void => {
@@ -170,8 +209,11 @@ export const Changes: ChangesAPI = (() => {
         });
 
         document.querySelectorAll('#changesTableBody td').forEach((cell) => {
-            if (!cell.classList.contains('leaves-cell')) {
-                cell.addEventListener('click', handleCellClick);
+            if (!cell.classList.contains('leaves-cell') && (cell as HTMLTableCellElement).cellIndex !== 0) {
+                const htmlCell = cell as HTMLTableCellElement;
+                htmlCell.setAttribute('tabindex', '0');
+                htmlCell.addEventListener('click', handleCellClick);
+                htmlCell.addEventListener('dblclick', handleCellDblClick);
             }
         });
     };
@@ -221,9 +263,36 @@ export const Changes: ChangesAPI = (() => {
                         const leaveStart = new Date(leave.startDate);
                         const leaveEnd = new Date(leave.endDate);
 
+                        // Sprawdź czy urlop pokrywa się z tym okresem
                         if (leave.type === 'vacation' && !(leaveEnd < periodStart || leaveStart > periodEnd)) {
                             const lastName = EmployeeManager.getLastNameById(employeeId);
-                            leavesHtml += `${lastName || employeeName}<br>`;
+
+                            // Formatuj datę końca urlopu
+                            const endDay = leaveEnd.getDate().toString().padStart(2, '0');
+                            const endMonth = (leaveEnd.getMonth() + 1).toString().padStart(2, '0');
+
+                            let dateRange = '';
+                            let tooltipText = `Urlop: ${leave.startDate} - ${leave.endDate}`;
+
+                            // Sprawdź czy urlop zaczął się PRZED początkiem tego okresu
+                            if (leaveStart < periodStart) {
+                                // Urlop zaczął się wcześniej - pokazuj "do XX.XX"
+                                dateRange = `do ${endDay}.${endMonth}`;
+                            } else {
+                                // Urlop zaczyna się w tym okresie - pokazuj pełny zakres
+                                const startDay = leaveStart.getDate().toString().padStart(2, '0');
+                                const startMonth = (leaveStart.getMonth() + 1).toString().padStart(2, '0');
+
+                                if (startMonth === endMonth) {
+                                    // Ten sam miesiąc
+                                    dateRange = `${startDay}-${endDay}.${startMonth}`;
+                                } else {
+                                    // Różne miesiące
+                                    dateRange = `${startDay}.${startMonth}-${endDay}.${endMonth}`;
+                                }
+                            }
+
+                            leavesHtml += `<span class="leave-entry" title="${tooltipText}">${lastName || employeeName} <small>(${dateRange})</small></span><br>`;
                         }
                     });
                 }
@@ -236,10 +305,142 @@ export const Changes: ChangesAPI = (() => {
         });
     };
 
+    /**
+     * Ustawia aktywną (zaznaczoną) komórkę
+     */
+    const setActiveCell = (cell: HTMLTableCellElement | null): void => {
+        // Usuń zaznaczenie z poprzedniej komórki
+        if (activeCell) {
+            activeCell.classList.remove('active-cell');
+        }
+
+        activeCell = cell;
+
+        // Dodaj zaznaczenie do nowej komórki
+        if (activeCell) {
+            activeCell.classList.add('active-cell');
+            activeCell.focus();
+        }
+    };
+
+    /**
+     * Obsługuje pojedyncze kliknięcie - zaznaczenie komórki
+     */
     const handleCellClick = (event: Event): void => {
         const cell = (event.target as HTMLElement).closest('td') as HTMLTableCellElement | null;
-        if (!cell) return;
+        if (!cell || cell.cellIndex === 0) return; // Ignoruj pierwszą kolumnę (daty)
+
+        setActiveCell(cell);
+    };
+
+    /**
+     * Obsługuje podwójne kliknięcie - otwarcie modala
+     */
+    const handleCellDblClick = (event: Event): void => {
+        const cell = (event.target as HTMLElement).closest('td') as HTMLTableCellElement | null;
+        if (!cell || cell.cellIndex === 0) return;
+
         openEmployeeSelectionModal(cell);
+    };
+
+    /**
+     * Obsługuje klawisze na zaznaczonej komórce
+     */
+    const handleKeyDown = (event: KeyboardEvent): void => {
+        // Ctrl+C - Kopiuj
+        if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
+            if (activeCell && activeCell.cellIndex !== 0) {
+                copyCell(activeCell);
+            }
+            return;
+        }
+
+        // Ctrl+V - Wklej
+        if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
+            event.preventDefault();
+            if (activeCell && activeCell.cellIndex !== 0 && clipboard) {
+                pasteCell(activeCell);
+            } else if (!clipboard) {
+                window.showToast('Brak skopiowanej komórki.', 2000);
+            }
+            return;
+        }
+
+        if (!activeCell) return;
+
+        // Enter - Otwórz modal
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            if (activeCell.cellIndex !== 0) {
+                openEmployeeSelectionModal(activeCell);
+            }
+            return;
+        }
+
+        // Delete/Backspace - Wyczyść komórkę
+        if (event.key === 'Delete' || event.key === 'Backspace') {
+            event.preventDefault();
+            if (activeCell.cellIndex !== 0) {
+                clearCell(activeCell);
+            }
+            return;
+        }
+
+        // Escape - Odznacz komórkę
+        if (event.key === 'Escape') {
+            setActiveCell(null);
+            return;
+        }
+
+        // Nawigacja strzałkami
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault();
+            navigateWithArrows(event.key);
+        }
+    };
+
+    /**
+     * Nawigacja strzałkami między komórkami
+     */
+    const navigateWithArrows = (key: string): void => {
+        if (!activeCell) return;
+
+        const row = activeCell.parentElement as HTMLTableRowElement;
+        const cellIndex = activeCell.cellIndex;
+        let newCell: HTMLTableCellElement | null = null;
+
+        switch (key) {
+            case 'ArrowUp': {
+                const prevRow = row.previousElementSibling as HTMLTableRowElement | null;
+                if (prevRow) {
+                    newCell = prevRow.cells[cellIndex] || null;
+                }
+                break;
+            }
+            case 'ArrowDown': {
+                const nextRow = row.nextElementSibling as HTMLTableRowElement | null;
+                if (nextRow) {
+                    newCell = nextRow.cells[cellIndex] || null;
+                }
+                break;
+            }
+            case 'ArrowLeft': {
+                if (cellIndex > 1) { // Pomijamy kolumnę dat (index 0)
+                    newCell = row.cells[cellIndex - 1] || null;
+                }
+                break;
+            }
+            case 'ArrowRight': {
+                if (cellIndex < row.cells.length - 1 && cellIndex < 8) { // Pomijamy kolumnę urlopów (index 8)
+                    newCell = row.cells[cellIndex + 1] || null;
+                }
+                break;
+            }
+        }
+
+        if (newCell && !newCell.classList.contains('leaves-cell') && newCell.cellIndex !== 0) {
+            setActiveCell(newCell);
+        }
     };
 
     const openEmployeeSelectionModal = (cell: HTMLTableCellElement): void => {
@@ -257,10 +458,21 @@ export const Changes: ChangesAPI = (() => {
         const allEmployees = Object.fromEntries(
             Object.entries(EmployeeManager.getAll()).filter(([, employee]) => !employee.isHidden && !employee.isScheduleOnly)
         );
-        const period = (cell.parentElement as HTMLTableRowElement).dataset.startDate || '';
+        const row = cell.parentElement as HTMLTableRowElement;
+        const period = row.dataset.startDate || '';
         const columnIndex = cell.cellIndex;
         const cellState = appState.changesCells[period]?.[columnIndex] || {};
         const assignedEmployees = new Set(cellState.assignedEmployees || []);
+
+        // Zbierz wszystkich pracowników już przypisanych w innych komórkach tego wiersza
+        const employeesInOtherCells = new Set<string>();
+        const periodCells = appState.changesCells[period] || {};
+        for (const colIdx in periodCells) {
+            if (Number(colIdx) !== columnIndex) {
+                const otherCellEmployees = periodCells[Number(colIdx)]?.assignedEmployees || [];
+                otherCellEmployees.forEach((empId: string) => employeesInOtherCells.add(empId));
+            }
+        }
 
         for (const id in allEmployees) {
             const employeeEl = document.createElement('div');
@@ -269,10 +481,17 @@ export const Changes: ChangesAPI = (() => {
             employeeEl.dataset.employeeId = id;
 
             if (assignedEmployees.has(id)) {
+                // Zaznaczony w tej komórce
                 employeeEl.classList.add('selected-employee');
+            } else if (employeesInOtherCells.has(id)) {
+                // Przypisany do innej komórki w tym okresie - wyszarzony
+                employeeEl.classList.add('disabled-employee');
+                employeeEl.setAttribute('title', 'Pracownik jest już przypisany do innej kolumny w tym okresie');
             }
 
             employeeEl.addEventListener('click', () => {
+                // Nie pozwól kliknąć na wyszarzonych
+                if (employeeEl.classList.contains('disabled-employee')) return;
                 employeeEl.classList.toggle('selected-employee');
             });
 
@@ -384,16 +603,29 @@ export const Changes: ChangesAPI = (() => {
         const tableHeaders = Array.from(table.querySelectorAll('thead th')).map((th, index) => ({
             text: th.textContent || '',
             style: 'tableHeader',
-            fillColor: index === 0 ? '#1e293b' : '#059669', // Slate-800 i Emerald-600
-            color: '#ffffff'
+            fillColor: index === 0 ? PdfHeaderColors.firstColumn : PdfHeaderColors.dataColumns,
+            color: PdfHeaderColors.text,
         }));
 
         const tableBody = Array.from(table.querySelectorAll('tbody tr')).map((row) => {
             const tr = row as HTMLTableRowElement;
             return Array.from(tr.cells).map((cell, cellIndex) => {
                 let textContent = '';
-                if (cellIndex === 0 || cellIndex === 8) {
-                    textContent = cell.innerHTML.replace(/<br\s*[/]?>/gi, '\n');
+
+                if (cellIndex === 0) {
+                    // Kolumna okresu - użyj textContent
+                    textContent = cell.textContent || '';
+                } else if (cellIndex === 8) {
+                    // Kolumna urlopów - pobierz tekst z każdego .leave-entry lub użyj textContent
+                    const leaveEntries = cell.querySelectorAll('.leave-entry');
+                    if (leaveEntries.length > 0) {
+                        textContent = Array.from(leaveEntries)
+                            .map(entry => entry.textContent?.trim() || '')
+                            .join('\n');
+                    } else {
+                        // Fallback - usuń tagi HTML
+                        textContent = cell.textContent || '';
+                    }
                 } else {
                     const period = tr.dataset.startDate || '';
                     const cellState = appState.changesCells[period]?.[cellIndex];
@@ -404,16 +636,14 @@ export const Changes: ChangesAPI = (() => {
 
                 return {
                     text: textContent,
-                    fillColor: cellIndex === 0 ? '#f8fafc' : null,
-                    alignment: cellIndex === 0 ? 'left' : 'center'
+                    fillColor: cellIndex === 0 ? PdfColors.slate100 : null,
+                    alignment: cellIndex === 0 ? 'left' : 'center',
                 };
             });
         });
 
         const docDefinition = {
-            pageOrientation: 'landscape',
-            pageSize: 'A3',
-            pageMargins: [20, 20, 20, 20],
+            ...PdfPageConfig,
             content: [
                 { text: `Grafik Zmian - ${currentYear}`, style: 'header' },
                 {
@@ -421,41 +651,20 @@ export const Changes: ChangesAPI = (() => {
                     table: {
                         headerRows: 1,
                         widths: ['auto', '*', '*', '*', '*', '*', '*', '*', '*'],
-                        body: [tableHeaders, ...tableBody]
+                        body: [tableHeaders, ...tableBody],
                     },
-                    layout: {
-                        hLineWidth: function () { return 0.5; },
-                        vLineWidth: function () { return 0.5; },
-                        hLineColor: function () { return '#cbd5e1'; }, // Slate-300
-                        vLineColor: function () { return '#cbd5e1'; },
-                        paddingLeft: function () { return 6; },
-                        paddingRight: function () { return 6; },
-                        paddingTop: function () { return 4; },
-                        paddingBottom: function () { return 4; }
-                    },
+                    layout: PdfTableLayoutCompact,
                 },
             ],
             styles: {
-                header: {
-                    fontSize: 22,
-                    bold: true,
-                    margin: [0, 0, 0, 15],
-                    color: '#0f172a'
-                },
-                tableExample: {
-                    margin: [0, 5, 0, 15]
-                },
+                ...PdfStyles,
                 tableHeader: {
                     bold: true,
                     fontSize: 10,
-                    alignment: 'center'
+                    alignment: 'center' as const,
                 },
             },
-            defaultStyle: {
-                font: 'Roboto',
-                fontSize: 9,
-                color: '#334155'
-            },
+            defaultStyle: PdfDefaultStyle,
         };
 
         pdfMake.createPdf(docDefinition).download(`grafik-zmian-${currentYear}.pdf`);
@@ -520,6 +729,7 @@ export const Changes: ChangesAPI = (() => {
         }
 
         document.addEventListener('app:search', handleAppSearch);
+        document.addEventListener('keydown', handleKeyDown);
 
         populateYearSelect();
         await refreshView();
@@ -536,12 +746,14 @@ export const Changes: ChangesAPI = (() => {
     const destroy = (): void => {
         const printButton = document.getElementById('printChangesTable');
         document.removeEventListener('app:search', handleAppSearch);
+        document.removeEventListener('keydown', handleKeyDown);
         if (printButton) {
             printButton.removeEventListener('click', printChangesTableToPdf);
         }
         if (window.destroyContextMenu) {
             window.destroyContextMenu('changesContextMenu');
         }
+        setActiveCell(null);
         debugLog('Changes module destroyed');
     };
 
