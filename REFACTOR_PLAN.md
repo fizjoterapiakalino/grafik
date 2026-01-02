@@ -93,9 +93,15 @@ To tworzy globalne zależności. Rozważyć usunięcie po pełnej migracji na mo
 
 **Wynik**: Dodano `debugLog`, `debounce` i flagę `AppConfig.debug`. Zoptymalizowano wyszukiwanie.
 
-### Faza 4: Refaktoryzacja dużych plików (Opcjonalne, 3-4h)
-1. `schedule-events.ts` → wydzielić drag-and-drop
-2. `leaves.ts` → wydzielić renderowanie tabeli
+### Faza 4: Refaktoryzacja dużych plików ✅ (UKOŃCZONA)
+1. ~~`schedule-events.ts` → wydzielić drag-and-drop~~ ✅
+   - Utworzono `schedule-drag-drop.ts` (219 linii)
+   - Zredukowano `schedule-events.ts` z 794 do 584 linii (-26%)
+2. ~~`leaves.ts` → wydzielić PDF export~~ ✅
+   - Utworzono `leaves-pdf.ts` (146 linii)
+   - Zredukowano `leaves.ts` z 779 do 670 linii (-14%)
+
+**Wynik**: Logika Drag & Drop i eksport PDF są teraz w osobnych, dobrze udokumentowanych modułach.
 
 ---
 

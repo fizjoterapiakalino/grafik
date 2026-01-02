@@ -35,6 +35,22 @@
     background-color: var(--color-gray-50);
 }
 
+/* Edytowalne komórki */
+.changes-table td[tabindex="0"] {
+    cursor: pointer;
+}
+
+/* Zaznaczona komórka */
+.changes-table td.active-cell {
+    outline: 2px solid var(--color-primary-500);
+    outline-offset: -2px;
+    background-color: var(--color-primary-50);
+}
+
+.changes-table td.active-cell:focus {
+    outline: 3px solid var(--color-primary-600);
+}
+
 /* Employee Selection Modal Styles */
 #employeeSelectionModal .modal-content {
     max-width: 800px;
@@ -88,6 +104,17 @@
 .changes-table tbody tr.past-period td {
     color: #a0a0a0;
     /* Wyszarzony tekst */
+}
+
+/* Styl dla wpisów urlopowych w kolumnie Urlopy */
+.changes-table .leave-entry {
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.changes-table .leave-entry small {
+    color: var(--color-gray-500);
+    font-size: 0.85em;
 }
 
 /* New Header Layout consistent with leaves page */

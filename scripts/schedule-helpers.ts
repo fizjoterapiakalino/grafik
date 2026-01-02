@@ -229,11 +229,36 @@ const updateSplitCellPart = (
         part = isFirstDiv ? 1 : 2;
     }
 
-    cellState[`content${part}`] = newText;
+    const contentKey = `content${part}` as 'content1' | 'content2';
+    const treatmentKey = `treatmentData${part}` as 'treatmentData1' | 'treatmentData2';
 
-    const treatmentData = cellState[`treatmentData${part}`] as TreatmentData | undefined;
-    if (treatmentData?.startDate) {
+    const oldContent = ((cellState[contentKey] as string) || '').trim().toLowerCase();
+    const newContent = newText.trim().toLowerCase();
+    const isDifferentPatient = oldContent !== '' && oldContent !== newContent && newContent !== '';
+
+    cellState[contentKey] = newText;
+
+    let treatmentData = cellState[treatmentKey] as TreatmentData | undefined;
+
+    if (isDifferentPatient) {
+        // Nowy pacjent w tej części - resetuj dane leczenia
+        treatmentData = {
+            startDate: getTodayDate(),
+            extensionDays: 0,
+            endDate: ScheduleLogic.calculateEndDate(getTodayDate(), 0),
+        };
+        cellState[treatmentKey] = treatmentData;
+    } else if (treatmentData?.startDate) {
+        // Ten sam pacjent - przelicz tylko datę końcową
         treatmentData.endDate = ScheduleLogic.calculateEndDate(treatmentData.startDate, treatmentData.extensionDays ?? undefined);
+    } else if (newContent !== '') {
+        // Pierwszy wpis - ustaw nowe dane
+        treatmentData = {
+            startDate: getTodayDate(),
+            extensionDays: 0,
+            endDate: ScheduleLogic.calculateEndDate(getTodayDate(), 0),
+        };
+        cellState[treatmentKey] = treatmentData;
     }
 };
 
@@ -241,10 +266,21 @@ const updateSplitCellPart = (
  * Aktualizuje normalną (niepodzieloną) komórkę
  */
 const updateNormalCell = (cellState: CellState, newText: string): void => {
-    const oldContent = cellState.content || '';
-    const contentChanged = oldContent.trim().toLowerCase() !== newText.trim().toLowerCase() && newText.trim() !== '';
+    const oldContent = (cellState.content || '').trim().toLowerCase();
+    const newContent = newText.trim().toLowerCase();
 
-    if (contentChanged) {
+    // Sprawdź czy zawartość się zmieniła (inny pacjent)
+    const contentChanged = oldContent !== newContent && newContent !== '';
+    const isDifferentPatient = oldContent !== '' && oldContent !== newContent && newContent !== '';
+
+    if (isDifferentPatient) {
+        // Nowy pacjent - resetuj wszystkie dane leczenia
+        cellState.treatmentStartDate = getTodayDate();
+        cellState.treatmentExtensionDays = 0;
+        cellState.additionalInfo = null;
+        cellState.treatmentEndDate = ScheduleLogic.calculateEndDate(cellState.treatmentStartDate, 0);
+    } else if (contentChanged) {
+        // Pierwszy wpis w pustej komórce
         if (!cellState.treatmentStartDate) {
             cellState.treatmentStartDate = getTodayDate();
         }

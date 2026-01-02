@@ -51,7 +51,7 @@ export const UIShell: UIShellAPI = (() => {
                         <button id="clearSearchButton" class="clear-search-btn" style="display: none;"><i class="fas fa-times"></i></button>
                     </div>
                     <button id="undoButton" class="action-icon-btn" title="Cofnij (Ctrl+Z)" disabled><i class="fas fa-undo"></i></button>
-                    <button id="printChangesTable" class="action-icon-btn active" title="Drukuj Grafik Harmonogramu" style="display: none;"><i class="fas fa-print"></i></button>
+                    <button id="printChangesTable" class="action-icon-btn active" title="Drukuj Grafik Zmian" style="display: none;"><i class="fas fa-file-pdf"></i></button>
                     <button id="printLeavesNavbarBtn" class="action-icon-btn active" title="Drukuj Grafik Urlopów" style="display: none;"><i class="fas fa-file-pdf"></i></button>
                 </div>
             </div>
@@ -157,7 +157,7 @@ export const UIShell: UIShellAPI = (() => {
                 scheduleActionButtons.style.display = pageName === 'schedule' ? 'flex' : 'none';
             }
             if (printChangesTable) {
-                printChangesTable.style.display = pageName === 'schedule' ? 'inline-block' : 'none';
+                printChangesTable.style.display = pageName === 'changes' ? 'inline-block' : 'none';
             }
             if (printLeavesNavbarBtn) {
                 printLeavesNavbarBtn.style.display = pageName === 'leaves' ? 'inline-block' : 'none';
