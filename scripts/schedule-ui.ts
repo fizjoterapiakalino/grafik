@@ -154,9 +154,11 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             const wrapper = document.createElement('div');
             wrapper.className = 'split-cell-wrapper';
 
-            displayData.parts.forEach((part) => {
+            displayData.parts.forEach((part, index) => {
                 const div = document.createElement('div');
                 div.setAttribute('tabindex', '0');
+                div.setAttribute('draggable', 'true');
+                div.setAttribute('data-split-part', String(index + 1)); // 1 = górna, 2 = dolna
 
                 const span = document.createElement('span');
                 span.textContent = part.text;
@@ -206,15 +208,57 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         const table = document.getElementById('mainScheduleTable') as HTMLTableElement | null;
         if (table) table.style.display = 'none';
 
-        const employeeIndex = employeeIndices[0];
-        if (employeeIndex === undefined) {
+        if (employeeIndices.length === 0) {
             mobileContainer.textContent = 'Brak danych pracownika do wyświetlenia.';
             return;
         }
 
         if (!_appState) return;
 
-        const employeeData = EmployeeManager.getById(employeeIndex);
+        // Get selected employee index from container's data attribute, or default to first
+        let selectedEmployeeIndex = mobileContainer.dataset.selectedEmployee || employeeIndices[0];
+
+        // Validate that selected employee is still in the list
+        if (!employeeIndices.includes(selectedEmployeeIndex)) {
+            selectedEmployeeIndex = employeeIndices[0];
+        }
+
+        // Add employee selector if multiple employees
+        if (employeeIndices.length > 1) {
+            const selectorWrapper = document.createElement('div');
+            selectorWrapper.className = 'mobile-employee-selector';
+
+            const label = document.createElement('label');
+            label.textContent = 'Wybierz pracownika: ';
+            label.htmlFor = 'mobileEmployeeSelect';
+            selectorWrapper.appendChild(label);
+
+            const select = document.createElement('select');
+            select.id = 'mobileEmployeeSelect';
+            select.className = 'employee-select';
+
+            employeeIndices.forEach((empId) => {
+                const option = document.createElement('option');
+                option.value = empId;
+                const empData = EmployeeManager.getById(empId);
+                option.textContent = capitalizeFirstLetter(empData?.displayName || `Pracownik ${parseInt(empId) + 1}`);
+                if (empId === selectedEmployeeIndex) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+
+            select.addEventListener('change', (e) => {
+                const newEmployeeId = (e.target as HTMLSelectElement).value;
+                mobileContainer!.dataset.selectedEmployee = newEmployeeId;
+                renderMobileView(employeeIndices);
+            });
+
+            selectorWrapper.appendChild(select);
+            mobileContainer.appendChild(selectorWrapper);
+        }
+
+        const employeeData = EmployeeManager.getById(selectedEmployeeIndex);
         const header = document.createElement('h3');
         header.textContent = `Grafik: ${capitalizeFirstLetter(employeeData?.displayName || 'Pracownik')}`;
         header.style.textAlign = 'center';
@@ -226,21 +270,29 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                 if (hour === AppConfig.schedule.endHour && minute === 30) continue;
 
                 const timeString = `${hour}:${minute.toString().padStart(2, '0')}`;
-                const cellData = _appState.scheduleCells[timeString]?.[employeeIndex] || {};
+                const cellData = _appState.scheduleCells[timeString]?.[selectedEmployeeIndex] || {};
                 const displayData = ScheduleLogic.getCellDisplayData(cellData);
 
                 const card = document.createElement('div');
                 card.className = 'appointment-card';
+                card.setAttribute('data-time', timeString);
 
                 const cardHeader = document.createElement('div');
                 cardHeader.className = 'card-header';
                 cardHeader.textContent = timeString;
+
+                // Add click handler for accordion toggle
+                cardHeader.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    card.classList.toggle('expanded');
+                });
+
                 card.appendChild(cardHeader);
 
                 const cardBody = document.createElement('div');
                 cardBody.className = 'card-body editable-cell';
                 cardBody.setAttribute('data-time', timeString);
-                cardBody.setAttribute('data-employee-index', employeeIndex);
+                cardBody.setAttribute('data-employee-index', selectedEmployeeIndex);
                 cardBody.setAttribute('tabindex', '0');
 
                 if (displayData.text) {
@@ -261,6 +313,34 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                 mobileContainer.appendChild(card);
             }
         }
+
+        // Auto-expand all cards from current time onwards
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes() < 30 ? 0 : 30;
+        const currentTimeString = `${currentHour}:${currentMinute.toString().padStart(2, '0')}`;
+
+        let foundCurrent = false;
+        const allCards = mobileContainer.querySelectorAll('.appointment-card');
+        allCards.forEach((card) => {
+            const cardTime = card.getAttribute('data-time');
+            if (cardTime === currentTimeString) {
+                foundCurrent = true;
+                card.classList.add('current-time');
+            }
+            // Expand all cards from current time onwards
+            if (foundCurrent) {
+                card.classList.add('expanded');
+            }
+        });
+
+        // Scroll to current time card
+        const currentCard = mobileContainer.querySelector('.current-time') as HTMLElement;
+        if (currentCard) {
+            setTimeout(() => {
+                currentCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        }
     };
 
     const renderTable = (): void => {
@@ -271,12 +351,10 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
 
         let employeeIndices: string[] = [];
         let isSingleUserView = false;
-        let isAdmin = false;
 
         const currentUser = auth.currentUser;
         if (currentUser) {
             if (EmployeeManager.isUserAdmin(currentUser.uid)) {
-                isAdmin = true;
                 const allEmployees = EmployeeManager.getAll();
                 employeeIndices = Object.keys(allEmployees)
                     .filter((id) => !allEmployees[id].isHidden)
@@ -297,7 +375,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             isSingleUserView = false;
         }
 
-        if (isMobile && !isAdmin) {
+        if (isMobile) {
             renderMobileView(employeeIndices);
             return;
         }

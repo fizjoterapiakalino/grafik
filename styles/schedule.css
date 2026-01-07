@@ -129,19 +129,19 @@ table.schedule-table tbody tr td.break-cell {
 }
 
 .pnf-text,
-td.split-cell > div.pnf-text > span {
+td.split-cell>div.pnf-text>span {
     color: var(--bg-pnf);
     font-weight: bold;
 }
 
 .massage-text,
-td.split-cell > div.massage-text > span {
+td.split-cell>div.massage-text>span {
     color: var(--bg-massage);
     font-weight: bold;
 }
 
 .every-other-day-text,
-td.split-cell > div.every-other-day-text > span {
+td.split-cell>div.every-other-day-text>span {
     color: var(--bg-every-other-day);
     font-weight: bold;
 }
@@ -265,7 +265,7 @@ td.split-cell {
     width: 100%;
 }
 
-.split-cell-wrapper > div {
+.split-cell-wrapper>div {
     flex: 1;
     display: flex;
     align-items: center;
@@ -281,11 +281,11 @@ td.split-cell {
     color: var(--color-text);
 }
 
-.split-cell-wrapper > div:last-child {
+.split-cell-wrapper>div:last-child {
     border-right: none;
 }
 
-.split-cell-wrapper > div:first-child {
+.split-cell-wrapper>div:first-child {
     border-right: 1px solid var(--color-border-dark);
 }
 
@@ -301,13 +301,13 @@ table.schedule-table tbody tr td.search-highlight.editable-cell {
     box-shadow: inset 0 0 0 2px var(--color-secondary);
 }
 
-table.schedule-table tbody tr.current-time-row > td:not(.break-cell) {
+table.schedule-table tbody tr.current-time-row>td:not(.break-cell) {
     background-color: #fffde7;
     /* Jasnożółte tło */
     font-weight: bold;
 }
 
-.schedule-table tbody tr.current-time-row > td:first-child {
+.schedule-table tbody tr.current-time-row>td:first-child {
     color: var(--color-text);
 }
 
@@ -333,6 +333,7 @@ td.current-time-highlight {
 }
 
 @keyframes bell-ring {
+
     0%,
     50%,
     100% {
@@ -422,19 +423,62 @@ td.current-time-highlight {
     .mobile-schedule-container {
         display: flex;
         flex-direction: column;
-        gap: var(--spacing-md);
+        gap: var(--spacing-xs);
+        /* Reduced from md to xs */
         padding: var(--spacing-sm);
     }
 
-    .appointment-card {
+    .mobile-employee-selector {
         background-color: var(--color-white);
+        padding: var(--spacing-md);
         border-radius: var(--border-radius);
         box-shadow: var(--shadow-sm);
         border: 1px solid var(--color-gray-200);
+        margin-bottom: var(--spacing-sm);
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
+    .mobile-employee-selector label {
+        font-weight: 600;
+        color: var(--color-gray-700);
+        font-size: 0.95em;
+    }
+
+    .mobile-employee-selector select {
+        padding: var(--spacing-sm) var(--spacing-md);
+        border: 1px solid var(--color-gray-300);
+        border-radius: var(--border-radius-sm);
+        background-color: var(--color-white);
+        color: var(--color-text);
+        font-size: 1em;
+        font-family: inherit;
+        cursor: pointer;
+        transition: border-color 0.2s;
+    }
+
+    .mobile-employee-selector select:focus {
+        outline: none;
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+
+    .appointment-card {
+        background-color: var(--color-white);
+        border-radius: var(--border-radius-sm);
+        /* Smaller radius */
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        /* Subtler shadow */
+        border: 1px solid var(--color-gray-300);
+        /* Darker border */
         overflow: hidden;
         transition:
-            transform 0.2s,
-            box-shadow 0.2s;
+            transform 0.15s,
+            box-shadow 0.15s;
+        margin-bottom: var(--spacing-xs);
+        /* Add margin between cards */
     }
 
     .appointment-card:active {
@@ -443,29 +487,71 @@ td.current-time-highlight {
 
     .card-header {
         background-color: var(--color-gray-100);
-        padding: var(--spacing-sm) var(--spacing-md);
-        font-weight: bold;
+        padding: 6px var(--spacing-sm);
+        /* Reduced vertical padding */
+        font-weight: 600;
+        font-size: 0.85em;
+        /* Smaller font */
         color: var(--color-gray-700);
         border-bottom: 1px solid var(--color-gray-200);
         display: flex;
         justify-content: space-between;
         align-items: center;
+        cursor: pointer;
+        /* Make it clickable */
+        user-select: none;
+        /* Prevent text selection */
+    }
+
+    /* Add chevron icon to indicate expandable */
+    .card-header::after {
+        content: '▼';
+        font-size: 0.75em;
+        color: var(--color-gray-500);
+        transition: transform 0.3s ease;
+    }
+
+    /* Rotate chevron when expanded */
+    .appointment-card.expanded .card-header::after {
+        transform: rotate(180deg);
+    }
+
+    /* Highlight current time slot */
+    .appointment-card.current-time .card-header {
+        background-color: var(--color-primary-100);
+        color: var(--color-primary-700);
+        font-weight: 700;
+    }
+
+    /* Hide card body when collapsed */
+    .appointment-card:not(.expanded) .card-body {
+        display: none;
     }
 
     .card-body {
-        padding: var(--spacing-md);
-        min-height: 40px;
+        padding: var(--spacing-sm);
+        /* Reduced from md */
+        min-height: 28px;
+        /* Reduced from 40px */
         display: flex;
         align-items: center;
         justify-content: center;
         text-align: center;
         cursor: pointer;
+        font-size: 0.9em;
+        /* Slightly smaller text */
+        line-height: 1.3;
     }
 
     .card-body.empty-slot {
-        color: var(--color-gray-400);
+        color: var(--color-gray-500);
+        /* Darker for better contrast */
         font-style: italic;
         background-color: var(--color-gray-50);
+        font-size: 0.85em;
+        /* Even smaller for empty slots */
+        min-height: 24px;
+        /* Smaller empty slots */
     }
 
     /* Reuse existing text classes */
@@ -586,4 +672,50 @@ td.current-time-highlight {
 .gender-icon.female::before {
     content: '\f221';
     color: var(--bg-massage);
+}
+
+/* --- Style dla Drag & Drop --- */
+
+/* Komórka lub część split obecnie przeciągana */
+.schedule-table td.editable-cell.is-dragging,
+.split-cell-wrapper > div.is-dragging {
+    opacity: 0.5;
+    background-color: var(--color-gray-200);
+    outline: 2px dashed var(--color-primary);
+}
+
+/* Komórka zawierająca przeciąganą część */
+.schedule-table td.editable-cell.has-dragging-part {
+    background-color: var(--color-gray-100);
+}
+
+/* Cel upuszczania - podświetlenie */
+.schedule-table td.editable-cell.drag-over-target,
+.split-cell-wrapper > div.drag-over-target {
+    background-color: var(--color-primary-100);
+    outline: 2px solid var(--color-primary);
+    box-shadow: inset 0 0 8px rgba(59, 130, 246, 0.3);
+}
+
+/* Kursor dla przeciągalnych elementów */
+.schedule-table td.editable-cell[draggable="true"]:not(.break-cell) {
+    cursor: grab;
+}
+
+.schedule-table td.editable-cell[draggable="true"]:not(.break-cell):active {
+    cursor: grabbing;
+}
+
+/* Kursor dla części split */
+.split-cell-wrapper > div[draggable="true"] {
+    cursor: grab;
+}
+
+.split-cell-wrapper > div[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+/* Podświetlenie części split przy hover podczas przeciągania */
+.split-cell-wrapper > div[draggable="true"]:hover {
+    background-color: var(--color-gray-50);
 }

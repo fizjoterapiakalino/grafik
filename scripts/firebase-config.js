@@ -275,11 +275,12 @@ export { signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWith
 if (typeof window !== 'undefined') {
     window.db = db;
     window.auth = auth;
-    // Emulacja starego API firebase.firestore.FieldValue
+    // Emulacja starego API firebase.firestore.FieldValue i firebase.auth()
     window.firebase = {
         firestore: {
             FieldValue: FieldValue,
         },
+        auth: () => auth,
     };
 }
 
