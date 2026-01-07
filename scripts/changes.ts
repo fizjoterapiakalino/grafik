@@ -735,12 +735,63 @@ export const Changes: ChangesAPI = (() => {
         await refreshView();
         await EmployeeManager.load();
 
+        // Setup mobile accordion
+        setupMobileAccordion();
+
         const contextMenuItems = [
             { id: 'ctxCopyCell', action: (cell: HTMLElement) => copyCell(cell as HTMLTableCellElement) },
             { id: 'ctxPasteCell', action: (cell: HTMLElement) => pasteCell(cell as HTMLTableCellElement) },
             { id: 'ctxClearCell', action: (cell: HTMLElement) => clearCell(cell as HTMLTableCellElement) },
         ];
         window.initializeContextMenu('changesContextMenu', '#changesTableBody td:not(.leaves-cell)', contextMenuItems);
+    };
+
+    const setupMobileAccordion = (): void => {
+        // Only setup on mobile screens
+        if (window.innerWidth > 768) return;
+
+        const tableBody = document.getElementById('changesTableBody');
+        if (!tableBody) return;
+
+        // Add click handlers for accordion toggle
+        tableBody.addEventListener('click', (event: Event) => {
+            const target = event.target as HTMLElement;
+            const firstCell = target.closest('td:first-child');
+
+            if (firstCell) {
+                const row = firstCell.closest('tr');
+                if (row) {
+                    row.classList.toggle('expanded');
+                }
+                event.stopPropagation();
+            }
+        }, true);
+
+        // Find and expand current period
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+
+        const rows = tableBody.querySelectorAll('tr');
+        rows.forEach((row) => {
+            const tr = row as HTMLTableRowElement;
+            const startDateStr = tr.dataset.startDate;
+            const endDateStr = tr.dataset.endDate;
+
+            if (startDateStr && endDateStr) {
+                const periodStart = new Date(startDateStr);
+                const periodEnd = new Date(endDateStr);
+
+                // Check if today falls within this period
+                if (today >= periodStart && today <= periodEnd) {
+                    tr.classList.add('expanded', 'current-period');
+                    // Scroll to current period
+                    setTimeout(() => {
+                        tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+                }
+            }
+        });
     };
 
     const destroy = (): void => {

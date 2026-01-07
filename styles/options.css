@@ -281,3 +281,353 @@
 .backup-info #lastBackupDate {
     font-weight: bold;
 }
+
+/* ============================================
+   PRIORITY 1 UI/UX ENHANCEMENTS
+   ============================================ */
+
+/* --- Form Sections with Visual Separators --- */
+.form-section {
+    background: var(--color-gray-50);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.form-section:hover {
+    border-color: var(--color-primary-300);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 var(--spacing-md) 0;
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 2px solid var(--color-primary-200);
+    color: var(--color-primary-700);
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+.section-title i {
+    color: var(--color-primary-500);
+}
+
+/* --- Form Row for Side-by-Side Inputs --- */
+.form-row {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+.form-row .form-group {
+    flex: 1;
+}
+
+/* --- Field Hints --- */
+.field-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.85em;
+    color: var(--color-gray-500);
+    font-style: italic;
+}
+
+/* --- Input with Suffix (e.g., "dni") --- */
+.input-with-suffix {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.input-with-suffix input {
+    flex: 0 0 100px;
+    text-align: center;
+}
+
+.input-suffix {
+    color: var(--color-gray-500);
+    font-weight: 500;
+}
+
+/* --- Checkbox Group with Icons and Tooltips --- */
+.checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.form-group-checkbox {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--border-radius-sm);
+    transition: all 0.2s ease;
+    position: relative;
+    cursor: pointer;
+}
+
+.form-group-checkbox:hover {
+    background: var(--color-primary-50);
+    border-color: var(--color-primary-300);
+}
+
+.form-group-checkbox input[type='checkbox'] {
+    margin-right: 10px;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--color-primary-500);
+}
+
+.form-group-checkbox label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0;
+    cursor: pointer;
+    flex: 1;
+    font-weight: 500;
+    color: var(--color-gray-700);
+}
+
+.checkbox-icon {
+    color: var(--color-gray-400);
+    font-size: 0.9em;
+    width: 18px;
+    text-align: center;
+}
+
+.form-group-checkbox:hover .checkbox-icon {
+    color: var(--color-primary-500);
+}
+
+/* --- Tooltip Indicator --- */
+.tooltip-indicator {
+    margin-left: auto;
+    color: var(--color-gray-400);
+    cursor: help;
+    transition: color 0.2s;
+}
+
+.tooltip-indicator:hover {
+    color: var(--color-secondary-500);
+}
+
+/* Tooltip on hover */
+.form-group-checkbox[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--color-gray-800);
+    color: white;
+    padding: 8px 12px;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.85em;
+    font-weight: 400;
+    white-space: normal;
+    max-width: 280px;
+    z-index: 100;
+    box-shadow: var(--shadow-lg);
+    animation: tooltipFadeIn 0.2s ease;
+}
+
+.form-group-checkbox[data-tooltip]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: var(--color-gray-800);
+    z-index: 100;
+}
+
+@keyframes tooltipFadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* --- Sticky Form Actions Footer --- */
+.form-actions-footer {
+    position: sticky;
+    bottom: 0;
+    background: linear-gradient(to top, var(--color-white) 80%, transparent);
+    padding: var(--spacing-lg) 0;
+    margin-top: var(--spacing-md);
+    display: flex;
+    gap: 10px;
+    justify-content: flex-start;
+    border-top: 1px solid var(--color-gray-200);
+}
+
+/* --- Employee List Item with Initials Avatar --- */
+.employee-list-item {
+    padding: 12px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--color-gray-100);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.employee-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-primary-400), var(--color-primary-600));
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.9em;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+}
+
+.employee-list-item.active .employee-avatar {
+    background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700));
+    box-shadow: 0 3px 8px rgba(16, 185, 129, 0.4);
+}
+
+.employee-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.employee-name {
+    font-weight: 500;
+    color: var(--color-gray-700);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.employee-list-item.active .employee-name {
+    color: var(--color-primary-700);
+    font-weight: 600;
+}
+
+/* --- Employee Status Badges --- */
+.employee-badges {
+    display: flex;
+    gap: 4px;
+}
+
+.employee-badge {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65em;
+}
+
+.employee-badge.admin {
+    background: var(--color-warning);
+    color: white;
+}
+
+.employee-badge.hidden {
+    background: var(--color-gray-400);
+    color: white;
+}
+
+.employee-badge.schedule-only {
+    background: var(--color-secondary-500);
+    color: white;
+}
+
+/* --- Employee Counter --- */
+.employee-counter {
+    font-size: 0.85em;
+    color: var(--color-gray-500);
+    margin-bottom: var(--spacing-sm);
+    padding: var(--spacing-xs) 0;
+}
+
+.employee-counter strong {
+    color: var(--color-primary-600);
+}
+
+/* --- UID Input Group Improvements --- */
+.uid-input-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.uid-input-group input[type='text'] {
+    flex: 1;
+    min-width: 200px;
+    font-family: monospace;
+    font-size: 0.9em;
+    color: var(--color-gray-600);
+}
+
+/* --- Responsive Adjustments for Mobile --- */
+@media (max-width: 768px) {
+    .form-row {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
+    .form-section {
+        padding: var(--spacing-sm);
+    }
+
+    .section-title {
+        font-size: 1em;
+    }
+
+    .form-group-checkbox[data-tooltip]:hover::after {
+        left: 10px;
+        transform: none;
+        max-width: calc(100% - 20px);
+    }
+
+    .form-group-checkbox[data-tooltip]:hover::before {
+        left: 30px;
+        transform: none;
+    }
+
+    .uid-input-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .uid-actions {
+        justify-content: stretch;
+    }
+
+    .uid-actions .action-btn {
+        flex: 1;
+    }
+
+    .form-actions-footer {
+        flex-direction: column;
+    }
+
+    .form-actions-footer .action-btn {
+        width: 100%;
+    }
+}

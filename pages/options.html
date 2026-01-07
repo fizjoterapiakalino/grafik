@@ -24,59 +24,102 @@
         </div>
 
         <div id="detailsEditForm" class="details-edit-form" style="display: none">
-            <h3>Edytuj dane pracownika</h3>
-            <div class="form-group">
-                <label for="employeeFirstNameInput">Imię</label>
-                <input type="text" id="employeeFirstNameInput" />
-            </div>
-            <div class="form-group">
-                <label for="employeeLastNameInput">Nazwisko</label>
-                <input type="text" id="employeeLastNameInput" />
-            </div>
-            <div class="form-group">
-                <label for="employeeDisplayNameInput">Nazwa wyświetlana</label>
-                <input type="text" id="employeeDisplayNameInput" />
-            </div>
-            <div class="form-group">
-                <label for="employeeNumberInput">Numer pracownika</label>
-                <input type="text" id="employeeNumberInput" />
-            </div>
-            <div class="form-group">
-                <label for="leaveEntitlementInput">Urlop należny w roku:</label>
-                <input type="number" id="leaveEntitlementInput" min="0" value="26" />
-            </div>
-            <!-- Usunięto: Urlop zaległy (edytowany teraz w podsumowaniu rocznym na stronie urlopów) -->
-            <div class="form-group form-group-checkbox">
-                <input type="checkbox" id="employeeRoleAdmin" />
-                <label for="employeeRoleAdmin">Administrator (pełny dostęp)</label>
-            </div>
-            <div class="form-group form-group-checkbox">
-                <input type="checkbox" id="employeeIsHidden" />
-                <label for="employeeIsHidden">Ukryj w grafiku (zachowaj w systemie)</label>
-            </div>
-            <div class="form-group form-group-checkbox">
-                <input type="checkbox" id="employeeIsScheduleOnly" />
-                <label for="employeeIsScheduleOnly">Widoczny TYLKO w Grafiku (tzw. skoczek)</label>
-            </div>
-            <div class="form-group">
-                <label for="employeeUidInput">Przypisany Użytkownik (UID)</label>
-                <div class="uid-input-group">
-                    <input type="text" id="employeeUidInput" readonly placeholder="Brak przypisanego użytkownika" />
-                    <div class="uid-actions">
-                        <button id="assignUidBtn" class="action-btn secondary">Przypisz do mnie</button>
-                        <button id="clearUidBtn" class="action-btn danger">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
+            <!-- Sekcja: Dane podstawowe -->
+            <div class="form-section">
+                <h3 class="section-title"><i class="fas fa-user-edit"></i> Dane podstawowe</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="employeeFirstNameInput">Imię</label>
+                        <input type="text" id="employeeFirstNameInput" placeholder="np. Jan" />
+                    </div>
+                    <div class="form-group">
+                        <label for="employeeLastNameInput">Nazwisko</label>
+                        <input type="text" id="employeeLastNameInput" placeholder="np. Kowalski" />
                     </div>
                 </div>
-                <div class="form-actions">
-                    <button id="saveEmployeeBtn" class="action-btn primary">
-                        <i class="fas fa-save"></i> Zapisz zmiany
-                    </button>
-                    <button id="deleteEmployeeBtn" class="action-btn danger">
-                        <i class="fas fa-trash-alt"></i> Usuń pracownika
-                    </button>
+                <div class="form-group">
+                    <label for="employeeDisplayNameInput">Nazwa wyświetlana</label>
+                    <input type="text" id="employeeDisplayNameInput" placeholder="np. Jan K." />
+                    <span class="field-hint">Ta nazwa będzie widoczna w grafiku i na liście urlopów</span>
                 </div>
+                <div class="form-group">
+                    <label for="employeeNumberInput">Numer pracownika</label>
+                    <input type="text" id="employeeNumberInput" placeholder="np. 001" />
+                </div>
+            </div>
+
+            <!-- Sekcja: Urlopy -->
+            <div class="form-section">
+                <h3 class="section-title"><i class="fas fa-umbrella-beach"></i> Urlopy</h3>
+                <div class="form-group">
+                    <label for="leaveEntitlementInput">Urlop należny w roku</label>
+                    <div class="input-with-suffix">
+                        <input type="number" id="leaveEntitlementInput" min="0" value="26" />
+                        <span class="input-suffix">dni</span>
+                    </div>
+                    <span class="field-hint">Urlop zaległy możesz edytować w podsumowaniu rocznym na stronie urlopów</span>
+                </div>
+            </div>
+
+            <!-- Sekcja: Ustawienia -->
+            <div class="form-section">
+                <h3 class="section-title"><i class="fas fa-cog"></i> Ustawienia</h3>
+                <div class="checkbox-group">
+                    <div class="form-group form-group-checkbox" data-tooltip="Administratorzy mają pełny dostęp do edycji grafiku, urlopów i ustawień wszystkich pracowników">
+                        <input type="checkbox" id="employeeRoleAdmin" />
+                        <label for="employeeRoleAdmin">
+                            <i class="fas fa-key checkbox-icon"></i>
+                            Administrator
+                        </label>
+                        <span class="tooltip-indicator"><i class="fas fa-info-circle"></i></span>
+                    </div>
+                    <div class="form-group form-group-checkbox" data-tooltip="Pracownik nie będzie widoczny w grafiku, ale zachowa wszystkie dane w systemie">
+                        <input type="checkbox" id="employeeIsHidden" />
+                        <label for="employeeIsHidden">
+                            <i class="fas fa-eye-slash checkbox-icon"></i>
+                            Ukryty w grafiku
+                        </label>
+                        <span class="tooltip-indicator"><i class="fas fa-info-circle"></i></span>
+                    </div>
+                    <div class="form-group form-group-checkbox" data-tooltip="Pracownik widoczny tylko w Grafiku - nie pojawia się w urlopach ani podsumowaniach (tzw. skoczek)">
+                        <input type="checkbox" id="employeeIsScheduleOnly" />
+                        <label for="employeeIsScheduleOnly">
+                            <i class="fas fa-running checkbox-icon"></i>
+                            Tylko w grafiku
+                        </label>
+                        <span class="tooltip-indicator"><i class="fas fa-info-circle"></i></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sekcja: Przypisanie konta -->
+            <div class="form-section">
+                <h3 class="section-title"><i class="fas fa-link"></i> Przypisanie konta</h3>
+                <div class="form-group">
+                    <label for="employeeUidInput">Przypisany użytkownik (UID)</label>
+                    <div class="uid-input-group">
+                        <input type="text" id="employeeUidInput" readonly placeholder="Brak przypisanego użytkownika" />
+                        <div class="uid-actions">
+                            <button id="assignUidBtn" class="action-btn secondary" title="Przypisz swoje konto do tego pracownika">
+                                <i class="fas fa-user-plus"></i> Przypisz do mnie
+                            </button>
+                            <button id="clearUidBtn" class="action-btn danger" title="Usuń przypisanie konta">
+                                <i class="fas fa-unlink"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <span class="field-hint">Przypisanie konta pozwala pracownikowi na logowanie się i edycję własnego grafiku</span>
+                </div>
+            </div>
+
+            <!-- Sticky footer z przyciskami akcji -->
+            <div class="form-actions-footer">
+                <button id="saveEmployeeBtn" class="action-btn primary">
+                    <i class="fas fa-save"></i> Zapisz zmiany
+                </button>
+                <button id="deleteEmployeeBtn" class="action-btn danger">
+                    <i class="fas fa-trash-alt"></i> Usuń pracownika
+                </button>
             </div>
         </div>
     </div>

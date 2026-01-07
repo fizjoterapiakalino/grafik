@@ -364,6 +364,36 @@ export const Leaves: LeavesAPI = (() => {
         clearFiltersBtn?.addEventListener('click', handleClearFilters);
         currentYearBtn?.addEventListener('click', handleCurrentYearClick);
         printLeavesNavbarBtn?.addEventListener('click', handlePrintLeaves);
+
+        // Mobile accordion functionality
+        setupMobileAccordion();
+    };
+
+    const setupMobileAccordion = (): void => {
+        // Only setup on mobile screens
+        if (window.innerWidth > 768) return;
+
+        const handleCardToggle = (event: Event): void => {
+            const target = event.target as HTMLElement;
+            const nameCell = target.closest('.employee-name-cell, .summary-table td:first-child');
+
+            if (nameCell) {
+                const row = nameCell.closest('tr');
+                if (row) {
+                    row.classList.toggle('expanded');
+                }
+                // Prevent event from bubbling to _handleTableClick
+                event.stopPropagation();
+            }
+        };
+
+        leavesTableBody?.addEventListener('click', handleCardToggle, true);
+
+        // Also setup for summary and care views
+        const summaryTableBody = document.getElementById('summaryTableBody');
+        const careTableBody = document.getElementById('careTableBody');
+        summaryTableBody?.addEventListener('click', handleCardToggle, true);
+        careTableBody?.addEventListener('click', handleCardToggle, true);
     };
 
     const handleClearFilters = async (): Promise<void> => {

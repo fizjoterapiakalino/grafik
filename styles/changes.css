@@ -177,4 +177,180 @@
         width: 100%;
         justify-content: space-between;
     }
+
+    /* Hide table header on mobile */
+    .changes-table thead {
+        border: none;
+        clip: rect(0 0 0 0);
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        padding: 0;
+        position: absolute;
+        width: 1px;
+    }
+
+    /* Transform table to card layout */
+    .changes-table,
+    .changes-table tbody,
+    .changes-table tr,
+    .changes-table td {
+        display: block;
+    }
+
+    .changes-table tr {
+        background-color: var(--color-white);
+        border: 1px solid var(--color-gray-300);
+        margin-bottom: var(--spacing-sm);
+        border-radius: var(--border-radius-sm);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        padding: 0;
+        /* Remove padding for accordion */
+        overflow: hidden;
+        transition: box-shadow 0.2s ease;
+    }
+
+    .changes-table tr:active {
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    }
+
+    /* Period header (first cell) - clickable */
+    .changes-table td:first-child {
+        font-size: 1.1em;
+        font-weight: 700;
+        text-align: left;
+        border: none;
+        border-bottom: 2px solid var(--color-gray-200);
+        margin-bottom: 0;
+        padding: var(--spacing-sm);
+        background-color: var(--color-gray-50);
+        color: var(--color-primary-600);
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    /* Add chevron icon */
+    .changes-table td:first-child::after {
+        content: '▼';
+        font-size: 0.8em;
+        color: var(--color-gray-500);
+        transition: transform 0.3s ease;
+    }
+
+    /* Rotate chevron when expanded */
+    .changes-table tr.expanded td:first-child::after {
+        transform: rotate(180deg);
+    }
+
+    /* Current period highlight */
+    .changes-table tr.current-period td:first-child {
+        background-color: var(--color-primary-100);
+        color: var(--color-primary-700);
+    }
+
+    /* Hide content when collapsed */
+    .changes-table tr:not(.expanded) td:not(:first-child) {
+        display: none;
+    }
+
+    /* Data cells with labels (only visible when expanded) */
+    .changes-table tr.expanded td:not(:first-child):not(.leaves-cell) {
+        border: none;
+        border-bottom: 1px solid var(--color-gray-100);
+        position: relative;
+        padding: var(--spacing-xs) var(--spacing-sm);
+        text-align: left;
+        min-height: 36px;
+        display: grid;
+        grid-template-columns: 140px 1fr;
+        gap: var(--spacing-xs);
+        align-items: center;
+    }
+
+    .changes-table td:last-child {
+        border-bottom: none;
+    }
+
+    /* Labels using pseudo-elements */
+    .changes-table td:nth-of-type(2)::before {
+        content: 'HYDRO 7-14:30';
+    }
+
+    .changes-table td:nth-of-type(3)::before {
+        content: 'MASAŻ 7-14:30';
+    }
+
+    .changes-table td:nth-of-type(4)::before {
+        content: 'FIZYKO 7-14:30';
+    }
+
+    .changes-table td:nth-of-type(5)::before {
+        content: 'SALA 7-14:30';
+    }
+
+    .changes-table td:nth-of-type(6)::before {
+        content: 'MASAŻ 10:30-18';
+    }
+
+    .changes-table td:nth-of-type(7)::before {
+        content: 'FIZYKO 10:30-18';
+    }
+
+    .changes-table td:nth-of-type(8)::before {
+        content: 'SALA 10:30-18';
+    }
+
+    .changes-table td:nth-of-type(9)::before {
+        content: 'URLOPY';
+    }
+
+    .changes-table td:not(:first-child):not(.leaves-cell)::before {
+        font-weight: 600;
+        color: var(--color-gray-700);
+        /* Darker for better contrast */
+        font-size: 0.85em;
+        /* Smaller font */
+        white-space: nowrap;
+    }
+
+    /* Leaves cell special styling */
+    .changes-table .leaves-cell {
+        text-align: left;
+        padding: var(--spacing-sm) 0;
+        /* Reduced padding */
+        border-top: 2px solid var(--color-gray-200);
+        margin-top: var(--spacing-xs);
+        font-size: 0.85em;
+        /* Smaller font */
+        line-height: 1.4;
+    }
+
+    .changes-table .leaves-cell::before {
+        display: block;
+        margin-bottom: var(--spacing-xs);
+        font-weight: 700;
+        color: var(--color-gray-800);
+    }
+
+    /* Improve leave entry styling */
+    .changes-table .leave-entry {
+        display: block;
+        padding: 2px 0;
+        font-size: 0.9em;
+    }
+
+    /* Modal adjustments for mobile */
+    #employeeSelectionModal .modal-content {
+        width: 95%;
+        max-width: none;
+        margin: 10% auto;
+        padding: var(--spacing-md);
+    }
+
+    #employeeSelectionModal .employee-grid {
+        grid-template-columns: 1fr;
+    }
 }

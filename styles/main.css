@@ -141,6 +141,8 @@ body {
     /* Padding zamiast marginesu, by scrollbar był przy krawędzi */
     width: 100%;
     box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;
+    /* Płynne scrollowanie na iOS/Chrome */
 }
 
 /* --- Ekran ładowania --- */
@@ -466,4 +468,78 @@ body {
 
 #loadingOverlay:not(.hidden) {
     opacity: 1;
+}
+
+/* Mobile responsive fixes */
+@media (max-width: 768px) {
+
+    /* Toast container - move to bottom center to avoid hamburger */
+    #toast-container {
+        bottom: 70px;
+        /* Above FAB menu */
+        right: 50%;
+        transform: translateX(50%);
+        align-items: center;
+        max-width: calc(100% - 20px);
+    }
+
+    .toast {
+        max-width: 100%;
+        text-align: center;
+        padding: 12px 16px;
+        font-size: 0.9em;
+    }
+
+    /* Day progress bar - stack vertically and prevent overflow */
+    .day-progress-bar {
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px 12px;
+        width: 100%;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+    .day-progress-info,
+    .day-progress-info-right {
+        min-width: unset;
+        width: 100%;
+        text-align: center;
+    }
+
+    .day-progress-info-right {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    /* Progress track - make bar visible on mobile */
+    .day-progress-track {
+        width: 100%;
+        min-width: unset;
+        height: 10px;
+        flex: none;
+        margin: 8px 0;
+    }
+
+    .day-progress-fill {
+        height: 100%;
+    }
+
+    .day-progress-marker {
+        width: 16px;
+        height: 16px;
+    }
+
+    .progress-bar-container {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    #dayProgressContainer {
+        margin: 8px 0;
+        padding: 0 var(--spacing-sm);
+        box-sizing: border-box;
+        overflow: hidden;
+    }
 }

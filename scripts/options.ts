@@ -173,8 +173,17 @@ export const Options: OptionsAPI = (() => {
         if (!employeeListContainer) return;
 
         employeeListContainer.innerHTML = '';
-        if (Object.keys(employees).length === 0) {
-            employeeListContainer.innerHTML = '<p class="empty-list-info">Brak pracowników. Dodaj pierwszego!</p>';
+
+        const employeeCount = Object.keys(employees).length;
+
+        // Dodaj licznik pracowników
+        const counterDiv = document.createElement('div');
+        counterDiv.className = 'employee-counter';
+        counterDiv.innerHTML = `Pracownicy: <strong>${employeeCount}</strong>`;
+        employeeListContainer.appendChild(counterDiv);
+
+        if (employeeCount === 0) {
+            employeeListContainer.innerHTML += '<p class="empty-list-info">Brak pracowników. Dodaj pierwszego!</p>';
             return;
         }
 
@@ -184,17 +193,53 @@ export const Options: OptionsAPI = (() => {
                 firstName: data.firstName,
                 lastName: data.lastName,
                 displayName: data.displayName || data.name,
+                isAdmin: data.role === 'admin',
+                isHidden: data.isHidden || false,
+                isScheduleOnly: data.isScheduleOnly || false,
             }))
             .sort((a, b) => a.index - b.index);
 
-        sortedEmployees.forEach(({ index, firstName, lastName, displayName }) => {
+        sortedEmployees.forEach(({ index, firstName, lastName, displayName, isAdmin, isHidden, isScheduleOnly }) => {
             const nameToDisplay = firstName && lastName ? `${firstName} ${lastName}` : displayName;
             if (!nameToDisplay) return;
+
+            // Generuj inicjały
+            const getInitials = (name: string): string => {
+                const parts = name.trim().split(/\s+/);
+                if (parts.length >= 2) {
+                    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+                }
+                return name.substring(0, 2).toUpperCase();
+            };
+
+            const initials = getInitials(nameToDisplay);
+
+            // Generuj badge'e statusu
+            let badgesHtml = '';
+            if (isAdmin || isHidden || isScheduleOnly) {
+                badgesHtml = '<div class="employee-badges">';
+                if (isAdmin) {
+                    badgesHtml += '<span class="employee-badge admin" title="Administrator"><i class="fas fa-key"></i></span>';
+                }
+                if (isHidden) {
+                    badgesHtml += '<span class="employee-badge hidden" title="Ukryty w grafiku"><i class="fas fa-eye-slash"></i></span>';
+                }
+                if (isScheduleOnly) {
+                    badgesHtml += '<span class="employee-badge schedule-only" title="Tylko w grafiku"><i class="fas fa-running"></i></span>';
+                }
+                badgesHtml += '</div>';
+            }
 
             const item = document.createElement('div');
             item.className = 'employee-list-item';
             item.dataset.employeeIndex = String(index);
-            item.innerHTML = `<i class="fas fa-user"></i> <span>${nameToDisplay}</span>`;
+            item.innerHTML = `
+                <div class="employee-avatar">${initials}</div>
+                <div class="employee-info">
+                    <span class="employee-name">${nameToDisplay}</span>
+                </div>
+                ${badgesHtml}
+            `;
 
             item.addEventListener('click', () => handleEmployeeSelect(index));
             employeeListContainer!.appendChild(item);
@@ -229,11 +274,26 @@ export const Options: OptionsAPI = (() => {
     const filterEmployees = (): void => {
         if (!employeeSearchInput) return;
         const searchTerm = employeeSearchInput.value.toLowerCase();
+        let visibleCount = 0;
+        const totalCount = document.querySelectorAll('.employee-list-item').length;
+
         document.querySelectorAll('.employee-list-item').forEach((item) => {
             const el = item as HTMLElement;
-            const name = el.querySelector('span')?.textContent?.toLowerCase() || '';
-            el.style.display = name.includes(searchTerm) ? 'flex' : 'none';
+            const name = el.querySelector('.employee-name')?.textContent?.toLowerCase() || '';
+            const isVisible = name.includes(searchTerm);
+            el.style.display = isVisible ? 'flex' : 'none';
+            if (isVisible) visibleCount++;
         });
+
+        // Aktualizuj licznik
+        const counter = document.querySelector('.employee-counter');
+        if (counter) {
+            if (searchTerm) {
+                counter.innerHTML = `Wyświetlono: <strong>${visibleCount}</strong> z ${totalCount}`;
+            } else {
+                counter.innerHTML = `Pracownicy: <strong>${totalCount}</strong>`;
+            }
+        }
     };
 
     const handleAddEmployee = async (): Promise<void> => {

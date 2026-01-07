@@ -939,27 +939,70 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     .leaves-table tr,
     .summary-table tr {
         background-color: var(--color-white);
-        border: 1px solid var(--color-gray-200);
-        margin-bottom: var(--spacing-md);
-        border-radius: var(--border-radius);
-        box-shadow: var(--shadow-sm);
-        padding: var(--spacing-sm);
+        border: 1px solid var(--color-gray-300);
+        /* Darker border */
+        margin-bottom: var(--spacing-sm);
+        /* Reduced spacing */
+        border-radius: var(--border-radius-sm);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        /* Subtler shadow */
+        padding: 0;
+        /* Remove padding - will be added to individual sections */
+        overflow: hidden;
+        /* For smooth collapse animation */
+        transition: box-shadow 0.2s ease;
     }
 
-    /* Employee Name styling (Card Header) */
+    .leaves-table tr:active,
+    .summary-table tr:active {
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    }
+
+    /* Employee Name styling (Card Header) - Now clickable */
     .leaves-table td.employee-name-cell,
     .summary-table td:first-child {
-        font-size: 1.2em;
-        font-weight: bold;
+        font-size: 1.1em;
+        /* Slightly smaller */
+        font-weight: 700;
         text-align: left;
         border: none;
-        border-bottom: 2px solid var(--color-gray-100);
-        margin-bottom: var(--spacing-sm);
-        padding-left: 0;
-        background-color: transparent;
-        position: static;
-        /* Disable sticky on mobile card view */
+        border-bottom: 2px solid var(--color-gray-200);
+        margin-bottom: 0;
+        /* Remove margin */
+        padding: var(--spacing-sm);
+        /* Add padding */
+        background-color: var(--color-gray-50);
+        position: relative;
         color: var(--color-primary-600);
+        cursor: pointer;
+        /* Make it clickable */
+        user-select: none;
+        /* Prevent text selection */
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    /* Add chevron icon to indicate expandable */
+    .leaves-table td.employee-name-cell::after,
+    .summary-table td:first-child::after {
+        content: '▼';
+        font-size: 0.8em;
+        color: var(--color-gray-500);
+        transition: transform 0.3s ease;
+    }
+
+    /* Rotate chevron when expanded */
+    .leaves-table tr.expanded td.employee-name-cell::after,
+    .summary-table tr.expanded td:first-child::after {
+        transform: rotate(180deg);
+    }
+
+    /* Collapsible content wrapper */
+    .leaves-table tr:not(.expanded) td:not(.employee-name-cell),
+    .summary-table tr:not(.expanded) td:not(:first-child) {
+        display: none;
+        /* Hide content when collapsed */
     }
 
     /* Data cells */
@@ -968,12 +1011,17 @@ table.summary-table tbody tr td.editable-carried-over:focus {
         border: none;
         border-bottom: 1px solid var(--color-gray-100);
         position: relative;
-        padding-left: 50%;
-        text-align: right;
-        min-height: 30px;
+        padding: var(--spacing-xs) var(--spacing-sm);
+        /* Add horizontal padding */
+        text-align: left;
+        /* Changed to left */
+        min-height: 32px;
+        /* Reduced min-height */
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        justify-content: flex-start;
+        /* Changed to flex-start */
+        gap: var(--spacing-xs);
     }
 
     .leaves-table td.day-cell:last-child {
@@ -989,17 +1037,32 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     .leaves-table td.day-cell::before,
     .summary-table td:not(:first-child)::before {
         content: attr(data-label);
-        font-weight: bold;
-        color: var(--color-gray-600);
+        font-weight: 600;
+        color: var(--color-gray-700);
+        /* Darker for better contrast */
         text-align: left;
-        flex: 1;
+        font-size: 0.85em;
+        /* Smaller font */
+        min-width: 80px;
+        /* Fixed width for labels */
+        flex-shrink: 0;
     }
 
     /* Adjust leave blocks in card view */
     .leave-block {
         display: inline-block;
-        margin-left: 5px;
+        margin-left: 0;
+        /* Removed margin */
+        margin-right: var(--spacing-xs);
+        margin-bottom: var(--spacing-xs);
         width: auto;
+        font-size: 0.85em;
+        /* Slightly larger for readability */
+        padding: 3px 8px;
+        /* Slightly larger padding */
+        color: var(--color-gray-900);
+        /* Darker text for better contrast */
+        font-weight: 600;
     }
 
     /* Layout adjustments for leave blocks inside the flex container */
