@@ -33,6 +33,17 @@ interface AppState {
 }
 
 /**
+ * Szablon obsady - przechowuje układ pracowników dla wszystkich kolumn
+ */
+interface ChangeTemplate {
+    id: string;
+    name: string;
+    /** Mapa kolumn (1-7) do listy ID pracowników */
+    columns: Record<number, string[]>;
+    createdAt: string;
+}
+
+/**
  * Okres dwutygodniowy
  */
 interface Period {
@@ -79,6 +90,12 @@ export const Changes: ChangesAPI = (() => {
 
     // Zaznaczenie wielu komórek
     let multiSelectedCells: Set<HTMLTableCellElement> = new Set();
+
+    // Szablony obsady
+    let templates: ChangeTemplate[] = [];
+    let pendingTemplateRow: HTMLTableRowElement | null = null; // Wiersz dla którego zapisujemy/stosujemy szablon
+
+    const TEMPLATES_STORAGE_KEY = 'changesTemplates';
 
     const isWeekend = (date: Date): boolean => {
         const day = date.getUTCDay();
@@ -276,6 +293,549 @@ export const Changes: ChangesAPI = (() => {
         window.showToast('Skopiowano obsadę z ostatniego wypełnionego okresu.', 2000);
     };
 
+    /**
+     * Kopiuje obsadę z bieżącego wiersza do następnego okresu
+     */
+    const handleCopyRowToNext = (event: Event): void => {
+        const btn = event.currentTarget as HTMLElement;
+        const currentRow = btn.closest('tr') as HTMLTableRowElement;
+        if (!currentRow) return;
+
+        const currentPeriod = currentRow.dataset.startDate || '';
+        const nextRow = currentRow.nextElementSibling as HTMLTableRowElement | null;
+
+        if (!nextRow || !nextRow.dataset.startDate) {
+            window.showToast('Brak następnego okresu.', 2000);
+            return;
+        }
+
+        const nextPeriod = nextRow.dataset.startDate;
+        const sourceCells = appState.changesCells[currentPeriod] || {};
+
+        // Sprawdź czy bieżący wiersz ma jakieś dane
+        const hasData = Object.keys(sourceCells).some(colIdx => {
+            const col = Number(colIdx);
+            const employees = sourceCells[col]?.assignedEmployees;
+            return col >= 1 && col <= 7 && employees && employees.length > 0;
+        });
+
+        if (!hasData) {
+            window.showToast('Bieżący okres jest pusty - brak danych do skopiowania.', 2000);
+            return;
+        }
+
+        // Zapisz stan przed zmianą
+        pushUndoState();
+
+        // Kopiuj tylko kolumny 1-7 (pomijamy 0-daty, 8-urlopy, 9-akcje)
+        if (!appState.changesCells[nextPeriod]) appState.changesCells[nextPeriod] = {};
+
+        for (let colIdx = 1; colIdx <= 7; colIdx++) {
+            const sourceCell = sourceCells[colIdx];
+            const employees = sourceCell?.assignedEmployees;
+            if (employees && employees.length > 0) {
+                appState.changesCells[nextPeriod][colIdx] = {
+                    assignedEmployees: [...employees],
+                    // Nie kopiujemy zastępstw - urlopy się zmieniają między okresami
+                };
+            }
+        }
+
+        renderChangesAndSave();
+        window.showToast(`Skopiowano obsadę do następnego okresu.`, 2000);
+    };
+
+    // =========================
+    // SZABLONY OBSADY
+    // =========================
+
+    /** Ładuje szablony z localStorage */
+    const loadTemplates = (): void => {
+        try {
+            const stored = localStorage.getItem(TEMPLATES_STORAGE_KEY);
+            templates = stored ? JSON.parse(stored) : [];
+        } catch {
+            templates = [];
+        }
+    };
+
+    /** Zapisuje szablony do localStorage */
+    const saveTemplates = (): void => {
+        localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(templates));
+    };
+
+    /** Generuje unikalny ID dla szablonu */
+    const generateTemplateId = (): string => {
+        return 'tpl_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+    };
+
+    /** Otwiera modal zapisu szablonu */
+    const openSaveTemplateModal = (row: HTMLTableRowElement): void => {
+        const period = row.dataset.startDate || '';
+        const rowData = appState.changesCells[period] || {};
+
+        // Sprawdź czy wiersz ma dane
+        const hasData = Object.keys(rowData).some(colIdx => {
+            const col = Number(colIdx);
+            const employees = rowData[col]?.assignedEmployees;
+            return col >= 1 && col <= 7 && employees && employees.length > 0;
+        });
+
+        if (!hasData) {
+            window.showToast('Wiersz jest pusty - nie ma czego zapisać jako szablon.', 2000);
+            return;
+        }
+
+        pendingTemplateRow = row;
+        const modal = document.getElementById('saveTemplateModal');
+        const input = document.getElementById('templateNameInput') as HTMLInputElement;
+
+        if (modal && input) {
+            input.value = '';
+            modal.style.display = 'flex';
+            input.focus();
+        }
+    };
+
+    /** Zapisuje wiersz jako szablon */
+    const saveRowAsTemplate = (): void => {
+        const input = document.getElementById('templateNameInput') as HTMLInputElement;
+        const modal = document.getElementById('saveTemplateModal');
+
+        if (!input || !pendingTemplateRow) return;
+
+        const name = input.value.trim();
+        if (!name) {
+            window.showToast('Podaj nazwę szablonu.', 2000);
+            return;
+        }
+
+        const period = pendingTemplateRow.dataset.startDate || '';
+        const rowData = appState.changesCells[period] || {};
+
+        // Zbuduj obiekt kolumn
+        const columns: Record<number, string[]> = {};
+        for (let colIdx = 1; colIdx <= 7; colIdx++) {
+            const employees = rowData[colIdx]?.assignedEmployees;
+            if (employees && employees.length > 0) {
+                columns[colIdx] = [...employees];
+            }
+        }
+
+        const template: ChangeTemplate = {
+            id: generateTemplateId(),
+            name,
+            columns,
+            createdAt: new Date().toISOString(),
+        };
+
+        templates.push(template);
+        saveTemplates();
+
+        if (modal) modal.style.display = 'none';
+        pendingTemplateRow = null;
+
+        window.showToast(`Zapisano szablon "${name}".`, 2000);
+    };
+
+    /** Otwiera modal aplikacji szablonu */
+    const openApplyTemplateModal = (row: HTMLTableRowElement): void => {
+        loadTemplates();
+
+        if (templates.length === 0) {
+            window.showToast('Brak zapisanych szablonów. Najpierw zapisz szablon z istniejącego wiersza.', 3000);
+            return;
+        }
+
+        pendingTemplateRow = row;
+        const modal = document.getElementById('applyTemplateModal');
+        const select = document.getElementById('templateSelect') as HTMLSelectElement;
+        const preview = document.getElementById('applyTemplatePreview');
+
+        if (modal && select) {
+            // Wypełnij listę szablonów
+            select.innerHTML = '<option value="">-- Wybierz szablon --</option>';
+            templates.forEach(tpl => {
+                const option = document.createElement('option');
+                option.value = tpl.id;
+                option.textContent = tpl.name;
+                select.appendChild(option);
+            });
+
+            // Event na zmianę szablonu - pokaż podgląd
+            select.onchange = () => {
+                const selectedId = select.value;
+                const tpl = templates.find(t => t.id === selectedId);
+
+                if (preview && tpl) {
+                    const columnNames = ['', 'HYDRO', 'MASAŻ', 'FIZYKO', 'SALA', 'MASAŻ', 'FIZYKO', 'SALA'];
+                    const previewHtml = Object.entries(tpl.columns)
+                        .map(([colIdx, empIds]) => {
+                            const names = (empIds as string[]).map(id => EmployeeManager.getFullNameById(id)).join(', ');
+                            return `<div><strong>${columnNames[Number(colIdx)] || 'Kol. ' + colIdx}:</strong> ${names}</div>`;
+                        })
+                        .join('');
+                    preview.innerHTML = previewHtml || '<em>Pusty szablon</em>';
+                } else if (preview) {
+                    preview.innerHTML = '';
+                }
+            };
+
+            if (preview) preview.innerHTML = '';
+            modal.style.display = 'flex';
+        }
+    };
+
+    /** Stosuje wybrany szablon do wiersza */
+    const applyTemplateToRow = (): void => {
+        const select = document.getElementById('templateSelect') as HTMLSelectElement;
+        const modal = document.getElementById('applyTemplateModal');
+
+        if (!select || !pendingTemplateRow) return;
+
+        const selectedId = select.value;
+        const template = templates.find(t => t.id === selectedId);
+
+        if (!template) {
+            window.showToast('Wybierz szablon.', 2000);
+            return;
+        }
+
+        const period = pendingTemplateRow.dataset.startDate || '';
+
+        // Zapisz stan przed zmianą
+        pushUndoState();
+
+        // Zastosuj szablon
+        if (!appState.changesCells[period]) appState.changesCells[period] = {};
+
+        for (let colIdx = 1; colIdx <= 7; colIdx++) {
+            const employees = template.columns[colIdx];
+            if (employees && employees.length > 0) {
+                appState.changesCells[period][colIdx] = {
+                    assignedEmployees: [...employees],
+                };
+            }
+        }
+
+        renderChangesAndSave();
+
+        if (modal) modal.style.display = 'none';
+        pendingTemplateRow = null;
+
+        window.showToast(`Zastosowano szablon "${template.name}".`, 2000);
+    };
+
+    /** Usuwa szablon */
+    const deleteTemplate = (templateId: string): void => {
+        const tpl = templates.find(t => t.id === templateId);
+        if (!tpl) return;
+
+        if (confirm(`Czy na pewno chcesz usunąć szablon "${tpl.name}"?`)) {
+            templates = templates.filter(t => t.id !== templateId);
+            saveTemplates();
+            renderTemplateList();
+            window.showToast('Szablon usunięty.', 2000);
+        }
+    };
+
+    /** Renderuje listę szablonów w modalu zarządzania */
+    const renderTemplateList = (): void => {
+        const list = document.getElementById('templateList');
+        const preview = document.getElementById('templatePreview');
+
+        if (!list) return;
+
+        if (templates.length === 0) {
+            list.innerHTML = `
+                <div class="template-empty">
+                    <i class="fas fa-folder-open"></i>
+                    <p>Brak zapisanych szablonów</p>
+                    <small>Kliknij prawym przyciskiem na wiersz i wybierz "Zapisz jako szablon"</small>
+                </div>
+            `;
+            return;
+        }
+
+        const columnNames = ['', 'HYDRO', 'MASAŻ', 'FIZYKO', 'SALA', 'MASAŻ', 'FIZYKO', 'SALA'];
+
+        list.innerHTML = templates.map(tpl => `
+            <div class="template-item" data-template-id="${tpl.id}">
+                <span class="template-item-name">${tpl.name}</span>
+                <div class="template-item-actions">
+                    <button class="template-item-btn delete-btn" data-action="delete" title="Usuń"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+        `).join('');
+
+        // Event listenery
+        list.querySelectorAll('.template-item').forEach(item => {
+            const itemEl = item as HTMLElement;
+
+            // Kliknięcie na element - pokaż podgląd
+            itemEl.addEventListener('click', (e) => {
+                const target = e.target as HTMLElement;
+                if (target.closest('.template-item-btn')) return; // Ignoruj kliknięcia na przyciski
+
+                const templateId = itemEl.dataset.templateId;
+                const tpl = templates.find(t => t.id === templateId);
+
+                // Oznacz jako wybrany
+                list.querySelectorAll('.template-item').forEach(el => el.classList.remove('selected'));
+                itemEl.classList.add('selected');
+
+                // Pokaż podgląd
+                if (preview && tpl) {
+                    const previewGrid = Object.entries(tpl.columns)
+                        .map(([colIdx, empIds]) => {
+                            const names = (empIds as string[]).map(id => EmployeeManager.getFullNameById(id)).join('<br>');
+                            return `
+                                <div class="template-preview-cell">
+                                    <div class="template-preview-cell-header">${columnNames[Number(colIdx)] || 'Kol. ' + colIdx}</div>
+                                    <div class="template-preview-cell-content">${names || '—'}</div>
+                                </div>
+                            `;
+                        })
+                        .join('');
+                    preview.innerHTML = `<div class="template-preview-grid">${previewGrid}</div>`;
+                }
+            });
+
+            // Przycisk usuń
+            itemEl.querySelector('.delete-btn')?.addEventListener('click', () => {
+                const templateId = itemEl.dataset.templateId;
+                if (templateId) deleteTemplate(templateId);
+            });
+        });
+    };
+
+    /** Otwiera modal zarządzania szablonami */
+    const openTemplateManagerModal = (): void => {
+        loadTemplates();
+        renderTemplateList();
+
+        const modal = document.getElementById('templateModal');
+        const preview = document.getElementById('templatePreview');
+
+        if (preview) {
+            preview.innerHTML = '<p class="template-placeholder">Wybierz szablon, aby zobaczyć podgląd</p>';
+        }
+
+        if (modal) {
+            modal.style.display = 'flex';
+        }
+    };
+
+    /** Inicjalizuje UI szablonów */
+    const initTemplateUI = (): void => {
+        loadTemplates();
+
+        // Przycisk "Szablony" w nagłówku
+        const manageBtn = document.getElementById('manageTemplatesBtn');
+        manageBtn?.addEventListener('click', openTemplateManagerModal);
+
+        // Modal zarządzania szablonami - przycisk zamknij
+        document.getElementById('closeTemplateModal')?.addEventListener('click', () => {
+            const modal = document.getElementById('templateModal');
+            if (modal) modal.style.display = 'none';
+        });
+
+        // Modal zapisu szablonu
+        document.getElementById('confirmSaveTemplate')?.addEventListener('click', saveRowAsTemplate);
+        document.getElementById('cancelSaveTemplate')?.addEventListener('click', () => {
+            const modal = document.getElementById('saveTemplateModal');
+            if (modal) modal.style.display = 'none';
+            pendingTemplateRow = null;
+        });
+
+        // Modal aplikacji szablonu
+        document.getElementById('confirmApplyTemplate')?.addEventListener('click', applyTemplateToRow);
+        document.getElementById('cancelApplyTemplate')?.addEventListener('click', () => {
+            const modal = document.getElementById('applyTemplateModal');
+            if (modal) modal.style.display = 'none';
+            pendingTemplateRow = null;
+        });
+
+        // Przycisk "Szybkie planowanie"
+        document.getElementById('quickPlanningBtn')?.addEventListener('click', openMultiPeriodModal);
+
+        // Modal szybkiego planowania
+        document.getElementById('confirmMultiPeriodTemplate')?.addEventListener('click', applyTemplateToMultiplePeriods);
+        document.getElementById('cancelMultiPeriodTemplate')?.addEventListener('click', () => {
+            const modal = document.getElementById('multiPeriodTemplateModal');
+            if (modal) modal.style.display = 'none';
+        });
+
+        // Opcje context menu są obsługiwane przez initializeContextMenu w init()
+    };
+
+    /** Pobiera listę okresów z obecnego roku */
+    const getCurrentPeriods = (): { value: string; label: string }[] => {
+        const periods = generateTwoWeekPeriods(currentYear);
+        return periods.map(p => ({
+            value: p.start,
+            label: `${formatDate(new Date(p.start))} - ${formatDate(new Date(p.end))}`,
+        }));
+    };
+
+    /** Formatuje datę do krótkiego formatu */
+    const formatDate = (date: Date): string => {
+        const day = date.getUTCDate().toString().padStart(2, '0');
+        const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+        return `${day}.${month}`;
+    };
+
+    /** Otwiera modal szybkiego planowania */
+    const openMultiPeriodModal = (): void => {
+        loadTemplates();
+
+        if (templates.length === 0) {
+            window.showToast('Brak zapisanych szablonów. Najpierw zapisz szablon z istniejącego wiersza.', 3000);
+            return;
+        }
+
+        const modal = document.getElementById('multiPeriodTemplateModal');
+        const templateSelect = document.getElementById('multiTemplateSelect') as HTMLSelectElement;
+        const periodFromSelect = document.getElementById('periodFromSelect') as HTMLSelectElement;
+        const periodToSelect = document.getElementById('periodToSelect') as HTMLSelectElement;
+        const preview = document.getElementById('multiTemplatePreview');
+
+        if (!modal || !templateSelect || !periodFromSelect || !periodToSelect) return;
+
+        // Wypełnij listę szablonów
+        templateSelect.innerHTML = '<option value="">-- Wybierz szablon --</option>';
+        templates.forEach(tpl => {
+            const option = document.createElement('option');
+            option.value = tpl.id;
+            option.textContent = tpl.name;
+            templateSelect.appendChild(option);
+        });
+
+        // Wypełnij listę okresów
+        const periods = getCurrentPeriods();
+        const periodOptionsHtml = '<option value="">-- Wybierz --</option>' +
+            periods.map(p => `<option value="${p.value}">${p.label}</option>`).join('');
+
+        periodFromSelect.innerHTML = periodOptionsHtml;
+        periodToSelect.innerHTML = periodOptionsHtml;
+
+        // Event na zmianę szablonu - pokaż podgląd
+        templateSelect.onchange = () => {
+            const selectedId = templateSelect.value;
+            const tpl = templates.find(t => t.id === selectedId);
+
+            if (preview && tpl) {
+                const columnNames = ['', 'HYDRO', 'MASAŻ', 'FIZYKO', 'SALA', 'MASAŻ', 'FIZYKO', 'SALA'];
+                const previewHtml = Object.entries(tpl.columns)
+                    .map(([colIdx, empIds]) => {
+                        const names = (empIds as string[]).map(id => EmployeeManager.getFullNameById(id)).join(', ');
+                        return `<div><strong>${columnNames[Number(colIdx)] || 'Kol. ' + colIdx}:</strong> ${names}</div>`;
+                    })
+                    .join('');
+                preview.innerHTML = previewHtml || '<em>Pusty szablon</em>';
+            } else if (preview) {
+                preview.innerHTML = '';
+            }
+        };
+
+        // Eventy na zmianę okresów - aktualizuj licznik
+        const updatePeriodsCount = (): void => {
+            const fromValue = periodFromSelect.value;
+            const toValue = periodToSelect.value;
+            const countSpan = document.getElementById('selectedPeriodsCount');
+
+            if (!fromValue || !toValue || !countSpan) {
+                if (countSpan) countSpan.textContent = 'Wybrano: 0 okresów';
+                return;
+            }
+
+            const periods = getCurrentPeriods();
+            const fromIndex = periods.findIndex(p => p.value === fromValue);
+            const toIndex = periods.findIndex(p => p.value === toValue);
+
+            if (fromIndex === -1 || toIndex === -1 || fromIndex > toIndex) {
+                countSpan.textContent = 'Wybrano: 0 okresów';
+                return;
+            }
+
+            const count = toIndex - fromIndex + 1;
+            countSpan.textContent = `Wybrano: ${count} ${count === 1 ? 'okres' : count < 5 ? 'okresy' : 'okresów'}`;
+        };
+
+        periodFromSelect.onchange = updatePeriodsCount;
+        periodToSelect.onchange = updatePeriodsCount;
+
+        // Reset
+        if (preview) preview.innerHTML = '';
+        document.getElementById('selectedPeriodsCount')!.textContent = 'Wybrano: 0 okresów';
+
+        modal.style.display = 'flex';
+    };
+
+    /** Stosuje szablon do wielu okresów */
+    const applyTemplateToMultiplePeriods = (): void => {
+        const templateSelect = document.getElementById('multiTemplateSelect') as HTMLSelectElement;
+        const periodFromSelect = document.getElementById('periodFromSelect') as HTMLSelectElement;
+        const periodToSelect = document.getElementById('periodToSelect') as HTMLSelectElement;
+        const modal = document.getElementById('multiPeriodTemplateModal');
+
+        if (!templateSelect || !periodFromSelect || !periodToSelect) return;
+
+        const selectedTemplateId = templateSelect.value;
+        const template = templates.find(t => t.id === selectedTemplateId);
+
+        if (!template) {
+            window.showToast('Wybierz szablon.', 2000);
+            return;
+        }
+
+        const fromValue = periodFromSelect.value;
+        const toValue = periodToSelect.value;
+
+        if (!fromValue || !toValue) {
+            window.showToast('Wybierz zakres okresów.', 2000);
+            return;
+        }
+
+        const periods = getCurrentPeriods();
+        const fromIndex = periods.findIndex(p => p.value === fromValue);
+        const toIndex = periods.findIndex(p => p.value === toValue);
+
+        if (fromIndex === -1 || toIndex === -1 || fromIndex > toIndex) {
+            window.showToast('Nieprawidłowy zakres okresów.', 2000);
+            return;
+        }
+
+        // Zapisz stan przed zmianą
+        pushUndoState();
+
+        // Zastosuj szablon do każdego okresu w zakresie
+        let appliedCount = 0;
+        for (let i = fromIndex; i <= toIndex; i++) {
+            const periodKey = periods[i].value;
+
+            if (!appState.changesCells[periodKey]) {
+                appState.changesCells[periodKey] = {};
+            }
+
+            for (let colIdx = 1; colIdx <= 7; colIdx++) {
+                const employees = template.columns[colIdx];
+                if (employees && employees.length > 0) {
+                    appState.changesCells[periodKey][colIdx] = {
+                        assignedEmployees: [...employees],
+                    };
+                }
+            }
+            appliedCount++;
+        }
+
+        renderChangesAndSave();
+
+        if (modal) modal.style.display = 'none';
+
+        window.showToast(`Zastosowano szablon "${template.name}" do ${appliedCount} ${appliedCount === 1 ? 'okresu' : appliedCount < 5 ? 'okresów' : 'okresów'}.`, 3000);
+    };
+
     const generateTwoWeekPeriods = (year: number): Period[] => {
         const periods: Period[] = [];
         let currentDate = new Date(Date.UTC(year, 0, 1));
@@ -318,36 +878,55 @@ export const Changes: ChangesAPI = (() => {
         changesHeaderRow.innerHTML = '';
         const headers = [
             'Okres', 'HYDRO 7:00-14:30', 'MASAŻ 7-14:30', 'FIZYKO 7-14:30', 'SALA 7-14:30',
-            'MASAŻ 10:30-18:00', 'FIZYKO 10:30-18:00', 'SALA 10:30-18:00', 'URLOPY',
+            'MASAŻ 10:30-18:00', 'FIZYKO 10:30-18:00', 'SALA 10:30-18:00', 'URLOPY', 'Akcje',
         ];
         headers.forEach((headerText) => {
             const th = document.createElement('th');
             th.textContent = headerText;
+            if (headerText === 'Akcje') {
+                th.classList.add('actions-header');
+            }
             changesHeaderRow!.appendChild(th);
         });
 
         changesTableBody.innerHTML = '';
-        periods.forEach((period) => {
+        periods.forEach((period, index) => {
             const tr = document.createElement('tr');
             tr.dataset.startDate = period.start;
             tr.dataset.endDate = period.end;
+            tr.dataset.periodIndex = String(index);
             const start = new Date(period.start);
             const end = new Date(period.end);
+
+            const isLastPeriod = index === periods.length - 1;
+            const copyBtnHtml = isLastPeriod
+                ? '<span class="no-action" title="Ostatni okres">—</span>'
+                : '<button class="copy-row-btn" title="Kopiuj do następnego okresu"><i class="fas fa-arrow-down"></i> Kopiuj ↓</button>';
+
             tr.innerHTML = `
                 <td>${start.getUTCDate()}.${(start.getUTCMonth() + 1).toString().padStart(2, '0')} - ${end.getUTCDate()}.${(end.getUTCMonth() + 1).toString().padStart(2, '0')}</td>
                 <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                 <td class="leaves-cell"></td>
+                <td class="actions-cell">${copyBtnHtml}</td>
             `;
             changesTableBody!.appendChild(tr);
         });
 
+        // Dodaj event listenery do komórek edytowalnych
         document.querySelectorAll('#changesTableBody td').forEach((cell) => {
-            if (!cell.classList.contains('leaves-cell') && (cell as HTMLTableCellElement).cellIndex !== 0) {
+            if (!cell.classList.contains('leaves-cell') &&
+                !cell.classList.contains('actions-cell') &&
+                (cell as HTMLTableCellElement).cellIndex !== 0) {
                 const htmlCell = cell as HTMLTableCellElement;
                 htmlCell.setAttribute('tabindex', '0');
                 htmlCell.addEventListener('click', handleCellClick);
                 htmlCell.addEventListener('dblclick', handleCellDblClick);
             }
+        });
+
+        // Dodaj event listenery do przycisków kopiowania
+        document.querySelectorAll('.copy-row-btn').forEach((btn) => {
+            btn.addEventListener('click', handleCopyRowToNext);
         });
     };
 
@@ -965,8 +1544,8 @@ export const Changes: ChangesAPI = (() => {
             const employeesOnLeave = getEmployeesOnLeaveForPeriod(period, periodEnd);
 
             Array.from(tr.cells).forEach((cell, index) => {
-                // Ignoruj pierwszą kolumnę (daty) i ostatnią (urlopy)
-                if (index === 0 || cell.classList.contains('leaves-cell')) return;
+                // Ignoruj pierwszą kolumnę (daty), urlopy i akcje
+                if (index === 0 || cell.classList.contains('leaves-cell') || cell.classList.contains('actions-cell')) return;
 
                 const hasAssignedEmployees =
                     appState.changesCells[period]?.[index]?.assignedEmployees &&
@@ -1163,6 +1742,9 @@ export const Changes: ChangesAPI = (() => {
         // Setup mobile accordion
         setupMobileAccordion();
 
+        // Inicjalizacja szablonów
+        initTemplateUI();
+
         const contextMenuItems = [
             { id: 'ctxCopyCell', action: (cell: HTMLElement) => copyCell(cell as HTMLTableCellElement) },
             { id: 'ctxPasteCell', action: (cell: HTMLElement) => pasteCell(cell as HTMLTableCellElement) },
@@ -1171,6 +1753,18 @@ export const Changes: ChangesAPI = (() => {
                 id: 'ctxCopyFromPrevious', action: (cell: HTMLElement) => {
                     const row = (cell as HTMLTableCellElement).parentElement as HTMLTableRowElement;
                     if (row) copyFromPreviousRow(row);
+                }
+            },
+            {
+                id: 'ctxSaveAsTemplate', action: (cell: HTMLElement) => {
+                    const row = (cell as HTMLTableCellElement).parentElement as HTMLTableRowElement;
+                    if (row) openSaveTemplateModal(row);
+                }
+            },
+            {
+                id: 'ctxApplyTemplate', action: (cell: HTMLElement) => {
+                    const row = (cell as HTMLTableCellElement).parentElement as HTMLTableRowElement;
+                    if (row) openApplyTemplateModal(row);
                 }
             },
         ];
