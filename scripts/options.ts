@@ -4,7 +4,7 @@ import { db as dbRaw, auth as authRaw, FieldValue } from './firebase-config.js';
 import { EmployeeManager } from './employee-manager.js';
 import { BackupService } from './backup-service.js';
 import type { FirestoreDbWrapper, FirebaseAuthWrapper } from './types/firebase';
-import type { Employee } from './types';
+import type { Employee, ShiftGroup } from './types';
 
 const db = dbRaw as unknown as FirestoreDbWrapper;
 const auth = authRaw as unknown as FirebaseAuthWrapper;
@@ -39,6 +39,7 @@ export const Options: OptionsAPI = (() => {
     let clearUidBtn: HTMLElement | null;
     let employeeIsHidden: HTMLInputElement | null;
     let employeeIsScheduleOnly: HTMLInputElement | null;
+    let employeeShiftGroup: HTMLSelectElement | null;
 
     let selectedEmployeeIndex: number | null = null;
 
@@ -268,6 +269,7 @@ export const Options: OptionsAPI = (() => {
         if (adminCheckbox) adminCheckbox.checked = employee.role === 'admin';
         if (employeeIsHidden) employeeIsHidden.checked = employee.isHidden || false;
         if (employeeIsScheduleOnly) employeeIsScheduleOnly.checked = employee.isScheduleOnly || false;
+        if (employeeShiftGroup) employeeShiftGroup.value = employee.shiftGroup || '';
         if (employeeUidInput) employeeUidInput.value = employee.uid || '';
     };
 
@@ -379,6 +381,7 @@ export const Options: OptionsAPI = (() => {
             role: isAdmin ? 'admin' : 'user',
             isHidden: isHidden,
             isScheduleOnly: employeeIsScheduleOnly?.checked || false,
+            shiftGroup: employeeShiftGroup?.value ? (employeeShiftGroup.value as ShiftGroup) : null,
             uid: newUid,
         };
 
@@ -518,6 +521,7 @@ export const Options: OptionsAPI = (() => {
         clearUidBtn = document.getElementById('clearUidBtn');
         employeeIsHidden = document.getElementById('employeeIsHidden') as HTMLInputElement | null;
         employeeIsScheduleOnly = document.getElementById('employeeIsScheduleOnly') as HTMLInputElement | null;
+        employeeShiftGroup = document.getElementById('employeeShiftGroup') as HTMLSelectElement | null;
         createBackupBtn = document.getElementById('createBackupBtn');
         restoreBackupBtn = document.getElementById('restoreBackupBtn');
         lastBackupDateSpan = document.getElementById('lastBackupDate');

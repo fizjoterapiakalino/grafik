@@ -678,7 +678,7 @@ td.current-time-highlight {
 
 /* Komórka lub część split obecnie przeciągana */
 .schedule-table td.editable-cell.is-dragging,
-.split-cell-wrapper > div.is-dragging {
+.split-cell-wrapper>div.is-dragging {
     opacity: 0.5;
     background-color: var(--color-gray-200);
     outline: 2px dashed var(--color-primary);
@@ -691,7 +691,7 @@ td.current-time-highlight {
 
 /* Cel upuszczania - podświetlenie */
 .schedule-table td.editable-cell.drag-over-target,
-.split-cell-wrapper > div.drag-over-target {
+.split-cell-wrapper>div.drag-over-target {
     background-color: var(--color-primary-100);
     outline: 2px solid var(--color-primary);
     box-shadow: inset 0 0 8px rgba(59, 130, 246, 0.3);
@@ -707,15 +707,32 @@ td.current-time-highlight {
 }
 
 /* Kursor dla części split */
-.split-cell-wrapper > div[draggable="true"] {
+.split-cell-wrapper>div[draggable="true"] {
     cursor: grab;
 }
 
-.split-cell-wrapper > div[draggable="true"]:active {
+.split-cell-wrapper>div[draggable="true"]:active {
     cursor: grabbing;
 }
 
 /* Podświetlenie części split przy hover podczas przeciągania */
-.split-cell-wrapper > div[draggable="true"]:hover {
+.split-cell-wrapper>div[draggable="true"]:hover {
     background-color: var(--color-gray-50);
+}
+
+/* --- Style dla badge'a URLOP w nagłówku pracownika --- */
+
+/* Badge wyświetlany przez ::after - inline z nazwą, bez zaburzania układu */
+.employee-header span.on-leave::after {
+    content: ' URLOP';
+    background-color: #ef4444;
+    color: white;
+    font-size: 0.6em;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 2px;
+    margin-left: 4px;
+    vertical-align: middle;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }

@@ -18,6 +18,11 @@ export interface EmployeeLeaveInfo {
 }
 
 /**
+ * Grupa zmianowa pracownika
+ */
+export type ShiftGroup = 'first' | 'second' | null;
+
+/**
  * Pełna struktura pracownika z Firestore
  */
 export interface Employee {
@@ -39,6 +44,8 @@ export interface Employee {
     isScheduleOnly?: boolean;
     /** Rola pracownika */
     role?: 'admin' | 'user';
+    /** Grupa zmianowa */
+    shiftGroup?: ShiftGroup;
     /** Przysługujący wymiar urlopu */
     leaveEntitlement?: number;
     /** Urlop zaległy (legacy) */

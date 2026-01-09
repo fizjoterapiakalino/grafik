@@ -32,7 +32,74 @@
 }
 
 .changes-table tbody tr:hover {
-    background-color: var(--color-gray-50);
+    background-color: var(--color-primary-50);
+}
+
+.changes-table tbody tr:hover td {
+    background-color: inherit;
+}
+
+/* Nieobsadzone komórki - ostrzeżenie */
+.changes-table td.empty-cell {
+    background: repeating-linear-gradient(45deg,
+            transparent,
+            transparent 10px,
+            rgba(239, 68, 68, 0.05) 10px,
+            rgba(239, 68, 68, 0.05) 20px);
+}
+
+.changes-table td.empty-cell::before {
+    content: '⚠';
+    display: block;
+    color: var(--color-warning);
+    font-size: 0.8em;
+    opacity: 0.6;
+}
+
+/* Licznik pracowników */
+.employee-count-badge {
+    display: inline-block;
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-700);
+    font-size: 0.75em;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-top: 4px;
+}
+
+/* Konflikt urlopowy */
+.leave-conflict-indicator {
+    color: var(--color-danger);
+    font-size: 0.8em;
+    margin-left: 4px;
+}
+
+/* Ikona ostrzeżenia o urlopie (wykrzyknik) */
+.leave-warning-icon {
+    color: var(--color-danger);
+    font-weight: bold;
+    margin-left: 4px;
+}
+
+/* Separator zastępstwa */
+.substitute-separator {
+    color: var(--color-primary-500);
+    font-weight: 700;
+    margin: 0 4px;
+}
+
+/* Nazwa zastępcy */
+.substitute-name {
+    color: var(--color-success);
+    font-weight: 500;
+}
+
+/* Zaznaczenie wielu komórek */
+.changes-table td.multi-selected {
+    background-color: var(--color-secondary-100);
+    outline: 2px dashed var(--color-secondary-500);
+    outline-offset: -2px;
 }
 
 /* Edytowalne komórki */
@@ -64,6 +131,22 @@
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
+}
+
+.employee-group-header {
+    grid-column: 1 / -1;
+    font-weight: 600;
+    color: var(--color-primary-700);
+    background-color: var(--color-primary-50);
+    padding: 8px 12px;
+    border-radius: var(--border-radius-sm);
+    margin-top: 10px;
+    margin-bottom: 5px;
+    border-left: 4px solid var(--color-primary-500);
+}
+
+.employee-group-header:first-child {
+    margin-top: 0;
 }
 
 #employeeSelectionModal .employee-list-item.disabled-employee {
@@ -98,6 +181,39 @@
     color: var(--color-primary-700);
     font-weight: bold;
     box-shadow: 0 0 0 1px var(--color-primary-500);
+}
+
+/* Pracownik na urlopie w modalu */
+#employeeSelectionModal .employee-list-item.on-leave {
+    background-color: var(--color-warning-50, #fffbeb);
+    border-color: var(--color-warning, #f59e0b);
+}
+
+#employeeSelectionModal .employee-list-item.on-leave small {
+    color: var(--color-warning, #f59e0b);
+    font-weight: normal;
+}
+
+/* Kontener na select zastępcy */
+.substitute-selector {
+    margin-top: 8px;
+    width: 100%;
+}
+
+.substitute-select {
+    width: 100%;
+    padding: 4px 8px;
+    font-size: 0.85em;
+    border: 1px solid var(--color-gray-300);
+    border-radius: var(--border-radius-sm);
+    background-color: var(--color-white);
+    color: var(--color-text);
+    cursor: pointer;
+}
+
+.substitute-select:focus {
+    outline: 2px solid var(--color-primary-500);
+    outline-offset: -2px;
 }
 
 /* Styl dla wierszy reprezentujących przeszłe okresy */
@@ -164,6 +280,27 @@
     outline: none;
     border-color: var(--color-primary-700);
     box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.2);
+}
+
+/* Placeholder urlopów w pustych komórkach */
+.changes-table .leave-placeholder {
+    display: block;
+    font-size: 0.75em;
+    color: var(--color-gray-400);
+    font-style: italic;
+    opacity: 0.8;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Ukryj placeholder gdy komórka jest aktywna (edytowana) */
+.changes-table td.active-cell .leave-placeholder {
+    display: none;
+}
+
+/* Komórka z placeholderem ma delikatne tło */
+.changes-table td.has-leave-placeholder {
+    background-color: rgba(239, 68, 68, 0.03);
 }
 
 @media (max-width: 768px) {

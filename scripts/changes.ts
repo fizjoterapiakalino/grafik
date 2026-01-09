@@ -19,7 +19,10 @@ const db = dbRaw as unknown as FirestoreDbWrapper;
  * Stan komórki w harmonogramie zmian
  */
 interface ChangesCellState {
+    /** Lista ID przypisanych pracowników */
     assignedEmployees?: string[];
+    /** Zastępstwa urlopowe: klucz = ID pracownika na urlopie, wartość = ID zastępcy */
+    substitutes?: Record<string, string>;
 }
 
 /**
@@ -35,6 +38,15 @@ interface AppState {
 interface Period {
     start: string;
     end: string;
+}
+
+/**
+ * Wpis urlopu pracownika
+ */
+interface LeaveEntry {
+    startDate: string;
+    endDate: string;
+    type: string;
 }
 
 /**
@@ -55,8 +67,18 @@ export const Changes: ChangesAPI = (() => {
 
     let currentYear = new Date().getUTCFullYear();
     let yearSelect: HTMLSelectElement | null = null;
-    let clipboard: string[] | null = null;
+    // Clipboard: tablica tablic - każdy element to lista pracowników z jednej komórki
+    // Przy kopiowaniu wielu komórek zachowujemy kolejność (pozycje względne)
+    let clipboard: string[][] | null = null;
     let activeCell: HTMLTableCellElement | null = null;
+    let cachedLeavesData: Record<string, LeaveEntry[]> = {}; // Przechowuje dane o urlopach
+
+    // Stos Undo dla cofania zmian
+    let undoStack: string[] = [];
+    const MAX_UNDO_STACK = 20;
+
+    // Zaznaczenie wielu komórek
+    let multiSelectedCells: Set<HTMLTableCellElement> = new Set();
 
     const isWeekend = (date: Date): boolean => {
         const day = date.getUTCDay();
@@ -75,63 +97,124 @@ export const Changes: ChangesAPI = (() => {
         });
     };
 
+    /**
+     * Sprawdza czy pracownik jest na urlopie w danym okresie
+     */
+    const isEmployeeOnLeave = (employeeId: string, periodStart: string, periodEnd: string): boolean => {
+        const employees = EmployeeManager.getAll();
+        const employee = employees[employeeId];
+        if (!employee) return false;
+
+        const employeeName = employee.displayName || employee.name;
+        if (!employeeName) return false;
+
+        const employeeLeaves = cachedLeavesData[employeeName];
+        if (!Array.isArray(employeeLeaves)) return false;
+
+        const start = new Date(periodStart);
+        const end = new Date(periodEnd);
+
+        return employeeLeaves.some(leave => {
+            if (leave.type !== 'vacation') return false;
+            const leaveStart = new Date(leave.startDate);
+            const leaveEnd = new Date(leave.endDate);
+            return !(leaveEnd < start || leaveStart > end);
+        });
+    };
+
+    /**
+     * Kopiuje komórkę lub wiele zaznaczonych komórek do schowka
+     */
     const copyCell = (cell: HTMLTableCellElement): void => {
         if (!cell) return;
+
+        // Jeśli są zaznaczone komórki (multi-select), kopiuj wszystkie posortowane wg kolumny
+        if (multiSelectedCells.size > 0) {
+            // Sortuj komórki wg indeksu kolumny
+            const sortedCells = Array.from(multiSelectedCells).sort((a, b) => a.cellIndex - b.cellIndex);
+
+            clipboard = sortedCells.map(c => {
+                const row = c.parentElement as HTMLTableRowElement;
+                const period = row.dataset.startDate || '';
+                const colIdx = c.cellIndex;
+                const cellState = appState.changesCells[period]?.[colIdx];
+                return cellState?.assignedEmployees ? [...cellState.assignedEmployees] : [];
+            });
+
+            window.showToast(`Skopiowano ${clipboard.length} komórek.`);
+            return;
+        }
+
+        // Pojedyncza komórka
         const period = (cell.parentElement as HTMLTableRowElement).dataset.startDate;
         if (!period) return;
         const columnIndex = cell.cellIndex;
         const cellState = appState.changesCells[period]?.[columnIndex];
 
         if (cellState?.assignedEmployees) {
-            clipboard = [...cellState.assignedEmployees];
+            clipboard = [[...cellState.assignedEmployees]];
             window.showToast('Skopiowano.');
         } else {
-            clipboard = [];
+            clipboard = [[]];
             window.showToast('Skopiowano pustą komórkę.');
         }
     };
 
+    /**
+     * Wkleja zawartość schowka do komórki (lub sekwencyjnie do kolejnych kolumn przy multi-paste)
+     */
     const pasteCell = (cell: HTMLTableCellElement): void => {
-        if (!cell || !clipboard) return;
+        if (!cell || !clipboard || clipboard.length === 0) return;
 
         const row = cell.parentElement as HTMLTableRowElement;
         const period = row.dataset.startDate || '';
-        const columnIndex = cell.cellIndex;
+        const startColumnIndex = cell.cellIndex;
+        const maxColumn = 7; // Ostatnia edytowalna kolumna (przed urlopami)
 
-        // Zbierz pracowników już przypisanych w innych komórkach tego wiersza
-        const employeesInOtherCells = new Set<string>();
-        const periodCells = appState.changesCells[period] || {};
-        for (const colIdx in periodCells) {
-            if (Number(colIdx) !== columnIndex) {
-                const otherCellEmployees = periodCells[Number(colIdx)]?.assignedEmployees || [];
-                otherCellEmployees.forEach((empId: string) => employeesInOtherCells.add(empId));
+        // Zapisz stan przed zmianą
+        pushUndoState();
+
+        // Określ ile komórek możemy wkleić (ograniczenie do końca wiersza)
+        const availableSlots = maxColumn - startColumnIndex + 1;
+        const cellsToPaste = Math.min(clipboard.length, availableSlots);
+
+        let pastedCount = 0;
+
+        for (let i = 0; i < cellsToPaste; i++) {
+            const targetColIndex = startColumnIndex + i;
+            const employeesToPaste = clipboard[i];
+
+            if (!employeesToPaste) continue;
+
+            // Zbierz pracowników już przypisanych w INNYCH komórkach tego wiersza
+            const employeesInOtherCells = new Set<string>();
+            const periodCells = appState.changesCells[period] || {};
+            for (const colIdx in periodCells) {
+                if (Number(colIdx) !== targetColIndex) {
+                    const otherCellEmployees = periodCells[Number(colIdx)]?.assignedEmployees || [];
+                    otherCellEmployees.forEach((empId: string) => employeesInOtherCells.add(empId));
+                }
             }
+
+            // Filtruj pracowników - wklej tylko tych, którzy nie są w innych komórkach
+            const validEmployees = employeesToPaste.filter(empId => !employeesInOtherCells.has(empId));
+
+            // Zapisz do stanu
+            if (!appState.changesCells[period]) appState.changesCells[period] = {};
+            appState.changesCells[period][targetColIndex] = {
+                assignedEmployees: [...validEmployees]
+            };
+            pastedCount++;
         }
 
-        // Sprawdź czy któryś z wklejanych pracowników jest już przypisany gdzie indziej
-        const conflictingEmployees = clipboard.filter(empId => employeesInOtherCells.has(empId));
+        renderChangesAndSave();
 
-        if (conflictingEmployees.length > 0) {
-            // Filtruj pracowników - wklej tylko tych, którzy nie są w innych komórkach
-            const validEmployees = clipboard.filter(empId => !employeesInOtherCells.has(empId));
-
-            if (validEmployees.length === 0) {
-                window.showToast('Wszyscy pracownicy są już przypisani w innych kolumnach tego okresu.', 3000);
-                return;
-            }
-
-            // Wklej tylko dozwolonych pracowników
-            const skippedNames = conflictingEmployees.map(id => EmployeeManager.getLastNameById(id)).join(', ');
-            updateCellState(cell, (state) => {
-                state.assignedEmployees = [...validEmployees];
-            });
-            window.showToast(`Wklejono. Pominięto już przypisanych: ${skippedNames}`, 3000);
-        } else {
-            // Wszyscy pracownicy są dozwoleni
-            updateCellState(cell, (state) => {
-                state.assignedEmployees = [...clipboard!];
-            });
+        if (clipboard.length === 1) {
             window.showToast('Wklejono.');
+        } else if (pastedCount < clipboard.length) {
+            window.showToast(`Wklejono ${pastedCount}/${clipboard.length} komórek (brak miejsca dla pozostałych).`);
+        } else {
+            window.showToast(`Wklejono ${pastedCount} komórek.`);
         }
     };
 
@@ -141,6 +224,56 @@ export const Changes: ChangesAPI = (() => {
             state.assignedEmployees = [];
         });
         window.showToast('Wyczyszczono.');
+    };
+
+    /**
+     * Kopiuje obsadę z ostatniego niepustego wiersza do aktualnego
+     */
+    const copyFromPreviousRow = (currentRow: HTMLTableRowElement): void => {
+        const currentPeriod = currentRow.dataset.startDate || '';
+        if (!currentPeriod) return;
+
+        // Szukaj ostatniego niepustego wiersza (idąc wstecz od aktualnego)
+        let sourceRow = currentRow.previousElementSibling as HTMLTableRowElement | null;
+        let sourcePeriod: string | null = null;
+
+        while (sourceRow) {
+            const period = sourceRow.dataset.startDate || '';
+            const periodCells = appState.changesCells[period] || {};
+
+            // Sprawdź czy ten wiersz ma jakichkolwiek przypisanych pracowników
+            const hasEmployees = Object.values(periodCells).some(
+                cell => cell.assignedEmployees && cell.assignedEmployees.length > 0
+            );
+
+            if (hasEmployees) {
+                sourcePeriod = period;
+                break;
+            }
+            sourceRow = sourceRow.previousElementSibling as HTMLTableRowElement | null;
+        }
+
+        if (!sourcePeriod) {
+            window.showToast('Brak wypełnionego okresu do skopiowania.', 2000);
+            return;
+        }
+
+        // Zapisz stan przed zmianą
+        pushUndoState();
+
+        const sourceCells = appState.changesCells[sourcePeriod] || {};
+
+        // Kopiuj tylko kolumny 1-7 (pomijamy 0-daty i 8-urlopy)
+        for (let colIdx = 1; colIdx <= 7; colIdx++) {
+            const sourceEmployees = sourceCells[colIdx]?.assignedEmployees || [];
+            if (!appState.changesCells[currentPeriod]) appState.changesCells[currentPeriod] = {};
+            appState.changesCells[currentPeriod][colIdx] = {
+                assignedEmployees: [...sourceEmployees]
+            };
+        }
+
+        renderChangesAndSave();
+        window.showToast('Skopiowano obsadę z ostatniego wypełnionego okresu.', 2000);
     };
 
     const generateTwoWeekPeriods = (year: number): Period[] => {
@@ -229,12 +362,6 @@ export const Changes: ChangesAPI = (() => {
             return {};
         }
     };
-
-    interface LeaveEntry {
-        startDate: string;
-        endDate: string;
-        type: string;
-    }
 
     const populateLeavesColumn = (allLeavesData: Record<string, unknown>): void => {
         const today = new Date();
@@ -327,9 +454,18 @@ export const Changes: ChangesAPI = (() => {
      * Obsługuje pojedyncze kliknięcie - zaznaczenie komórki
      */
     const handleCellClick = (event: Event): void => {
+        const mouseEvent = event as MouseEvent;
         const cell = (event.target as HTMLElement).closest('td') as HTMLTableCellElement | null;
         if (!cell || cell.cellIndex === 0) return; // Ignoruj pierwszą kolumnę (daty)
 
+        // Ctrl+Click - zaznacz wiele komórek
+        if (mouseEvent.ctrlKey || mouseEvent.metaKey) {
+            toggleMultiSelection(cell);
+            return;
+        }
+
+        // Normalne kliknięcie - wyczyść multi-select i zaznacz pojedynczą
+        clearMultiSelection();
         setActiveCell(cell);
     };
 
@@ -347,6 +483,21 @@ export const Changes: ChangesAPI = (() => {
      * Obsługuje klawisze na zaznaczonej komórce
      */
     const handleKeyDown = (event: KeyboardEvent): void => {
+        // Ctrl+S - Szybki zapis
+        if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+            event.preventDefault();
+            saveChanges();
+            window.showToast('Zapisano zmiany.', 2000);
+            return;
+        }
+
+        // Ctrl+Z - Cofnij
+        if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
+            event.preventDefault();
+            undoLastChange();
+            return;
+        }
+
         // Ctrl+C - Kopiuj
         if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
             if (activeCell && activeCell.cellIndex !== 0) {
@@ -358,15 +509,25 @@ export const Changes: ChangesAPI = (() => {
         // Ctrl+V - Wklej
         if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
             event.preventDefault();
-            if (activeCell && activeCell.cellIndex !== 0 && clipboard) {
-                pasteCell(activeCell);
-            } else if (!clipboard) {
+            if (!clipboard) {
                 window.showToast('Brak skopiowanej komórki.', 2000);
+                return;
+            }
+
+            if (activeCell && activeCell.cellIndex !== 0) {
+                pasteCell(activeCell);
             }
             return;
         }
 
         if (!activeCell) return;
+
+        // Tab - Następna komórka
+        if (event.key === 'Tab') {
+            event.preventDefault();
+            navigateWithArrows(event.shiftKey ? 'ArrowLeft' : 'ArrowRight');
+            return;
+        }
 
         // Enter - Otwórz modal
         if (event.key === 'Enter') {
@@ -386,9 +547,10 @@ export const Changes: ChangesAPI = (() => {
             return;
         }
 
-        // Escape - Odznacz komórkę
+        // Escape - Odznacz komórkę i wyczyść multi-select
         if (event.key === 'Escape') {
             setActiveCell(null);
+            clearMultiSelection();
             return;
         }
 
@@ -455,9 +617,18 @@ export const Changes: ChangesAPI = (() => {
         employeeListDiv.innerHTML = '';
         searchInput.value = '';
 
-        const allEmployees = Object.fromEntries(
-            Object.entries(EmployeeManager.getAll()).filter(([, employee]) => !employee.isHidden && !employee.isScheduleOnly)
-        );
+        const allEmployees = EmployeeManager.getAll();
+        if (Object.keys(allEmployees).length === 0) {
+            employeeListDiv.innerHTML = '<p style="text-align: center; color: var(--color-gray-500); padding: 20px;">Brak pracowników do wyświetlenia.</p>';
+            modal.style.display = 'flex';
+            cancelBtn.onclick = () => { modal.style.display = 'none'; };
+            return;
+        }
+        const visibleEmployeesIds = Object.keys(allEmployees).filter((id) => {
+            const emp = allEmployees[id];
+            return !emp.isHidden && !emp.isScheduleOnly;
+        });
+
         const row = cell.parentElement as HTMLTableRowElement;
         const period = row.dataset.startDate || '';
         const columnIndex = cell.cellIndex;
@@ -474,36 +645,140 @@ export const Changes: ChangesAPI = (() => {
             }
         }
 
-        for (const id in allEmployees) {
-            const employeeEl = document.createElement('div');
-            employeeEl.classList.add('employee-list-item');
-            employeeEl.textContent = EmployeeManager.getFullNameById(id);
-            employeeEl.dataset.employeeId = id;
+        // Grupowanie
+        const groups: Record<string, string[]> = {
+            first: [],
+            second: [],
+            other: [],
+        };
 
-            if (assignedEmployees.has(id)) {
-                // Zaznaczony w tej komórce
-                employeeEl.classList.add('selected-employee');
-            } else if (employeesInOtherCells.has(id)) {
-                // Przypisany do innej komórki w tym okresie - wyszarzony
-                employeeEl.classList.add('disabled-employee');
-                employeeEl.setAttribute('title', 'Pracownik jest już przypisany do innej kolumny w tym okresie');
-            }
+        // Sortowanie alfabetyczne
+        visibleEmployeesIds.sort((a, b) => EmployeeManager.compareEmployees(allEmployees[a], allEmployees[b]));
 
-            employeeEl.addEventListener('click', () => {
-                // Nie pozwól kliknąć na wyszarzonych
-                if (employeeEl.classList.contains('disabled-employee')) return;
-                employeeEl.classList.toggle('selected-employee');
+        visibleEmployeesIds.forEach((id) => {
+            const group = allEmployees[id].shiftGroup || 'other';
+            if (groups[group]) groups[group].push(id);
+            else groups.other.push(id);
+        });
+
+        // Tymczasowe przechowywanie zastępstw (przed zapisem)
+        const tempSubstitutes: Record<string, string> = { ...(cellState.substitutes || {}) };
+        const periodEnd = row.dataset.endDate || '';
+
+        const renderGroup = (title: string, ids: string[]) => {
+            if (ids.length === 0) return;
+            const header = document.createElement('div');
+            header.className = 'employee-group-header';
+            header.textContent = title;
+            employeeListDiv.appendChild(header);
+
+            ids.forEach((id) => {
+                const employeeEl = document.createElement('div');
+                employeeEl.classList.add('employee-list-item');
+
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = EmployeeManager.getFullNameById(id);
+                employeeEl.appendChild(nameSpan);
+                employeeEl.dataset.employeeId = id;
+
+                const isOnLeave = isEmployeeOnLeave(id, period, periodEnd);
+
+                if (assignedEmployees.has(id)) {
+                    employeeEl.classList.add('selected-employee');
+
+                    // Jeśli pracownik jest na urlopie, dodaj UI do wyboru zastępcy
+                    if (isOnLeave) {
+                        employeeEl.classList.add('on-leave');
+                        nameSpan.innerHTML = `⚠ ${EmployeeManager.getFullNameById(id)} <small>(urlop)</small>`;
+
+                        const substituteContainer = document.createElement('div');
+                        substituteContainer.className = 'substitute-selector';
+
+                        const substituteSelect = document.createElement('select');
+                        substituteSelect.className = 'substitute-select';
+                        substituteSelect.innerHTML = '<option value="">-- Wybierz zastępcę --</option>';
+
+                        // Dodaj dostępnych pracowników do selecta
+                        visibleEmployeesIds
+                            .filter(empId => empId !== id && !assignedEmployees.has(empId))
+                            .forEach(empId => {
+                                const opt = document.createElement('option');
+                                opt.value = empId;
+                                opt.textContent = EmployeeManager.getFullNameById(empId);
+                                if (tempSubstitutes[id] === empId) {
+                                    opt.selected = true;
+                                }
+                                substituteSelect.appendChild(opt);
+                            });
+
+                        substituteSelect.addEventListener('change', (e) => {
+                            const value = (e.target as HTMLSelectElement).value;
+                            if (value) {
+                                tempSubstitutes[id] = value;
+                            } else {
+                                delete tempSubstitutes[id];
+                            }
+                        });
+
+                        substituteContainer.appendChild(substituteSelect);
+                        employeeEl.appendChild(substituteContainer);
+                    }
+                } else if (employeesInOtherCells.has(id)) {
+                    employeeEl.classList.add('disabled-employee');
+                    employeeEl.setAttribute('title', 'Pracownik jest już przypisany do innej kolumny w tym okresie');
+                } else if (isOnLeave) {
+                    // Nieprzypisany pracownik na urlopie - oznacz ale pozwól kliknąć
+                    nameSpan.innerHTML = `<span style="color: var(--color-warning);">⚠</span> ${EmployeeManager.getFullNameById(id)} <small style="color: var(--color-gray-400);">(urlop)</small>`;
+                }
+
+                employeeEl.addEventListener('click', (e) => {
+                    // Nie pozwól kliknąć na wyszarzonych
+                    if (employeeEl.classList.contains('disabled-employee')) return;
+                    // Nie przełączaj jeśli kliknięto w select
+                    if ((e.target as HTMLElement).tagName === 'SELECT' || (e.target as HTMLElement).tagName === 'OPTION') return;
+                    employeeEl.classList.toggle('selected-employee');
+                });
+
+                employeeListDiv.appendChild(employeeEl);
             });
+        };
 
-            employeeListDiv.appendChild(employeeEl);
-        }
+        renderGroup('Pierwsza zmiana', groups.first);
+        renderGroup('Druga zmiana', groups.second);
+        renderGroup('Pozostali', groups.other);
 
         const filterEmployees = (): void => {
             const searchTerm = searchInput.value.toLowerCase();
+
+            // 1. Filtruj elementy
             employeeListDiv.querySelectorAll('.employee-list-item').forEach((item) => {
                 const el = item as HTMLElement;
-                el.style.display = el.textContent?.toLowerCase().includes(searchTerm) ? '' : 'none';
+                const matches = !!el.textContent?.toLowerCase().includes(searchTerm);
+                el.style.display = matches ? '' : 'none';
+                el.dataset.visible = matches ? 'true' : 'false';
             });
+
+            // 2. Obsłuż nagłówki
+            let currentHeader: HTMLElement | null = null;
+            let hasVisibleItems = false;
+
+            Array.from(employeeListDiv.children).forEach(child => {
+                if (child.classList.contains('employee-group-header')) {
+                    if (currentHeader) {
+                        currentHeader.style.display = hasVisibleItems ? '' : 'none';
+                    }
+                    currentHeader = child as HTMLElement;
+                    hasVisibleItems = false;
+                } else if (child.classList.contains('employee-list-item')) {
+                    if ((child as HTMLElement).dataset.visible === 'true') {
+                        hasVisibleItems = true;
+                    }
+                }
+            });
+            // Ostatni nagłówek
+            if (currentHeader) {
+                (currentHeader as HTMLElement).style.display = hasVisibleItems ? '' : 'none';
+            }
         };
 
         searchInput.addEventListener('input', filterEmployees);
@@ -525,8 +800,22 @@ export const Changes: ChangesAPI = (() => {
                 }
             });
 
+            // Usuń zastępstwa dla pracowników, którzy nie są już przypisani
+            const validSubstitutes: Record<string, string> = {};
+            for (const empId of selectedEmployees) {
+                if (tempSubstitutes[empId]) {
+                    validSubstitutes[empId] = tempSubstitutes[empId];
+                }
+            }
+
             updateCellState(cell, (state) => {
                 state.assignedEmployees = selectedEmployees;
+                // Firestore nie akceptuje undefined - usuwamy pole jeśli puste
+                if (Object.keys(validSubstitutes).length > 0) {
+                    state.substitutes = validSubstitutes;
+                } else {
+                    delete state.substitutes;
+                }
             });
             window.showToast('Zapisano zmiany.');
             closeModal();
@@ -535,10 +824,63 @@ export const Changes: ChangesAPI = (() => {
         cancelBtn.onclick = closeModal;
     };
 
+    /**
+     * Zapisuje aktualny stan do stosu Undo
+     */
+    const pushUndoState = (): void => {
+        const stateSnapshot = JSON.stringify(appState.changesCells);
+        undoStack.push(stateSnapshot);
+        if (undoStack.length > MAX_UNDO_STACK) {
+            undoStack.shift();
+        }
+    };
+
+    /**
+     * Cofa ostatnią zmianę
+     */
+    const undoLastChange = (): void => {
+        if (undoStack.length === 0) {
+            window.showToast('Brak zmian do cofnięcia.', 2000);
+            return;
+        }
+        const previousState = undoStack.pop();
+        if (previousState) {
+            appState.changesCells = JSON.parse(previousState);
+            renderChangesContent();
+            saveChanges();
+            window.showToast('Cofnięto zmianę.', 2000);
+        }
+    };
+
+    /**
+     * Czyści zaznaczenie wielu komórek
+     */
+    const clearMultiSelection = (): void => {
+        multiSelectedCells.forEach(cell => cell.classList.remove('multi-selected'));
+        multiSelectedCells.clear();
+    };
+
+    /**
+     * Dodaje/usuwa komórkę z zaznaczenia wielokrotnego
+     */
+    const toggleMultiSelection = (cell: HTMLTableCellElement): void => {
+        if (multiSelectedCells.has(cell)) {
+            multiSelectedCells.delete(cell);
+            cell.classList.remove('multi-selected');
+        } else {
+            multiSelectedCells.add(cell);
+            cell.classList.add('multi-selected');
+        }
+    };
+
     const updateCellState = (cell: HTMLTableCellElement, updateFn: (state: ChangesCellState) => void): void => {
         if (!cell) return;
         const period = (cell.parentElement as HTMLTableRowElement).dataset.startDate;
         if (!period) return;
+
+        // Zapisz stan przed zmianą dla możliwości cofnięcia
+        pushUndoState();
+
         const columnIndex = cell.cellIndex;
         if (!appState.changesCells[period]) appState.changesCells[period] = {};
         let cellState = appState.changesCells[period][columnIndex] || {};
@@ -576,16 +918,98 @@ export const Changes: ChangesAPI = (() => {
         }
     };
 
+    /**
+     * Pobiera listę pracowników na urlopie w danym okresie
+     */
+    const getEmployeesOnLeaveForPeriod = (periodStart: string, periodEnd: string): string[] => {
+        const start = new Date(periodStart);
+        const end = new Date(periodEnd);
+        const employeesOnLeave: string[] = [];
+        const employees = EmployeeManager.getAll();
+
+        for (const employeeId in employees) {
+            const employee = employees[employeeId];
+            if (employee.isHidden || employee.isScheduleOnly) continue;
+
+            const employeeName = employee.displayName || employee.name;
+            if (!employeeName) continue;
+
+            const employeeLeaves = cachedLeavesData[employeeName];
+            if (!Array.isArray(employeeLeaves)) continue;
+
+            // Sprawdź czy pracownik ma urlop pokrywający się z tym okresem
+            for (const leave of employeeLeaves) {
+                if (leave.type !== 'vacation') continue;
+
+                const leaveStart = new Date(leave.startDate);
+                const leaveEnd = new Date(leave.endDate);
+
+                // Sprawdź czy urlop pokrywa się z okresem
+                if (!(leaveEnd < start || leaveStart > end)) {
+                    const lastName = EmployeeManager.getLastNameById(employeeId);
+                    employeesOnLeave.push(lastName || employeeName);
+                    break; // Pracownik już dodany, przejdź do następnego
+                }
+            }
+        }
+        return employeesOnLeave;
+    };
+
     const renderChangesContent = (): void => {
         document.querySelectorAll('#changesTableBody tr').forEach((row) => {
             const tr = row as HTMLTableRowElement;
             const period = tr.dataset.startDate || '';
+            const periodEnd = tr.dataset.endDate || '';
+
+            // Pobierz pracowników na urlopie dla tego okresu
+            const employeesOnLeave = getEmployeesOnLeaveForPeriod(period, periodEnd);
+
             Array.from(tr.cells).forEach((cell, index) => {
-                if (appState.changesCells[period]?.[index]?.assignedEmployees) {
-                    const employeeNames = appState.changesCells[period][index].assignedEmployees!
-                        .map((id) => EmployeeManager.getFullNameById(id))
-                        .join('<br>');
-                    cell.innerHTML = employeeNames;
+                // Ignoruj pierwszą kolumnę (daty) i ostatnią (urlopy)
+                if (index === 0 || cell.classList.contains('leaves-cell')) return;
+
+                const hasAssignedEmployees =
+                    appState.changesCells[period]?.[index]?.assignedEmployees &&
+                    appState.changesCells[period][index].assignedEmployees!.length > 0;
+
+                if (hasAssignedEmployees) {
+                    // Komórka ma przypisanych pracowników - wyświetl ich
+                    const cellState = appState.changesCells[period][index];
+                    const assignedIds = cellState.assignedEmployees!;
+                    const substitutes = cellState.substitutes || {};
+
+                    const employeeNames = assignedIds.map((id) => {
+                        const name = EmployeeManager.getFullNameById(id);
+                        const isOnLeave = isEmployeeOnLeave(id, period, periodEnd);
+                        const substituteId = substitutes[id];
+
+                        if (isOnLeave && substituteId) {
+                            // Pracownik na urlopie z zastępcą
+                            const substituteName = EmployeeManager.getFullNameById(substituteId);
+                            return `<span class="employee-on-leave">${name}</span> <span class="substitute-separator">/</span> <span class="substitute-name">${substituteName}</span>`;
+                        } else if (isOnLeave) {
+                            // Pracownik na urlopie bez zastępcy
+                            return `<span class="employee-on-leave" title="Na urlopie - kliknij dwukrotnie aby dodać zastępcę">${name} <span class="leave-warning-icon">⚠</span></span>`;
+                        }
+                        return name;
+                    }).join('<br>');
+
+                    // Dodaj licznik pracowników
+                    const countBadge = `<div class="employee-count-badge">${assignedIds.length} os.</div>`;
+                    cell.innerHTML = employeeNames + countBadge;
+                    cell.classList.remove('has-leave-placeholder', 'empty-cell');
+                } else {
+                    // Komórka jest pusta - oznacz jako nieobsadzoną
+                    cell.classList.add('empty-cell');
+
+                    if (employeesOnLeave.length > 0) {
+                        const placeholder = `<span class="leave-placeholder">${employeesOnLeave.join(', ')}</span>`;
+                        cell.innerHTML = placeholder;
+                        cell.classList.add('has-leave-placeholder');
+                    } else {
+                        cell.innerHTML = '';
+                        cell.classList.remove('has-leave-placeholder');
+                    }
                 }
             });
         });
@@ -699,8 +1123,9 @@ export const Changes: ChangesAPI = (() => {
         const periods = generateTwoWeekPeriods(currentYear);
         renderTable(periods);
         await loadChanges();
-        renderChangesContent();
         const allLeaves = await getAllLeavesData();
+        cachedLeavesData = allLeaves as Record<string, LeaveEntry[]>;
+        renderChangesContent();
         populateLeavesColumn(allLeaves);
     };
 
@@ -742,6 +1167,12 @@ export const Changes: ChangesAPI = (() => {
             { id: 'ctxCopyCell', action: (cell: HTMLElement) => copyCell(cell as HTMLTableCellElement) },
             { id: 'ctxPasteCell', action: (cell: HTMLElement) => pasteCell(cell as HTMLTableCellElement) },
             { id: 'ctxClearCell', action: (cell: HTMLElement) => clearCell(cell as HTMLTableCellElement) },
+            {
+                id: 'ctxCopyFromPrevious', action: (cell: HTMLElement) => {
+                    const row = (cell as HTMLTableCellElement).parentElement as HTMLTableRowElement;
+                    if (row) copyFromPreviousRow(row);
+                }
+            },
         ];
         window.initializeContextMenu('changesContextMenu', '#changesTableBody td:not(.leaves-cell)', contextMenuItems);
     };
