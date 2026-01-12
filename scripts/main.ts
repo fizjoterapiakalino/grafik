@@ -20,8 +20,10 @@ import './changes.js';
 import './scrapped-pdfs.js';
 import './options.js';
 import './login.js';
+import { ColorPreferences } from './color-preferences.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+    ColorPreferences.init(); // Apply saved color preferences
     Router.init();
     BackupScheduler.init();
     UXEnhancements.init();

@@ -31,8 +31,159 @@
     color: var(--color-text);
 }
 
-.changes-table tbody tr:hover {
+/* Kolumna Akcje */
+.changes-table th.actions-header {
+    width: 70px;
+    min-width: 70px;
+    text-align: center;
+    background-color: var(--color-primary-700);
+}
+
+.changes-table td.actions-cell {
+    width: 70px;
+    min-width: 70px;
+    text-align: center;
     background-color: var(--color-gray-50);
+    padding: 4px;
+}
+
+/* Kontener przycisków akcji wiersza */
+.row-action-buttons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+/* Pokaż przyciski przy hover na wierszu */
+.changes-table tbody tr:hover .row-action-buttons {
+    opacity: 1;
+}
+
+/* Pokaż przyciski gdy wiersz ma aktywną komórkę */
+.changes-table tbody tr.has-active-cell .row-action-buttons {
+    opacity: 1;
+}
+
+/* Styl przycisków akcji wiersza */
+.row-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    font-size: 0.8em;
+    color: var(--color-gray-500);
+    background-color: var(--color-white);
+    border: 1px solid var(--color-gray-300);
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.row-action-btn:hover {
+    color: var(--color-primary-600);
+    border-color: var(--color-primary-400);
+    background-color: var(--color-primary-50);
+}
+
+.row-action-btn:active {
+    transform: scale(0.95);
+}
+
+/* Przycisk kopiowania */
+.row-action-btn.copy-row-btn:hover {
+    color: var(--color-primary-600);
+    border-color: var(--color-primary-400);
+}
+
+/* Przycisk wklejania */
+.row-action-btn.paste-row-btn {
+    color: var(--color-gray-400);
+}
+
+.row-action-btn.paste-row-btn.has-clipboard {
+    color: var(--color-gray-500);
+}
+
+.row-action-btn.paste-row-btn.has-clipboard:hover {
+    color: var(--color-success);
+    border-color: var(--color-success);
+    background-color: var(--color-primary-50);
+}
+
+.changes-table tbody tr:hover {
+    background-color: var(--color-primary-50);
+}
+
+.changes-table tbody tr:hover td {
+    background-color: inherit;
+}
+
+/* Nieobsadzone komórki - ostrzeżenie */
+.changes-table td.empty-cell {
+    background: repeating-linear-gradient(45deg,
+            transparent,
+            transparent 10px,
+            rgba(239, 68, 68, 0.05) 10px,
+            rgba(239, 68, 68, 0.05) 20px);
+}
+
+.changes-table td.empty-cell::before {
+    content: '⚠';
+    display: block;
+    color: var(--color-warning);
+    font-size: 0.8em;
+    opacity: 0.6;
+}
+
+/* Licznik pracowników */
+.employee-count-badge {
+    display: inline-block;
+    background-color: var(--color-primary-100);
+    color: var(--color-primary-700);
+    font-size: 0.75em;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-top: 4px;
+}
+
+/* Konflikt urlopowy */
+.leave-conflict-indicator {
+    color: var(--color-danger);
+    font-size: 0.8em;
+    margin-left: 4px;
+}
+
+/* Ikona ostrzeżenia o urlopie (wykrzyknik) */
+.leave-warning-icon {
+    color: var(--color-danger);
+    font-weight: bold;
+    margin-left: 4px;
+}
+
+/* Separator zastępstwa */
+.substitute-separator {
+    color: var(--color-primary-500);
+    font-weight: 700;
+    margin: 0 4px;
+}
+
+/* Nazwa zastępcy */
+.substitute-name {
+    color: var(--color-success);
+    font-weight: 500;
+}
+
+/* Zaznaczenie wielu komórek */
+.changes-table td.multi-selected {
+    background-color: var(--color-secondary-100);
+    outline: 2px dashed var(--color-secondary-500);
+    outline-offset: -2px;
 }
 
 /* Edytowalne komórki */
@@ -64,6 +215,22 @@
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
+}
+
+.employee-group-header {
+    grid-column: 1 / -1;
+    font-weight: 600;
+    color: var(--color-primary-700);
+    background-color: var(--color-primary-50);
+    padding: 8px 12px;
+    border-radius: var(--border-radius-sm);
+    margin-top: 10px;
+    margin-bottom: 5px;
+    border-left: 4px solid var(--color-primary-500);
+}
+
+.employee-group-header:first-child {
+    margin-top: 0;
 }
 
 #employeeSelectionModal .employee-list-item.disabled-employee {
@@ -100,6 +267,39 @@
     box-shadow: 0 0 0 1px var(--color-primary-500);
 }
 
+/* Pracownik na urlopie w modalu */
+#employeeSelectionModal .employee-list-item.on-leave {
+    background-color: var(--color-warning-50, #fffbeb);
+    border-color: var(--color-warning, #f59e0b);
+}
+
+#employeeSelectionModal .employee-list-item.on-leave small {
+    color: var(--color-warning, #f59e0b);
+    font-weight: normal;
+}
+
+/* Kontener na select zastępcy */
+.substitute-selector {
+    margin-top: 8px;
+    width: 100%;
+}
+
+.substitute-select {
+    width: 100%;
+    padding: 4px 8px;
+    font-size: 0.85em;
+    border: 1px solid var(--color-gray-300);
+    border-radius: var(--border-radius-sm);
+    background-color: var(--color-white);
+    color: var(--color-text);
+    cursor: pointer;
+}
+
+.substitute-select:focus {
+    outline: 2px solid var(--color-primary-500);
+    outline-offset: -2px;
+}
+
 /* Styl dla wierszy reprezentujących przeszłe okresy */
 .changes-table tbody tr.past-period td {
     color: #a0a0a0;
@@ -120,7 +320,7 @@
 /* New Header Layout consistent with leaves page */
 .changes-header-controls {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
     align-items: center;
     border-bottom: 2px solid var(--color-gray-300);
     margin-bottom: var(--spacing-lg);
@@ -164,6 +364,27 @@
     outline: none;
     border-color: var(--color-primary-700);
     box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.2);
+}
+
+/* Placeholder urlopów w pustych komórkach */
+.changes-table .leave-placeholder {
+    display: block;
+    font-size: 0.75em;
+    color: var(--color-gray-400);
+    font-style: italic;
+    opacity: 0.8;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Ukryj placeholder gdy komórka jest aktywna (edytowana) */
+.changes-table td.active-cell .leave-placeholder {
+    display: none;
+}
+
+/* Komórka z placeholderem ma delikatne tło */
+.changes-table td.has-leave-placeholder {
+    background-color: rgba(239, 68, 68, 0.03);
 }
 
 @media (max-width: 768px) {
@@ -307,6 +528,10 @@
         content: 'URLOPY';
     }
 
+    .changes-table td:nth-of-type(10)::before {
+        content: 'AKCJE';
+    }
+
     .changes-table td:not(:first-child):not(.leaves-cell)::before {
         font-weight: 600;
         color: var(--color-gray-700);
@@ -353,4 +578,289 @@
     #employeeSelectionModal .employee-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* =========================
+   SZABLONY OBSADY
+   ========================= */
+
+/* Przycisk szablonów w nagłówku */
+.template-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.template-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    font-size: 0.9em;
+    font-weight: 600;
+    color: var(--color-white);
+    background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
+    border: none;
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.template-btn:hover {
+    background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700));
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.template-btn i {
+    font-size: 1em;
+}
+
+/* Modal szablonów */
+.template-modal {
+    max-width: 800px;
+    width: 90%;
+}
+
+.template-modal-body {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: var(--spacing-lg);
+    margin: var(--spacing-lg) 0;
+    min-height: 300px;
+}
+
+.template-list-section h3,
+.template-preview-section h3 {
+    font-size: 0.9em;
+    color: var(--color-gray-600);
+    margin-bottom: var(--spacing-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.template-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+.template-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background-color: var(--color-gray-50);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.template-item:hover {
+    background-color: var(--color-primary-50);
+    border-color: var(--color-primary-300);
+}
+
+.template-item.selected {
+    background-color: var(--color-primary-100);
+    border-color: var(--color-primary-500);
+}
+
+.template-item-name {
+    font-weight: 500;
+    flex-grow: 1;
+}
+
+.template-item-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.template-item-btn {
+    padding: 4px 8px;
+    font-size: 0.75em;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.template-item-btn.apply-btn {
+    background-color: var(--color-success);
+    color: var(--color-white);
+}
+
+.template-item-btn.apply-btn:hover {
+    background-color: var(--color-success-dark);
+}
+
+.template-item-btn.delete-btn {
+    background-color: var(--color-danger);
+    color: var(--color-white);
+}
+
+.template-item-btn.delete-btn:hover {
+    background-color: var(--color-danger-dark);
+}
+
+.template-preview {
+    background-color: var(--color-gray-50);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--border-radius-sm);
+    padding: var(--spacing-md);
+    min-height: 200px;
+}
+
+.template-placeholder {
+    color: var(--color-gray-400);
+    font-style: italic;
+    text-align: center;
+    padding: var(--spacing-lg);
+}
+
+.template-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--spacing-sm);
+}
+
+.template-preview-cell {
+    background-color: var(--color-white);
+    border: 1px solid var(--color-gray-300);
+    border-radius: var(--border-radius-sm);
+    padding: var(--spacing-sm);
+}
+
+.template-preview-cell-header {
+    font-size: 0.7em;
+    font-weight: 600;
+    color: var(--color-gray-500);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+
+.template-preview-cell-content {
+    font-size: 0.85em;
+    color: var(--color-text);
+}
+
+/* Modal zapisu szablonu */
+.small-modal {
+    max-width: 400px;
+}
+
+.form-group {
+    margin: var(--spacing-lg) 0;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    font-weight: 500;
+    color: var(--color-gray-700);
+}
+
+.form-input,
+.form-select {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 1em;
+    border: 1px solid var(--color-gray-300);
+    border-radius: var(--border-radius-sm);
+    background-color: var(--color-white);
+    transition: border-color 0.15s ease;
+}
+
+.form-input:focus,
+.form-select:focus {
+    outline: none;
+    border-color: var(--color-primary-500);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.template-apply-preview {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-sm);
+    background-color: var(--color-gray-50);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.85em;
+}
+
+/* Context menu separator */
+.context-menu .separator {
+    height: 1px;
+    background-color: var(--color-gray-200);
+    margin: 4px 0;
+}
+
+/* Empty template list */
+.template-empty {
+    text-align: center;
+    padding: var(--spacing-lg);
+    color: var(--color-gray-400);
+}
+
+.template-empty i {
+    font-size: 2em;
+    margin-bottom: var(--spacing-sm);
+    display: block;
+}
+
+/* =========================
+   SZYBKIE PLANOWANIE (MULTI-PERIOD)
+   ========================= */
+
+/* Secondary button style */
+.template-btn.secondary {
+    background: linear-gradient(135deg, var(--color-gray-500), var(--color-gray-600));
+}
+
+.template-btn.secondary:hover {
+    background: linear-gradient(135deg, var(--color-gray-600), var(--color-gray-700));
+}
+
+/* Multi-period modal */
+.multi-period-modal {
+    max-width: 500px;
+    width: 90%;
+}
+
+.modal-subtitle {
+    color: var(--color-gray-500);
+    font-size: 0.9em;
+    margin: -8px 0 var(--spacing-md) 0;
+}
+
+.multi-period-form {
+    margin: var(--spacing-md) 0;
+}
+
+.form-row {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+.form-group.half {
+    flex: 1;
+}
+
+.selected-periods-info {
+    background-color: var(--color-primary-50);
+    border: 1px solid var(--color-primary-200);
+    border-radius: var(--border-radius-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin: var(--spacing-md) 0;
+    text-align: center;
+}
+
+.periods-count {
+    font-weight: 600;
+    color: var(--color-primary-700);
+}
+
+.confirm-btn i {
+    margin-right: 6px;
 }

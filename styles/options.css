@@ -15,8 +15,9 @@
 
 /* Panel lewy - Lista pracowników */
 .employee-list-panel {
-    flex: 1;
-    min-width: 300px;
+    flex: 0 0 280px;
+    min-width: 250px;
+    max-width: 320px;
     display: flex;
     flex-direction: column;
     border-right: 1px solid var(--color-gray-200);
@@ -96,10 +97,37 @@
 
 /* Button style removed - delegated to components.css .action-btn */
 
-/* Panel prawy - Szczegóły */
+/* Panel środkowy - Formularz edycji */
 .employee-details-panel {
-    flex: 2;
-    padding-left: var(--spacing-lg);
+    flex: 1;
+    min-width: 350px;
+    padding: 0 var(--spacing-lg);
+    border-right: 1px solid var(--color-gray-200);
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+    overflow-y: auto;
+}
+
+/* Panel prawy - Ustawienia */
+.settings-panel {
+    flex: 0 0 280px;
+    min-width: 250px;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    max-height: 100%;
+    overflow-y: auto;
+}
+
+.settings-panel .backup-container,
+.settings-panel .color-settings-container {
+    margin-top: 0;
+    padding: var(--spacing-md);
+    background-color: var(--color-white);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
 }
 
 .details-placeholder {
@@ -119,6 +147,7 @@
 
 .details-edit-form .form-group {
     margin-bottom: var(--spacing-lg);
+    position: relative;
 }
 
 .details-edit-form label {
@@ -129,13 +158,16 @@
 }
 
 .details-edit-form input[type='text'],
-.details-edit-form input[type='number'] {
+.details-edit-form input[type='number'],
+.details-edit-form select {
     width: 100%;
     padding: 10px;
     border: 1px solid var(--color-gray-300);
     border-radius: var(--border-radius-sm);
     font-size: 1em;
     box-sizing: border-box;
+    background-color: var(--color-white);
+    color: var(--color-text);
 }
 
 .form-group-checkbox {
@@ -200,12 +232,46 @@
 }
 
 /* Responsywność */
+@media (max-width: 1200px) {
+    .options-container {
+        flex-wrap: wrap;
+    }
+
+    .employee-list-panel {
+        flex: 0 0 250px;
+        max-width: none;
+    }
+
+    .employee-details-panel {
+        flex: 1 1 300px;
+        min-width: 300px;
+    }
+
+    .settings-panel {
+        flex: 1 1 100%;
+        max-width: none;
+        flex-direction: row;
+        flex-wrap: wrap;
+        border-top: 1px solid var(--color-gray-200);
+        padding-top: var(--spacing-lg);
+        margin-top: var(--spacing-md);
+    }
+
+    .settings-panel .backup-container,
+    .settings-panel .color-settings-container {
+        flex: 1;
+        min-width: 280px;
+    }
+}
+
 @media (max-width: 768px) {
     .options-container {
         flex-direction: column;
     }
 
     .employee-list-panel {
+        flex: none;
+        max-width: none;
         border-right: none;
         border-bottom: 1px solid var(--color-gray-200);
         padding-right: 0;
@@ -213,7 +279,14 @@
     }
 
     .employee-details-panel {
-        padding-left: 0;
+        flex: none;
+        min-width: auto;
+        padding: var(--spacing-lg) 0;
+        border-right: none;
+    }
+
+    .settings-panel {
+        flex-direction: column;
     }
 }
 
@@ -280,6 +353,97 @@
 
 .backup-info #lastBackupDate {
     font-weight: bold;
+}
+
+/* --- Color Settings Section --- */
+.color-settings-container {
+    margin-top: var(--spacing-lg);
+    background-color: var(--color-white);
+    padding: var(--spacing-lg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-md);
+}
+
+.color-settings-container h2 {
+    margin-top: 0;
+    color: var(--color-text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.color-settings-container h2 i {
+    color: var(--color-primary-500);
+}
+
+.color-settings-container .section-description {
+    color: var(--color-gray-500);
+    margin-bottom: var(--spacing-lg);
+    font-size: 0.95em;
+}
+
+.color-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.color-setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--color-gray-50);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--border-radius-sm);
+    transition: all 0.2s ease;
+}
+
+.color-setting-item:hover {
+    border-color: var(--color-primary-300);
+    background: var(--color-primary-50);
+}
+
+.color-setting-item label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+    color: var(--color-gray-700);
+    cursor: pointer;
+}
+
+.color-preview {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--color-gray-200);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.color-setting-item input[type="color"] {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    background: transparent;
+}
+
+.color-setting-item input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 2px;
+}
+
+.color-setting-item input[type="color"]::-webkit-color-swatch {
+    border-radius: var(--border-radius-sm);
+    border: 2px solid var(--color-gray-300);
+}
+
+.color-settings-actions {
+    margin-top: var(--spacing-lg);
+    display: flex;
+    justify-content: flex-end;
 }
 
 /* ============================================
@@ -420,7 +584,8 @@
 }
 
 /* Tooltip on hover */
-.form-group-checkbox[data-tooltip]:hover::after {
+.form-group-checkbox[data-tooltip]:hover::after,
+.form-group[data-tooltip]:hover::after {
     content: attr(data-tooltip);
     position: absolute;
     bottom: calc(100% + 8px);
@@ -439,7 +604,8 @@
     animation: tooltipFadeIn 0.2s ease;
 }
 
-.form-group-checkbox[data-tooltip]:hover::before {
+.form-group-checkbox[data-tooltip]:hover::before,
+.form-group[data-tooltip]:hover::before {
     content: '';
     position: absolute;
     bottom: calc(100% + 2px);

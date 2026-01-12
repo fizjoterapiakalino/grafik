@@ -3,8 +3,9 @@ import { debugLog } from './common.js';
 import { db as dbRaw, auth as authRaw, FieldValue } from './firebase-config.js';
 import { EmployeeManager } from './employee-manager.js';
 import { BackupService } from './backup-service.js';
+import { ColorPreferences } from './color-preferences.js';
 import type { FirestoreDbWrapper, FirebaseAuthWrapper } from './types/firebase';
-import type { Employee } from './types';
+import type { Employee, ShiftGroup } from './types';
 
 const db = dbRaw as unknown as FirestoreDbWrapper;
 const auth = authRaw as unknown as FirebaseAuthWrapper;
@@ -39,6 +40,7 @@ export const Options: OptionsAPI = (() => {
     let clearUidBtn: HTMLElement | null;
     let employeeIsHidden: HTMLInputElement | null;
     let employeeIsScheduleOnly: HTMLInputElement | null;
+    let employeeShiftGroup: HTMLSelectElement | null;
 
     let selectedEmployeeIndex: number | null = null;
 
@@ -268,6 +270,7 @@ export const Options: OptionsAPI = (() => {
         if (adminCheckbox) adminCheckbox.checked = employee.role === 'admin';
         if (employeeIsHidden) employeeIsHidden.checked = employee.isHidden || false;
         if (employeeIsScheduleOnly) employeeIsScheduleOnly.checked = employee.isScheduleOnly || false;
+        if (employeeShiftGroup) employeeShiftGroup.value = employee.shiftGroup || '';
         if (employeeUidInput) employeeUidInput.value = employee.uid || '';
     };
 
@@ -379,6 +382,7 @@ export const Options: OptionsAPI = (() => {
             role: isAdmin ? 'admin' : 'user',
             isHidden: isHidden,
             isScheduleOnly: employeeIsScheduleOnly?.checked || false,
+            shiftGroup: employeeShiftGroup?.value ? (employeeShiftGroup.value as ShiftGroup) : null,
             uid: newUid,
         };
 
@@ -518,6 +522,7 @@ export const Options: OptionsAPI = (() => {
         clearUidBtn = document.getElementById('clearUidBtn');
         employeeIsHidden = document.getElementById('employeeIsHidden') as HTMLInputElement | null;
         employeeIsScheduleOnly = document.getElementById('employeeIsScheduleOnly') as HTMLInputElement | null;
+        employeeShiftGroup = document.getElementById('employeeShiftGroup') as HTMLSelectElement | null;
         createBackupBtn = document.getElementById('createBackupBtn');
         restoreBackupBtn = document.getElementById('restoreBackupBtn');
         lastBackupDateSpan = document.getElementById('lastBackupDate');
@@ -543,6 +548,101 @@ export const Options: OptionsAPI = (() => {
         clearUidBtn?.addEventListener('click', handleClearUid);
         createBackupBtn?.addEventListener('click', createBackup);
         restoreBackupBtn?.addEventListener('click', handleRestoreBackup);
+
+        // Inicjalizacja sekcji personalizacji kolorów
+        initColorPreferencesUI();
+    };
+
+    /**
+     * Inicjalizuje UI dla personalizacji kolorów
+     */
+    const initColorPreferencesUI = (): void => {
+        const colorMassageInput = document.getElementById('colorMassage') as HTMLInputElement | null;
+        const colorPnfInput = document.getElementById('colorPnf') as HTMLInputElement | null;
+        const colorEveryOtherDayInput = document.getElementById('colorEveryOtherDay') as HTMLInputElement | null;
+        const colorBreakInput = document.getElementById('colorBreak') as HTMLInputElement | null;
+        const resetColorsBtn = document.getElementById('resetColorsBtn');
+
+        // Wczytaj aktualne kolory
+        const currentColors = ColorPreferences.getColors();
+
+        // Ustaw wartości inputów
+        if (colorMassageInput) {
+            colorMassageInput.value = currentColors.massage;
+            updateColorPreview('colorMassagePreview', currentColors.massage);
+        }
+        if (colorPnfInput) {
+            colorPnfInput.value = currentColors.pnf;
+            updateColorPreview('colorPnfPreview', currentColors.pnf);
+        }
+        if (colorEveryOtherDayInput) {
+            colorEveryOtherDayInput.value = currentColors.everyOtherDay;
+            updateColorPreview('colorEveryOtherDayPreview', currentColors.everyOtherDay);
+        }
+        if (colorBreakInput) {
+            colorBreakInput.value = currentColors.break;
+            updateColorPreview('colorBreakPreview', currentColors.break);
+        }
+
+        // Dodaj nasłuchiwacze zmiany kolorów
+        colorMassageInput?.addEventListener('input', (e) => {
+            const color = (e.target as HTMLInputElement).value;
+            ColorPreferences.setColor('massage', color);
+            updateColorPreview('colorMassagePreview', color);
+        });
+
+        colorPnfInput?.addEventListener('input', (e) => {
+            const color = (e.target as HTMLInputElement).value;
+            ColorPreferences.setColor('pnf', color);
+            updateColorPreview('colorPnfPreview', color);
+        });
+
+        colorEveryOtherDayInput?.addEventListener('input', (e) => {
+            const color = (e.target as HTMLInputElement).value;
+            ColorPreferences.setColor('everyOtherDay', color);
+            updateColorPreview('colorEveryOtherDayPreview', color);
+        });
+
+        colorBreakInput?.addEventListener('input', (e) => {
+            const color = (e.target as HTMLInputElement).value;
+            ColorPreferences.setColor('break', color);
+            updateColorPreview('colorBreakPreview', color);
+        });
+
+        // Przycisk resetu kolorów
+        resetColorsBtn?.addEventListener('click', () => {
+            ColorPreferences.resetToDefaults();
+            const defaults = ColorPreferences.getColors();
+
+            if (colorMassageInput) {
+                colorMassageInput.value = defaults.massage;
+                updateColorPreview('colorMassagePreview', defaults.massage);
+            }
+            if (colorPnfInput) {
+                colorPnfInput.value = defaults.pnf;
+                updateColorPreview('colorPnfPreview', defaults.pnf);
+            }
+            if (colorEveryOtherDayInput) {
+                colorEveryOtherDayInput.value = defaults.everyOtherDay;
+                updateColorPreview('colorEveryOtherDayPreview', defaults.everyOtherDay);
+            }
+            if (colorBreakInput) {
+                colorBreakInput.value = defaults.break;
+                updateColorPreview('colorBreakPreview', defaults.break);
+            }
+
+            window.showToast('Przywrócono domyślne kolory', 2000);
+        });
+    };
+
+    /**
+     * Aktualizuje preview koloru
+     */
+    const updateColorPreview = (previewId: string, color: string): void => {
+        const preview = document.getElementById(previewId);
+        if (preview) {
+            preview.style.backgroundColor = color;
+        }
     };
 
     const destroy = (): void => {

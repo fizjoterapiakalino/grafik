@@ -1,11 +1,14 @@
 // scripts/schedule-ui.ts
 import { AppConfig, capitalizeFirstLetter } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
-import { auth as authRaw } from './firebase-config.js';
+import { auth as authRaw, db as dbRaw } from './firebase-config.js';
 import { ScheduleLogic } from './schedule-logic.js';
-import type { FirebaseAuthWrapper } from './types/firebase';
+import { toUTCDate } from './utils.js';
+import type { FirebaseAuthWrapper, FirestoreDbWrapper } from './types/firebase';
+import type { LeaveEntry } from './types/index.js';
 
 const auth = authRaw as unknown as FirebaseAuthWrapper;
+const db = dbRaw as unknown as FirestoreDbWrapper;
 
 /**
  * Stan komórki
@@ -45,6 +48,8 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
     let _appState: AppState | null = null;
     let _employeeTooltip: HTMLDivElement | null = null;
     let _currentTimeInterval: ReturnType<typeof setInterval> | null = null;
+    let _leavesData: Record<string, LeaveEntry[]> = {};
+    let _leavesLoaded = false;
 
     const _createEmployeeTooltip = (): void => {
         const existing = document.getElementById('globalEmployeeTooltip') as HTMLDivElement | null;
@@ -94,9 +99,108 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         }
     };
 
+    /**
+     * Pobiera dane o urlopach z Firebase
+     */
+    const _loadLeavesData = async (): Promise<void> => {
+        if (_leavesLoaded) return;
+        try {
+            const docRef = db.collection(AppConfig.firestore.collections.leaves).doc(AppConfig.firestore.docs.mainLeaves);
+            const docSnap = await docRef.get();
+            _leavesData = docSnap.exists ? (docSnap.data() as Record<string, LeaveEntry[]>) || {} : {};
+            _leavesLoaded = true;
+        } catch (error) {
+            console.error('Błąd podczas ładowania danych o urlopach:', error);
+            _leavesData = {};
+        }
+    };
+
+    /**
+     * Sprawdza czy pracownik ma urlop w dzisiejszym dniu
+     * @param employeeDisplayName - wyświetlana nazwa pracownika (klucz w danych urlopowych)
+     * @returns true jeśli pracownik ma urlop dzisiaj
+     */
+    const _isEmployeeOnLeaveToday = (employeeDisplayName: string): boolean => {
+        const leaves = _leavesData[employeeDisplayName] || [];
+        if (leaves.length === 0) return false;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        for (const leave of leaves) {
+            if (!leave.startDate || !leave.endDate) continue;
+
+            const start = toUTCDate(leave.startDate);
+            const end = toUTCDate(leave.endDate);
+
+            // Sprawdź czy dzisiaj jest w zakresie urlopu
+            const startTime = start.getTime();
+            const endTime = end.getTime();
+
+            // Używamy UTC do porównania, więc dopasujmy dzisiejszą datę
+            const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+            const todayUTCTime = todayUTC.getTime();
+
+            if (todayUTCTime >= startTime && todayUTCTime <= endTime) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    /**
+     * Oblicza obciążenie pracownika (ile slotów jest zajętych)
+     */
+    interface WorkloadData {
+        filled: number;
+        total: number;
+        percentage: number;
+    }
+
+    const _calculateEmployeeWorkload = (employeeIndex: string): WorkloadData => {
+        if (!_appState) return { filled: 0, total: 0, percentage: 0 };
+
+        let filled = 0;
+        let total = 0;
+
+        // Iteruj po wszystkich godzinach
+        for (let hour = AppConfig.schedule.startHour; hour <= AppConfig.schedule.endHour; hour++) {
+            for (let minute = 0; minute < 60; minute += 30) {
+                if (hour === AppConfig.schedule.endHour && minute === 30) continue;
+
+                total++;
+                const timeString = `${hour}:${minute.toString().padStart(2, '0')}`;
+                const cellData = _appState.scheduleCells[timeString]?.[employeeIndex];
+
+                if (cellData) {
+                    // Sprawdź czy komórka jest zajęta (ma treść lub jest przerwą)
+                    const hasContent = cellData.content && cellData.content.trim() !== '';
+                    const hasSplitContent = cellData.isSplit && (
+                        (cellData.content1 && String(cellData.content1).trim() !== '') ||
+                        (cellData.content2 && String(cellData.content2).trim() !== '')
+                    );
+                    const isBreak = cellData.isBreak;
+
+                    if (hasContent || hasSplitContent || isBreak) {
+                        filled++;
+                    }
+                }
+            }
+        }
+
+        const percentage = total > 0 ? Math.round((filled / total) * 100) : 0;
+        return { filled, total, percentage };
+    };
+
     const initialize = (appState: AppState): void => {
         _appState = appState;
         _createEmployeeTooltip();
+
+        // Załaduj dane o urlopach w tle
+        _loadLeavesData().then(() => {
+            // Po załadowaniu urlopów, odśwież tabelę żeby wyświetlić badge'y
+            renderTable();
+        });
 
         let lastWidth = window.innerWidth;
 
@@ -172,6 +276,24 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                 if (part.isPnf) div.dataset.isPnf = 'true';
                 if (part.isEveryOtherDay) div.dataset.isEveryOtherDay = 'true';
 
+                // Dodaj tooltip z datą końca zabiegu
+                if (part.treatmentEndDate) {
+                    const formattedDate = formatDatePolish(part.treatmentEndDate);
+                    let tooltipText = '';
+                    if (part.daysRemaining !== null && part.daysRemaining !== undefined) {
+                        if (part.daysRemaining <= 0) {
+                            tooltipText = `⚠️ Zabieg zakończony: ${formattedDate}`;
+                        } else if (part.daysRemaining === 1) {
+                            tooltipText = `Koniec zabiegu: ${formattedDate} (pozostał 1 dzień)`;
+                        } else {
+                            tooltipText = `Koniec zabiegu: ${formattedDate} (pozostało ${part.daysRemaining} dni)`;
+                        }
+                    } else {
+                        tooltipText = `Koniec zabiegu: ${formattedDate}`;
+                    }
+                    div.title = tooltipText;
+                }
+
                 wrapper.appendChild(div);
             });
             cell.appendChild(wrapper);
@@ -183,7 +305,33 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             if (cellObj.isMassage) cell.dataset.isMassage = 'true';
             if (cellObj.isPnf) cell.dataset.isPnf = 'true';
             if (cellObj.isEveryOtherDay) cell.dataset.isEveryOtherDay = 'true';
+
+            // Dodaj tooltip z datą końca zabiegu
+            if (displayData.treatmentEndDate) {
+                const formattedDate = formatDatePolish(displayData.treatmentEndDate);
+                let tooltipText = '';
+                if (displayData.daysRemaining !== null && displayData.daysRemaining !== undefined) {
+                    if (displayData.daysRemaining <= 0) {
+                        tooltipText = `⚠️ Zabieg zakończony: ${formattedDate}`;
+                    } else if (displayData.daysRemaining === 1) {
+                        tooltipText = `Koniec zabiegu: ${formattedDate} (pozostał 1 dzień)`;
+                    } else {
+                        tooltipText = `Koniec zabiegu: ${formattedDate} (pozostało ${displayData.daysRemaining} dni)`;
+                    }
+                } else {
+                    tooltipText = `Koniec zabiegu: ${formattedDate}`;
+                }
+                cell.title = tooltipText;
+            }
         }
+    };
+
+    /**
+     * Formatuje datę ISO na format polski (dd.mm.yyyy)
+     */
+    const formatDatePolish = (isoDate: string): string => {
+        const [year, month, day] = isoDate.split('-');
+        return `${day}.${month}.${year}`;
     };
 
     const refreshAllRowHeights = (): void => {
@@ -414,7 +562,37 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
 
             const span = document.createElement('span');
             span.textContent = capitalizeFirstLetter(displayName);
+
+            // Sprawdź czy pracownik ma urlop dzisiaj i dodaj odpowiednią klasę
+            const isOnLeave = _isEmployeeOnLeaveToday(displayName);
+            if (isOnLeave) {
+                span.classList.add('on-leave');
+                th.classList.add('employee-on-leave');
+            }
+
             th.appendChild(span);
+
+            // Oblicz obciążenie pracownika (zajęte sloty / wszystkie sloty)
+            const workloadData = _calculateEmployeeWorkload(i);
+            const workloadBar = document.createElement('div');
+            workloadBar.className = 'workload-bar';
+
+            const workloadFill = document.createElement('div');
+            workloadFill.className = 'workload-fill';
+            workloadFill.style.width = `${workloadData.percentage}%`;
+
+            // Ustaw kolor w zależności od obciążenia
+            if (workloadData.percentage >= 80) {
+                workloadFill.classList.add('high');
+            } else if (workloadData.percentage >= 50) {
+                workloadFill.classList.add('medium');
+            } else {
+                workloadFill.classList.add('low');
+            }
+
+            workloadBar.appendChild(workloadFill);
+            workloadBar.setAttribute('title', `Obciążenie: ${workloadData.filled}/${workloadData.total} (${workloadData.percentage}%)`);
+            th.appendChild(workloadBar);
 
             th.dataset.fullName = fullName;
             th.dataset.employeeNumber = employeeNumber;

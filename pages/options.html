@@ -57,15 +57,28 @@
                         <input type="number" id="leaveEntitlementInput" min="0" value="26" />
                         <span class="input-suffix">dni</span>
                     </div>
-                    <span class="field-hint">Urlop zaległy możesz edytować w podsumowaniu rocznym na stronie urlopów</span>
+                    <span class="field-hint">Urlop zaległy możesz edytować w podsumowaniu rocznym na stronie
+                        urlopów</span>
                 </div>
             </div>
 
             <!-- Sekcja: Ustawienia -->
             <div class="form-section">
                 <h3 class="section-title"><i class="fas fa-cog"></i> Ustawienia</h3>
+                <div class="form-group"
+                    data-tooltip="Określa przynależność pracownika do I lub II zmiany. Ułatwia planowanie obsady i filtrowanie grafiku.">
+                    <label for="employeeShiftGroup">Grupa zmianowa <span class="tooltip-indicator"
+                            style="margin-left: 5px; display: inline-block;"><i
+                                class="fas fa-info-circle"></i></span></label>
+                    <select id="employeeShiftGroup" class="form-select">
+                        <option value="">Brak przypisania</option>
+                        <option value="first">Pierwsza zmiana</option>
+                        <option value="second">Druga zmiana</option>
+                    </select>
+                </div>
                 <div class="checkbox-group">
-                    <div class="form-group form-group-checkbox" data-tooltip="Administratorzy mają pełny dostęp do edycji grafiku, urlopów i ustawień wszystkich pracowników">
+                    <div class="form-group form-group-checkbox"
+                        data-tooltip="Administratorzy mają pełny dostęp do edycji grafiku, urlopów i ustawień wszystkich pracowników">
                         <input type="checkbox" id="employeeRoleAdmin" />
                         <label for="employeeRoleAdmin">
                             <i class="fas fa-key checkbox-icon"></i>
@@ -73,7 +86,8 @@
                         </label>
                         <span class="tooltip-indicator"><i class="fas fa-info-circle"></i></span>
                     </div>
-                    <div class="form-group form-group-checkbox" data-tooltip="Pracownik nie będzie widoczny w grafiku, ale zachowa wszystkie dane w systemie">
+                    <div class="form-group form-group-checkbox"
+                        data-tooltip="Pracownik nie będzie widoczny w grafiku, ale zachowa wszystkie dane w systemie">
                         <input type="checkbox" id="employeeIsHidden" />
                         <label for="employeeIsHidden">
                             <i class="fas fa-eye-slash checkbox-icon"></i>
@@ -81,7 +95,8 @@
                         </label>
                         <span class="tooltip-indicator"><i class="fas fa-info-circle"></i></span>
                     </div>
-                    <div class="form-group form-group-checkbox" data-tooltip="Pracownik widoczny tylko w Grafiku - nie pojawia się w urlopach ani podsumowaniach (tzw. skoczek)">
+                    <div class="form-group form-group-checkbox"
+                        data-tooltip="Pracownik widoczny tylko w Grafiku - nie pojawia się w urlopach ani podsumowaniach (tzw. skoczek)">
                         <input type="checkbox" id="employeeIsScheduleOnly" />
                         <label for="employeeIsScheduleOnly">
                             <i class="fas fa-running checkbox-icon"></i>
@@ -100,7 +115,8 @@
                     <div class="uid-input-group">
                         <input type="text" id="employeeUidInput" readonly placeholder="Brak przypisanego użytkownika" />
                         <div class="uid-actions">
-                            <button id="assignUidBtn" class="action-btn secondary" title="Przypisz swoje konto do tego pracownika">
+                            <button id="assignUidBtn" class="action-btn secondary"
+                                title="Przypisz swoje konto do tego pracownika">
                                 <i class="fas fa-user-plus"></i> Przypisz do mnie
                             </button>
                             <button id="clearUidBtn" class="action-btn danger" title="Usuń przypisanie konta">
@@ -108,7 +124,8 @@
                             </button>
                         </div>
                     </div>
-                    <span class="field-hint">Przypisanie konta pozwala pracownikowi na logowanie się i edycję własnego grafiku</span>
+                    <span class="field-hint">Przypisanie konta pozwala pracownikowi na logowanie się i edycję własnego
+                        grafiku</span>
                 </div>
             </div>
 
@@ -119,6 +136,65 @@
                 </button>
                 <button id="deleteEmployeeBtn" class="action-btn danger">
                     <i class="fas fa-trash-alt"></i> Usuń pracownika
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel prawy: Backup i ustawienia -->
+    <div class="settings-panel">
+        <div class="backup-container">
+            <h2><i class="fas fa-database"></i> Kopia zapasowa</h2>
+            <div class="backup-controls">
+                <button id="createBackupBtn" class="action-btn secondary"><i class="fas fa-save"></i> Utwórz
+                    kopię</button>
+                <button id="restoreBackupBtn" class="action-btn outline">
+                    <i class="fas fa-undo"></i> Przywróć
+                </button>
+            </div>
+            <div class="backup-info">
+                <p>Ostatnia kopia: <span id="lastBackupDate">Nigdy</span></p>
+            </div>
+        </div>
+
+        <div class="color-settings-container">
+            <h2><i class="fas fa-palette"></i> Personalizacja kolorów</h2>
+            <p class="section-description">Dostosuj kolory typów zabiegów.</p>
+
+            <div class="color-settings-grid">
+                <div class="color-setting-item">
+                    <label for="colorMassage">
+                        <span class="color-preview" id="colorMassagePreview"></span>
+                        Masaż
+                    </label>
+                    <input type="color" id="colorMassage" value="#f472b6" />
+                </div>
+                <div class="color-setting-item">
+                    <label for="colorPnf">
+                        <span class="color-preview" id="colorPnfPreview"></span>
+                        PNF
+                    </label>
+                    <input type="color" id="colorPnf" value="#3b82f6" />
+                </div>
+                <div class="color-setting-item">
+                    <label for="colorEveryOtherDay">
+                        <span class="color-preview" id="colorEveryOtherDayPreview"></span>
+                        Co 2 dni
+                    </label>
+                    <input type="color" id="colorEveryOtherDay" value="#a855f7" />
+                </div>
+                <div class="color-setting-item">
+                    <label for="colorBreak">
+                        <span class="color-preview" id="colorBreakPreview"></span>
+                        Przerwa
+                    </label>
+                    <input type="color" id="colorBreak" value="#64748b" />
+                </div>
+            </div>
+
+            <div class="color-settings-actions">
+                <button id="resetColorsBtn" class="action-btn outline">
+                    <i class="fas fa-undo"></i> Przywróć domyślne
                 </button>
             </div>
         </div>
@@ -139,20 +215,6 @@
                 <button id="confirmDeleteBtn" class="action-btn danger" disabled>Usuń trwale</button>
                 <button id="cancelDeleteBtn" class="action-btn outline">Anuluj</button>
             </div>
-        </div>
-    </div>
-
-    <div class="backup-container">
-        <h2>Kopia zapasowa</h2>
-        <div class="backup-controls">
-            <button id="createBackupBtn" class="action-btn secondary"><i class="fas fa-save"></i> Utwórz kopię
-                zapasową</button>
-            <button id="restoreBackupBtn" class="action-btn outline">
-                <i class="fas fa-undo"></i> Przywróć z kopii zapasowej
-            </button>
-        </div>
-        <div class="backup-info">
-            <p>Ostatnia kopia zapasowa: <span id="lastBackupDate">Nigdy</span></p>
         </div>
     </div>
 
