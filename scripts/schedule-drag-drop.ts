@@ -50,12 +50,16 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
     let _dependencies: DragDropDependencies;
     let draggedCell: HTMLElement | null = null;
     let draggedSplitPart: number | null = null; // 1 = górna część, 2 = dolna część, null = cała komórka
+    let isAltDrag: boolean = false; // Tryb kopiowania (Alt+przeciągnij)
 
     /**
      * Rozpoczęcie przeciągania komórki lub części podzielonej komórki
      */
     const handleDragStart = (event: DragEvent): void => {
         const target = event.target as HTMLElement;
+
+        // Sprawdź czy Alt jest wciśnięty (tryb kopiowania)
+        isAltDrag = event.altKey;
 
         // Sprawdź czy przeciągamy część podzielonej komórki
         if (target.hasAttribute('data-split-part')) {
@@ -71,8 +75,11 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
                         { draggedPart: draggedSplitPart }
                     ))
                 );
-                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.effectAllowed = isAltDrag ? 'copy' : 'move';
                 target.classList.add('is-dragging');
+                if (isAltDrag) {
+                    target.classList.add('is-copying');
+                }
                 parentCell.classList.add('has-dragging-part');
             } else {
                 event.preventDefault();
@@ -90,8 +97,11 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
                 'application/json',
                 JSON.stringify(_dependencies.getCurrentTableStateForCell(cellTarget))
             );
-            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.effectAllowed = isAltDrag ? 'copy' : 'move';
             draggedCell.classList.add('is-dragging');
+            if (isAltDrag) {
+                draggedCell.classList.add('is-copying');
+            }
         } else {
             event.preventDefault();
         }
@@ -325,7 +335,11 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
                         }
                     },
                 },
-                {
+            ];
+
+            // Dodaj aktualizację źródła tylko jeśli NIE kopiujemy (Alt nie wciśnięty)
+            if (!isAltDrag) {
+                updates.push({
                     time: sourceTime,
                     employeeIndex: sourceIndex,
                     updateFn: (sourceState: CellState) => {
@@ -394,10 +408,21 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
                             }
                         }
                     },
-                },
-            ];
+                });
+            }
 
             _dependencies.updateMultipleCells(updates);
+
+            // Dodaj animację drop na komórce docelowej
+            dropTargetCell.classList.add('just-dropped');
+            setTimeout(() => {
+                dropTargetCell.classList.remove('just-dropped');
+            }, 300);
+
+            // Pokaż toast przy kopiowaniu
+            if (isAltDrag) {
+                window.showToast?.('Skopiowano pacjenta', 1500);
+            }
         }
     };
 
@@ -407,10 +432,12 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
     const handleDragEnd = (): void => {
         // Usuń klasy is-dragging z części split i z komórek
         document.querySelectorAll('.is-dragging').forEach((el) => el.classList.remove('is-dragging'));
+        document.querySelectorAll('.is-copying').forEach((el) => el.classList.remove('is-copying'));
         document.querySelectorAll('.has-dragging-part').forEach((el) => el.classList.remove('has-dragging-part'));
         document.querySelectorAll('.drag-over-target').forEach((el) => el.classList.remove('drag-over-target'));
         draggedCell = null;
         draggedSplitPart = null;
+        isAltDrag = false;
     };
 
     /**

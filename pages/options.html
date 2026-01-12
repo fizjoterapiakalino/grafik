@@ -141,6 +141,65 @@
         </div>
     </div>
 
+    <!-- Panel prawy: Backup i ustawienia -->
+    <div class="settings-panel">
+        <div class="backup-container">
+            <h2><i class="fas fa-database"></i> Kopia zapasowa</h2>
+            <div class="backup-controls">
+                <button id="createBackupBtn" class="action-btn secondary"><i class="fas fa-save"></i> Utwórz
+                    kopię</button>
+                <button id="restoreBackupBtn" class="action-btn outline">
+                    <i class="fas fa-undo"></i> Przywróć
+                </button>
+            </div>
+            <div class="backup-info">
+                <p>Ostatnia kopia: <span id="lastBackupDate">Nigdy</span></p>
+            </div>
+        </div>
+
+        <div class="color-settings-container">
+            <h2><i class="fas fa-palette"></i> Personalizacja kolorów</h2>
+            <p class="section-description">Dostosuj kolory typów zabiegów.</p>
+
+            <div class="color-settings-grid">
+                <div class="color-setting-item">
+                    <label for="colorMassage">
+                        <span class="color-preview" id="colorMassagePreview"></span>
+                        Masaż
+                    </label>
+                    <input type="color" id="colorMassage" value="#f472b6" />
+                </div>
+                <div class="color-setting-item">
+                    <label for="colorPnf">
+                        <span class="color-preview" id="colorPnfPreview"></span>
+                        PNF
+                    </label>
+                    <input type="color" id="colorPnf" value="#3b82f6" />
+                </div>
+                <div class="color-setting-item">
+                    <label for="colorEveryOtherDay">
+                        <span class="color-preview" id="colorEveryOtherDayPreview"></span>
+                        Co 2 dni
+                    </label>
+                    <input type="color" id="colorEveryOtherDay" value="#a855f7" />
+                </div>
+                <div class="color-setting-item">
+                    <label for="colorBreak">
+                        <span class="color-preview" id="colorBreakPreview"></span>
+                        Przerwa
+                    </label>
+                    <input type="color" id="colorBreak" value="#64748b" />
+                </div>
+            </div>
+
+            <div class="color-settings-actions">
+                <button id="resetColorsBtn" class="action-btn outline">
+                    <i class="fas fa-undo"></i> Przywróć domyślne
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div id="deleteConfirmationModal" class="modal-overlay" style="display: none">
         <div class="modal-content">
             <h2 class="modal-title">Potwierdź usunięcie</h2>
@@ -156,20 +215,6 @@
                 <button id="confirmDeleteBtn" class="action-btn danger" disabled>Usuń trwale</button>
                 <button id="cancelDeleteBtn" class="action-btn outline">Anuluj</button>
             </div>
-        </div>
-    </div>
-
-    <div class="backup-container">
-        <h2>Kopia zapasowa</h2>
-        <div class="backup-controls">
-            <button id="createBackupBtn" class="action-btn secondary"><i class="fas fa-save"></i> Utwórz kopię
-                zapasową</button>
-            <button id="restoreBackupBtn" class="action-btn outline">
-                <i class="fas fa-undo"></i> Przywróć z kopii zapasowej
-            </button>
-        </div>
-        <div class="backup-info">
-            <p>Ostatnia kopia zapasowa: <span id="lastBackupDate">Nigdy</span></p>
         </div>
     </div>
 

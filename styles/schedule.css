@@ -71,6 +71,37 @@ table.schedule-table thead tr th {
     background-color: var(--color-primary-700);
 }
 
+/* --- Wskaźnik obciążenia pracownika --- */
+.workload-bar {
+    width: 100%;
+    height: 4px;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    margin-top: 4px;
+    overflow: hidden;
+}
+
+.workload-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.workload-fill.low {
+    background-color: #22c55e;
+    /* Zielony - niskie obciążenie */
+}
+
+.workload-fill.medium {
+    background-color: #eab308;
+    /* Żółty - średnie obciążenie */
+}
+
+.workload-fill.high {
+    background-color: #ef4444;
+    /* Czerwony - wysokie obciążenie */
+}
+
 table.schedule-table thead tr th:first-child {
     background-color: var(--color-gray-800);
     left: 0;
@@ -218,6 +249,115 @@ td.split-cell>div.every-other-day-text>span {
     background-color: var(--bg-break);
 }
 
+/* --- Quick Actions Toolbar --- */
+.quick-actions-toolbar {
+    position: fixed;
+    z-index: 1000;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1);
+    padding: 6px 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+}
+
+.quick-actions-toolbar.visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.quick-actions-toolbar::before {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid var(--color-gray-200);
+}
+
+.quick-actions-toolbar::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #ffffff;
+}
+
+.quick-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    background-color: transparent;
+    color: var(--color-gray-600);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 0.9em;
+}
+
+.quick-action-btn:hover {
+    background-color: var(--color-gray-100);
+    color: var(--color-primary-600);
+    transform: scale(1.1);
+}
+
+.quick-action-btn:active {
+    transform: scale(0.95);
+}
+
+.quick-action-btn[data-action="massage"]:hover {
+    color: var(--bg-massage);
+    background-color: rgba(236, 72, 153, 0.1);
+}
+
+.quick-action-btn[data-action="pnf"]:hover {
+    color: var(--bg-pnf);
+    background-color: rgba(139, 92, 246, 0.1);
+}
+
+.quick-action-btn[data-action="everyOtherDay"]:hover {
+    color: var(--bg-every-other-day);
+    background-color: rgba(234, 179, 8, 0.1);
+}
+
+.quick-action-btn[data-action="break"]:hover {
+    color: var(--bg-break);
+    background-color: rgba(100, 116, 139, 0.1);
+}
+
+.quick-action-btn[data-action="patientInfo"]:hover {
+    color: var(--color-secondary);
+    background-color: rgba(59, 130, 246, 0.1);
+}
+
+.quick-action-btn.danger:hover {
+    color: var(--color-danger);
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+.quick-action-divider {
+    width: 1px;
+    height: 24px;
+    background-color: var(--color-gray-200);
+    margin: 0 4px;
+}
+
 /* --- Style dla ikon akcji w nagłówku po najechaniu kursorem (gdy są aktywne) --- */
 .schedule-action-buttons .action-icon-btn.active:hover {
     background-color: rgba(0, 0, 0, 0.1);
@@ -354,6 +494,12 @@ td.current-time-highlight {
     40% {
         transform: rotate(-13deg);
     }
+}
+
+/* Komórki z informacją o dacie końca zabiegu - dodatkowe style */
+.editable-cell[data-treatment-end],
+.split-cell-wrapper>div[data-treatment-end] {
+    cursor: help;
 }
 
 /* --- Modal Styles --- */
@@ -674,14 +820,21 @@ td.current-time-highlight {
     color: var(--bg-massage);
 }
 
-/* --- Style dla Drag & Drop --- */
+/* --- Style dla Drag & Drop z animacjami --- */
+
+/* Bazowa transakcja dla wszystkich edytowalnych komórek */
+.schedule-table td.editable-cell {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
 
 /* Komórka lub część split obecnie przeciągana */
 .schedule-table td.editable-cell.is-dragging,
 .split-cell-wrapper>div.is-dragging {
-    opacity: 0.5;
+    opacity: 0.4;
     background-color: var(--color-gray-200);
     outline: 2px dashed var(--color-primary);
+    transform: scale(0.95);
+    transition: all 0.15s ease;
 }
 
 /* Komórka zawierająca przeciąganą część */
@@ -689,12 +842,14 @@ td.current-time-highlight {
     background-color: var(--color-gray-100);
 }
 
-/* Cel upuszczania - podświetlenie */
+/* Cel upuszczania - podświetlenie z animacją */
 .schedule-table td.editable-cell.drag-over-target,
 .split-cell-wrapper>div.drag-over-target {
     background-color: var(--color-primary-100);
     outline: 2px solid var(--color-primary);
-    box-shadow: inset 0 0 8px rgba(59, 130, 246, 0.3);
+    box-shadow: inset 0 0 12px rgba(16, 185, 129, 0.3), 0 0 8px rgba(16, 185, 129, 0.2);
+    transform: scale(1.02);
+    transition: all 0.15s ease;
 }
 
 /* Kursor dla przeciągalnych elementów */
@@ -709,6 +864,7 @@ td.current-time-highlight {
 /* Kursor dla części split */
 .split-cell-wrapper>div[draggable="true"] {
     cursor: grab;
+    transition: background-color 0.15s ease, transform 0.15s ease;
 }
 
 .split-cell-wrapper>div[draggable="true"]:active {
@@ -718,6 +874,60 @@ td.current-time-highlight {
 /* Podświetlenie części split przy hover podczas przeciągania */
 .split-cell-wrapper>div[draggable="true"]:hover {
     background-color: var(--color-gray-50);
+}
+
+/* --- Animacja aktualizacji komórki (po zapisaniu) --- */
+@keyframes cellPulse {
+    0% {
+        box-shadow: inset 0 0 0 0 rgba(16, 185, 129, 0.4);
+    }
+
+    50% {
+        box-shadow: inset 0 0 0 3px rgba(16, 185, 129, 0.6);
+    }
+
+    100% {
+        box-shadow: inset 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+}
+
+.schedule-table td.editable-cell.cell-updated {
+    animation: cellPulse 0.6s ease-out;
+}
+
+/* --- Animacja drop (upuszczenie elementu) --- */
+@keyframes dropBounce {
+    0% {
+        transform: scale(1.1);
+        opacity: 0.7;
+    }
+
+    50% {
+        transform: scale(0.95);
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.schedule-table td.editable-cell.just-dropped {
+    animation: dropBounce 0.3s ease-out;
+}
+
+/* --- Tryb kopiowania (Alt+przeciągnij) --- */
+.schedule-table td.editable-cell.is-copying,
+.split-cell-wrapper>div.is-copying {
+    opacity: 0.8;
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+    background-color: var(--color-primary-100);
+}
+
+/* Kursor dla trybu kopiowania */
+.schedule-table td.editable-cell.is-copying {
+    cursor: copy;
 }
 
 /* --- Style dla badge'a URLOP w nagłówku pracownika --- */

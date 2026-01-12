@@ -45,6 +45,8 @@ interface PartData {
     isMassage: boolean;
     isPnf: boolean;
     isEveryOtherDay: boolean;
+    treatmentEndDate?: string | null;
+    daysRemaining?: number | null;
 }
 
 /**
@@ -57,6 +59,8 @@ interface CellDisplayData {
     isSplit: boolean;
     parts: PartData[];
     isBreak: boolean;
+    treatmentEndDate?: string | null;
+    daysRemaining?: number | null;
 }
 
 /**
@@ -144,6 +148,8 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
 
             // Treatment End Markers for Split
             const todayStr = new Date().toISOString().split('T')[0];
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
 
             // Part 1
             let endDate1: string | null = cellData.treatmentData1?.endDate
@@ -152,8 +158,14 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
             if (!endDate1 && cellData.treatmentData1?.startDate && cellData.content1) {
                 endDate1 = calculateEndDate(cellData.treatmentData1.startDate, cellData.treatmentData1.extensionDays || 0);
             }
-            if (endDate1 && endDate1 <= todayStr) {
-                result.parts[0].classes.push('treatment-end-marker');
+            if (endDate1) {
+                result.parts[0].treatmentEndDate = endDate1;
+                const endDateObj = new Date(endDate1 + 'T00:00:00');
+                const diffTime = endDateObj.getTime() - today.getTime();
+                result.parts[0].daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                if (endDate1 <= todayStr) {
+                    result.parts[0].classes.push('treatment-end-marker');
+                }
             }
 
             // Part 2
@@ -163,8 +175,14 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
             if (!endDate2 && cellData.treatmentData2?.startDate && cellData.content2) {
                 endDate2 = calculateEndDate(cellData.treatmentData2.startDate, cellData.treatmentData2.extensionDays || 0);
             }
-            if (endDate2 && endDate2 <= todayStr) {
-                result.parts[1].classes.push('treatment-end-marker');
+            if (endDate2) {
+                result.parts[1].treatmentEndDate = endDate2;
+                const endDateObj = new Date(endDate2 + 'T00:00:00');
+                const diffTime = endDateObj.getTime() - today.getTime();
+                result.parts[1].daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                if (endDate2 <= todayStr) {
+                    result.parts[1].classes.push('treatment-end-marker');
+                }
             }
 
             return result;
@@ -185,6 +203,9 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
 
         // Treatment End Marker for Normal
         const todayStr = new Date().toISOString().split('T')[0];
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
         let endDateStr: string | null = cellData.treatmentEndDate
             ? cellData.treatmentEndDate.toString().trim()
             : null;
@@ -193,8 +214,14 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
             endDateStr = calculateEndDate(cellData.treatmentStartDate, cellData.treatmentExtensionDays || 0);
         }
 
-        if (endDateStr && endDateStr <= todayStr) {
-            result.classes.push('treatment-end-marker');
+        if (endDateStr) {
+            result.treatmentEndDate = endDateStr;
+            const endDateObj = new Date(endDateStr + 'T00:00:00');
+            const diffTime = endDateObj.getTime() - today.getTime();
+            result.daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (endDateStr <= todayStr) {
+                result.classes.push('treatment-end-marker');
+            }
         }
 
         return result;

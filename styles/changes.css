@@ -32,46 +32,87 @@
 }
 
 /* Kolumna Akcje */
-.changes-table th.actions-header,
+.changes-table th.actions-header {
+    width: 70px;
+    min-width: 70px;
+    text-align: center;
+    background-color: var(--color-primary-700);
+}
+
 .changes-table td.actions-cell {
-    width: 90px;
-    min-width: 90px;
+    width: 70px;
+    min-width: 70px;
     text-align: center;
     background-color: var(--color-gray-50);
+    padding: 4px;
 }
 
-.copy-row-btn {
-    display: inline-flex;
+/* Kontener przycisków akcji wiersza */
+.row-action-buttons {
+    display: flex;
+    justify-content: center;
     align-items: center;
     gap: 4px;
-    padding: 6px 10px;
-    font-size: 0.75em;
-    font-weight: 600;
-    color: var(--color-white);
-    background-color: var(--color-primary-500);
-    border: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+/* Pokaż przyciski przy hover na wierszu */
+.changes-table tbody tr:hover .row-action-buttons {
+    opacity: 1;
+}
+
+/* Pokaż przyciski gdy wiersz ma aktywną komórkę */
+.changes-table tbody tr.has-active-cell .row-action-buttons {
+    opacity: 1;
+}
+
+/* Styl przycisków akcji wiersza */
+.row-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    font-size: 0.8em;
+    color: var(--color-gray-500);
+    background-color: var(--color-white);
+    border: 1px solid var(--color-gray-300);
     border-radius: var(--border-radius-sm);
     cursor: pointer;
-    transition: all 0.2s ease;
-    white-space: nowrap;
+    transition: all 0.15s ease;
 }
 
-.copy-row-btn:hover {
-    background-color: var(--color-primary-600);
-    transform: translateY(-1px);
+.row-action-btn:hover {
+    color: var(--color-primary-600);
+    border-color: var(--color-primary-400);
+    background-color: var(--color-primary-50);
 }
 
-.copy-row-btn:active {
-    transform: translateY(0);
+.row-action-btn:active {
+    transform: scale(0.95);
 }
 
-.copy-row-btn i {
-    font-size: 0.9em;
+/* Przycisk kopiowania */
+.row-action-btn.copy-row-btn:hover {
+    color: var(--color-primary-600);
+    border-color: var(--color-primary-400);
 }
 
-.no-action {
+/* Przycisk wklejania */
+.row-action-btn.paste-row-btn {
     color: var(--color-gray-400);
-    font-size: 0.9em;
+}
+
+.row-action-btn.paste-row-btn.has-clipboard {
+    color: var(--color-gray-500);
+}
+
+.row-action-btn.paste-row-btn.has-clipboard:hover {
+    color: var(--color-success);
+    border-color: var(--color-success);
+    background-color: var(--color-primary-50);
 }
 
 .changes-table tbody tr:hover {
@@ -279,7 +320,7 @@
 /* New Header Layout consistent with leaves page */
 .changes-header-controls {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
     align-items: center;
     border-bottom: 2px solid var(--color-gray-300);
     margin-bottom: var(--spacing-lg);
@@ -485,6 +526,10 @@
 
     .changes-table td:nth-of-type(9)::before {
         content: 'URLOPY';
+    }
+
+    .changes-table td:nth-of-type(10)::before {
+        content: 'AKCJE';
     }
 
     .changes-table td:not(:first-child):not(.leaves-cell)::before {

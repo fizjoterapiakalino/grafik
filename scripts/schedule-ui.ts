@@ -148,6 +148,50 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         return false;
     };
 
+    /**
+     * Oblicza obciążenie pracownika (ile slotów jest zajętych)
+     */
+    interface WorkloadData {
+        filled: number;
+        total: number;
+        percentage: number;
+    }
+
+    const _calculateEmployeeWorkload = (employeeIndex: string): WorkloadData => {
+        if (!_appState) return { filled: 0, total: 0, percentage: 0 };
+
+        let filled = 0;
+        let total = 0;
+
+        // Iteruj po wszystkich godzinach
+        for (let hour = AppConfig.schedule.startHour; hour <= AppConfig.schedule.endHour; hour++) {
+            for (let minute = 0; minute < 60; minute += 30) {
+                if (hour === AppConfig.schedule.endHour && minute === 30) continue;
+
+                total++;
+                const timeString = `${hour}:${minute.toString().padStart(2, '0')}`;
+                const cellData = _appState.scheduleCells[timeString]?.[employeeIndex];
+
+                if (cellData) {
+                    // Sprawdź czy komórka jest zajęta (ma treść lub jest przerwą)
+                    const hasContent = cellData.content && cellData.content.trim() !== '';
+                    const hasSplitContent = cellData.isSplit && (
+                        (cellData.content1 && String(cellData.content1).trim() !== '') ||
+                        (cellData.content2 && String(cellData.content2).trim() !== '')
+                    );
+                    const isBreak = cellData.isBreak;
+
+                    if (hasContent || hasSplitContent || isBreak) {
+                        filled++;
+                    }
+                }
+            }
+        }
+
+        const percentage = total > 0 ? Math.round((filled / total) * 100) : 0;
+        return { filled, total, percentage };
+    };
+
     const initialize = (appState: AppState): void => {
         _appState = appState;
         _createEmployeeTooltip();
@@ -232,6 +276,24 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                 if (part.isPnf) div.dataset.isPnf = 'true';
                 if (part.isEveryOtherDay) div.dataset.isEveryOtherDay = 'true';
 
+                // Dodaj tooltip z datą końca zabiegu
+                if (part.treatmentEndDate) {
+                    const formattedDate = formatDatePolish(part.treatmentEndDate);
+                    let tooltipText = '';
+                    if (part.daysRemaining !== null && part.daysRemaining !== undefined) {
+                        if (part.daysRemaining <= 0) {
+                            tooltipText = `⚠️ Zabieg zakończony: ${formattedDate}`;
+                        } else if (part.daysRemaining === 1) {
+                            tooltipText = `Koniec zabiegu: ${formattedDate} (pozostał 1 dzień)`;
+                        } else {
+                            tooltipText = `Koniec zabiegu: ${formattedDate} (pozostało ${part.daysRemaining} dni)`;
+                        }
+                    } else {
+                        tooltipText = `Koniec zabiegu: ${formattedDate}`;
+                    }
+                    div.title = tooltipText;
+                }
+
                 wrapper.appendChild(div);
             });
             cell.appendChild(wrapper);
@@ -243,7 +305,33 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             if (cellObj.isMassage) cell.dataset.isMassage = 'true';
             if (cellObj.isPnf) cell.dataset.isPnf = 'true';
             if (cellObj.isEveryOtherDay) cell.dataset.isEveryOtherDay = 'true';
+
+            // Dodaj tooltip z datą końca zabiegu
+            if (displayData.treatmentEndDate) {
+                const formattedDate = formatDatePolish(displayData.treatmentEndDate);
+                let tooltipText = '';
+                if (displayData.daysRemaining !== null && displayData.daysRemaining !== undefined) {
+                    if (displayData.daysRemaining <= 0) {
+                        tooltipText = `⚠️ Zabieg zakończony: ${formattedDate}`;
+                    } else if (displayData.daysRemaining === 1) {
+                        tooltipText = `Koniec zabiegu: ${formattedDate} (pozostał 1 dzień)`;
+                    } else {
+                        tooltipText = `Koniec zabiegu: ${formattedDate} (pozostało ${displayData.daysRemaining} dni)`;
+                    }
+                } else {
+                    tooltipText = `Koniec zabiegu: ${formattedDate}`;
+                }
+                cell.title = tooltipText;
+            }
         }
+    };
+
+    /**
+     * Formatuje datę ISO na format polski (dd.mm.yyyy)
+     */
+    const formatDatePolish = (isoDate: string): string => {
+        const [year, month, day] = isoDate.split('-');
+        return `${day}.${month}.${year}`;
     };
 
     const refreshAllRowHeights = (): void => {
@@ -483,6 +571,28 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             }
 
             th.appendChild(span);
+
+            // Oblicz obciążenie pracownika (zajęte sloty / wszystkie sloty)
+            const workloadData = _calculateEmployeeWorkload(i);
+            const workloadBar = document.createElement('div');
+            workloadBar.className = 'workload-bar';
+
+            const workloadFill = document.createElement('div');
+            workloadFill.className = 'workload-fill';
+            workloadFill.style.width = `${workloadData.percentage}%`;
+
+            // Ustaw kolor w zależności od obciążenia
+            if (workloadData.percentage >= 80) {
+                workloadFill.classList.add('high');
+            } else if (workloadData.percentage >= 50) {
+                workloadFill.classList.add('medium');
+            } else {
+                workloadFill.classList.add('low');
+            }
+
+            workloadBar.appendChild(workloadFill);
+            workloadBar.setAttribute('title', `Obciążenie: ${workloadData.filled}/${workloadData.total} (${workloadData.percentage}%)`);
+            th.appendChild(workloadBar);
 
             th.dataset.fullName = fullName;
             th.dataset.employeeNumber = employeeNumber;

@@ -74,10 +74,11 @@ interface ChangesAPI {
 export const Changes: ChangesAPI = (() => {
     let changesTableBody: HTMLElement | null = null;
     let changesHeaderRow: HTMLElement | null = null;
+    let yearSelect: HTMLSelectElement | null = null;
+    let printButton: HTMLElement | null = null;
     let appState: AppState = { changesCells: {} };
 
     let currentYear = new Date().getUTCFullYear();
-    let yearSelect: HTMLSelectElement | null = null;
     // Clipboard: tablica tablic - każdy element to lista pracowników z jednej komórki
     // Przy kopiowaniu wielu komórek zachowujemy kolejność (pozycje względne)
     let clipboard: string[][] | null = null;
@@ -94,6 +95,9 @@ export const Changes: ChangesAPI = (() => {
     // Szablony obsady
     let templates: ChangeTemplate[] = [];
     let pendingTemplateRow: HTMLTableRowElement | null = null; // Wiersz dla którego zapisujemy/stosujemy szablon
+
+    // Schowek dla kopiowania całego wiersza
+    let rowClipboard: Record<number, string[]> | null = null;
 
     const TEMPLATES_STORAGE_KEY = 'changesTemplates';
 
@@ -244,78 +248,16 @@ export const Changes: ChangesAPI = (() => {
     };
 
     /**
-     * Kopiuje obsadę z ostatniego niepustego wiersza do aktualnego
+     * Kopiuje cały wiersz do schowka wierszy
      */
-    const copyFromPreviousRow = (currentRow: HTMLTableRowElement): void => {
-        const currentPeriod = currentRow.dataset.startDate || '';
-        if (!currentPeriod) return;
+    const copyRowToClipboard = (row: HTMLTableRowElement): void => {
+        const period = row.dataset.startDate || '';
+        const periodCells = appState.changesCells[period] || {};
 
-        // Szukaj ostatniego niepustego wiersza (idąc wstecz od aktualnego)
-        let sourceRow = currentRow.previousElementSibling as HTMLTableRowElement | null;
-        let sourcePeriod: string | null = null;
-
-        while (sourceRow) {
-            const period = sourceRow.dataset.startDate || '';
-            const periodCells = appState.changesCells[period] || {};
-
-            // Sprawdź czy ten wiersz ma jakichkolwiek przypisanych pracowników
-            const hasEmployees = Object.values(periodCells).some(
-                cell => cell.assignedEmployees && cell.assignedEmployees.length > 0
-            );
-
-            if (hasEmployees) {
-                sourcePeriod = period;
-                break;
-            }
-            sourceRow = sourceRow.previousElementSibling as HTMLTableRowElement | null;
-        }
-
-        if (!sourcePeriod) {
-            window.showToast('Brak wypełnionego okresu do skopiowania.', 2000);
-            return;
-        }
-
-        // Zapisz stan przed zmianą
-        pushUndoState();
-
-        const sourceCells = appState.changesCells[sourcePeriod] || {};
-
-        // Kopiuj tylko kolumny 1-7 (pomijamy 0-daty i 8-urlopy)
-        for (let colIdx = 1; colIdx <= 7; colIdx++) {
-            const sourceEmployees = sourceCells[colIdx]?.assignedEmployees || [];
-            if (!appState.changesCells[currentPeriod]) appState.changesCells[currentPeriod] = {};
-            appState.changesCells[currentPeriod][colIdx] = {
-                assignedEmployees: [...sourceEmployees]
-            };
-        }
-
-        renderChangesAndSave();
-        window.showToast('Skopiowano obsadę z ostatniego wypełnionego okresu.', 2000);
-    };
-
-    /**
-     * Kopiuje obsadę z bieżącego wiersza do następnego okresu
-     */
-    const handleCopyRowToNext = (event: Event): void => {
-        const btn = event.currentTarget as HTMLElement;
-        const currentRow = btn.closest('tr') as HTMLTableRowElement;
-        if (!currentRow) return;
-
-        const currentPeriod = currentRow.dataset.startDate || '';
-        const nextRow = currentRow.nextElementSibling as HTMLTableRowElement | null;
-
-        if (!nextRow || !nextRow.dataset.startDate) {
-            window.showToast('Brak następnego okresu.', 2000);
-            return;
-        }
-
-        const nextPeriod = nextRow.dataset.startDate;
-        const sourceCells = appState.changesCells[currentPeriod] || {};
-
-        // Sprawdź czy bieżący wiersz ma jakieś dane
-        const hasData = Object.keys(sourceCells).some(colIdx => {
+        // Sprawdź czy wiersz ma jakieś dane
+        const hasData = Object.keys(periodCells).some(colIdx => {
             const col = Number(colIdx);
-            const employees = sourceCells[col]?.assignedEmployees;
+            const employees = periodCells[col]?.assignedEmployees;
             return col >= 1 && col <= 7 && employees && employees.length > 0;
         });
 
@@ -324,25 +266,51 @@ export const Changes: ChangesAPI = (() => {
             return;
         }
 
+        // Kopiuj tylko kolumny 1-7
+        rowClipboard = {};
+        for (let colIdx = 1; colIdx <= 7; colIdx++) {
+            const employees = periodCells[colIdx]?.assignedEmployees || [];
+            if (employees.length > 0) {
+                rowClipboard[colIdx] = [...employees];
+            }
+        }
+
+        window.showToast('Skopiowano wiersz do schowka.', 2000);
+
+        // Aktualizuj wizualny stan przycisków paste
+        document.querySelectorAll('.paste-row-btn').forEach(btn => {
+            btn.classList.add('has-clipboard');
+        });
+    };
+
+    /**
+     * Wkleja zawartość schowka wierszy do wskazanego wiersza
+     */
+    const pasteRowFromClipboard = (row: HTMLTableRowElement): void => {
+        if (!rowClipboard || Object.keys(rowClipboard).length === 0) {
+            window.showToast('Schowek jest pusty - najpierw skopiuj wiersz.', 2000);
+            return;
+        }
+
+        const period = row.dataset.startDate || '';
+        if (!period) return;
+
         // Zapisz stan przed zmianą
         pushUndoState();
 
-        // Kopiuj tylko kolumny 1-7 (pomijamy 0-daty, 8-urlopy, 9-akcje)
-        if (!appState.changesCells[nextPeriod]) appState.changesCells[nextPeriod] = {};
+        if (!appState.changesCells[period]) appState.changesCells[period] = {};
 
         for (let colIdx = 1; colIdx <= 7; colIdx++) {
-            const sourceCell = sourceCells[colIdx];
-            const employees = sourceCell?.assignedEmployees;
+            const employees = rowClipboard[colIdx];
             if (employees && employees.length > 0) {
-                appState.changesCells[nextPeriod][colIdx] = {
+                appState.changesCells[period][colIdx] = {
                     assignedEmployees: [...employees],
-                    // Nie kopiujemy zastępstw - urlopy się zmieniają między okresami
                 };
             }
         }
 
         renderChangesAndSave();
-        window.showToast(`Skopiowano obsadę do następnego okresu.`, 2000);
+        window.showToast('Wklejono wiersz ze schowka.', 2000);
     };
 
     // =========================
@@ -898,16 +866,19 @@ export const Changes: ChangesAPI = (() => {
             const start = new Date(period.start);
             const end = new Date(period.end);
 
-            const isLastPeriod = index === periods.length - 1;
-            const copyBtnHtml = isLastPeriod
-                ? '<span class="no-action" title="Ostatni okres">—</span>'
-                : '<button class="copy-row-btn" title="Kopiuj do następnego okresu"><i class="fas fa-arrow-down"></i> Kopiuj ↓</button>';
+            const hasClipboard = rowClipboard && Object.keys(rowClipboard).length > 0;
+            const actionBtnsHtml = `
+                <div class="row-action-buttons">
+                    <button class="row-action-btn copy-row-btn" title="Kopiuj wiersz"><i class="fas fa-copy"></i></button>
+                    <button class="row-action-btn paste-row-btn${hasClipboard ? ' has-clipboard' : ''}" title="Wklej wiersz"><i class="fas fa-paste"></i></button>
+                </div>
+            `;
 
             tr.innerHTML = `
                 <td>${start.getUTCDate()}.${(start.getUTCMonth() + 1).toString().padStart(2, '0')} - ${end.getUTCDate()}.${(end.getUTCMonth() + 1).toString().padStart(2, '0')}</td>
                 <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                 <td class="leaves-cell"></td>
-                <td class="actions-cell">${copyBtnHtml}</td>
+                <td class="actions-cell">${actionBtnsHtml}</td>
             `;
             changesTableBody!.appendChild(tr);
         });
@@ -924,9 +895,18 @@ export const Changes: ChangesAPI = (() => {
             }
         });
 
-        // Dodaj event listenery do przycisków kopiowania
+        // Dodaj event listenery do przycisków kopiowania/wklejania wiersza
         document.querySelectorAll('.copy-row-btn').forEach((btn) => {
-            btn.addEventListener('click', handleCopyRowToNext);
+            btn.addEventListener('click', (e) => {
+                const row = (e.currentTarget as HTMLElement).closest('tr') as HTMLTableRowElement;
+                if (row) copyRowToClipboard(row);
+            });
+        });
+        document.querySelectorAll('.paste-row-btn').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                const row = (e.currentTarget as HTMLElement).closest('tr') as HTMLTableRowElement;
+                if (row) pasteRowFromClipboard(row);
+            });
         });
     };
 
@@ -991,7 +971,11 @@ export const Changes: ChangesAPI = (() => {
 
                                 if (startMonth === endMonth) {
                                     // Ten sam miesiąc
-                                    dateRange = `${startDay}-${endDay}.${startMonth}`;
+                                    if (startDay === endDay) {
+                                        dateRange = `${startDay}.${startMonth}`;
+                                    } else {
+                                        dateRange = `${startDay}-${endDay}.${startMonth}`;
+                                    }
                                 } else {
                                     // Różne miesiące
                                     dateRange = `${startDay}.${startMonth}-${endDay}.${endMonth}`;
@@ -1015,17 +999,21 @@ export const Changes: ChangesAPI = (() => {
      * Ustawia aktywną (zaznaczoną) komórkę
      */
     const setActiveCell = (cell: HTMLTableCellElement | null): void => {
-        // Usuń zaznaczenie z poprzedniej komórki
+        // Usuń zaznaczenie z poprzedniej komórki i wiersza
         if (activeCell) {
             activeCell.classList.remove('active-cell');
+            const prevRow = activeCell.closest('tr');
+            if (prevRow) prevRow.classList.remove('has-active-cell');
         }
 
         activeCell = cell;
 
-        // Dodaj zaznaczenie do nowej komórki
+        // Dodaj zaznaczenie do nowej komórki i wiersza
         if (activeCell) {
             activeCell.classList.add('active-cell');
             activeCell.focus();
+            const newRow = activeCell.closest('tr');
+            if (newRow) newRow.classList.add('has-active-cell');
         }
     };
 
@@ -1603,30 +1591,36 @@ export const Changes: ChangesAPI = (() => {
         const table = document.getElementById('changesTable');
         if (!table) return;
 
-        const tableHeaders = Array.from(table.querySelectorAll('thead th')).map((th, index) => ({
-            text: th.textContent || '',
-            style: 'tableHeader',
-            fillColor: index === 0 ? PdfHeaderColors.firstColumn : PdfHeaderColors.dataColumns,
-            color: PdfHeaderColors.text,
-        }));
+        // Pobierz nagłówki, ale pomiń ostatnią kolumnę (Akcje)
+        const tableHeaders = Array.from(table.querySelectorAll('thead th'))
+            .filter((_, index, array) => index < array.length - 1)
+            .map((th, index) => ({
+                text: th.textContent || '',
+                style: 'tableHeader',
+                fillColor: index === 0 ? PdfHeaderColors.firstColumn : PdfHeaderColors.dataColumns,
+                color: PdfHeaderColors.text,
+            }));
 
+        // Pobierz wiersze, ale pomiń ostatnią kolumnę (Akcje)
         const tableBody = Array.from(table.querySelectorAll('tbody tr')).map((row) => {
             const tr = row as HTMLTableRowElement;
-            return Array.from(tr.cells).map((cell, cellIndex) => {
+            // Pomiń ostatnią komórkę (Akcje)
+            const cells = Array.from(tr.cells).filter((_, index, array) => index < array.length - 1);
+
+            return cells.map((cell, cellIndex) => {
                 let textContent = '';
 
                 if (cellIndex === 0) {
-                    // Kolumna okresu - użyj textContent
+                    // Kolumna okresu
                     textContent = cell.textContent || '';
                 } else if (cellIndex === 8) {
-                    // Kolumna urlopów - pobierz tekst z każdego .leave-entry lub użyj textContent
+                    // Kolumna urlopów
                     const leaveEntries = cell.querySelectorAll('.leave-entry');
                     if (leaveEntries.length > 0) {
                         textContent = Array.from(leaveEntries)
                             .map(entry => entry.textContent?.trim() || '')
                             .join('\n');
                     } else {
-                        // Fallback - usuń tagi HTML
                         textContent = cell.textContent || '';
                     }
                 } else {
@@ -1653,6 +1647,7 @@ export const Changes: ChangesAPI = (() => {
                     style: 'tableExample',
                     table: {
                         headerRows: 1,
+                        // 9 kolumn: Okres + 7 danych + Urlopy
                         widths: ['auto', '*', '*', '*', '*', '*', '*', '*', '*'],
                         body: [tableHeaders, ...tableBody],
                     },
@@ -1670,7 +1665,12 @@ export const Changes: ChangesAPI = (() => {
             defaultStyle: PdfDefaultStyle,
         };
 
-        pdfMake.createPdf(docDefinition).download(`grafik-zmian-${currentYear}.pdf`);
+        if (typeof pdfMake !== 'undefined') {
+            pdfMake.createPdf(docDefinition).download(`grafik-zmian-${currentYear}.pdf`);
+        } else {
+            console.error('pdfMake is not defined');
+            window.showToast('Błąd: Biblioteka PDF nie została załadowana.', 3000);
+        }
     };
 
     const populateYearSelect = (): void => {
@@ -1727,7 +1727,7 @@ export const Changes: ChangesAPI = (() => {
             }
         }
 
-        const printButton = document.getElementById('printChangesTable');
+        printButton = document.getElementById('printChangesTable');
         if (printButton) {
             printButton.addEventListener('click', printChangesTableToPdf);
         }
@@ -1749,12 +1749,6 @@ export const Changes: ChangesAPI = (() => {
             { id: 'ctxCopyCell', action: (cell: HTMLElement) => copyCell(cell as HTMLTableCellElement) },
             { id: 'ctxPasteCell', action: (cell: HTMLElement) => pasteCell(cell as HTMLTableCellElement) },
             { id: 'ctxClearCell', action: (cell: HTMLElement) => clearCell(cell as HTMLTableCellElement) },
-            {
-                id: 'ctxCopyFromPrevious', action: (cell: HTMLElement) => {
-                    const row = (cell as HTMLTableCellElement).parentElement as HTMLTableRowElement;
-                    if (row) copyFromPreviousRow(row);
-                }
-            },
             {
                 id: 'ctxSaveAsTemplate', action: (cell: HTMLElement) => {
                     const row = (cell as HTMLTableCellElement).parentElement as HTMLTableRowElement;
