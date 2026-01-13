@@ -102,6 +102,24 @@ table.schedule-table thead tr th {
     /* Czerwony - wysokie obciążenie */
 }
 
+.workload-fill.overload {
+    background-color: #8b5cf6;
+    /* Fioletowy - ponad normę (>100%) */
+    animation: pulseOverload 1.5s ease-in-out infinite;
+}
+
+@keyframes pulseOverload {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+}
+
 table.schedule-table thead tr th:first-child {
     background-color: var(--color-gray-800);
     left: 0;
@@ -732,26 +750,47 @@ td.current-time-highlight {
 #globalEmployeeTooltip {
     display: none;
     position: absolute;
-    background-color: #333;
+    background-color: #1f2937;
     color: #fff;
-    padding: 8px 12px;
-    border-radius: 4px;
+    padding: 10px 14px;
+    border-radius: 8px;
     white-space: nowrap;
     z-index: 9999;
-    font-size: 0.9em;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    font-size: 0.85em;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     pointer-events: none;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 #globalEmployeeTooltip p {
     margin: 0;
-    padding: 2px 0;
+    padding: 3px 0;
+}
+
+#globalEmployeeTooltip .tooltip-name {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: #fff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding-bottom: 6px;
+    margin-bottom: 4px;
 }
 
 #globalEmployeeTooltip .employee-number-tooltip {
-    font-size: 1.1em;
-    font-weight: bold;
-    color: var(--bg-active);
+    font-size: 0.95em;
+    color: #9ca3af;
+}
+
+#globalEmployeeTooltip .employee-number-tooltip strong {
+    color: var(--color-primary, #10b981);
+}
+
+#globalEmployeeTooltip .tooltip-workload {
+    font-size: 0.95em;
+    color: #9ca3af;
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Style dla ułożenia pól obok siebie w modalu */

@@ -22,6 +22,14 @@ interface ServerStatus {
 }
 
 /**
+ * Cache z timestampem
+ */
+interface CachedPdfData {
+    data: PdfDocument[];
+    timestamp: number;
+}
+
+/**
  * Interfejs publicznego API PdfService
  */
 interface PdfServiceAPI {
@@ -35,17 +43,23 @@ interface PdfServiceAPI {
 }
 
 export const PdfService: PdfServiceAPI = (() => {
-    const SCRAPED_PDFS_CACHE_KEY = 'scrapedPdfLinks';
+    const SCRAPED_PDFS_CACHE_KEY = 'scrapedPdfLinksV2'; // Nowa wersja cache z TTL
     const SEEN_DOCS_COUNT_KEY = 'seenPdfDocsCount';
     const RENDER_API_BASE_URL = 'https://pdf-scraper-api-5qqr.onrender.com';
 
     const MAX_RETRIES = 3;
-    const RETRY_DELAY_MS = 2000;
+    const RETRY_DELAY_MS = 3000; // Zwiększone dla cold start
     const SSE_RECONNECT_DELAY_MS = 5000;
+
+    // Cache TTL - 30 minut (dane są odświeżane w tle po tym czasie)
+    const CACHE_TTL_MS = 30 * 60 * 1000;
+    // Stale cache - użyj jeśli API niedostępne (max 24h)
+    const STALE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
     let sse: EventSource | null = null;
     let sseReconnectTimeout: ReturnType<typeof setTimeout> | null = null;
     let isDestroyed = false;
+    let isBackgroundRefreshInProgress = false;
 
     const checkForNewDocuments = (docs: PdfDocument[]): void => {
         const seenCount = parseInt(localStorage.getItem(SEEN_DOCS_COUNT_KEY) || '0', 10);
@@ -61,26 +75,65 @@ export const PdfService: PdfServiceAPI = (() => {
     };
 
     const markAsSeen = (): void => {
-        const cachedData = localStorage.getItem(SCRAPED_PDFS_CACHE_KEY);
-        if (cachedData) {
-            try {
-                const docs = JSON.parse(cachedData) as PdfDocument[];
-                localStorage.setItem(SEEN_DOCS_COUNT_KEY, docs.length.toString());
-                window.dispatchEvent(new CustomEvent('iso-updates-cleared'));
-            } catch (err) {
-                console.error('Błąd parsowania cached PDF data:', err);
-            }
+        const cached = getCachedDataWithMeta();
+        if (cached && cached.data.length > 0) {
+            localStorage.setItem(SEEN_DOCS_COUNT_KEY, cached.data.length.toString());
+            window.dispatchEvent(new CustomEvent('iso-updates-cleared'));
         }
     };
 
-    const getCachedData = (): PdfDocument[] | null => {
+    /**
+     * Pobiera cache z metadanymi (timestamp)
+     */
+    const getCachedDataWithMeta = (): CachedPdfData | null => {
         try {
             const cached = localStorage.getItem(SCRAPED_PDFS_CACHE_KEY);
-            return cached ? JSON.parse(cached) : null;
+            if (!cached) return null;
+
+            const parsed = JSON.parse(cached);
+            // Sprawdź czy to nowy format (z timestamp) czy stary (tablica)
+            if (Array.isArray(parsed)) {
+                // Stary format - migruj do nowego
+                return { data: parsed, timestamp: 0 };
+            }
+            return parsed as CachedPdfData;
         } catch (err) {
             console.error('Błąd odczytu cache:', err);
             return null;
         }
+    };
+
+    /**
+     * Sprawdza czy cache jest świeży (w ramach TTL)
+     */
+    const isCacheFresh = (cached: CachedPdfData | null): boolean => {
+        if (!cached || !cached.timestamp) return false;
+        return Date.now() - cached.timestamp < CACHE_TTL_MS;
+    };
+
+    /**
+     * Sprawdza czy cache może być użyty jako fallback (stale)
+     */
+    const isCacheUsable = (cached: CachedPdfData | null): boolean => {
+        if (!cached || cached.data.length === 0) return false;
+        if (!cached.timestamp) return true; // Stary format - użyj
+        return Date.now() - cached.timestamp < STALE_CACHE_TTL_MS;
+    };
+
+    const getCachedData = (): PdfDocument[] | null => {
+        const cached = getCachedDataWithMeta();
+        return cached ? cached.data : null;
+    };
+
+    /**
+     * Zapisuje dane do cache z timestampem
+     */
+    const saveToCache = (data: PdfDocument[]): void => {
+        const cacheData: CachedPdfData = {
+            data,
+            timestamp: Date.now()
+        };
+        localStorage.setItem(SCRAPED_PDFS_CACHE_KEY, JSON.stringify(cacheData));
     };
 
     const fetchWithRetry = async (url: string, retries: number = MAX_RETRIES): Promise<Response> => {
@@ -100,33 +153,21 @@ export const PdfService: PdfServiceAPI = (() => {
         }
     };
 
-    const fetchAndCachePdfLinks = async (forceScrape: boolean = false): Promise<PdfDocument[]> => {
-        Shared.setIsoLinkActive(false);
-
-        if (!forceScrape) {
-            const cached = getCachedData();
-            if (cached && cached.length > 0) {
-                checkForNewDocuments(cached);
-                Shared.setIsoLinkActive(true);
-                return cached;
-            }
-        }
-
+    /**
+     * Pobiera dane z API i zapisuje do cache
+     */
+    const fetchFromApi = async (): Promise<PdfDocument[] | null> => {
         try {
-            if (forceScrape) {
-                window.showToast('Odświeżanie linków ISO...', 3000);
-            }
-
             const response = await fetchWithRetry(`${RENDER_API_BASE_URL}/api/pdfs`);
             const data = await response.json();
 
             if (Array.isArray(data)) {
-                localStorage.setItem(SCRAPED_PDFS_CACHE_KEY, JSON.stringify(data));
+                saveToCache(data);
                 checkForNewDocuments(data);
                 Shared.setIsoLinkActive(true);
 
-                if (forceScrape || data.length > 0) {
-                    window.showToast(`Załadowano ${data.length} dokumentów ISO.`, 3000);
+                if (data.length > 0) {
+                    debugLog(`Pobrano ${data.length} dokumentów ISO z API`);
                 }
 
                 return data;
@@ -135,18 +176,58 @@ export const PdfService: PdfServiceAPI = (() => {
             }
         } catch (error) {
             console.error('Błąd podczas pobierania linków PDF:', error);
-
-            const cached = getCachedData();
-            if (cached && cached.length > 0) {
-                debugLog('Używam cache jako fallback');
-                Shared.setIsoLinkActive(true);
-                return cached;
-            }
-
-            window.showToast('Nie można pobrać linków ISO.', 5000);
-            Shared.setIsoLinkActive(false);
-            return [];
+            return null;
         }
+    };
+
+    const fetchAndCachePdfLinks = async (forceScrape: boolean = false): Promise<PdfDocument[]> => {
+        Shared.setIsoLinkActive(false);
+
+        const cachedWithMeta = getCachedDataWithMeta();
+
+        // Jeśli nie wymuszamy odświeżenia i cache jest świeży - użyj go
+        if (!forceScrape && isCacheFresh(cachedWithMeta)) {
+            debugLog('Używam świeżego cache (TTL ok)');
+            checkForNewDocuments(cachedWithMeta!.data);
+            Shared.setIsoLinkActive(true);
+            return cachedWithMeta!.data;
+        }
+
+        // Jeśli cache jest przestarzały ale użyteczny - pokaż go od razu, odśwież w tle
+        if (!forceScrape && isCacheUsable(cachedWithMeta) && !isBackgroundRefreshInProgress) {
+            debugLog('Używam przestarzałego cache, odświeżam w tle...');
+            checkForNewDocuments(cachedWithMeta!.data);
+            Shared.setIsoLinkActive(true);
+
+            // Odśwież w tle (stale-while-revalidate)
+            isBackgroundRefreshInProgress = true;
+            fetchFromApi().finally(() => {
+                isBackgroundRefreshInProgress = false;
+            });
+
+            return cachedWithMeta!.data;
+        }
+
+        // Brak cache lub wymuszony refresh - pobierz synchronicznie
+        if (forceScrape) {
+            window.showToast?.('Odświeżanie linków ISO...', 3000);
+        }
+
+        const data = await fetchFromApi();
+        if (data) {
+            return data;
+        }
+
+        // Fallback do przestarzałego cache jeśli API niedostępne
+        if (isCacheUsable(cachedWithMeta)) {
+            debugLog('API niedostępne, używam przestarzałego cache jako fallback');
+            Shared.setIsoLinkActive(true);
+            return cachedWithMeta!.data;
+        }
+
+        window.showToast?.('Nie można pobrać linków ISO.', 5000);
+        Shared.setIsoLinkActive(false);
+        return [];
     };
 
     const initRealtimeUpdates = (): void => {
@@ -171,7 +252,7 @@ export const PdfService: PdfServiceAPI = (() => {
 
             sse.addEventListener('scrapingComplete', (event) => {
                 debugLog('Otrzymano zdarzenie scrapingComplete:', event.data);
-                window.showToast('Nowe dokumenty ISO dostępne!', 5000);
+                window.showToast?.('Nowe dokumenty ISO dostępne!', 5000);
                 fetchAndCachePdfLinks(true);
             });
 

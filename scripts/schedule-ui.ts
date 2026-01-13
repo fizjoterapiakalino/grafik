@@ -69,22 +69,43 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         const th = event.currentTarget as HTMLTableCellElement;
         const fullName = th.dataset.fullName || '';
         const employeeNumber = th.dataset.employeeNumber || '';
+        const workloadFilled = th.dataset.workloadFilled || '0';
+        const workloadTotal = th.dataset.workloadTotal || '0';
+        const workloadPercentage = th.dataset.workloadPercentage || '0';
 
         _employeeTooltip.innerHTML = '';
 
+        // Imię i nazwisko (numer)
         const nameP = document.createElement('p');
-        nameP.textContent = fullName;
+        nameP.className = 'tooltip-name';
+        nameP.textContent = employeeNumber ? `${fullName} (${employeeNumber})` : fullName;
         _employeeTooltip.appendChild(nameP);
 
-        if (employeeNumber) {
-            const numberP = document.createElement('p');
-            numberP.classList.add('employee-number-tooltip');
-            const strong = document.createElement('strong');
-            strong.textContent = employeeNumber;
-            numberP.appendChild(document.createTextNode('Numer: '));
-            numberP.appendChild(strong);
-            _employeeTooltip.appendChild(numberP);
+        // Obciążenie pracownika
+        const workloadP = document.createElement('p');
+        workloadP.className = 'tooltip-workload';
+
+        const workloadLabel = document.createElement('span');
+        workloadLabel.textContent = 'Obciążenie: ';
+        workloadP.appendChild(workloadLabel);
+
+        const workloadValue = document.createElement('strong');
+        workloadValue.textContent = `${workloadFilled}/${workloadTotal} (${workloadPercentage}%)`;
+
+        // Koloruj procent w zależności od obciążenia
+        const pct = parseInt(workloadPercentage);
+        if (pct > 100) {
+            workloadValue.style.color = '#8b5cf6'; // fioletowy - ponad normę
+        } else if (pct >= 80) {
+            workloadValue.style.color = '#ef4444'; // czerwony
+        } else if (pct >= 50) {
+            workloadValue.style.color = '#f59e0b'; // pomarańczowy
+        } else {
+            workloadValue.style.color = '#10b981'; // zielony
         }
+
+        workloadP.appendChild(workloadValue);
+        _employeeTooltip.appendChild(workloadP);
 
         const rect = th.getBoundingClientRect();
         _employeeTooltip.style.left = `${rect.left + rect.width / 2}px`;
@@ -149,7 +170,94 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
     };
 
     /**
+     * Dane z harmonogramu zmian (Changes)
+     */
+    interface ChangesCellState {
+        assignedEmployees?: string[];
+    }
+    type ChangesData = Record<string, Record<number, ChangesCellState>>;
+    let _changesData: ChangesData = {};
+    let _changesLoaded = false;
+
+    /**
+     * Pobiera dane z harmonogramu zmian (Changes) z Firebase
+     */
+    const _loadChangesData = async (): Promise<void> => {
+        if (_changesLoaded) return;
+        try {
+            const currentYear = new Date().getFullYear();
+            const docRef = db.collection(AppConfig.firestore.collections.schedules).doc(`changesSchedule_${currentYear}`);
+            const docSnap = await docRef.get();
+            const data = docSnap.exists ? (docSnap.data() as { changesCells?: ChangesData }) : null;
+            _changesData = data?.changesCells || {};
+            _changesLoaded = true;
+        } catch (error) {
+            console.error('Błąd podczas ładowania danych z harmonogramu zmian:', error);
+            _changesData = {};
+        }
+    };
+
+    /**
+     * Określa zmianę pracownika na podstawie przypisania do kolumn w Changes
+     * Kolumny 1-4 = pierwsza zmiana (7:00-14:30)
+     * Kolumny 5-7 = druga zmiana (10:30-17:00)
+     * @param employeeId - ID pracownika
+     * @returns 'first' | 'second' | null
+     */
+    const _getEmployeeShiftFromChanges = (employeeId: string): ShiftType => {
+        // Znajdź bieżący okres (dwutygodniowy) na podstawie dzisiejszej daty
+        const today = new Date();
+
+        // Szukaj okresu, który zawiera dzisiejszą datę
+        let currentPeriod: string | null = null;
+        for (const periodKey of Object.keys(_changesData)) {
+            // periodKey to data startu okresu (YYYY-MM-DD)
+            const periodStart = new Date(periodKey);
+            const periodEnd = new Date(periodStart);
+            periodEnd.setDate(periodEnd.getDate() + 13); // 2 tygodnie
+
+            if (today >= periodStart && today <= periodEnd) {
+                currentPeriod = periodKey;
+                break;
+            }
+        }
+
+        if (!currentPeriod) return null;
+
+        const periodData = _changesData[currentPeriod];
+        if (!periodData) return null;
+
+        // Sprawdź w których kolumnach jest przypisany pracownik
+        // Kolumny 1-4 = pierwsza zmiana, Kolumny 5-7 = druga zmiana
+        let inMorningShift = false;
+        let inAfternoonShift = false;
+
+        for (const colIdxStr of Object.keys(periodData)) {
+            const colIdx = Number(colIdxStr);
+            const cellState = periodData[colIdx];
+            const assignedEmployees = cellState?.assignedEmployees || [];
+
+            if (assignedEmployees.includes(employeeId)) {
+                if (colIdx >= 1 && colIdx <= 4) {
+                    inMorningShift = true;
+                } else if (colIdx >= 5 && colIdx <= 7) {
+                    inAfternoonShift = true;
+                }
+            }
+        }
+
+        // Jeśli pracownik jest w obu zmianach lub w żadnej - zwróć null (pełny zakres)
+        if (inMorningShift && inAfternoonShift) return null;
+        if (inMorningShift) return 'first';
+        if (inAfternoonShift) return 'second';
+
+        return null;
+    };
+
+    /**
      * Oblicza obciążenie pracownika (ile slotów jest zajętych)
+     * @param employeeIndex - indeks pracownika
+     * @param shiftType - grupa zmianowa ('first' = 7:00-14:30, 'second' = 10:30-17:00, null = pełny zakres)
      */
     interface WorkloadData {
         filled: number;
@@ -157,31 +265,59 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         percentage: number;
     }
 
-    const _calculateEmployeeWorkload = (employeeIndex: string): WorkloadData => {
+    type ShiftType = 'first' | 'second' | null | undefined;
+
+    const _calculateEmployeeWorkload = (employeeIndex: string, shiftType?: ShiftType): WorkloadData => {
         if (!_appState) return { filled: 0, total: 0, percentage: 0 };
 
         let filled = 0;
         let total = 0;
 
-        // Iteruj po wszystkich godzinach
-        for (let hour = AppConfig.schedule.startHour; hour <= AppConfig.schedule.endHour; hour++) {
+        // Określ zakres godzin na podstawie zmiany
+        let rangeStartHour = AppConfig.schedule.startHour; // domyślnie 7
+        let rangeStartMinute = 0;
+        let rangeEndHour = AppConfig.schedule.endHour;     // domyślnie 17
+        let rangeEndMinute = 0;
+
+        if (shiftType === 'first') {
+            // Poranna zmiana: 7:00-14:30
+            rangeStartHour = 7;
+            rangeStartMinute = 0;
+            rangeEndHour = 14;
+            rangeEndMinute = 30;
+        } else if (shiftType === 'second') {
+            // Popołudniowa zmiana: 10:30-17:00
+            rangeStartHour = 10;
+            rangeStartMinute = 30;
+            rangeEndHour = 17;
+            rangeEndMinute = 0;
+        }
+
+        // Iteruj po slotach w odpowiednim zakresie
+        for (let hour = rangeStartHour; hour <= rangeEndHour; hour++) {
             for (let minute = 0; minute < 60; minute += 30) {
-                if (hour === AppConfig.schedule.endHour && minute === 30) continue;
+                // Pomiń sloty przed rangeStartMinute na pierwszej godzinie
+                if (hour === rangeStartHour && minute < rangeStartMinute) continue;
+                // Pomiń sloty po rangeEndMinute na ostatniej godzinie
+                if (hour === rangeEndHour && minute >= rangeEndMinute && rangeEndMinute !== 0) continue;
+                if (hour === rangeEndHour && minute === 30 && rangeEndMinute === 0) continue;
 
                 total++;
                 const timeString = `${hour}:${minute.toString().padStart(2, '0')}`;
                 const cellData = _appState.scheduleCells[timeString]?.[employeeIndex];
 
                 if (cellData) {
-                    // Sprawdź czy komórka jest zajęta (ma treść lub jest przerwą)
-                    const hasContent = cellData.content && cellData.content.trim() !== '';
-                    const hasSplitContent = cellData.isSplit && (
-                        (cellData.content1 && String(cellData.content1).trim() !== '') ||
-                        (cellData.content2 && String(cellData.content2).trim() !== '')
-                    );
-                    const isBreak = cellData.isBreak;
-
-                    if (hasContent || hasSplitContent || isBreak) {
+                    if (cellData.isBreak) {
+                        // Przerwa liczy się jako pełny slot
+                        filled++;
+                    } else if (cellData.isSplit) {
+                        // Podzielona komórka - każda zajęta część = 1 (umożliwia przekroczenie 100%)
+                        const part1Filled = cellData.content1 && String(cellData.content1).trim() !== '';
+                        const part2Filled = cellData.content2 && String(cellData.content2).trim() !== '';
+                        if (part1Filled) filled++;
+                        if (part2Filled) filled++;
+                    } else if (cellData.content && cellData.content.trim() !== '') {
+                        // Normalna komórka z treścią
                         filled++;
                     }
                 }
@@ -196,9 +332,9 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         _appState = appState;
         _createEmployeeTooltip();
 
-        // Załaduj dane o urlopach w tle
-        _loadLeavesData().then(() => {
-            // Po załadowaniu urlopów, odśwież tabelę żeby wyświetlić badge'y
+        // Załaduj dane o urlopach i harmonogramie zmian w tle
+        Promise.all([_loadLeavesData(), _loadChangesData()]).then(() => {
+            // Po załadowaniu danych, odśwież tabelę żeby wyświetlić badge'y i workload
             renderTable();
         });
 
@@ -573,16 +709,22 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             th.appendChild(span);
 
             // Oblicz obciążenie pracownika (zajęte sloty / wszystkie sloty)
-            const workloadData = _calculateEmployeeWorkload(i);
+            // Określ zmianę na podstawie przypisania w harmonogramie zmian (Changes)
+            // Kolumny 1-4 = ranna zmiana (7:00-14:30), Kolumny 5-7 = popołudniowa (10:30-17:00)
+            const shiftFromChanges = _getEmployeeShiftFromChanges(i);
+            const workloadData = _calculateEmployeeWorkload(i, shiftFromChanges);
             const workloadBar = document.createElement('div');
             workloadBar.className = 'workload-bar';
 
             const workloadFill = document.createElement('div');
             workloadFill.className = 'workload-fill';
-            workloadFill.style.width = `${workloadData.percentage}%`;
+            // Ogranicz szerokość do 100%, ale pozwól na wyświetlanie wartości > 100%
+            workloadFill.style.width = `${Math.min(workloadData.percentage, 100)}%`;
 
             // Ustaw kolor w zależności od obciążenia
-            if (workloadData.percentage >= 80) {
+            if (workloadData.percentage > 100) {
+                workloadFill.classList.add('overload'); // ponad normę
+            } else if (workloadData.percentage >= 80) {
                 workloadFill.classList.add('high');
             } else if (workloadData.percentage >= 50) {
                 workloadFill.classList.add('medium');
@@ -591,11 +733,14 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             }
 
             workloadBar.appendChild(workloadFill);
-            workloadBar.setAttribute('title', `Obciążenie: ${workloadData.filled}/${workloadData.total} (${workloadData.percentage}%)`);
             th.appendChild(workloadBar);
 
             th.dataset.fullName = fullName;
             th.dataset.employeeNumber = employeeNumber;
+            // Zapisz dane workload do dataset dla tooltipa
+            th.dataset.workloadFilled = String(workloadData.filled);
+            th.dataset.workloadTotal = String(workloadData.total);
+            th.dataset.workloadPercentage = String(workloadData.percentage);
             tableHeaderRow.appendChild(th);
 
             th.addEventListener('mouseover', _showEmployeeTooltip);
