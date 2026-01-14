@@ -62,6 +62,7 @@ export const Shared: SharedAPI = (() => {
                 { href: '#schedule', text: 'Grafik', icon: 'fas fa-calendar-alt' },
                 { href: '#leaves', text: 'Urlopy', icon: 'fas fa-plane-departure' },
                 { href: '#changes', text: 'Harmonogram zmian', icon: 'fas fa-exchange-alt' },
+                { href: '#statistics', text: 'Statystyki', icon: 'fas fa-chart-bar' },
                 { href: '#scrapped-pdfs', text: 'ISO', icon: 'fas fa-file-pdf', id: 'navLinkIso' },
                 { href: '#options', text: 'Opcje', icon: 'fas fa-cogs' },
             ];
