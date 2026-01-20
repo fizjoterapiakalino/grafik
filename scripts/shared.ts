@@ -60,6 +60,7 @@ export const Shared: SharedAPI = (() => {
 
             const navLinks: NavLink[] = [
                 { href: '#schedule', text: 'Grafik', icon: 'fas fa-calendar-alt' },
+                { href: '#stations', text: 'Stanowiska', icon: 'fas fa-clinic-medical' },
                 { href: '#leaves', text: 'Urlopy', icon: 'fas fa-plane-departure' },
                 { href: '#changes', text: 'Harmonogram zmian', icon: 'fas fa-exchange-alt' },
                 { href: '#statistics', text: 'Statystyki', icon: 'fas fa-chart-bar' },

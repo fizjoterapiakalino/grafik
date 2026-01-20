@@ -1,0 +1,77 @@
+<!-- pages/stations.html - PhysioResource Tracker -->
+<div class="stations-container">
+    <!-- Header Section -->
+    <div class="stations-header">
+        <div class="stations-header-left">
+            <h1 class="stations-title">
+                <i class="fas fa-clinic-medical"></i>
+                Stanowiska Zabiegowe
+            </h1>
+            <p class="stations-subtitle">Zarządzanie stanowiskami i zabiegami w czasie rzeczywistym</p>
+        </div>
+        <div class="stations-header-right">
+            <div class="status-legend">
+                <div class="legend-item">
+                    <span class="legend-dot free"></span>
+                    <span>Wolne</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-dot occupied"></span>
+                    <span>Zajęte</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-dot finished"></span>
+                    <span>Zakończone</span>
+                </div>
+            </div>
+            <button id="toggleSoundBtn" class="sound-toggle-btn" title="Włącz/Wyłącz dźwięk">
+                <i class="fas fa-volume-up"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Mobile View (Accordion) -->
+    <div class="stations-mobile-view" id="stationsMobileView">
+        <!-- Will be populated by JavaScript -->
+    </div>
+
+    <!-- Desktop View (Grid) -->
+    <div class="stations-desktop-view" id="stationsDesktopView">
+        <!-- Will be populated by JavaScript -->
+    </div>
+
+    <!-- Treatment Selection Modal -->
+    <div id="treatmentModal" class="treatment-modal">
+        <div class="treatment-modal-content">
+            <div class="treatment-modal-header">
+                <h3 id="treatmentModalTitle">Wybierz zabieg</h3>
+                <button class="treatment-modal-close" id="closeTreatmentModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="treatment-modal-body" id="treatmentModalBody">
+                <!-- Treatment options will be populated here -->
+            </div>
+            <div class="treatment-modal-footer">
+                <button class="btn-cancel" id="cancelTreatmentBtn">Anuluj</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="confirm-modal">
+        <div class="confirm-modal-content">
+            <div class="confirm-modal-header">
+                <i class="fas fa-check-circle"></i>
+                <h3>Potwierdź zakończenie</h3>
+            </div>
+            <div class="confirm-modal-body">
+                <p id="confirmModalText">Czy na pewno chcesz zwolnić to stanowisko?</p>
+            </div>
+            <div class="confirm-modal-footer">
+                <button class="btn-cancel" id="cancelConfirmBtn">Anuluj</button>
+                <button class="btn-confirm" id="confirmReleaseBtn">Zwolnij</button>
+            </div>
+        </div>
+    </div>
+</div>
