@@ -123,7 +123,7 @@ const calculateLeaveBarPosition = (
 /**
  * Render leave bars for an employee
  */
-const renderLeaveBars = (leaves: LeaveEntry[], year: number): string => {
+const renderLeaveBars = (leaves: LeaveEntry[], year: number, employeeName: string): string => {
     if (!leaves || leaves.length === 0) return '';
 
     return leaves.map(leave => {
@@ -147,10 +147,14 @@ const renderLeaveBars = (leaves: LeaveEntry[], year: number): string => {
             <div class="gantt-leave-bar ${leaveType}" 
                  style="left: ${left}px; width: ${width}px;"
                  data-leave-id="${leave.id}"
+                 data-employee="${employeeName}"
+                 data-type="${leaveType}"
                  data-start="${leave.startDate}"
                  data-end="${leave.endDate}"
                  title="${typeConfig.label}: ${leave.startDate} - ${leave.endDate} (${days} dni)">
-                ${text}
+                <div class="resize-handle left" data-side="left"></div>
+                <span class="leave-bar-text">${text}</span>
+                <div class="resize-handle right" data-side="right"></div>
             </div>
         `;
     }).join('');
@@ -192,7 +196,7 @@ const renderEmployeeRow = (
             <div class="gantt-employee-cell">${employeeName}</div>
             <div class="gantt-timeline-row">
                 ${renderDayCells(year)}
-                ${renderLeaveBars(leaves, year)}
+                ${renderLeaveBars(leaves, year, employeeName)}
             </div>
         </div>
     `;
@@ -662,4 +666,368 @@ export const cleanupDragListeners = (): void => {
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
     removeSelectionOverlay();
+};
+
+// ============================================
+// LEAVE BAR EDITING (RESIZE + CLICK TO EDIT)
+// ============================================
+
+interface ResizeState {
+    isResizing: boolean;
+    leaveId: string | null;
+    employeeName: string | null;
+    side: 'left' | 'right' | null;
+    originalStart: string | null;
+    originalEnd: string | null;
+    leaveBar: HTMLElement | null;
+    timelineRow: HTMLElement | null;
+}
+
+let resizeState: ResizeState = {
+    isResizing: false,
+    leaveId: null,
+    employeeName: null,
+    side: null,
+    originalStart: null,
+    originalEnd: null,
+    leaveBar: null,
+    timelineRow: null,
+};
+
+// Callbacks for leave operations
+let onLeaveUpdatedCallback: ((employeeName: string, leaveId: string, startDate: string, endDate: string) => Promise<void>) | null = null;
+let onLeaveDeletedCallback: ((employeeName: string, leaveId: string) => Promise<void>) | null = null;
+let onLeaveTypeChangedCallback: ((employeeName: string, leaveId: string, newType: string) => Promise<void>) | null = null;
+
+/**
+ * Set callbacks for leave editing operations
+ */
+export const setOnLeaveUpdated = (callback: (employeeName: string, leaveId: string, startDate: string, endDate: string) => Promise<void>): void => {
+    onLeaveUpdatedCallback = callback;
+};
+
+export const setOnLeaveDeleted = (callback: (employeeName: string, leaveId: string) => Promise<void>): void => {
+    onLeaveDeletedCallback = callback;
+};
+
+export const setOnLeaveTypeChanged = (callback: (employeeName: string, leaveId: string, newType: string) => Promise<void>): void => {
+    onLeaveTypeChangedCallback = callback;
+};
+
+/**
+ * Setup leave bar click and resize handlers
+ */
+export const setupLeaveBarInteractions = (): void => {
+    const ganttBody = document.getElementById('ganttBody');
+    if (!ganttBody) return;
+
+    // Handle clicks on leave bars for editing
+    ganttBody.addEventListener('click', handleLeaveBarClick);
+
+    // Handle resize start
+    ganttBody.addEventListener('mousedown', handleResizeStart);
+};
+
+/**
+ * Cleanup leave bar interactions
+ */
+export const cleanupLeaveBarInteractions = (): void => {
+    const ganttBody = document.getElementById('ganttBody');
+    if (ganttBody) {
+        ganttBody.removeEventListener('click', handleLeaveBarClick);
+        ganttBody.removeEventListener('mousedown', handleResizeStart);
+    }
+    document.removeEventListener('mousemove', handleResizeMove);
+    document.removeEventListener('mouseup', handleResizeEnd);
+};
+
+/**
+ * Handle click on leave bar to show edit popup
+ */
+const handleLeaveBarClick = (e: MouseEvent): void => {
+    const target = e.target as HTMLElement;
+    const leaveBar = target.closest('.gantt-leave-bar') as HTMLElement;
+
+    // Don't show popup if clicking on resize handle
+    if (target.closest('.resize-handle')) return;
+
+    if (!leaveBar) return;
+
+    e.stopPropagation();
+
+    const leaveId = leaveBar.dataset.leaveId || '';
+    const employeeName = leaveBar.dataset.employee || '';
+    const startDate = leaveBar.dataset.start || '';
+    const endDate = leaveBar.dataset.end || '';
+    const leaveType = leaveBar.dataset.type || 'vacation';
+
+    showEditPopup(employeeName, leaveId, startDate, endDate, leaveType, e.clientX, e.clientY);
+};
+
+/**
+ * Handle resize start (mousedown on resize handle)
+ */
+const handleResizeStart = (e: MouseEvent): void => {
+    const target = e.target as HTMLElement;
+    const handle = target.closest('.resize-handle') as HTMLElement;
+
+    if (!handle) return;
+
+    const leaveBar = handle.closest('.gantt-leave-bar') as HTMLElement;
+    const timelineRow = leaveBar?.closest('.gantt-timeline-row') as HTMLElement;
+
+    if (!leaveBar || !timelineRow) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    resizeState = {
+        isResizing: true,
+        leaveId: leaveBar.dataset.leaveId || null,
+        employeeName: leaveBar.dataset.employee || null,
+        side: handle.dataset.side as 'left' | 'right',
+        originalStart: leaveBar.dataset.start || null,
+        originalEnd: leaveBar.dataset.end || null,
+        leaveBar: leaveBar,
+        timelineRow: timelineRow,
+    };
+
+    // Add temporary listeners for resize
+    document.addEventListener('mousemove', handleResizeMove);
+    document.addEventListener('mouseup', handleResizeEnd);
+
+    // Visual feedback
+    leaveBar.style.opacity = '0.7';
+};
+
+/**
+ * Handle resize move
+ */
+const handleResizeMove = (e: MouseEvent): void => {
+    if (!resizeState.isResizing || !resizeState.leaveBar || !resizeState.timelineRow) return;
+
+    const rect = resizeState.timelineRow.getBoundingClientRect();
+    const scrollLeft = resizeState.timelineRow.scrollLeft;
+
+    // Calculate day index from mouse position
+    const relativeX = e.clientX - rect.left + scrollLeft;
+    const dayIndex = Math.floor(relativeX / DAY_WIDTH);
+
+    // Find the corresponding date
+    const dayCells = resizeState.timelineRow.querySelectorAll('.gantt-day-cell');
+    if (dayIndex < 0 || dayIndex >= dayCells.length) return;
+
+    const targetCell = dayCells[dayIndex] as HTMLElement;
+    const targetDate = targetCell.dataset.date;
+    if (!targetDate) return;
+
+    // Update the leave bar visually based on which side is being resized
+    if (resizeState.side === 'left') {
+        // Don't allow start date to go past end date
+        if (resizeState.originalEnd && targetDate > resizeState.originalEnd) return;
+        resizeState.leaveBar.dataset.start = targetDate;
+    } else if (resizeState.side === 'right') {
+        // Don't allow end date to go before start date
+        if (resizeState.originalStart && targetDate < resizeState.originalStart) return;
+        resizeState.leaveBar.dataset.end = targetDate;
+    }
+
+    // Update visual position
+    updateLeaveBarVisual(resizeState.leaveBar);
+};
+
+/**
+ * Handle resize end
+ */
+const handleResizeEnd = async (): Promise<void> => {
+    if (!resizeState.isResizing) return;
+
+    document.removeEventListener('mousemove', handleResizeMove);
+    document.removeEventListener('mouseup', handleResizeEnd);
+
+    const { leaveId, employeeName, leaveBar } = resizeState;
+
+    if (leaveBar) {
+        leaveBar.style.opacity = '1';
+
+        const newStart = leaveBar.dataset.start || '';
+        const newEnd = leaveBar.dataset.end || '';
+
+        // Save if dates changed
+        if (onLeaveUpdatedCallback && leaveId && employeeName &&
+            (newStart !== resizeState.originalStart || newEnd !== resizeState.originalEnd)) {
+            await onLeaveUpdatedCallback(employeeName, leaveId, newStart, newEnd);
+        }
+    }
+
+    // Reset state
+    resizeState = {
+        isResizing: false,
+        leaveId: null,
+        employeeName: null,
+        side: null,
+        originalStart: null,
+        originalEnd: null,
+        leaveBar: null,
+        timelineRow: null,
+    };
+};
+
+/**
+ * Update leave bar visual position/width
+ */
+const updateLeaveBarVisual = (leaveBar: HTMLElement): void => {
+    const startDateStr = leaveBar.dataset.start;
+    const endDateStr = leaveBar.dataset.end;
+
+    if (!startDateStr || !endDateStr) return;
+
+    const timelineRow = leaveBar.closest('.gantt-timeline-row');
+    if (!timelineRow) return;
+
+    const dayCells = timelineRow.querySelectorAll('.gantt-day-cell');
+    let startIndex = -1;
+    let endIndex = -1;
+
+    dayCells.forEach((cell, index) => {
+        const cellDate = (cell as HTMLElement).dataset.date;
+        if (cellDate === startDateStr) startIndex = index;
+        if (cellDate === endDateStr) endIndex = index;
+    });
+
+    if (startIndex === -1 || endIndex === -1) return;
+
+    const left = startIndex * DAY_WIDTH;
+    const width = (endIndex - startIndex + 1) * DAY_WIDTH;
+
+    leaveBar.style.left = `${left}px`;
+    leaveBar.style.width = `${width}px`;
+
+    // Update text
+    const days = endIndex - startIndex + 1;
+    const textSpan = leaveBar.querySelector('.leave-bar-text');
+    if (textSpan) {
+        textSpan.textContent = width >= 40 ? `${days}d` : '';
+    }
+};
+
+/**
+ * Show edit popup for a leave
+ */
+const showEditPopup = (
+    employeeName: string,
+    leaveId: string,
+    startDate: string,
+    endDate: string,
+    currentType: string,
+    x: number,
+    y: number
+): void => {
+    // Remove any existing popup
+    const existingPopup = document.querySelector('.gantt-leave-popup');
+    if (existingPopup) existingPopup.remove();
+
+    // Calculate days
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    // Format dates
+    const formatDate = (dateStr: string): string => {
+        const [year, month, day] = dateStr.split('-');
+        return `${day}.${month}.${year}`;
+    };
+
+    const currentTypeConfig = LEAVE_TYPES[currentType] || LEAVE_TYPES.vacation;
+
+    // Create popup
+    const popup = document.createElement('div');
+    popup.className = 'gantt-leave-popup gantt-edit-popup';
+    popup.innerHTML = `
+        <div class="gantt-popup-header">
+            <strong>${employeeName}</strong>
+            <button class="gantt-popup-close">&times;</button>
+        </div>
+        <div class="gantt-popup-dates">
+            ${formatDate(startDate)} - ${formatDate(endDate)} (${days} dni)
+        </div>
+        <div class="gantt-popup-current-type">
+            <span class="type-indicator" style="background: ${currentTypeConfig.color}"></span>
+            ${currentTypeConfig.label}
+        </div>
+        <div class="gantt-popup-actions">
+            <button class="gantt-popup-action-btn change-type-btn">
+                <i class="fas fa-exchange-alt"></i> Zmień typ
+            </button>
+            <button class="gantt-popup-action-btn delete-btn danger">
+                <i class="fas fa-trash"></i> Usuń urlop
+            </button>
+        </div>
+        <div class="gantt-popup-type-selector" style="display: none;">
+            <p>Wybierz nowy typ:</p>
+            ${Object.entries(LEAVE_TYPES).map(([type, config]) => `
+                <button class="gantt-popup-type-btn ${type === currentType ? 'current' : ''}" 
+                        data-type="${type}" 
+                        style="background: ${config.color}">
+                    ${config.label}
+                </button>
+            `).join('')}
+        </div>
+        <div class="gantt-popup-footer">
+            <button class="gantt-popup-cancel">Zamknij</button>
+        </div>
+    `;
+
+    // Position popup
+    popup.style.position = 'fixed';
+    popup.style.left = `${Math.min(x, window.innerWidth - 320)}px`;
+    popup.style.top = `${Math.min(y, window.innerHeight - 400)}px`;
+    popup.style.zIndex = '1000';
+
+    document.body.appendChild(popup);
+
+    // Event listeners
+    popup.querySelector('.gantt-popup-close')?.addEventListener('click', () => popup.remove());
+    popup.querySelector('.gantt-popup-cancel')?.addEventListener('click', () => popup.remove());
+
+    // Change type button
+    popup.querySelector('.change-type-btn')?.addEventListener('click', () => {
+        const typeSelector = popup.querySelector('.gantt-popup-type-selector') as HTMLElement;
+        typeSelector.style.display = typeSelector.style.display === 'none' ? 'block' : 'none';
+    });
+
+    // Type selection
+    popup.querySelectorAll('.gantt-popup-type-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const newType = (btn as HTMLElement).dataset.type || 'vacation';
+            if (newType !== currentType && onLeaveTypeChangedCallback) {
+                popup.remove();
+                await onLeaveTypeChangedCallback(employeeName, leaveId, newType);
+            } else {
+                popup.remove();
+            }
+        });
+    });
+
+    // Delete button
+    popup.querySelector('.delete-btn')?.addEventListener('click', async () => {
+        if (confirm('Czy na pewno chcesz usunąć ten urlop?')) {
+            popup.remove();
+            if (onLeaveDeletedCallback) {
+                await onLeaveDeletedCallback(employeeName, leaveId);
+            }
+        }
+    });
+
+    // Close on outside click
+    const closeOnOutsideClick = (e: MouseEvent) => {
+        if (!popup.contains(e.target as Node)) {
+            popup.remove();
+            document.removeEventListener('mousedown', closeOnOutsideClick);
+        }
+    };
+
+    setTimeout(() => {
+        document.addEventListener('mousedown', closeOnOutsideClick);
+    }, 100);
 };

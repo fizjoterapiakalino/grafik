@@ -8,7 +8,19 @@ import { LeavesCareSummary } from './leaves-care-summary.js';
 import { CalendarModal } from './calendar-modal.js';
 import { toUTCDate } from './utils.js';
 import { printLeavesTableToPdf } from './leaves-pdf.js';
-import { renderGanttView, scrollToToday, setupMobileAccordion as setupGanttMobileAccordion, setupDragToSelect, setOnLeaveCreated, cleanupDragListeners } from './leaves-gantt.js';
+import {
+    renderGanttView,
+    scrollToToday,
+    setupMobileAccordion as setupGanttMobileAccordion,
+    setupDragToSelect,
+    setOnLeaveCreated,
+    cleanupDragListeners,
+    setupLeaveBarInteractions,
+    cleanupLeaveBarInteractions,
+    setOnLeaveUpdated,
+    setOnLeaveDeleted,
+    setOnLeaveTypeChanged
+} from './leaves-gantt.js';
 import type { FirestoreDbWrapper } from './types/firebase';
 import type { Employee, LeaveEntry } from './types';
 
@@ -322,8 +334,9 @@ export const Leaves: LeavesAPI = (() => {
         currentYearBtn?.removeEventListener('click', handleCurrentYearClick);
         printLeavesNavbarBtn?.removeEventListener('click', handlePrintLeaves);
 
-        // Cleanup Gantt drag listeners
+        // Cleanup Gantt listeners
         cleanupDragListeners();
+        cleanupLeaveBarInteractions();
 
         if (window.destroyContextMenu) {
             window.destroyContextMenu('contextMenu');
@@ -435,9 +448,8 @@ export const Leaves: LeavesAPI = (() => {
 
         renderGanttView(employees, allLeaves, currentYear);
 
-        // Setup drag-to-select for adding leaves
-        setOnLeaveCreated(handleGanttLeaveCreated);
-        setupDragToSelect();
+        // Setup all Gantt interactions
+        setupGanttInteractions();
 
         // Scroll to today's position
         setTimeout(() => scrollToToday(), 100);
@@ -482,13 +494,125 @@ export const Leaves: LeavesAPI = (() => {
             const updatedLeaves = await getAllLeavesData();
             renderGanttView(employees, updatedLeaves, currentYear);
 
-            // Re-setup drag listeners after re-render
-            setOnLeaveCreated(handleGanttLeaveCreated);
-            setupDragToSelect();
+            // Re-setup interactions after re-render
+            setupGanttInteractions();
 
         } catch (error) {
             console.error('Błąd podczas tworzenia urlopu:', error);
             window.showToast('Wystąpił błąd podczas tworzenia urlopu. Spróbuj ponownie.', 5000);
+        }
+    };
+
+    /**
+     * Setup all Gantt interactions (drag, resize, click)
+     */
+    const setupGanttInteractions = (): void => {
+        setOnLeaveCreated(handleGanttLeaveCreated);
+        setOnLeaveUpdated(handleGanttLeaveUpdated);
+        setOnLeaveDeleted(handleGanttLeaveDeleted);
+        setOnLeaveTypeChanged(handleGanttLeaveTypeChanged);
+        setupDragToSelect();
+        setupLeaveBarInteractions();
+    };
+
+    /**
+     * Handle leave dates updated (resize)
+     */
+    const handleGanttLeaveUpdated = async (
+        employeeName: string,
+        leaveId: string,
+        newStartDate: string,
+        newEndDate: string
+    ): Promise<void> => {
+        try {
+            const allLeaves = await getAllLeavesData();
+
+            appState.leaves = allLeaves;
+            undoManager.pushState(appState);
+
+            const employeeLeaves = allLeaves[employeeName] || [];
+            const leaveIndex = employeeLeaves.findIndex(l => l.id === leaveId);
+
+            if (leaveIndex !== -1) {
+                employeeLeaves[leaveIndex].startDate = newStartDate;
+                employeeLeaves[leaveIndex].endDate = newEndDate;
+
+                await saveLeavesData(employeeName, employeeLeaves);
+
+                // Refresh view
+                const employees = EmployeeManager.getAll();
+                const updatedLeaves = await getAllLeavesData();
+                renderGanttView(employees, updatedLeaves, currentYear);
+                setupGanttInteractions();
+            }
+        } catch (error) {
+            console.error('Błąd podczas aktualizacji urlopu:', error);
+            window.showToast('Wystąpił błąd podczas aktualizacji. Spróbuj ponownie.', 5000);
+        }
+    };
+
+    /**
+     * Handle leave deleted
+     */
+    const handleGanttLeaveDeleted = async (
+        employeeName: string,
+        leaveId: string
+    ): Promise<void> => {
+        try {
+            const allLeaves = await getAllLeavesData();
+
+            appState.leaves = allLeaves;
+            undoManager.pushState(appState);
+
+            const employeeLeaves = allLeaves[employeeName] || [];
+            const filteredLeaves = employeeLeaves.filter(l => l.id !== leaveId);
+
+            await saveLeavesData(employeeName, filteredLeaves);
+            window.showToast('Urlop został usunięty.', 2000);
+
+            // Refresh view
+            const employees = EmployeeManager.getAll();
+            const updatedLeaves = await getAllLeavesData();
+            renderGanttView(employees, updatedLeaves, currentYear);
+            setupGanttInteractions();
+        } catch (error) {
+            console.error('Błąd podczas usuwania urlopu:', error);
+            window.showToast('Wystąpił błąd podczas usuwania. Spróbuj ponownie.', 5000);
+        }
+    };
+
+    /**
+     * Handle leave type changed
+     */
+    const handleGanttLeaveTypeChanged = async (
+        employeeName: string,
+        leaveId: string,
+        newType: string
+    ): Promise<void> => {
+        try {
+            const allLeaves = await getAllLeavesData();
+
+            appState.leaves = allLeaves;
+            undoManager.pushState(appState);
+
+            const employeeLeaves = allLeaves[employeeName] || [];
+            const leaveIndex = employeeLeaves.findIndex(l => l.id === leaveId);
+
+            if (leaveIndex !== -1) {
+                employeeLeaves[leaveIndex].type = newType;
+
+                await saveLeavesData(employeeName, employeeLeaves);
+                window.showToast('Typ urlopu został zmieniony.', 2000);
+
+                // Refresh view
+                const employees = EmployeeManager.getAll();
+                const updatedLeaves = await getAllLeavesData();
+                renderGanttView(employees, updatedLeaves, currentYear);
+                setupGanttInteractions();
+            }
+        } catch (error) {
+            console.error('Błąd podczas zmiany typu urlopu:', error);
+            window.showToast('Wystąpił błąd podczas zmiany typu. Spróbuj ponownie.', 5000);
         }
     };
 

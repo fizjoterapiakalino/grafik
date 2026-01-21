@@ -1638,3 +1638,111 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     background: var(--color-gray-100);
     border-color: var(--color-gray-400);
 }
+
+/* ============================================
+   GANTT EDIT POPUP ADDITIONS
+   ============================================ */
+.gantt-popup-current-type {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: var(--color-gray-50);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.gantt-popup-current-type .type-indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+}
+
+.gantt-popup-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px;
+}
+
+.gantt-popup-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 16px;
+    border: 1px solid var(--color-gray-300);
+    border-radius: var(--border-radius-sm);
+    background: white;
+    color: var(--color-gray-700);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.gantt-popup-action-btn:hover {
+    background: var(--color-gray-100);
+    border-color: var(--color-gray-400);
+}
+
+.gantt-popup-action-btn.danger {
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+}
+
+.gantt-popup-action-btn.danger:hover {
+    background: rgba(var(--color-danger-rgb, 220, 38, 38), 0.1);
+}
+
+.gantt-popup-type-selector {
+    padding: 12px 16px;
+    border-top: 1px solid var(--color-gray-200);
+    background: var(--color-gray-50);
+}
+
+.gantt-popup-type-selector p {
+    margin: 0 0 10px 0;
+    font-size: 0.85rem;
+    color: var(--color-gray-600);
+}
+
+.gantt-popup-type-btn.current {
+    opacity: 0.6;
+    cursor: default;
+    transform: none !important;
+}
+
+/* Leave bar text styling */
+.leave-bar-text {
+    position: relative;
+    z-index: 1;
+}
+
+/* Enhanced resize handles */
+.gantt-leave-bar .resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    cursor: ew-resize;
+    background: transparent;
+    z-index: 5;
+}
+
+.gantt-leave-bar .resize-handle.left {
+    left: 0;
+    border-radius: 4px 0 0 4px;
+}
+
+.gantt-leave-bar .resize-handle.right {
+    right: 0;
+    border-radius: 0 4px 4px 0;
+}
+
+.gantt-leave-bar:hover .resize-handle {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+.gantt-leave-bar .resize-handle:hover {
+    background: rgba(255, 255, 255, 0.6);
+}
