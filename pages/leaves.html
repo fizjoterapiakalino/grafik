@@ -1,6 +1,7 @@
 <div class="leaves-header-controls">
     <div class="view-tabs">
-        <button id="monthlyViewBtn" class="tab-btn active">Widok Miesięczny</button>
+        <button id="ganttViewBtn" class="tab-btn active">Widok Gantt</button>
+        <button id="monthlyViewBtn" class="tab-btn">Widok Miesięczny</button>
         <button id="summaryViewBtn" class="tab-btn">Podsumowanie Roczne</button>
         <button id="careViewBtn" class="tab-btn">Opieka</button>
     </div>
@@ -20,12 +21,24 @@
     <button id="clearFiltersBtn" class="action-btn outline">Wyczyść filtry</button>
 </div>
 
-<table id="leavesTable" class="leaves-table">
-    <thead>
-        <tr id="leavesHeaderRow"></tr>
-    </thead>
-    <tbody id="leavesTableBody"></tbody>
-</table>
+<!-- Gantt View Container -->
+<div id="ganttViewContainer" class="gantt-container">
+    <div class="gantt-header">
+        <div class="gantt-employee-header">Pracownik</div>
+        <div class="gantt-timeline-header" id="ganttTimelineHeader"></div>
+    </div>
+    <div class="gantt-body" id="ganttBody"></div>
+</div>
+
+<!-- Monthly View (existing) -->
+<div id="monthlyViewContainer" style="display: none;">
+    <table id="leavesTable" class="leaves-table">
+        <thead>
+            <tr id="leavesHeaderRow"></tr>
+        </thead>
+        <tbody id="leavesTableBody"></tbody>
+    </table>
+</div>
 
 <div id="careViewContainer" style="display: none"></div>
 

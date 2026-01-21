@@ -8,6 +8,7 @@ import { LeavesCareSummary } from './leaves-care-summary.js';
 import { CalendarModal } from './calendar-modal.js';
 import { toUTCDate } from './utils.js';
 import { printLeavesTableToPdf } from './leaves-pdf.js';
+import { renderGanttView, scrollToToday, setupMobileAccordion as setupGanttMobileAccordion, setupDragToSelect, setOnLeaveCreated, cleanupDragListeners } from './leaves-gantt.js';
 import type { FirestoreDbWrapper } from './types/firebase';
 import type { Employee, LeaveEntry } from './types';
 
@@ -35,9 +36,11 @@ export const Leaves: LeavesAPI = (() => {
     let loadingOverlay: HTMLElement | null = null;
     let leavesTableBody: HTMLTableSectionElement | null = null;
     let leavesHeaderRow: HTMLTableRowElement | null = null;
+    let ganttViewBtn: HTMLElement | null = null;
     let monthlyViewBtn: HTMLElement | null = null;
     let summaryViewBtn: HTMLElement | null = null;
     let careViewBtn: HTMLElement | null = null;
+    let ganttViewContainer: HTMLElement | null = null;
     let monthlyViewContainer: HTMLElement | null = null;
     let careViewContainer: HTMLElement | null = null;
     let clearFiltersBtn: HTMLElement | null = null;
@@ -172,7 +175,9 @@ export const Leaves: LeavesAPI = (() => {
     };
 
     const refreshCurrentView = async (): Promise<void> => {
-        if (monthlyViewBtn?.classList.contains('active')) {
+        if (ganttViewBtn?.classList.contains('active')) {
+            await showGanttView();
+        } else if (monthlyViewBtn?.classList.contains('active')) {
             await showMonthlyView();
         } else if (summaryViewBtn?.classList.contains('active')) {
             await showSummaryView();
@@ -258,10 +263,12 @@ export const Leaves: LeavesAPI = (() => {
         loadingOverlay = document.getElementById('loadingOverlay');
         leavesTableBody = document.getElementById('leavesTableBody') as HTMLTableSectionElement | null;
         leavesHeaderRow = document.getElementById('leavesHeaderRow') as HTMLTableRowElement | null;
+        ganttViewBtn = document.getElementById('ganttViewBtn');
         monthlyViewBtn = document.getElementById('monthlyViewBtn');
         summaryViewBtn = document.getElementById('summaryViewBtn');
         careViewBtn = document.getElementById('careViewBtn');
-        monthlyViewContainer = document.getElementById('leavesTable');
+        ganttViewContainer = document.getElementById('ganttViewContainer');
+        monthlyViewContainer = document.getElementById('monthlyViewContainer');
         careViewContainer = document.getElementById('careViewContainer');
         leavesFilterContainer = document.getElementById('leavesFilterContainer');
         yearSelect = document.getElementById('yearSelect') as HTMLSelectElement | null;
@@ -284,7 +291,8 @@ export const Leaves: LeavesAPI = (() => {
             undoManager = new UndoManager({ maxStates: 20 });
             undoManager.initialize(appState);
 
-            await showMonthlyView();
+            // Show Gantt view by default
+            await showGanttView();
             highlightCurrentMonth();
 
             const contextMenuItems = [
@@ -301,6 +309,7 @@ export const Leaves: LeavesAPI = (() => {
     };
 
     const destroy = (): void => {
+        ganttViewBtn?.removeEventListener('click', showGanttView);
         monthlyViewBtn?.removeEventListener('click', showMonthlyView);
         summaryViewBtn?.removeEventListener('click', showSummaryView);
         careViewBtn?.removeEventListener('click', showCareView);
@@ -312,6 +321,9 @@ export const Leaves: LeavesAPI = (() => {
         yearSelect?.removeEventListener('change', handleYearChange);
         currentYearBtn?.removeEventListener('click', handleCurrentYearClick);
         printLeavesNavbarBtn?.removeEventListener('click', handlePrintLeaves);
+
+        // Cleanup Gantt drag listeners
+        cleanupDragListeners();
 
         if (window.destroyContextMenu) {
             window.destroyContextMenu('contextMenu');
@@ -354,6 +366,7 @@ export const Leaves: LeavesAPI = (() => {
     };
 
     const setupEventListeners = (): void => {
+        ganttViewBtn?.addEventListener('click', showGanttView);
         monthlyViewBtn?.addEventListener('click', showMonthlyView);
         summaryViewBtn?.addEventListener('click', showSummaryView);
         careViewBtn?.addEventListener('click', showCareView);
@@ -403,11 +416,89 @@ export const Leaves: LeavesAPI = (() => {
         renderAllEmployeeLeaves(allLeaves);
     };
 
+    /**
+     * Show Gantt View
+     */
+    const showGanttView = async (): Promise<void> => {
+        ganttViewBtn?.classList.add('active');
+        monthlyViewBtn?.classList.remove('active');
+        summaryViewBtn?.classList.remove('active');
+        careViewBtn?.classList.remove('active');
+
+        if (ganttViewContainer) ganttViewContainer.style.display = '';
+        if (monthlyViewContainer) monthlyViewContainer.style.display = 'none';
+        if (careViewContainer) careViewContainer.style.display = 'none';
+        if (leavesFilterContainer) leavesFilterContainer.style.display = 'flex';
+
+        const employees = EmployeeManager.getAll();
+        const allLeaves = await getAllLeavesData();
+
+        renderGanttView(employees, allLeaves, currentYear);
+
+        // Setup drag-to-select for adding leaves
+        setOnLeaveCreated(handleGanttLeaveCreated);
+        setupDragToSelect();
+
+        // Scroll to today's position
+        setTimeout(() => scrollToToday(), 100);
+
+        // Setup mobile accordion
+        setupGanttMobileAccordion();
+    };
+
+    /**
+     * Handle new leave created from Gantt drag-select
+     */
+    const handleGanttLeaveCreated = async (
+        employeeName: string,
+        startDate: string,
+        endDate: string,
+        leaveType: string
+    ): Promise<void> => {
+        try {
+            const allLeaves = await getAllLeavesData();
+
+            // Save state for undo
+            appState.leaves = allLeaves;
+            undoManager.pushState(appState);
+
+            // Create new leave entry
+            const newLeave = {
+                id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                type: leaveType,
+                startDate: startDate,
+                endDate: endDate,
+            };
+
+            // Add to employee leaves
+            const employeeLeaves = allLeaves[employeeName] || [];
+            employeeLeaves.push(newLeave);
+
+            // Save to Firebase
+            await saveLeavesData(employeeName, employeeLeaves);
+
+            // Refresh Gantt view
+            const employees = EmployeeManager.getAll();
+            const updatedLeaves = await getAllLeavesData();
+            renderGanttView(employees, updatedLeaves, currentYear);
+
+            // Re-setup drag listeners after re-render
+            setOnLeaveCreated(handleGanttLeaveCreated);
+            setupDragToSelect();
+
+        } catch (error) {
+            console.error('Błąd podczas tworzenia urlopu:', error);
+            window.showToast('Wystąpił błąd podczas tworzenia urlopu. Spróbuj ponownie.', 5000);
+        }
+    };
+
     const showMonthlyView = async (): Promise<void> => {
+        ganttViewBtn?.classList.remove('active');
         monthlyViewBtn?.classList.add('active');
         summaryViewBtn?.classList.remove('active');
         careViewBtn?.classList.remove('active');
 
+        if (ganttViewContainer) ganttViewContainer.style.display = 'none';
         if (monthlyViewContainer) monthlyViewContainer.style.display = '';
         if (careViewContainer) careViewContainer.style.display = 'none';
         if (leavesFilterContainer) leavesFilterContainer.style.display = 'flex';

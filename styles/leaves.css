@@ -1193,3 +1193,448 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     color: var(--color-danger);
     font-weight: bold;
 }
+
+/* ============================================
+   GANTT VIEW STYLES
+   ============================================ */
+
+.gantt-container {
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+/* Gantt Header - fixed employee column + scrollable timeline */
+.gantt-header {
+    display: flex;
+    background: var(--color-primary-600);
+    color: white;
+    font-weight: 600;
+    font-size: 0.85rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.gantt-employee-header {
+    width: 150px;
+    min-width: 150px;
+    padding: 8px 12px;
+    background: var(--color-gray-800);
+    display: flex;
+    align-items: center;
+}
+
+.gantt-timeline-header {
+    flex: 1;
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+/* Sync scroll between header and body */
+.gantt-timeline-header::-webkit-scrollbar {
+    display: none;
+}
+
+/* Month header groups */
+.gantt-month-group {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.gantt-month-label {
+    padding: 4px 8px;
+    text-align: center;
+    background: var(--color-primary-700);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.gantt-days-row {
+    display: flex;
+}
+
+.gantt-day-header {
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.gantt-day-header.weekend {
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.gantt-day-header.today {
+    background: var(--color-secondary);
+    font-weight: bold;
+}
+
+/* Gantt Body */
+.gantt-body {
+    display: flex;
+    flex-direction: column;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.gantt-row {
+    display: flex;
+    min-height: 36px;
+    border-bottom: 1px solid var(--color-gray-200);
+}
+
+.gantt-row:hover {
+    background: var(--color-gray-50);
+}
+
+.gantt-employee-cell {
+    width: 150px;
+    min-width: 150px;
+    padding: 8px 12px;
+    background: var(--color-gray-100);
+    font-weight: 500;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    border-right: 1px solid var(--color-gray-300);
+}
+
+.gantt-timeline-row {
+    flex: 1;
+    display: flex;
+    position: relative;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+/* Day cells in timeline */
+.gantt-day-cell {
+    width: 24px;
+    min-width: 24px;
+    height: 100%;
+    border-right: 1px solid var(--color-gray-100);
+    position: relative;
+}
+
+.gantt-day-cell.weekend {
+    background: var(--color-gray-100);
+}
+
+.gantt-day-cell.month-start {
+    border-left: 2px solid var(--color-gray-300);
+}
+
+.gantt-day-cell.today {
+    background: rgba(var(--color-secondary-rgb), 0.1);
+}
+
+/* Leave bars on the timeline */
+.gantt-leave-bar {
+    position: absolute;
+    top: 4px;
+    height: calc(100% - 8px);
+    min-height: 24px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: white;
+    cursor: pointer;
+    z-index: 2;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.gantt-leave-bar:hover {
+    transform: scaleY(1.1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+}
+
+/* Leave type colors - matching existing leave-block colors */
+.gantt-leave-bar.vacation {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+}
+
+.gantt-leave-bar.child_care_art_188 {
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+}
+
+.gantt-leave-bar.sick_child_care {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+}
+
+.gantt-leave-bar.family_member_care {
+    background: linear-gradient(135deg, #9b59b6, #8e44ad);
+}
+
+.gantt-leave-bar.schedule_pickup {
+    background: linear-gradient(135deg, #1abc9c, #16a085);
+}
+
+/* Resize handles for leave bars */
+.gantt-leave-bar .resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: ew-resize;
+    background: transparent;
+}
+
+.gantt-leave-bar .resize-handle.left {
+    left: 0;
+    border-radius: 4px 0 0 4px;
+}
+
+.gantt-leave-bar .resize-handle.right {
+    right: 0;
+    border-radius: 0 4px 4px 0;
+}
+
+.gantt-leave-bar:hover .resize-handle {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Selection overlay for drag-to-select */
+.gantt-selection-overlay {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: rgba(var(--color-primary-rgb), 0.3);
+    border: 2px dashed var(--color-primary);
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* Scrollbar styling */
+.gantt-timeline-row::-webkit-scrollbar {
+    height: 8px;
+}
+
+.gantt-timeline-row::-webkit-scrollbar-track {
+    background: var(--color-gray-100);
+}
+
+.gantt-timeline-row::-webkit-scrollbar-thumb {
+    background: var(--color-gray-400);
+    border-radius: 4px;
+}
+
+.gantt-timeline-row::-webkit-scrollbar-thumb:hover {
+    background: var(--color-gray-500);
+}
+
+/* Mobile: simplified list view instead of Gantt */
+@media (max-width: 768px) {
+    .gantt-container {
+        display: none;
+    }
+
+    /* Will show mobile list view instead */
+    .gantt-mobile-view {
+        display: block;
+    }
+}
+
+@media (min-width: 769px) {
+    .gantt-mobile-view {
+        display: none;
+    }
+}
+
+/* Mobile list view styles */
+.gantt-mobile-view {
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+}
+
+.gantt-mobile-employee {
+    border-bottom: 1px solid var(--color-gray-200);
+}
+
+.gantt-mobile-employee-header {
+    padding: 12px 16px;
+    background: var(--color-gray-100);
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.gantt-mobile-employee-header .arrow {
+    transition: transform 0.2s;
+}
+
+.gantt-mobile-employee.expanded .gantt-mobile-employee-header .arrow {
+    transform: rotate(180deg);
+}
+
+.gantt-mobile-leaves-list {
+    display: none;
+    padding: 8px 16px;
+}
+
+.gantt-mobile-employee.expanded .gantt-mobile-leaves-list {
+    display: block;
+}
+
+.gantt-mobile-leave-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--color-gray-100);
+}
+
+.gantt-mobile-leave-item:last-child {
+    border-bottom: none;
+}
+
+.gantt-mobile-leave-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.gantt-mobile-leave-dates {
+    font-weight: 500;
+}
+
+.gantt-mobile-leave-type {
+    font-size: 0.85rem;
+    color: var(--color-gray-500);
+}
+
+/* ============================================
+   GANTT LEAVE POPUP
+   ============================================ */
+.gantt-leave-popup {
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    min-width: 280px;
+    max-width: 320px;
+    overflow: hidden;
+    animation: popup-fade-in 0.15s ease-out;
+}
+
+@keyframes popup-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.gantt-popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--color-primary-600);
+    color: white;
+}
+
+.gantt-popup-header strong {
+    font-size: 0.95rem;
+}
+
+.gantt-popup-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+    opacity: 0.8;
+    transition: opacity 0.15s;
+}
+
+.gantt-popup-close:hover {
+    opacity: 1;
+}
+
+.gantt-popup-dates {
+    padding: 12px 16px;
+    background: var(--color-gray-50);
+    font-size: 0.9rem;
+    color: var(--color-gray-700);
+    text-align: center;
+    border-bottom: 1px solid var(--color-gray-200);
+}
+
+.gantt-popup-types {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gantt-popup-type-btn {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.gantt-popup-type-btn:hover {
+    transform: scale(1.02);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.gantt-popup-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--color-gray-200);
+    text-align: right;
+}
+
+.gantt-popup-cancel {
+    padding: 8px 16px;
+    border: 1px solid var(--color-gray-300);
+    border-radius: var(--border-radius-sm);
+    background: white;
+    color: var(--color-gray-600);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.gantt-popup-cancel:hover {
+    background: var(--color-gray-100);
+    border-color: var(--color-gray-400);
+}
