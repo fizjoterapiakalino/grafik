@@ -17,7 +17,7 @@ const MONTH_NAMES = [
     'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
 ];
 
-const DAY_WIDTH = 24; // pixels per day
+const DAY_WIDTH = 32; // pixels per day (increased for better visibility)
 
 /**
  * Get number of days in a month
@@ -139,9 +139,25 @@ const renderLeaveBars = (leaves: LeaveEntry[], year: number, employeeName: strin
         const endDate = parseDate(leave.endDate);
         const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
-        // Only show text if bar is wide enough
-        const showText = width >= 40;
-        const text = showText ? `${days}d` : '';
+        // Format date range for display (DD-DD or DD.MM-DD.MM if cross-month)
+        const startDay = startDate.getDate().toString().padStart(2, '0');
+        const endDay = endDate.getDate().toString().padStart(2, '0');
+        const startMonth = (startDate.getMonth() + 1).toString().padStart(2, '0');
+        const endMonth = (endDate.getMonth() + 1).toString().padStart(2, '0');
+
+        let text = '';
+        if (width >= 80) {
+            // Full date range for wider bars
+            if (startDate.getMonth() === endDate.getMonth()) {
+                text = `${startDay}-${endDay}`;
+            } else {
+                text = `${startDay}.${startMonth}-${endDay}.${endMonth}`;
+            }
+        } else if (width >= 50) {
+            // Just days for medium bars
+            text = `${startDay}-${endDay}`;
+        }
+        // No text for narrow bars
 
         return `
             <div class="gantt-leave-bar ${leaveType}" 
@@ -1009,15 +1025,44 @@ const showEditPopup = (
         });
     });
 
-    // Delete button
-    popup.querySelector('.delete-btn')?.addEventListener('click', async () => {
-        if (confirm('Czy na pewno chcesz usunąć ten urlop?')) {
-            popup.remove();
-            if (onLeaveDeletedCallback) {
-                await onLeaveDeletedCallback(employeeName, leaveId);
+    // Delete button - show inline confirmation
+    const deleteBtn = popup.querySelector('.delete-btn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            // Show inline confirmation
+            const actionsDiv = popup.querySelector('.gantt-popup-actions');
+            if (actionsDiv) {
+                actionsDiv.innerHTML = `
+                    <p style="margin: 0 0 10px; color: var(--color-danger); font-weight: 500;">
+                        Czy na pewno usunąć ten urlop?
+                    </p>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="gantt-popup-action-btn confirm-delete-btn danger" style="flex: 1;">
+                            <i class="fas fa-check"></i> Tak, usuń
+                        </button>
+                        <button class="gantt-popup-action-btn cancel-delete-btn" style="flex: 1;">
+                            <i class="fas fa-times"></i> Anuluj
+                        </button>
+                    </div>
+                `;
+
+                // Confirm delete
+                actionsDiv.querySelector('.confirm-delete-btn')?.addEventListener('click', async () => {
+                    popup.remove();
+                    if (onLeaveDeletedCallback) {
+                        await onLeaveDeletedCallback(employeeName, leaveId);
+                    }
+                });
+
+                // Cancel delete
+                actionsDiv.querySelector('.cancel-delete-btn')?.addEventListener('click', () => {
+                    popup.remove();
+                });
             }
-        }
-    });
+        });
+    }
 
     // Close on outside click
     const closeOnOutsideClick = (e: MouseEvent) => {
