@@ -89,8 +89,10 @@ interface StationsAPI {
  */
 export const Stations: StationsAPI = (() => {
     // Configuration - room definitions based on specification
+    // Column 1: Simple rooms (Hydro, Magnet, Aquavibron, Sala21)
+    // Column 2: Fizyko 18, Fizyko 22
+    // Column 3: Sala Gimnastyczna
     const ROOMS_CONFIG: Room[] = [
-        // Row 1: Hydroterapia, Pole magnetyczne, Fizyko 18, Fizyko 22
         {
             id: 'hydro',
             name: 'Hydroterapia',
@@ -117,6 +119,35 @@ export const Stations: StationsAPI = (() => {
                 { id: 'magnet_2', name: 'Aparat Duży', roomId: 'magnet', status: 'FREE' },
             ],
             treatments: [],
+        },
+        {
+            id: 'aquavibron',
+            name: 'Aquavibron',
+            icon: 'fa-wave-square',
+            type: 'simple',
+            maxCapacity: 1,
+            defaultDuration: 6,
+            stations: [
+                { id: 'aquavibron_1', name: 'Aquavibron', roomId: 'aquavibron', status: 'FREE' },
+            ],
+            treatments: [],
+        },
+        {
+            id: 'sala21',
+            name: 'Sala 21',
+            icon: 'fa-hands',
+            type: 'multi',
+            maxCapacity: 2,
+            defaultDuration: 15,
+            stations: [
+                { id: 'sala21_1', name: 'Leżanka 1', roomId: 'sala21', status: 'FREE' },
+                { id: 'sala21_2', name: 'Leżanka 2', roomId: 'sala21', status: 'FREE' },
+            ],
+            treatments: [
+                { id: 'massage_treatment', name: 'Masaż', shortName: 'Masaż', duration: 15 },
+                { id: 'therapy', name: 'Terapia', shortName: 'Terapia', duration: 20 },
+                { id: 'prady_sala21', name: 'Prądy', shortName: 'Prądy', duration: 15 },
+            ],
         },
         {
             id: 'physio1',
@@ -154,36 +185,6 @@ export const Stations: StationsAPI = (() => {
                 { id: 'ultrasound', name: 'Ultradźwięki', shortName: 'UD', duration: 7.5, limit: 2 },
                 { id: 'laser', name: 'Laser', shortName: 'Laser', duration: 7.5, limit: 1 },
                 { id: 'sollux', name: 'Sollux', shortName: 'Sollux', duration: 15 },
-            ],
-        },
-        // Row 2: Aquavibron, Sala 21, Sala Gimnastyczna
-        {
-            id: 'aquavibron',
-            name: 'Aquavibron',
-            icon: 'fa-wave-square',
-            type: 'simple',
-            maxCapacity: 1,
-            defaultDuration: 6,
-            stations: [
-                { id: 'aquavibron_1', name: 'Aquavibron', roomId: 'aquavibron', status: 'FREE' },
-            ],
-            treatments: [],
-        },
-        {
-            id: 'sala21',
-            name: 'Sala 21',
-            icon: 'fa-hands',
-            type: 'multi',
-            maxCapacity: 2,
-            defaultDuration: 15,
-            stations: [
-                { id: 'sala21_1', name: 'Leżanka 1', roomId: 'sala21', status: 'FREE' },
-                { id: 'sala21_2', name: 'Leżanka 2', roomId: 'sala21', status: 'FREE' },
-            ],
-            treatments: [
-                { id: 'massage_treatment', name: 'Masaż', shortName: 'Masaż', duration: 15 },
-                { id: 'therapy', name: 'Terapia', shortName: 'Terapia', duration: 20 },
-                { id: 'prady_sala21', name: 'Prądy', shortName: 'Prądy', duration: 15 },
             ],
         },
         {
@@ -523,9 +524,20 @@ export const Stations: StationsAPI = (() => {
      * Update timer display for a specific station
      */
     const updateTimerDisplay = (stationId: string, seconds: number): void => {
-        const timerElements = document.querySelectorAll(`[data-station-id="${stationId}"] .station-timer`);
-        timerElements.forEach(el => {
-            el.textContent = formatTime(seconds);
+        const stationCards = document.querySelectorAll(`[data-station-id="${stationId}"]`);
+        stationCards.forEach(card => {
+            // Update timer text
+            const timerEl = card.querySelector('.station-timer');
+            if (timerEl) {
+                timerEl.textContent = formatTime(seconds);
+            }
+
+            // Add/remove ending warning class (last 60 seconds)
+            if (seconds > 0 && seconds <= 60) {
+                card.classList.add('ending');
+            } else {
+                card.classList.remove('ending');
+            }
         });
     };
 
@@ -731,7 +743,7 @@ export const Stations: StationsAPI = (() => {
             // FINISHED
             return `
                 <div class="station-card station-multi ${statusClass}" data-station-id="${station.id}" 
-                     data-action="release" data-room="${room.id}">
+                     data-action="release" data-station="${station.id}" data-room="${room.id}">
                     <div class="station-finished-content">
                         <div class="station-info">
                             <span class="station-name">${station.name}</span>
