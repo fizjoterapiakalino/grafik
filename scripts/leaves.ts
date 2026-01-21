@@ -10,6 +10,7 @@ import { toUTCDate } from './utils.js';
 import { printLeavesTableToPdf } from './leaves-pdf.js';
 import {
     renderGanttView,
+    renderMobileView,
     scrollToToday,
     setupMobileAccordion as setupGanttMobileAccordion,
     setupDragToSelect,
@@ -53,6 +54,7 @@ export const Leaves: LeavesAPI = (() => {
     let summaryViewBtn: HTMLElement | null = null;
     let careViewBtn: HTMLElement | null = null;
     let ganttViewContainer: HTMLElement | null = null;
+    let ganttMobileViewContainer: HTMLElement | null = null;
     let monthlyViewContainer: HTMLElement | null = null;
     let careViewContainer: HTMLElement | null = null;
     let clearFiltersBtn: HTMLElement | null = null;
@@ -280,6 +282,7 @@ export const Leaves: LeavesAPI = (() => {
         summaryViewBtn = document.getElementById('summaryViewBtn');
         careViewBtn = document.getElementById('careViewBtn');
         ganttViewContainer = document.getElementById('ganttViewContainer');
+        ganttMobileViewContainer = document.getElementById('ganttMobileViewContainer');
         monthlyViewContainer = document.getElementById('monthlyViewContainer');
         careViewContainer = document.getElementById('careViewContainer');
         leavesFilterContainer = document.getElementById('leavesFilterContainer');
@@ -439,6 +442,7 @@ export const Leaves: LeavesAPI = (() => {
         careViewBtn?.classList.remove('active');
 
         if (ganttViewContainer) ganttViewContainer.style.display = '';
+        if (ganttMobileViewContainer) ganttMobileViewContainer.style.display = '';
         if (monthlyViewContainer) monthlyViewContainer.style.display = 'none';
         if (careViewContainer) careViewContainer.style.display = 'none';
         if (leavesFilterContainer) leavesFilterContainer.style.display = 'flex';
@@ -446,16 +450,20 @@ export const Leaves: LeavesAPI = (() => {
         const employees = EmployeeManager.getAll();
         const allLeaves = await getAllLeavesData();
 
+        // Render desktop Gantt view
         renderGanttView(employees, allLeaves, currentYear);
 
-        // Setup all Gantt interactions
+        // Render mobile list view
+        if (ganttMobileViewContainer) {
+            ganttMobileViewContainer.innerHTML = renderMobileView(employees, allLeaves, currentYear);
+            setupGanttMobileAccordion();
+        }
+
+        // Setup all Gantt interactions (desktop only)
         setupGanttInteractions();
 
         // Scroll to today's position
         setTimeout(() => scrollToToday(), 100);
-
-        // Setup mobile accordion
-        setupGanttMobileAccordion();
     };
 
     /**

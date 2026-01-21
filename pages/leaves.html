@@ -11,17 +11,14 @@
     </div>
 </div>
 
-<div
-    id="leavesFilterContainer"
-    class="leaves-filter-container"
-    style="padding: 10px; background-color: #f8f9fa; border-radius: 5px; margin-bottom: 15px"
->
+<div id="leavesFilterContainer" class="leaves-filter-container"
+    style="padding: 10px; background-color: #f8f9fa; border-radius: 5px; margin-bottom: 15px">
     <div id="leavesLegend" class="leaves-legend"></div>
     <button id="currentYearBtn" class="action-btn secondary" style="margin-left: auto">Ten Rok</button>
     <button id="clearFiltersBtn" class="action-btn outline">Wyczyść filtry</button>
 </div>
 
-<!-- Gantt View Container -->
+<!-- Gantt View Container (Desktop) -->
 <div id="ganttViewContainer" class="gantt-container">
     <div class="gantt-header">
         <div class="gantt-employee-header">Pracownik</div>
@@ -29,6 +26,9 @@
     </div>
     <div class="gantt-body" id="ganttBody"></div>
 </div>
+
+<!-- Gantt Mobile View (List) -->
+<div id="ganttMobileViewContainer" class="gantt-mobile-view"></div>
 
 <!-- Monthly View (existing) -->
 <div id="monthlyViewContainer" style="display: none;">
@@ -63,9 +63,7 @@
             </div>
         </div>
         <div class="modal-footer">
-            <div
-                class="calendar-footer-top"
-                style="
+            <div class="calendar-footer-top" style="
                     display: flex;
                     justify-content: space-between;
                     align-items: flex-end;
@@ -73,22 +71,17 @@
                     margin-bottom: 15px;
                     flex-wrap: wrap;
                     gap: 15px;
-                "
-            >
+                ">
                 <div class="leave-type-selector" style="text-align: left">
                     <label for="leaveTypeSelect">Wybierz typ urlopu</label>
                     <div class="leave-type-input-group" style="display: flex; align-items: center; gap: 10px">
-                        <span
-                            id="leaveTypeColorIndicator"
-                            class="color-indicator-box"
-                            style="
+                        <span id="leaveTypeColorIndicator" class="color-indicator-box" style="
                                 display: inline-block;
                                 width: 24px;
                                 height: 24px;
                                 border-radius: 4px;
                                 border: 1px solid #ccc;
-                            "
-                        ></span>
+                            "></span>
                         <select id="leaveTypeSelect" class="modal-select" style="flex-grow: 1">
                             <option value="vacation" selected>Wypoczynkowy</option>
                             <option value="child_care_art_188">Opieka nad zdrowym dzieckiem</option>
