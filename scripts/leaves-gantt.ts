@@ -441,11 +441,10 @@ const handleMouseDown = (e: MouseEvent): void => {
     if (target.closest('.gantt-leave-bar')) return;
 
     const timelineRow = dayCell.closest('.gantt-timeline-row') as HTMLElement;
-    const ganttRow = dayCell.closest('.gantt-row') as HTMLElement;
+    if (!timelineRow) return;
 
-    if (!timelineRow || !ganttRow) return;
-
-    const employeeName = ganttRow.dataset.employee || '';
+    // Employee name is now stored on the timeline row itself
+    const employeeName = timelineRow.dataset.employee || '';
     const startDate = dayCell.dataset.date || '';
 
     e.preventDefault();
@@ -471,18 +470,12 @@ const handleMouseDown = (e: MouseEvent): void => {
 const handleMouseMove = (e: MouseEvent): void => {
     if (!dragState.isDragging || !dragState.overlay || !dragState.timelineRow) return;
 
-    const rect = dragState.timelineRow.getBoundingClientRect();
-    const scrollLeft = dragState.timelineRow.scrollLeft;
+    // Use elementFromPoint to find the day cell under the mouse
+    const elemUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
+    const dayCell = elemUnderMouse?.closest('.gantt-day-cell') as HTMLElement;
 
-    // Calculate current date based on mouse position
-    const relativeX = e.clientX - rect.left + scrollLeft;
-    const dayIndex = Math.floor(relativeX / DAY_WIDTH);
-
-    // Find the day cell at this position
-    const dayCells = dragState.timelineRow.querySelectorAll('.gantt-day-cell');
-    if (dayIndex >= 0 && dayIndex < dayCells.length) {
-        const currentCell = dayCells[dayIndex] as HTMLElement;
-        dragState.endDate = currentCell.dataset.date || dragState.startDate;
+    if (dayCell && dayCell.dataset.date) {
+        dragState.endDate = dayCell.dataset.date;
     }
 
     // Update overlay position and width
@@ -722,24 +715,24 @@ export const setOnLeaveTypeChanged = (callback: (employeeName: string, leaveId: 
  * Setup leave bar click and resize handlers
  */
 export const setupLeaveBarInteractions = (): void => {
-    const ganttBody = document.getElementById('ganttBody');
-    if (!ganttBody) return;
+    const timelineBody = document.getElementById('ganttTimelineBody');
+    if (!timelineBody) return;
 
     // Handle clicks on leave bars for editing
-    ganttBody.addEventListener('click', handleLeaveBarClick);
+    timelineBody.addEventListener('click', handleLeaveBarClick);
 
     // Handle resize start
-    ganttBody.addEventListener('mousedown', handleResizeStart);
+    timelineBody.addEventListener('mousedown', handleResizeStart);
 };
 
 /**
  * Cleanup leave bar interactions
  */
 export const cleanupLeaveBarInteractions = (): void => {
-    const ganttBody = document.getElementById('ganttBody');
-    if (ganttBody) {
-        ganttBody.removeEventListener('click', handleLeaveBarClick);
-        ganttBody.removeEventListener('mousedown', handleResizeStart);
+    const timelineBody = document.getElementById('ganttTimelineBody');
+    if (timelineBody) {
+        timelineBody.removeEventListener('click', handleLeaveBarClick);
+        timelineBody.removeEventListener('mousedown', handleResizeStart);
     }
     document.removeEventListener('mousemove', handleResizeMove);
     document.removeEventListener('mouseup', handleResizeEnd);
@@ -808,22 +801,15 @@ const handleResizeStart = (e: MouseEvent): void => {
  * Handle resize move
  */
 const handleResizeMove = (e: MouseEvent): void => {
-    if (!resizeState.isResizing || !resizeState.leaveBar || !resizeState.timelineRow) return;
+    if (!resizeState.isResizing || !resizeState.leaveBar) return;
 
-    const rect = resizeState.timelineRow.getBoundingClientRect();
-    const scrollLeft = resizeState.timelineRow.scrollLeft;
+    // Use elementFromPoint to find the day cell under the mouse
+    const elemUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
+    const dayCell = elemUnderMouse?.closest('.gantt-day-cell') as HTMLElement;
 
-    // Calculate day index from mouse position
-    const relativeX = e.clientX - rect.left + scrollLeft;
-    const dayIndex = Math.floor(relativeX / DAY_WIDTH);
+    if (!dayCell || !dayCell.dataset.date) return;
 
-    // Find the corresponding date
-    const dayCells = resizeState.timelineRow.querySelectorAll('.gantt-day-cell');
-    if (dayIndex < 0 || dayIndex >= dayCells.length) return;
-
-    const targetCell = dayCells[dayIndex] as HTMLElement;
-    const targetDate = targetCell.dataset.date;
-    if (!targetDate) return;
+    const targetDate = dayCell.dataset.date;
 
     // Update the leave bar visually based on which side is being resized
     if (resizeState.side === 'left') {
