@@ -20,11 +20,14 @@
 
 <!-- Gantt View Container (Desktop) -->
 <div id="ganttViewContainer" class="gantt-container">
-    <div class="gantt-header">
+    <div class="gantt-fixed-column">
         <div class="gantt-employee-header">Pracownik</div>
-        <div class="gantt-timeline-header" id="ganttTimelineHeader"></div>
+        <div class="gantt-employees-list" id="ganttEmployeesList"></div>
     </div>
-    <div class="gantt-body" id="ganttBody"></div>
+    <div class="gantt-scroll-wrapper" id="ganttScrollWrapper">
+        <div class="gantt-timeline-header" id="ganttTimelineHeader"></div>
+        <div class="gantt-timeline-body" id="ganttTimelineBody"></div>
+    </div>
 </div>
 
 <!-- Gantt Mobile View (List) -->

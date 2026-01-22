@@ -67,25 +67,27 @@ const parseDate = (dateStr: string): Date => {
  * Render the Gantt timeline header (months + days)
  */
 export const renderGanttHeader = (year: number): string => {
-    let html = '';
+    // Build months row
+    let monthsHtml = '<div class="gantt-months-row">';
+    let daysHtml = '<div class="gantt-days-row">';
 
     for (let month = 0; month < 12; month++) {
         const daysInMonth = getDaysInMonth(year, month);
+        const width = daysInMonth * DAY_WIDTH;
 
-        html += `<div class="gantt-month-group">`;
-        html += `<div class="gantt-month-label">${MONTH_NAMES[month].substring(0, 3)}</div>`;
-        html += `<div class="gantt-days-row">`;
+        monthsHtml += `<div class="gantt-month-header" style="width: ${width}px; min-width: ${width}px;">${MONTH_NAMES[month].substring(0, 3)}</div>`;
 
         for (let day = 1; day <= daysInMonth; day++) {
             const weekend = isWeekend(year, month, day) ? 'weekend' : '';
             const today = isToday(year, month, day) ? 'today' : '';
-            html += `<div class="gantt-day-header ${weekend} ${today}">${day}</div>`;
+            daysHtml += `<div class="gantt-day-header ${weekend} ${today}">${day}</div>`;
         }
-
-        html += `</div></div>`;
     }
 
-    return html;
+    monthsHtml += '</div>';
+    daysHtml += '</div>';
+
+    return monthsHtml + daysHtml;
 };
 
 /**
@@ -200,20 +202,17 @@ const renderDayCells = (year: number): string => {
 };
 
 /**
- * Render a single employee row
+ * Render a single timeline row (without employee cell - separate now)
  */
-const renderEmployeeRow = (
+const renderTimelineRow = (
     employeeName: string,
     leaves: LeaveEntry[],
     year: number
 ): string => {
     return `
-        <div class="gantt-row" data-employee="${employeeName}">
-            <div class="gantt-employee-cell">${employeeName}</div>
-            <div class="gantt-timeline-row">
-                ${renderDayCells(year)}
-                ${renderLeaveBars(leaves, year, employeeName)}
-            </div>
+        <div class="gantt-timeline-row" data-employee="${employeeName}">
+            ${renderDayCells(year)}
+            ${renderLeaveBars(leaves, year, employeeName)}
         </div>
     `;
 };
@@ -227,9 +226,11 @@ export const renderGanttView = (
     year: number
 ): void => {
     const headerContainer = document.getElementById('ganttTimelineHeader');
-    const bodyContainer = document.getElementById('ganttBody');
+    const employeesList = document.getElementById('ganttEmployeesList');
+    const timelineBody = document.getElementById('ganttTimelineBody');
+    const scrollWrapper = document.getElementById('ganttScrollWrapper');
 
-    if (!headerContainer || !bodyContainer) {
+    if (!headerContainer || !employeesList || !timelineBody) {
         console.error('Gantt containers not found');
         return;
     }
@@ -237,7 +238,7 @@ export const renderGanttView = (
     // Render header
     headerContainer.innerHTML = renderGanttHeader(year);
 
-    // Render employee rows
+    // Get sorted employees
     const sortedEmployees = Object.entries(employees)
         .filter(([_, emp]) => !emp.isHidden && !emp.isScheduleOnly)
         .sort((a, b) => {
@@ -246,47 +247,39 @@ export const renderGanttView = (
             return nameA.localeCompare(nameB, 'pl');
         });
 
-    let rowsHtml = '';
+    // Render employee names in fixed column
+    let employeesHtml = '';
+    let timelineHtml = '';
 
     for (const [empId, emp] of sortedEmployees) {
         const employeeName = emp.displayName || emp.name || empId;
         const employeeLeaves = leaves[employeeName] || [];
 
-        rowsHtml += renderEmployeeRow(employeeName, employeeLeaves, year);
+        employeesHtml += `<div class="gantt-employee-cell" data-employee="${employeeName}">${employeeName}</div>`;
+        timelineHtml += renderTimelineRow(employeeName, employeeLeaves, year);
     }
 
-    bodyContainer.innerHTML = rowsHtml;
+    employeesList.innerHTML = employeesHtml;
+    timelineBody.innerHTML = timelineHtml;
 
-    // Sync horizontal scrolling between header and rows
-    syncScroll();
+    // Sync vertical scroll between employees list and timeline
+    if (scrollWrapper) {
+        syncVerticalScroll(employeesList, scrollWrapper);
+    }
 };
 
 /**
- * Sync horizontal scroll between header and body rows
+ * Sync vertical scroll between employees list and timeline body
  */
-const syncScroll = (): void => {
-    const header = document.getElementById('ganttTimelineHeader');
-    const rows = document.querySelectorAll('.gantt-timeline-row');
-
-    if (!header) return;
-
-    // Scroll all rows when header scrolls
-    header.addEventListener('scroll', () => {
-        rows.forEach(row => {
-            (row as HTMLElement).scrollLeft = header.scrollLeft;
-        });
+const syncVerticalScroll = (employeesList: HTMLElement, scrollWrapper: HTMLElement): void => {
+    // When timeline scrolls vertically, sync employee list
+    scrollWrapper.addEventListener('scroll', () => {
+        employeesList.scrollTop = scrollWrapper.scrollTop;
     });
 
-    // Scroll header and other rows when any row scrolls
-    rows.forEach(row => {
-        row.addEventListener('scroll', () => {
-            header.scrollLeft = (row as HTMLElement).scrollLeft;
-            rows.forEach(otherRow => {
-                if (otherRow !== row) {
-                    (otherRow as HTMLElement).scrollLeft = (row as HTMLElement).scrollLeft;
-                }
-            });
-        });
+    // When employee list scrolls, sync timeline
+    employeesList.addEventListener('scroll', () => {
+        scrollWrapper.scrollTop = employeesList.scrollTop;
     });
 };
 
@@ -375,16 +368,11 @@ export const scrollToToday = (): void => {
     const dayOfYear = getDayOfYear(today);
     const scrollPosition = (dayOfYear - 10) * DAY_WIDTH; // 10 days before today
 
-    const header = document.getElementById('ganttTimelineHeader');
-    const rows = document.querySelectorAll('.gantt-timeline-row');
+    const scrollWrapper = document.getElementById('ganttScrollWrapper');
 
-    if (header) {
-        header.scrollLeft = Math.max(0, scrollPosition);
+    if (scrollWrapper) {
+        scrollWrapper.scrollLeft = Math.max(0, scrollPosition);
     }
-
-    rows.forEach(row => {
-        (row as HTMLElement).scrollLeft = Math.max(0, scrollPosition);
-    });
 };
 
 // ============================================
@@ -425,16 +413,16 @@ export const setOnLeaveCreated = (callback: (employeeName: string, startDate: st
  * Setup drag-to-select on Gantt rows
  */
 export const setupDragToSelect = (): void => {
-    const ganttBody = document.getElementById('ganttBody');
-    if (!ganttBody) return;
+    const timelineBody = document.getElementById('ganttTimelineBody');
+    if (!timelineBody) return;
 
     // Remove existing listeners to avoid duplicates
-    ganttBody.removeEventListener('mousedown', handleMouseDown);
+    timelineBody.removeEventListener('mousedown', handleMouseDown);
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
 
     // Add new listeners
-    ganttBody.addEventListener('mousedown', handleMouseDown);
+    timelineBody.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
 };

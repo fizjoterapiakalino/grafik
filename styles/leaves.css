@@ -1203,66 +1203,116 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-sm);
     overflow: hidden;
+    display: flex;
+    max-height: 70vh;
 }
 
-/* Gantt Header - fixed employee column + scrollable timeline */
-.gantt-header {
+/* Fixed left column for employee names */
+.gantt-fixed-column {
+    flex-shrink: 0;
+    width: 150px;
     display: flex;
-    background: var(--color-primary-600);
-    color: white;
-    font-weight: 600;
-    font-size: 0.85rem;
-    position: sticky;
-    top: 0;
+    flex-direction: column;
+    border-right: 2px solid var(--color-gray-300);
     z-index: 10;
+    background: var(--color-gray-100);
 }
 
 .gantt-employee-header {
-    width: 150px;
-    min-width: 150px;
+    height: 60px;
     padding: 8px 12px;
     background: var(--color-gray-800);
+    color: white;
+    font-weight: 600;
+    font-size: 0.85rem;
     display: flex;
     align-items: center;
+    border-bottom: 1px solid var(--color-gray-600);
 }
 
-.gantt-timeline-header {
+.gantt-employees-list {
     flex: 1;
+    overflow-y: auto;
+}
+
+.gantt-employee-cell {
+    height: 42px;
+    padding: 8px 12px;
+    background: var(--color-gray-100);
+    font-weight: 500;
+    font-size: 0.85rem;
     display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--color-gray-200);
+}
+
+.gantt-employee-cell:hover {
+    background: var(--color-gray-200);
+}
+
+/* Scrollable timeline wrapper */
+.gantt-scroll-wrapper {
+    flex: 1;
     overflow-x: auto;
-    overflow-y: hidden;
-}
-
-/* Sync scroll between header and body */
-.gantt-timeline-header::-webkit-scrollbar {
-    display: none;
-}
-
-/* Month header groups */
-.gantt-month-group {
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
-    border-right: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.gantt-month-label {
-    padding: 4px 8px;
+.gantt-scroll-wrapper::-webkit-scrollbar {
+    height: 12px;
+    width: 8px;
+}
+
+.gantt-scroll-wrapper::-webkit-scrollbar-track {
+    background: var(--color-gray-100);
+}
+
+.gantt-scroll-wrapper::-webkit-scrollbar-thumb {
+    background: var(--color-gray-400);
+    border-radius: 6px;
+}
+
+.gantt-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+    background: var(--color-gray-500);
+}
+
+/* Timeline header with months and days */
+.gantt-timeline-header {
+    flex-shrink: 0;
+    background: var(--color-primary-600);
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+.gantt-months-row {
+    display: flex;
+    height: 28px;
+}
+
+.gantt-month-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     text-align: center;
     background: var(--color-primary-700);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .gantt-days-row {
     display: flex;
+    height: 28px;
 }
 
 .gantt-day-header {
     width: 32px;
     min-width: 32px;
-    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1271,7 +1321,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
 }
 
 .gantt-day-header.weekend {
-    background: rgba(0, 0, 0, 0.15);
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .gantt-day-header.today {
@@ -1279,45 +1329,20 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     font-weight: bold;
 }
 
-/* Gantt Body */
-.gantt-body {
-    display: flex;
-    flex-direction: column;
-    max-height: 60vh;
-    overflow-y: auto;
-}
-
-.gantt-row {
-    display: flex;
-    min-height: 42px;
-    border-bottom: 1px solid var(--color-gray-200);
-}
-
-.gantt-row:hover {
-    background: var(--color-gray-50);
-}
-
-.gantt-employee-cell {
-    width: 150px;
-    min-width: 150px;
-    padding: 8px 12px;
-    background: var(--color-gray-100);
-    font-weight: 500;
-    font-size: 0.85rem;
-    display: flex;
-    align-items: center;
-    position: sticky;
-    left: 0;
-    z-index: 5;
-    border-right: 1px solid var(--color-gray-300);
+/* Timeline body with leave rows */
+.gantt-timeline-body {
+    flex: 1;
 }
 
 .gantt-timeline-row {
-    flex: 1;
     display: flex;
     position: relative;
-    overflow-x: auto;
-    overflow-y: hidden;
+    height: 42px;
+    border-bottom: 1px solid var(--color-gray-200);
+}
+
+.gantt-timeline-row:hover {
+    background: var(--color-gray-50);
 }
 
 /* Day cells in timeline */
@@ -1331,7 +1356,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
 }
 
 .gantt-day-cell:hover {
-    background: rgba(var(--color-primary-rgb, 16, 185, 129), 0.15) !important;
+    background: rgba(0, 0, 0, 0.08);
 }
 
 .gantt-day-cell.weekend {
