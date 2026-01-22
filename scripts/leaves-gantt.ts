@@ -17,7 +17,89 @@ const MONTH_NAMES = [
     'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
 ];
 
+/**
+ * Get ISO week number
+ */
+const getWeekNumber = (d: Date): number => {
+    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return weekNo;
+};
+
+/**
+ * Get unique week numbers for a month
+ */
+const getWeeksForMonth = (year: number, month: number): number[] => {
+    const weeks: Set<number> = new Set();
+    const daysInMonth = getDaysInMonth(year, month);
+
+    // We only count a week if its Monday falls in this month, 
+    // or if it's the first week of the month.
+    for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(year, month, day);
+        const dayOfWeek = date.getDay(); // 0 is Sunday
+
+        // Add week if it's the first day of month or if it's a Monday
+        if (day === 1 || dayOfWeek === 1) {
+            weeks.add(getWeekNumber(date));
+        }
+    }
+    return Array.from(weeks);
+};
+
+
 const DAY_WIDTH = 32; // pixels per day (increased for better visibility)
+const COLLAPSED_MONTH_WIDTH = 100; // base width for collapsed month (now flexes)
+
+// Track which months are expanded (by default current month and next are expanded)
+let expandedMonths: Set<number> = new Set();
+
+/**
+ * Initialize expanded months - expand current month and its neighbors
+ */
+export const initExpandedMonths = (year: number): void => {
+    const currentMonth = new Date().getMonth();
+    expandedMonths = new Set([currentMonth]);
+    // Also expand previous and next month if in current year
+    if (year === new Date().getFullYear()) {
+        if (currentMonth > 0) expandedMonths.add(currentMonth - 1);
+        if (currentMonth < 11) expandedMonths.add(currentMonth + 1);
+    }
+};
+
+/**
+ * Toggle month expansion
+ */
+export const toggleMonthExpansion = (month: number): void => {
+    if (expandedMonths.has(month)) {
+        expandedMonths.delete(month);
+    } else {
+        expandedMonths.add(month);
+    }
+};
+
+/**
+ * Check if month is expanded
+ */
+export const isMonthExpanded = (month: number): boolean => {
+    return expandedMonths.has(month);
+};
+
+/**
+ * Expand all months
+ */
+export const expandAllMonths = (): void => {
+    expandedMonths = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+};
+
+/**
+ * Collapse all months
+ */
+export const collapseAllMonths = (): void => {
+    expandedMonths = new Set();
+};
 
 /**
  * Get number of days in a month
@@ -73,14 +155,31 @@ export const renderGanttHeader = (year: number): string => {
 
     for (let month = 0; month < 12; month++) {
         const daysInMonth = getDaysInMonth(year, month);
-        const width = daysInMonth * DAY_WIDTH;
+        const isExpanded = expandedMonths.has(month);
 
-        monthsHtml += `<div class="gantt-month-header" style="width: ${width}px; min-width: ${width}px;">${MONTH_NAMES[month].substring(0, 3)}</div>`;
+        if (isExpanded) {
+            // Expanded month - show all days
+            const width = daysInMonth * DAY_WIDTH;
+            monthsHtml += `<div class="gantt-month-header expanded" data-month="${month}" style="width: ${width}px; min-width: ${width}px;">
+                <i class="fas fa-chevron-down"></i> ${MONTH_NAMES[month]}
+            </div>`;
 
-        for (let day = 1; day <= daysInMonth; day++) {
-            const weekend = isWeekend(year, month, day) ? 'weekend' : '';
-            const today = isToday(year, month, day) ? 'today' : '';
-            daysHtml += `<div class="gantt-day-header ${weekend} ${today}">${day}</div>`;
+            for (let day = 1; day <= daysInMonth; day++) {
+                const weekend = isWeekend(year, month, day) ? 'weekend' : '';
+                const today = isToday(year, month, day) ? 'today' : '';
+                daysHtml += `<div class="gantt-day-header ${weekend} ${today}">${day}</div>`;
+            }
+        } else {
+            // Collapsed month - show full month name
+            monthsHtml += `<div class="gantt-month-header collapsed" data-month="${month}" style="flex: 1; min-width: ${COLLAPSED_MONTH_WIDTH}px;">
+                <i class="fas fa-chevron-right"></i> ${MONTH_NAMES[month]}
+            </div>`;
+
+            // Week tiles for days row in collapsed month
+            const weeks = getWeeksForMonth(year, month);
+            daysHtml += `<div class="gantt-collapsed-days" data-month="${month}" style="flex: 1; min-width: ${COLLAPSED_MONTH_WIDTH}px;">
+                ${weeks.map(w => `<div class="gantt-week-tile">${w}</div>`).join('')}
+            </div>`;
         }
     }
 
@@ -91,12 +190,43 @@ export const renderGanttHeader = (year: number): string => {
 };
 
 /**
+ * Calculate the pixel offset for a given date, accounting for collapsed months
+ */
+const getDatePixelOffset = (date: Date, year: number): number => {
+    let offset = 0;
+    const targetMonth = date.getMonth();
+    const targetDay = date.getDate();
+
+    for (let month = 0; month < 12; month++) {
+        if (month < targetMonth) {
+            // Full month before target
+            if (expandedMonths.has(month)) {
+                offset += getDaysInMonth(year, month) * DAY_WIDTH;
+            } else {
+                offset += COLLAPSED_MONTH_WIDTH;
+            }
+        } else if (month === targetMonth) {
+            // Target month
+            if (expandedMonths.has(month)) {
+                offset += (targetDay - 1) * DAY_WIDTH;
+            } else {
+                // For collapsed months, position at start of collapsed area
+                offset += 0;
+            }
+            break;
+        }
+    }
+
+    return offset;
+};
+
+/**
  * Calculate leave bar position and width
  */
 const calculateLeaveBarPosition = (
     leave: LeaveEntry,
     year: number
-): { left: number; width: number; visible: boolean } => {
+): { left: number; width: number; visible: boolean; isInCollapsedMonth: boolean } => {
     const startDate = parseDate(leave.startDate);
     const endDate = parseDate(leave.endDate);
 
@@ -105,21 +235,33 @@ const calculateLeaveBarPosition = (
     const yearEnd = new Date(year, 11, 31);
 
     if (endDate < yearStart || startDate > yearEnd) {
-        return { left: 0, width: 0, visible: false };
+        return { left: 0, width: 0, visible: false, isInCollapsedMonth: false };
     }
 
     // Clamp dates to year boundaries
     const effectiveStart = startDate < yearStart ? yearStart : startDate;
     const effectiveEnd = endDate > yearEnd ? yearEnd : endDate;
 
-    // Calculate position (day of year * day width)
-    const startDayOfYear = getDayOfYear(effectiveStart);
-    const endDayOfYear = getDayOfYear(effectiveEnd);
+    const startMonth = effectiveStart.getMonth();
+    const endMonth = effectiveEnd.getMonth();
 
-    const left = (startDayOfYear - 1) * DAY_WIDTH;
-    const width = (endDayOfYear - startDayOfYear + 1) * DAY_WIDTH;
+    // Check if entirely in a collapsed month
+    const isInCollapsedMonth = startMonth === endMonth && !expandedMonths.has(startMonth);
 
-    return { left, width, visible: true };
+    // Calculate position
+    const left = getDatePixelOffset(effectiveStart, year);
+
+    if (isInCollapsedMonth) {
+        // For collapsed months, show a small indicator
+        return { left, width: COLLAPSED_MONTH_WIDTH - 4, visible: true, isInCollapsedMonth: true };
+    }
+
+    // Calculate width for expanded view
+    const endOffset = getDatePixelOffset(effectiveEnd, year);
+    const endMonthExpanded = expandedMonths.has(endMonth);
+    const width = endOffset - left + (endMonthExpanded ? DAY_WIDTH : 0);
+
+    return { left, width: Math.max(width, DAY_WIDTH), visible: true, isInCollapsedMonth: false };
 };
 
 /**
@@ -129,7 +271,7 @@ const renderLeaveBars = (leaves: LeaveEntry[], year: number, employeeName: strin
     if (!leaves || leaves.length === 0) return '';
 
     return leaves.map(leave => {
-        const { left, width, visible } = calculateLeaveBarPosition(leave, year);
+        const { left, width, visible, isInCollapsedMonth } = calculateLeaveBarPosition(leave, year);
 
         if (!visible) return '';
 
@@ -144,25 +286,29 @@ const renderLeaveBars = (leaves: LeaveEntry[], year: number, employeeName: strin
         // Format date range for display (DD-DD or DD.MM-DD.MM if cross-month)
         const startDay = startDate.getDate().toString().padStart(2, '0');
         const endDay = endDate.getDate().toString().padStart(2, '0');
-        const startMonth = (startDate.getMonth() + 1).toString().padStart(2, '0');
-        const endMonth = (endDate.getMonth() + 1).toString().padStart(2, '0');
+        const startMonthNum = (startDate.getMonth() + 1).toString().padStart(2, '0');
+        const endMonthNum = (endDate.getMonth() + 1).toString().padStart(2, '0');
 
         let text = '';
-        if (width >= 80) {
-            // Full date range for wider bars
-            if (startDate.getMonth() === endDate.getMonth()) {
+        if (!isInCollapsedMonth) {
+            if (width >= 80) {
+                // Full date range for wider bars
+                if (startDate.getMonth() === endDate.getMonth()) {
+                    text = `${startDay}-${endDay}`;
+                } else {
+                    text = `${startDay}.${startMonthNum}-${endDay}.${endMonthNum}`;
+                }
+            } else if (width >= 50) {
+                // Just days for medium bars
                 text = `${startDay}-${endDay}`;
-            } else {
-                text = `${startDay}.${startMonth}-${endDay}.${endMonth}`;
             }
-        } else if (width >= 50) {
-            // Just days for medium bars
-            text = `${startDay}-${endDay}`;
         }
-        // No text for narrow bars
+        // No text for collapsed or narrow bars
+
+        const collapsedClass = isInCollapsedMonth ? 'collapsed-bar' : '';
 
         return `
-            <div class="gantt-leave-bar ${leaveType}" 
+            <div class="gantt-leave-bar ${leaveType} ${collapsedClass}" 
                  style="left: ${left}px; width: ${width}px;"
                  data-leave-id="${leave.id}"
                  data-employee="${employeeName}"
@@ -170,9 +316,9 @@ const renderLeaveBars = (leaves: LeaveEntry[], year: number, employeeName: strin
                  data-start="${leave.startDate}"
                  data-end="${leave.endDate}"
                  title="${typeConfig.label}: ${leave.startDate} - ${leave.endDate} (${days} dni)">
-                <div class="resize-handle left" data-side="left"></div>
+                ${!isInCollapsedMonth ? '<div class="resize-handle left" data-side="left"></div>' : ''}
                 <span class="leave-bar-text">${text}</span>
-                <div class="resize-handle right" data-side="right"></div>
+                ${!isInCollapsedMonth ? '<div class="resize-handle right" data-side="right"></div>' : ''}
             </div>
         `;
     }).join('');
@@ -185,16 +331,27 @@ const renderDayCells = (year: number): string => {
     let html = '';
 
     for (let month = 0; month < 12; month++) {
-        const daysInMonth = getDaysInMonth(year, month);
+        const isExpanded = expandedMonths.has(month);
 
-        for (let day = 1; day <= daysInMonth; day++) {
-            const weekend = isWeekend(year, month, day) ? 'weekend' : '';
-            const today = isToday(year, month, day) ? 'today' : '';
-            const monthStart = day === 1 ? 'month-start' : '';
+        if (isExpanded) {
+            // Expanded month - show all day cells
+            const daysInMonth = getDaysInMonth(year, month);
 
-            html += `<div class="gantt-day-cell ${weekend} ${today} ${monthStart}" 
-                         data-date="${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}">
-                     </div>`;
+            for (let day = 1; day <= daysInMonth; day++) {
+                const weekend = isWeekend(year, month, day) ? 'weekend' : '';
+                const today = isToday(year, month, day) ? 'today' : '';
+                const monthStart = day === 1 ? 'month-start' : '';
+
+                html += `<div class="gantt-day-cell ${weekend} ${today} ${monthStart}" 
+                             data-date="${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}">
+                         </div>`;
+            }
+        } else {
+            // Collapsed month - week tiles in the timeline row
+            const weeks = getWeeksForMonth(year, month);
+            html += `<div class="gantt-collapsed-cell" data-month="${month}" style="flex: 1; min-width: ${COLLAPSED_MONTH_WIDTH}px;">
+                ${weeks.map(() => '<div class="gantt-week-tile-cell"></div>').join('')}
+            </div>`;
         }
     }
 
@@ -280,6 +437,39 @@ const syncVerticalScroll = (employeesList: HTMLElement, scrollWrapper: HTMLEleme
     // When employee list scrolls, sync timeline
     employeesList.addEventListener('scroll', () => {
         scrollWrapper.scrollTop = employeesList.scrollTop;
+    });
+};
+
+// Callback for re-rendering after month toggle
+let onMonthToggleCallback: (() => void) | null = null;
+
+/**
+ * Set callback for when months are toggled
+ */
+export const setOnMonthToggle = (callback: () => void): void => {
+    onMonthToggleCallback = callback;
+};
+
+/**
+ * Setup click handlers on month headers to toggle expansion
+ */
+export const setupMonthToggle = (): void => {
+    const monthHeaders = document.querySelectorAll('.gantt-month-header');
+
+    monthHeaders.forEach(header => {
+        header.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const monthAttr = (header as HTMLElement).dataset.month;
+            if (monthAttr !== undefined) {
+                const month = parseInt(monthAttr, 10);
+                toggleMonthExpansion(month);
+
+                // Re-render the Gantt view
+                if (onMonthToggleCallback) {
+                    onMonthToggleCallback();
+                }
+            }
+        });
     });
 };
 

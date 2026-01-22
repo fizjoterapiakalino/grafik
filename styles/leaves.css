@@ -1207,6 +1207,12 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     max-height: 70vh;
 }
 
+.gantt-container *,
+.gantt-container *::before,
+.gantt-container *::after {
+    box-sizing: border-box;
+}
+
 /* Fixed left column for employee names */
 .gantt-fixed-column {
     flex-shrink: 0;
@@ -1228,6 +1234,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     display: flex;
     align-items: center;
     border-bottom: 1px solid var(--color-gray-600);
+    flex-shrink: 0;
 }
 
 .gantt-employees-list {
@@ -1289,13 +1296,14 @@ table.summary-table tbody tr td.editable-carried-over:focus {
 
 .gantt-months-row {
     display: flex;
-    height: 28px;
+    height: 30px;
 }
 
 .gantt-month-header {
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 6px;
     text-align: center;
     background: var(--color-primary-700);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -1303,11 +1311,31 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     border-right: 1px solid rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.gantt-month-header:hover {
+    background: var(--color-primary-600);
+}
+
+.gantt-month-header i {
+    font-size: 0.6rem;
+    opacity: 0.8;
+}
+
+.gantt-month-header.collapsed {
+    background: var(--color-gray-600);
+    font-weight: 600;
+}
+
+.gantt-month-header.collapsed:hover {
+    background: var(--color-gray-500);
 }
 
 .gantt-days-row {
     display: flex;
-    height: 28px;
+    height: 30px;
 }
 
 .gantt-day-header {
@@ -1338,6 +1366,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     display: flex;
     position: relative;
     height: 42px;
+    min-height: 42px;
     border-bottom: 1px solid var(--color-gray-200);
 }
 
@@ -1369,6 +1398,49 @@ table.summary-table tbody tr td.editable-carried-over:focus {
 
 .gantt-day-cell.today {
     background: rgba(var(--color-secondary-rgb), 0.2);
+}
+
+/* Collapsed month cells - Week Tiles */
+.gantt-collapsed-days,
+.gantt-collapsed-cell {
+    background: var(--color-gray-100);
+    border-right: 1px solid var(--color-gray-300);
+    display: flex;
+    align-items: stretch;
+    justify-content: stretch;
+    cursor: pointer;
+    position: relative;
+    padding: 0;
+}
+
+.gantt-week-tile {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: white;
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
+    background: var(--color-gray-600);
+}
+
+.gantt-week-tile:last-child {
+    border-right: none;
+}
+
+.gantt-week-tile-cell {
+    flex: 1;
+    border-right: 1px solid var(--color-gray-200);
+    background: var(--color-gray-50);
+}
+
+.gantt-week-tile-cell:last-child {
+    border-right: none;
+}
+
+.gantt-collapsed-cell:hover .gantt-week-tile-cell {
+    background: var(--color-gray-200);
 }
 
 /* Leave bars on the timeline */
@@ -1419,6 +1491,18 @@ table.summary-table tbody tr td.editable-carried-over:focus {
 
 .gantt-leave-bar.schedule_pickup {
     background: linear-gradient(135deg, #1abc9c, #16a085);
+}
+
+/* Collapsed leave bar indicator */
+.gantt-leave-bar.collapsed-bar {
+    border-radius: 2px;
+    min-height: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 16px;
+    font-size: 0;
+    padding: 0;
+    margin: 0 2px;
 }
 
 /* Resize handles for leave bars */

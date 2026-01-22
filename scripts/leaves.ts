@@ -20,7 +20,10 @@ import {
     cleanupLeaveBarInteractions,
     setOnLeaveUpdated,
     setOnLeaveDeleted,
-    setOnLeaveTypeChanged
+    setOnLeaveTypeChanged,
+    initExpandedMonths,
+    setupMonthToggle,
+    setOnMonthToggle
 } from './leaves-gantt.js';
 import type { FirestoreDbWrapper } from './types/firebase';
 import type { Employee, LeaveEntry } from './types';
@@ -447,8 +450,18 @@ export const Leaves: LeavesAPI = (() => {
         if (careViewContainer) careViewContainer.style.display = 'none';
         if (leavesFilterContainer) leavesFilterContainer.style.display = 'flex';
 
+        // Initialize expanded months for current year
+        initExpandedMonths(currentYear);
+
         const employees = EmployeeManager.getAll();
         const allLeaves = await getAllLeavesData();
+
+        // Set callback for month toggle re-rendering
+        setOnMonthToggle(() => {
+            renderGanttView(employees, allLeaves, currentYear);
+            setupMonthToggle();
+            setupGanttInteractions();
+        });
 
         // Render desktop Gantt view
         renderGanttView(employees, allLeaves, currentYear);
@@ -458,6 +471,9 @@ export const Leaves: LeavesAPI = (() => {
             ganttMobileViewContainer.innerHTML = renderMobileView(employees, allLeaves, currentYear);
             setupGanttMobileAccordion();
         }
+
+        // Setup month toggle click handlers
+        setupMonthToggle();
 
         // Setup all Gantt interactions (desktop only)
         setupGanttInteractions();
