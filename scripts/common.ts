@@ -94,12 +94,12 @@ export const AppConfig: AppConfigType = {
             family_member_care: 14,
         },
         leaveTypeColors: {
-            vacation: '#80deea',
-            child_care_art_188: '#ffcc80',
-            sick_child_care: '#f48fb1',
-            family_member_care: '#cf93d9',
-            schedule_pickup: '#b39ddb',
-            default: '#e6ee9b',
+            vacation: '#3498db',
+            child_care_art_188: '#f39c12',
+            sick_child_care: '#e74c3c',
+            family_member_care: '#9b59b6',
+            schedule_pickup: '#1abc9c',
+            default: '#bdc3c7',
         },
     },
     firestore: {

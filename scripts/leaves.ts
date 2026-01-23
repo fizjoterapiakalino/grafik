@@ -23,7 +23,11 @@ import {
     setOnLeaveTypeChanged,
     initExpandedMonths,
     setupMonthToggle,
-    setOnMonthToggle
+    setOnMonthToggle,
+    setCurrentViewData,
+    expandAllMonths,
+    collapseAllMonths,
+    isMonthExpanded
 } from './leaves-gantt.js';
 import type { FirestoreDbWrapper } from './types/firebase';
 import type { Employee, LeaveEntry } from './types';
@@ -64,6 +68,7 @@ export const Leaves: LeavesAPI = (() => {
     let leavesFilterContainer: HTMLElement | null = null;
     let yearSelect: HTMLSelectElement | null = null;
     let currentYearBtn: HTMLElement | null = null;
+    let toggleAllMonthsBtn: HTMLElement | null = null;
     let printLeavesNavbarBtn: HTMLElement | null = null;
 
     const months = [
@@ -291,6 +296,7 @@ export const Leaves: LeavesAPI = (() => {
         leavesFilterContainer = document.getElementById('leavesFilterContainer');
         yearSelect = document.getElementById('yearSelect') as HTMLSelectElement | null;
         currentYearBtn = document.getElementById('currentYearBtn');
+        toggleAllMonthsBtn = document.getElementById('toggleAllMonthsBtn');
         printLeavesNavbarBtn = document.getElementById('printLeavesNavbarBtn');
 
         CalendarModal.init();
@@ -338,6 +344,7 @@ export const Leaves: LeavesAPI = (() => {
         clearFiltersBtn?.removeEventListener('click', handleClearFilters);
         yearSelect?.removeEventListener('change', handleYearChange);
         currentYearBtn?.removeEventListener('click', handleCurrentYearClick);
+        toggleAllMonthsBtn?.removeEventListener('click', handleToggleAllMonths);
         printLeavesNavbarBtn?.removeEventListener('click', handlePrintLeaves);
 
         // Cleanup Gantt listeners
@@ -395,6 +402,7 @@ export const Leaves: LeavesAPI = (() => {
         document.addEventListener('app:search', _handleAppSearch);
         clearFiltersBtn?.addEventListener('click', handleClearFilters);
         currentYearBtn?.addEventListener('click', handleCurrentYearClick);
+        toggleAllMonthsBtn?.addEventListener('click', handleToggleAllMonths);
         printLeavesNavbarBtn?.addEventListener('click', handlePrintLeaves);
 
         // Mobile accordion functionality
@@ -455,6 +463,9 @@ export const Leaves: LeavesAPI = (() => {
 
         const employees = EmployeeManager.getAll();
         const allLeaves = await getAllLeavesData();
+
+        // Store current view data for popup limit validation
+        setCurrentViewData(employees, allLeaves, currentYear);
 
         // Set callback for month toggle re-rendering
         setOnMonthToggle(() => {
@@ -669,6 +680,29 @@ export const Leaves: LeavesAPI = (() => {
         } else {
             highlightCurrentMonth();
         }
+    };
+
+    const handleToggleAllMonths = async (): Promise<void> => {
+        let allExpanded = true;
+        for (let i = 0; i < 12; i++) {
+            if (!isMonthExpanded(i)) {
+                allExpanded = false;
+                break;
+            }
+        }
+
+        if (allExpanded) {
+            collapseAllMonths();
+        } else {
+            expandAllMonths();
+        }
+
+        // Refresh view
+        const employees = EmployeeManager.getAll();
+        const allLeaves = await getAllLeavesData();
+        renderGanttView(employees, allLeaves, currentYear);
+        setupMonthToggle();
+        setupGanttInteractions();
     };
 
     const highlightCurrentMonth = (): void => {

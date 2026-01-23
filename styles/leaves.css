@@ -1257,6 +1257,48 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     background: var(--color-gray-200);
 }
 
+/* Employee cell layout with name and leave counter */
+.gantt-employee-cell {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.gantt-employee-cell .employee-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gantt-employee-cell .leave-counter {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 10px;
+    background: var(--color-gray-200);
+    color: var(--color-gray-700);
+}
+
+.gantt-employee-cell .leave-counter.status-ok {
+    background: rgba(46, 204, 113, 0.2);
+    color: #27ae60;
+}
+
+.gantt-employee-cell .leave-counter.status-warning {
+    background: rgba(243, 156, 18, 0.2);
+    color: #e67e22;
+}
+
+.gantt-employee-cell .leave-counter.status-exceeded {
+    background: rgba(231, 76, 60, 0.2);
+    color: #c0392b;
+    font-weight: 700;
+}
+
+
 /* Scrollable timeline wrapper */
 .gantt-scroll-wrapper {
     flex: 1;
@@ -1292,11 +1334,13 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     position: sticky;
     top: 0;
     z-index: 5;
+    min-width: max-content;
 }
 
 .gantt-months-row {
     display: flex;
     height: 30px;
+    min-width: max-content;
 }
 
 .gantt-month-header {
@@ -1313,6 +1357,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     border-right: 1px solid rgba(255, 255, 255, 0.2);
     cursor: pointer;
     transition: background-color 0.2s ease;
+    flex-shrink: 0;
 }
 
 .gantt-month-header:hover {
@@ -1327,6 +1372,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
 .gantt-month-header.collapsed {
     background: var(--color-gray-600);
     font-weight: 600;
+    flex-shrink: 1;
 }
 
 .gantt-month-header.collapsed:hover {
@@ -1336,6 +1382,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
 .gantt-days-row {
     display: flex;
     height: 30px;
+    min-width: max-content;
 }
 
 .gantt-day-header {
@@ -1346,6 +1393,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     justify-content: center;
     font-size: 0.7rem;
     border-right: 1px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
 }
 
 .gantt-day-header.weekend {
@@ -1360,6 +1408,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
 /* Timeline body with leave rows */
 .gantt-timeline-body {
     flex: 1;
+    min-width: max-content;
 }
 
 .gantt-timeline-row {
@@ -1368,6 +1417,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     height: 42px;
     min-height: 42px;
     border-bottom: 1px solid var(--color-gray-200);
+    min-width: max-content;
 }
 
 .gantt-timeline-row:hover {
@@ -1382,6 +1432,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     border-right: 1px solid var(--color-gray-100);
     position: relative;
     transition: background-color 0.1s ease;
+    flex-shrink: 0;
 }
 
 .gantt-day-cell:hover {
@@ -1859,4 +1910,78 @@ table.summary-table tbody tr td.editable-carried-over:focus {
 
 .gantt-leave-bar .resize-handle:hover {
     background: rgba(255, 255, 255, 0.6);
+}
+
+/* ============================================
+   GANTT POPUP LIMIT INFO
+   ============================================ */
+.gantt-popup-limit-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--color-gray-100);
+    font-size: 0.8rem;
+    color: var(--color-gray-700);
+    border-bottom: 1px solid var(--color-gray-200);
+}
+
+.gantt-popup-limit-info .limit-label {
+    font-weight: 500;
+}
+
+.gantt-popup-limit-info .limit-value {
+    font-weight: 700;
+    color: var(--color-primary);
+}
+
+.gantt-popup-limit-info .limit-remaining {
+    color: var(--color-gray-500);
+}
+
+.gantt-popup-limit-info.exceeded {
+    background: rgba(231, 76, 60, 0.1);
+}
+
+.gantt-popup-limit-info.exceeded .limit-value {
+    color: #c0392b;
+}
+
+.gantt-popup-limit-info.exceeded .limit-remaining {
+    color: #c0392b;
+    font-weight: 600;
+}
+
+.gantt-popup-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 16px;
+    background: rgba(231, 76, 60, 0.1);
+    border: 1px solid rgba(231, 76, 60, 0.3);
+    border-left: 3px solid #e74c3c;
+    margin: 8px 12px;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.85rem;
+    color: #c0392b;
+    line-height: 1.4;
+}
+
+.gantt-popup-warning i {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: #e74c3c;
+}
+
+.gantt-popup-type-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.gantt-popup-type-btn.disabled:hover {
+    transform: none;
+    box-shadow: none;
 }

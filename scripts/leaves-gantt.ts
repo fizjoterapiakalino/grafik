@@ -1,5 +1,92 @@
 // scripts/leaves-gantt.ts - Gantt View for Leaves Module
 import type { Employee, LeaveEntry, LeavesMap } from './types';
+import { EmployeeManager } from './employee-manager';
+
+/**
+ * Helper: Parse date string to Date object in UTC
+ */
+const toUTCDate = (dateStr: string): Date => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day));
+};
+
+/**
+ * Calculate planned vacation days for an employee in a given year
+ * Only counts vacation type leaves and excludes weekends
+ */
+export const calculatePlannedVacationDays = (leaves: LeaveEntry[], year: number): number => {
+    let plannedDays = 0;
+
+    leaves.forEach((leave) => {
+        // Only count vacation type
+        if (leave.type !== 'vacation' && leave.type !== undefined) return;
+        if (!leave.startDate || !leave.endDate) return;
+
+        const start = toUTCDate(leave.startDate);
+        const end = toUTCDate(leave.endDate);
+
+        const yearStart = new Date(Date.UTC(year, 0, 1));
+        const yearEnd = new Date(Date.UTC(year, 11, 31));
+
+        const effectiveStart = start < yearStart ? yearStart : start;
+        const effectiveEnd = end > yearEnd ? yearEnd : end;
+
+        if (effectiveStart > effectiveEnd) return;
+
+        let current = new Date(effectiveStart);
+        while (current <= effectiveEnd) {
+            const dayOfWeek = current.getUTCDay();
+            // Exclude weekends (0 = Sunday, 6 = Saturday)
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                plannedDays++;
+            }
+            current.setUTCDate(current.getUTCDate() + 1);
+        }
+    });
+
+    return plannedDays;
+};
+
+/**
+ * Calculate working days between two dates (excluding weekends)
+ */
+export const calculateWorkingDays = (startDate: string, endDate: string): number => {
+    const start = toUTCDate(startDate);
+    const end = toUTCDate(endDate);
+
+    let workingDays = 0;
+    let current = new Date(start);
+
+    while (current <= end) {
+        const dayOfWeek = current.getUTCDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            workingDays++;
+        }
+        current.setUTCDate(current.getUTCDate() + 1);
+    }
+
+    return workingDays;
+};
+
+/**
+ * Get employee leave limit info by name
+ */
+export const getEmployeeLeaveLimitByName = (
+    employeeName: string,
+    employees: Record<string, Employee>,
+    year: number
+): { totalLimit: number; employeeId: string | null } => {
+    // Find employee ID by name
+    for (const [id, emp] of Object.entries(employees)) {
+        const name = emp.displayName || emp.name || id;
+        if (name === employeeName) {
+            const leaveInfo = EmployeeManager.getLeaveInfoById(id, year);
+            const totalLimit = (leaveInfo.entitlement || 0) + (leaveInfo.carriedOver || 0);
+            return { totalLimit, employeeId: id };
+        }
+    }
+    return { totalLimit: 0, employeeId: null };
+};
 
 /**
  * Leave type configuration for colors and labels
@@ -55,6 +142,25 @@ const COLLAPSED_MONTH_WIDTH = 100; // base width for collapsed month (now flexes
 
 // Track which months are expanded (by default current month and next are expanded)
 let expandedMonths: Set<number> = new Set();
+
+// Module-level state for current view data (needed for limit validation in popups)
+let currentEmployees: Record<string, Employee> = {};
+let currentLeaves: LeavesMap = {};
+let currentYear: number = new Date().getFullYear();
+
+/**
+ * Set current view data (called from leaves.ts when rendering)
+ */
+export const setCurrentViewData = (
+    employees: Record<string, Employee>,
+    leaves: LeavesMap,
+    year: number
+): void => {
+    currentEmployees = employees;
+    currentLeaves = leaves;
+    currentYear = year;
+};
+
 
 /**
  * Initialize expanded months - expand current month and its neighbors
@@ -412,17 +518,113 @@ export const renderGanttView = (
         const employeeName = emp.displayName || emp.name || empId;
         const employeeLeaves = leaves[employeeName] || [];
 
-        employeesHtml += `<div class="gantt-employee-cell" data-employee="${employeeName}">${employeeName}</div>`;
+        // Calculate leave stats
+        const leaveInfo = EmployeeManager.getLeaveInfoById(empId, year);
+        const totalLimit = (leaveInfo.entitlement || 0) + (leaveInfo.carriedOver || 0);
+        const plannedDays = calculatePlannedVacationDays(employeeLeaves, year);
+        const remainingDays = totalLimit - plannedDays;
+
+        // Determine status class for styling
+        let statusClass = 'status-ok';
+        if (remainingDays < 0) {
+            statusClass = 'status-exceeded';
+        } else if (remainingDays <= 5) {
+            statusClass = 'status-warning';
+        }
+
+        employeesHtml += `
+            <div class="gantt-employee-cell" data-employee="${employeeName}" data-id="${empId}">
+                <span class="employee-name">${employeeName}</span>
+                <span class="leave-counter ${statusClass}" title="Zaplanowano ${plannedDays} z ${totalLimit} dni urlopu wypoczynkowego">
+                    ${plannedDays}/${totalLimit}
+                </span>
+            </div>`;
         timelineHtml += renderTimelineRow(employeeName, employeeLeaves, year);
     }
 
     employeesList.innerHTML = employeesHtml;
     timelineBody.innerHTML = timelineHtml;
 
+    // Update leave bar positions after DOM is rendered
+    requestAnimationFrame(() => {
+        updateLeaveBarPositions(timelineBody, year);
+    });
+
     // Sync vertical scroll between employees list and timeline
     if (scrollWrapper) {
         syncVerticalScroll(employeesList, scrollWrapper);
     }
+};
+
+/**
+ * Update leave bar positions based on actual DOM cell positions
+ * This is needed because collapsed months have dynamic widths (flex: 1)
+ */
+const updateLeaveBarPositions = (timelineBody: HTMLElement, year: number): void => {
+    const leaveBars = timelineBody.querySelectorAll('.gantt-leave-bar');
+
+    leaveBars.forEach((bar) => {
+        const leaveBar = bar as HTMLElement;
+        const startDateStr = leaveBar.dataset.start;
+        const endDateStr = leaveBar.dataset.end;
+        const employeeName = leaveBar.dataset.employee;
+
+        if (!startDateStr || !endDateStr || !employeeName) return;
+
+        const timelineRow = leaveBar.closest('.gantt-timeline-row') as HTMLElement;
+        if (!timelineRow) return;
+
+        const startDate = parseDate(startDateStr);
+        const endDate = parseDate(endDateStr);
+
+        // Clamp to year boundaries
+        const yearStart = new Date(year, 0, 1);
+        const yearEnd = new Date(year, 11, 31);
+        const effectiveStart = startDate < yearStart ? yearStart : startDate;
+        const effectiveEnd = endDate > yearEnd ? yearEnd : endDate;
+
+        const startMonth = effectiveStart.getMonth();
+        const endMonth = effectiveEnd.getMonth();
+
+        // Check if entirely in collapsed month
+        const isInCollapsedMonth = startMonth === endMonth && !expandedMonths.has(startMonth);
+
+        if (isInCollapsedMonth) {
+            // Find the collapsed cell for this month
+            const collapsedCell = timelineRow.querySelector(`.gantt-collapsed-cell[data-month="${startMonth}"]`) as HTMLElement;
+            if (collapsedCell) {
+                leaveBar.style.left = `${collapsedCell.offsetLeft + 2}px`;
+                leaveBar.style.width = `${collapsedCell.offsetWidth - 4}px`;
+            }
+        } else {
+            // Find start and end day cells
+            const startDateFormatted = formatDateString(effectiveStart);
+            const endDateFormatted = formatDateString(effectiveEnd);
+
+            const startCell = timelineRow.querySelector(`.gantt-day-cell[data-date="${startDateFormatted}"]`) as HTMLElement;
+            const endCell = timelineRow.querySelector(`.gantt-day-cell[data-date="${endDateFormatted}"]`) as HTMLElement;
+
+            if (startCell && endCell) {
+                const left = startCell.offsetLeft;
+                const right = endCell.offsetLeft + endCell.offsetWidth;
+                leaveBar.style.left = `${left}px`;
+                leaveBar.style.width = `${right - left}px`;
+            } else if (startCell) {
+                // Only start cell found (end might be in collapsed month)
+                leaveBar.style.left = `${startCell.offsetLeft}px`;
+            }
+        }
+    });
+};
+
+/**
+ * Format date to YYYY-MM-DD string
+ */
+const formatDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 };
 
 /**
@@ -450,27 +652,43 @@ export const setOnMonthToggle = (callback: () => void): void => {
     onMonthToggleCallback = callback;
 };
 
+// Store reference to the current month toggle handler for cleanup
+let monthToggleHandler: ((e: Event) => void) | null = null;
+
 /**
  * Setup click handlers on month headers to toggle expansion
+ * Uses event delegation to avoid duplicate listeners after re-renders
  */
 export const setupMonthToggle = (): void => {
-    const monthHeaders = document.querySelectorAll('.gantt-month-header');
+    const headerContainer = document.getElementById('ganttTimelineHeader');
+    if (!headerContainer) return;
 
-    monthHeaders.forEach(header => {
-        header.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const monthAttr = (header as HTMLElement).dataset.month;
-            if (monthAttr !== undefined) {
-                const month = parseInt(monthAttr, 10);
-                toggleMonthExpansion(month);
+    // Remove old handler if exists
+    if (monthToggleHandler) {
+        headerContainer.removeEventListener('click', monthToggleHandler);
+    }
 
-                // Re-render the Gantt view
-                if (onMonthToggleCallback) {
-                    onMonthToggleCallback();
-                }
+    // Create new handler using event delegation
+    monthToggleHandler = (e: Event) => {
+        const target = e.target as HTMLElement;
+        const header = target.closest('.gantt-month-header') as HTMLElement;
+
+        if (!header) return;
+
+        e.stopPropagation();
+        const monthAttr = header.dataset.month;
+        if (monthAttr !== undefined) {
+            const month = parseInt(monthAttr, 10);
+            toggleMonthExpansion(month);
+
+            // Re-render the Gantt view
+            if (onMonthToggleCallback) {
+                onMonthToggleCallback();
             }
-        });
-    });
+        }
+    };
+
+    headerContainer.addEventListener('click', monthToggleHandler);
 };
 
 /**
@@ -710,7 +928,7 @@ const createSelectionOverlay = (timelineRow: HTMLElement, startCell: HTMLElement
     overlay.className = 'gantt-selection-overlay';
 
     overlay.style.left = `${startCell.offsetLeft}px`;
-    overlay.style.width = `${DAY_WIDTH}px`;
+    overlay.style.width = `${startCell.offsetWidth}px`;
 
     timelineRow.appendChild(overlay);
     dragState.overlay = overlay;
@@ -723,23 +941,31 @@ const updateSelectionOverlay = (): void => {
     if (!dragState.overlay || !dragState.startDate || !dragState.endDate || !dragState.timelineRow) return;
 
     const dayCells = dragState.timelineRow.querySelectorAll('.gantt-day-cell');
-    let startIndex = -1;
-    let endIndex = -1;
+    let foundStartCell: HTMLElement | null = null;
+    let foundEndCell: HTMLElement | null = null;
 
-    dayCells.forEach((cell, index) => {
-        const cellDate = (cell as HTMLElement).dataset.date;
-        if (cellDate === dragState.startDate) startIndex = index;
-        if (cellDate === dragState.endDate) endIndex = index;
+    dayCells.forEach((cell) => {
+        const htmlCell = cell as HTMLElement;
+        const cellDate = htmlCell.dataset.date;
+        if (cellDate === dragState.startDate) foundStartCell = htmlCell;
+        if (cellDate === dragState.endDate) foundEndCell = htmlCell;
     });
 
-    if (startIndex === -1 || endIndex === -1) return;
+    if (!foundStartCell || !foundEndCell) return;
+
+    const startCell = foundStartCell as HTMLElement;
+    const endCell = foundEndCell as HTMLElement;
+
+    // Get actual positions from DOM
+    const startLeft = startCell.offsetLeft;
+    const endLeft = endCell.offsetLeft;
+    const startWidth = startCell.offsetWidth;
+    const endWidth = endCell.offsetWidth;
 
     // Ensure correct order
-    const minIndex = Math.min(startIndex, endIndex);
-    const maxIndex = Math.max(startIndex, endIndex);
-
-    const left = minIndex * DAY_WIDTH;
-    const width = (maxIndex - minIndex + 1) * DAY_WIDTH;
+    const left = Math.min(startLeft, endLeft);
+    const right = Math.max(startLeft + startWidth, endLeft + endWidth);
+    const width = right - left;
 
     dragState.overlay.style.left = `${left}px`;
     dragState.overlay.style.width = `${width}px`;
@@ -763,15 +989,47 @@ const showLeaveTypePopup = (employeeName: string, startDate: string, endDate: st
     const existingPopup = document.querySelector('.gantt-leave-popup');
     if (existingPopup) existingPopup.remove();
 
-    // Calculate days
+    // Calculate working days for the selected range
+    const workingDaysInSelection = calculateWorkingDays(startDate, endDate);
+
+    // Calculate total calendar days
     const start = new Date(startDate);
     const end = new Date(endDate);
-    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    // Get employee leave limit info
+    const employeeLeaves = currentLeaves[employeeName] || [];
+    const { totalLimit } = getEmployeeLeaveLimitByName(employeeName, currentEmployees, currentYear);
+    const plannedDays = calculatePlannedVacationDays(employeeLeaves, currentYear);
+    const remainingDays = totalLimit - plannedDays;
+
+    // Check if adding this vacation would exceed the limit
+    const wouldExceedLimit = workingDaysInSelection > remainingDays;
 
     // Format dates for display
     const formatDate = (dateStr: string): string => {
         const [year, month, day] = dateStr.split('-');
         return `${day}.${month}.${year}`;
+    };
+
+    // Generate leave type buttons with conditional disabling for vacation
+    const generateTypeButtons = (): string => {
+        return Object.entries(LEAVE_TYPES).map(([type, config]) => {
+            const isVacation = type === 'vacation';
+            const isDisabled = isVacation && wouldExceedLimit;
+            const disabledClass = isDisabled ? 'disabled' : '';
+            const disabledAttr = isDisabled ? 'disabled' : '';
+            const disabledStyle = isDisabled ? 'opacity: 0.5; cursor: not-allowed;' : '';
+
+            return `
+                <button class="gantt-popup-type-btn ${disabledClass}" 
+                        data-type="${type}" 
+                        style="background: ${config.color}; ${disabledStyle}"
+                        ${disabledAttr}>
+                    ${config.label}
+                </button>
+            `;
+        }).join('');
     };
 
     // Create popup
@@ -783,14 +1041,21 @@ const showLeaveTypePopup = (employeeName: string, startDate: string, endDate: st
             <button class="gantt-popup-close">&times;</button>
         </div>
         <div class="gantt-popup-dates">
-            ${formatDate(startDate)} - ${formatDate(endDate)} (${days} dni)
+            ${formatDate(startDate)} - ${formatDate(endDate)} (${totalDays} dni, ${workingDaysInSelection} roboczych)
         </div>
+        <div class="gantt-popup-limit-info ${wouldExceedLimit ? 'exceeded' : ''}">
+            <span class="limit-label">Limit urlopu wypoczynkowego:</span>
+            <span class="limit-value">${plannedDays}/${totalLimit} dni</span>
+            <span class="limit-remaining">(pozostało: ${remainingDays})</span>
+        </div>
+        ${wouldExceedLimit ? `
+            <div class="gantt-popup-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                Nie można dodać ${workingDaysInSelection} dni urlopu wypoczynkowego - pozostało tylko ${remainingDays} dni.
+            </div>
+        ` : ''}
         <div class="gantt-popup-types">
-            ${Object.entries(LEAVE_TYPES).map(([type, config]) => `
-                <button class="gantt-popup-type-btn" data-type="${type}" style="background: ${config.color}">
-                    ${config.label}
-                </button>
-            `).join('')}
+            ${generateTypeButtons()}
         </div>
         <div class="gantt-popup-footer">
             <button class="gantt-popup-cancel">Anuluj</button>
@@ -800,7 +1065,7 @@ const showLeaveTypePopup = (employeeName: string, startDate: string, endDate: st
     // Position popup
     popup.style.position = 'fixed';
     popup.style.left = `${Math.min(x, window.innerWidth - 320)}px`;
-    popup.style.top = `${Math.min(y, window.innerHeight - 300)}px`;
+    popup.style.top = `${Math.min(y, window.innerHeight - 350)}px`;
     popup.style.zIndex = '1000';
 
     document.body.appendChild(popup);
@@ -816,7 +1081,7 @@ const showLeaveTypePopup = (employeeName: string, startDate: string, endDate: st
         removeSelectionOverlay();
     });
 
-    popup.querySelectorAll('.gantt-popup-type-btn').forEach(btn => {
+    popup.querySelectorAll('.gantt-popup-type-btn:not(.disabled)').forEach(btn => {
         btn.addEventListener('click', async () => {
             const leaveType = (btn as HTMLElement).dataset.type || 'vacation';
             popup.remove();
@@ -866,6 +1131,8 @@ interface ResizeState {
     side: 'left' | 'right' | null;
     originalStart: string | null;
     originalEnd: string | null;
+    currentStart: string | null;
+    currentEnd: string | null;
     leaveBar: HTMLElement | null;
     timelineRow: HTMLElement | null;
 }
@@ -877,6 +1144,8 @@ let resizeState: ResizeState = {
     side: null,
     originalStart: null,
     originalEnd: null,
+    currentStart: null,
+    currentEnd: null,
     leaveBar: null,
     timelineRow: null,
 };
@@ -907,6 +1176,12 @@ export const setOnLeaveTypeChanged = (callback: (employeeName: string, leaveId: 
 export const setupLeaveBarInteractions = (): void => {
     const timelineBody = document.getElementById('ganttTimelineBody');
     if (!timelineBody) return;
+
+    // Remove existing listeners to avoid duplicates (important after re-renders)
+    timelineBody.removeEventListener('click', handleLeaveBarClick);
+    timelineBody.removeEventListener('mousedown', handleResizeStart);
+    document.removeEventListener('mousemove', handleResizeMove);
+    document.removeEventListener('mouseup', handleResizeEnd);
 
     // Handle clicks on leave bars for editing
     timelineBody.addEventListener('click', handleLeaveBarClick);
@@ -968,13 +1243,18 @@ const handleResizeStart = (e: MouseEvent): void => {
     e.preventDefault();
     e.stopPropagation();
 
+    const startDate = leaveBar.dataset.start || null;
+    const endDate = leaveBar.dataset.end || null;
+
     resizeState = {
         isResizing: true,
         leaveId: leaveBar.dataset.leaveId || null,
         employeeName: leaveBar.dataset.employee || null,
         side: handle.dataset.side as 'left' | 'right',
-        originalStart: leaveBar.dataset.start || null,
-        originalEnd: leaveBar.dataset.end || null,
+        originalStart: startDate,
+        originalEnd: endDate,
+        currentStart: startDate,
+        currentEnd: endDate,
         leaveBar: leaveBar,
         timelineRow: timelineRow,
     };
@@ -991,25 +1271,53 @@ const handleResizeStart = (e: MouseEvent): void => {
  * Handle resize move
  */
 const handleResizeMove = (e: MouseEvent): void => {
-    if (!resizeState.isResizing || !resizeState.leaveBar) return;
+    if (!resizeState.isResizing || !resizeState.leaveBar || !resizeState.timelineRow) return;
 
-    // Use elementFromPoint to find the day cell under the mouse
-    const elemUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
-    const dayCell = elemUnderMouse?.closest('.gantt-day-cell') as HTMLElement;
+    // Get timeline row bounds
+    const timelineRect = resizeState.timelineRow.getBoundingClientRect();
+    const relativeX = e.clientX - timelineRect.left;
 
-    if (!dayCell || !dayCell.dataset.date) return;
+    // Calculate which day cell index we're over based on X position
+    const dayCells = resizeState.timelineRow.querySelectorAll('.gantt-day-cell');
+    if (dayCells.length === 0) return;
 
-    const targetDate = dayCell.dataset.date;
+    // Find the cell at the current X position
+    let targetCell: HTMLElement | null = null;
+    for (let i = 0; i < dayCells.length; i++) {
+        const cell = dayCells[i] as HTMLElement;
+        const cellLeft = cell.offsetLeft;
+        const cellRight = cellLeft + cell.offsetWidth;
+
+        if (relativeX >= cellLeft && relativeX < cellRight) {
+            targetCell = cell;
+            break;
+        }
+    }
+
+    // If we're outside the cells, clamp to first or last cell
+    if (!targetCell) {
+        if (relativeX < 0) {
+            targetCell = dayCells[0] as HTMLElement;
+        } else {
+            targetCell = dayCells[dayCells.length - 1] as HTMLElement;
+        }
+    }
+
+    if (!targetCell || !targetCell.dataset.date) return;
+
+    const targetDate = targetCell.dataset.date;
 
     // Update the leave bar visually based on which side is being resized
     if (resizeState.side === 'left') {
-        // Don't allow start date to go past end date
-        if (resizeState.originalEnd && targetDate > resizeState.originalEnd) return;
+        // Don't allow start date to go past current end date
+        if (resizeState.currentEnd && targetDate > resizeState.currentEnd) return;
         resizeState.leaveBar.dataset.start = targetDate;
+        resizeState.currentStart = targetDate;
     } else if (resizeState.side === 'right') {
-        // Don't allow end date to go before start date
-        if (resizeState.originalStart && targetDate < resizeState.originalStart) return;
+        // Don't allow end date to go before current start date
+        if (resizeState.currentStart && targetDate < resizeState.currentStart) return;
         resizeState.leaveBar.dataset.end = targetDate;
+        resizeState.currentEnd = targetDate;
     }
 
     // Update visual position
@@ -1048,6 +1356,8 @@ const handleResizeEnd = async (): Promise<void> => {
         side: null,
         originalStart: null,
         originalEnd: null,
+        currentStart: null,
+        currentEnd: null,
         leaveBar: null,
         timelineRow: null,
     };
@@ -1066,25 +1376,35 @@ const updateLeaveBarVisual = (leaveBar: HTMLElement): void => {
     if (!timelineRow) return;
 
     const dayCells = timelineRow.querySelectorAll('.gantt-day-cell');
-    let startIndex = -1;
-    let endIndex = -1;
+    let startCell: HTMLElement | null = null;
+    let endCell: HTMLElement | null = null;
 
-    dayCells.forEach((cell, index) => {
-        const cellDate = (cell as HTMLElement).dataset.date;
-        if (cellDate === startDateStr) startIndex = index;
-        if (cellDate === endDateStr) endIndex = index;
+    dayCells.forEach((cell) => {
+        const htmlCell = cell as HTMLElement;
+        const cellDate = htmlCell.dataset.date;
+        if (cellDate === startDateStr) startCell = htmlCell;
+        if (cellDate === endDateStr) endCell = htmlCell;
     });
 
-    if (startIndex === -1 || endIndex === -1) return;
+    if (!startCell || !endCell) return;
 
-    const left = startIndex * DAY_WIDTH;
-    const width = (endIndex - startIndex + 1) * DAY_WIDTH;
+    // Need explicit cast after null check due to TypeScript narrowing issues with forEach
+    const startCellEl = startCell as HTMLElement;
+    const endCellEl = endCell as HTMLElement;
+
+    // Use actual DOM positions
+    const left = startCellEl.offsetLeft;
+    const right = endCellEl.offsetLeft + endCellEl.offsetWidth;
+    const width = right - left;
 
     leaveBar.style.left = `${left}px`;
     leaveBar.style.width = `${width}px`;
 
-    // Update text
-    const days = endIndex - startIndex + 1;
+    // Update text - calculate days from dates
+    const start = parseDate(startDateStr);
+    const end = parseDate(endDateStr);
+    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
     const textSpan = leaveBar.querySelector('.leave-bar-text');
     if (textSpan) {
         textSpan.textContent = width >= 40 ? `${days}d` : '';
