@@ -163,6 +163,19 @@ export const CalendarModal: CalendarModalAPI = (() => {
             const date = new Date(Date.UTC(year, month, i));
             dayCell.dataset.date = toDateString(date);
 
+            const dayOfWeek = date.getUTCDay();
+            if (dayOfWeek === 0 || dayOfWeek === 6) {
+                dayCell.classList.add('weekend');
+            }
+            if (dayOfWeek === 0) {
+                dayCell.classList.add('sunday');
+            }
+
+            const todayStr = toDateString(new Date());
+            if (dayCell.dataset.date === todayStr) {
+                dayCell.classList.add('today');
+            }
+
             if (isHoliday(date)) {
                 dayCell.classList.add('holiday');
                 dayCell.title = "Święto";
@@ -178,11 +191,7 @@ export const CalendarModal: CalendarModalAPI = (() => {
     const generateInitialCalendars = (): void => {
         if (!calendarSlider) return;
         calendarSlider.innerHTML = '';
-        calendarSlider.style.display = 'grid';
-        calendarSlider.style.gridTemplateColumns = 'repeat(4, 1fr)';
-        calendarSlider.style.gap = '20px';
-        calendarSlider.style.width = '100%';
-        calendarSlider.style.transform = 'none';
+        // Layout is now handled by CSS grid and media queries in leaves.css
 
         for (let i = 0; i < 12; i++) {
             calendarSlider.appendChild(createCalendar(currentYear, i));

@@ -8,18 +8,16 @@
         <tbody></tbody>
     </table>
 
-    <!-- Pasek postępu dnia - wstawiony pod tabelą, nad legendą -->
-    <div id="dayProgressContainer"></div>
-
-    <div class="schedule-legend">
-        <h3>Legenda:</h3>
-        <ul>
-            <li><span class="legend-color massage-color"></span>Masaż</li>
-            <li><span class="legend-color pnf-color"></span>PNF</li>
-            <li><span class="legend-color every-other-day-color"></span>Co 2 Dni</li>
-            <li><span class="legend-color break-color"></span>Przerwa</li>
-        </ul>
-        <span id="patientCount" class="patient-count-legend"></span>
+    <!-- Połączony pasek informacji i legendy -->
+    <div class="schedule-footer-bar">
+        <div id="dayProgressContainer"></div>
+        <div class="compact-legend">
+            <div class="legend-item" data-type="massage"><span class="legend-dot massage-color"></span>Masaż</div>
+            <div class="legend-item" data-type="pnf"><span class="legend-dot pnf-color"></span>PNF</div>
+            <div class="legend-item" data-type="every-other-day"><span class="legend-dot every-other-day-color"></span>Co 2 Dni</div>
+            <div class="legend-item" data-type="break"><span class="legend-dot break-color"></span>Przerwa</div>
+        </div>
+        <div id="patientCount" class="patient-count-badge"></div>
     </div>
 </div>
 

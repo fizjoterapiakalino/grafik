@@ -129,7 +129,19 @@ export const Shared: SharedAPI = (() => {
             footerInfo.innerHTML = '<p>&copy; 2025 Fizjoterapia Kalinowa. Wszelkie prawa zastrzeżone.</p>';
             navPanel.appendChild(footerInfo);
 
-            document.body.appendChild(hamburger);
+            if (headerRightMenu) {
+                headerRightMenu.appendChild(hamburger);
+            }
+
+            // Mobile floating hamburger (cloned to have separate event listener or just same logic)
+            const mobileHamburger = hamburger.cloneNode(true) as HTMLElement;
+            mobileHamburger.addEventListener('click', (e: MouseEvent) => {
+                e.stopPropagation();
+                navPanel.classList.toggle('visible');
+                mobileHamburger.classList.toggle('active');
+            });
+
+            document.body.appendChild(mobileHamburger);
             document.body.appendChild(navPanel);
 
             const updateActiveLink = (): void => {

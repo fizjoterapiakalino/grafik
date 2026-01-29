@@ -178,14 +178,14 @@ export const Options: OptionsAPI = (() => {
 
         const employeeCount = Object.keys(employees).length;
 
-        // Dodaj licznik pracowników
-        const counterDiv = document.createElement('div');
-        counterDiv.className = 'employee-counter';
-        counterDiv.innerHTML = `Pracownicy: <strong>${employeeCount}</strong>`;
-        employeeListContainer.appendChild(counterDiv);
+        // Update badge count
+        const countBadge = document.getElementById('employeeCountBadge');
+        if (countBadge) {
+            countBadge.textContent = String(employeeCount);
+        }
 
         if (employeeCount === 0) {
-            employeeListContainer.innerHTML += '<p class="empty-list-info">Brak pracowników. Dodaj pierwszego!</p>';
+            employeeListContainer.innerHTML = '<p class="empty-list-info">Brak pracowników. Dodaj pierwszego!</p>';
             return;
         }
 
@@ -288,14 +288,16 @@ export const Options: OptionsAPI = (() => {
             if (isVisible) visibleCount++;
         });
 
-        // Aktualizuj licznik
-        const counter = document.querySelector('.employee-counter');
-        if (counter) {
-            if (searchTerm) {
-                counter.innerHTML = `Wyświetlono: <strong>${visibleCount}</strong> z ${totalCount}`;
-            } else {
-                counter.innerHTML = `Pracownicy: <strong>${totalCount}</strong>`;
-            }
+        // Update badge count
+        const countBadge = document.getElementById('employeeCountBadge');
+        if (countBadge) {
+            countBadge.textContent = searchTerm ? `${visibleCount}/${totalCount}` : String(totalCount);
+        }
+
+        // Show/hide clear button
+        const clearBtn = document.getElementById('clearEmployeeSearch');
+        if (clearBtn) {
+            clearBtn.style.display = searchTerm ? 'flex' : 'none';
         }
     };
 
@@ -548,6 +550,16 @@ export const Options: OptionsAPI = (() => {
         clearUidBtn?.addEventListener('click', handleClearUid);
         createBackupBtn?.addEventListener('click', createBackup);
         restoreBackupBtn?.addEventListener('click', handleRestoreBackup);
+
+        // Clear search button
+        const clearSearchBtn = document.getElementById('clearEmployeeSearch');
+        clearSearchBtn?.addEventListener('click', () => {
+            if (employeeSearchInput) {
+                employeeSearchInput.value = '';
+                filterEmployees();
+                employeeSearchInput.focus();
+            }
+        });
 
         // Inicjalizacja sekcji personalizacji kolorów
         initColorPreferencesUI();

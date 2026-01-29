@@ -435,7 +435,7 @@ export const Stations: StationsAPI = (() => {
     /**
      * Start treatment on a station (for multi-treatment rooms)
      */
-    const startMultiTreatment = async (room: Room, station: Station, treatment: Treatment): Promise<void> => {
+    const startMultiTreatment = async (_room: Room, station: Station, treatment: Treatment): Promise<void> => {
         station.status = 'OCCUPIED';
         station.treatmentId = treatment.id;
         station.startTime = Date.now();

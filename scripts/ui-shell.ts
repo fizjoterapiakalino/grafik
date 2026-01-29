@@ -43,8 +43,8 @@ export const UIShell: UIShellAPI = (() => {
                         <button id="btnPatientInfo" class="action-icon-btn" title="Informacje o pacjencie"><i class="fas fa-user-circle"></i></button>
                         <button id="btnAddBreak" class="action-icon-btn" title="Dodaj przerwę"><i class="fas fa-coffee"></i></button>
                         <button id="btnClearCell" class="action-icon-btn danger" title="Wyczyść komórkę"><i class="fas fa-trash-alt"></i></button>
-                        <button id="btnIso" class="action-icon-btn" title="Dokumenty ISO"><i class="fas fa-file-alt"></i><span class="notification-badge" style="display: none;"></span></button>
                     </div>
+                    <button id="btnIso" class="action-icon-btn active header-action-btn" title="Dokumenty ISO"><i class="fas fa-file-alt"></i><span class="notification-badge" style="display: none;"></span></button>
                     <div class="search-container">
                         <button id="searchToggleBtn" class="search-toggle-btn" title="Szukaj"><i class="fas fa-search"></i></button>
                         <input type="text" id="searchInput" class="search-input" placeholder="Szukaj...">

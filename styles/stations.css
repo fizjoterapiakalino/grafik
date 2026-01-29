@@ -2,21 +2,26 @@
 
 /* ============================================
    CSS VARIABLES FOR STATION STATES
+   Maps to main design system colors
    ============================================ */
 :root {
-    --station-free: #10b981;
-    --station-free-bg: #d1fae5;
-    --station-free-border: #34d399;
+    /* Free: Success/Emerald */
+    --station-free: var(--color-success);
+    --station-free-bg: var(--color-success-light);
+    --station-free-border: var(--color-primary-400);
 
-    --station-occupied: #f59e0b;
-    --station-occupied-bg: #fef3c7;
-    --station-occupied-border: #fbbf24;
+    /* Occupied: Warning/Amber */
+    --station-occupied: var(--color-warning);
+    --station-occupied-bg: var(--color-warning-light);
+    --station-occupied-border: var(--color-warning);
 
-    --station-finished: #ef4444;
-    --station-finished-bg: #fee2e2;
+    /* Finished: Danger/Red */
+    --station-finished: var(--color-danger);
+    --station-finished-bg: var(--color-danger-light);
     --station-finished-border: #f87171;
 
-    --station-ending: #dc2626;
+    /* Ending: Critical Danger */
+    --station-ending: var(--color-danger-dark);
     --station-ending-bg: #fecaca;
     --station-ending-border: #f87171;
 }
@@ -39,7 +44,7 @@
     align-items: center;
     margin-bottom: 6px;
     padding: 6px 12px;
-    background: white;
+    background: var(--color-white);
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-sm);
     flex-wrap: wrap;
