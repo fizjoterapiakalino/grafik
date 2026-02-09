@@ -52,14 +52,15 @@ const testFirebaseConfig = {
 };
 
 // Produkcyjna Baza Danych (dla GitHub Pages)
+// Placeholdery są zastępowane przez GitHub Actions podczas deploymentu
 const prodFirebaseConfig = {
-    apiKey: 'AIzaSyCdPhCgZeFYv3fLrd9Xc4AVwBu70cCvlVQ',
-    authDomain: 'grafikkalinowa-c1b41.firebaseapp.com',
-    projectId: 'grafikkalinowa-c1b41',
-    storageBucket: 'grafikkalinowa-c1b41.firebasestorage.app',
-    messagingSenderId: '59665168961',
-    appId: '1:59665168961:web:166b1816b1981b2babe4c0',
-    measurementId: 'G-RXBFWH2CXN',
+    apiKey: '__FIREBASE_API_KEY__',
+    authDomain: '__FIREBASE_AUTH_DOMAIN__',
+    projectId: '__FIREBASE_PROJECT_ID__',
+    storageBucket: '__FIREBASE_STORAGE_BUCKET__',
+    messagingSenderId: '__FIREBASE_MESSAGING_SENDER_ID__',
+    appId: '__FIREBASE_APP_ID__',
+    measurementId: '__FIREBASE_MEASUREMENT_ID__',
 };
 
 // Automatyczne wykrywanie środowiska
