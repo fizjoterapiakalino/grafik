@@ -15,7 +15,6 @@
 }
 
 .app-header:hover {
-    background: rgba(5, 150, 105, 0.85);
     box-shadow: var(--shadow-xl);
 }
 
@@ -147,6 +146,19 @@
     width: 200px;
     opacity: 1;
     padding: 0 8px;
+    color: white;
+}
+
+.search-container:focus-within .search-input {
+    color: var(--color-gray-900);
+}
+
+.search-input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.search-container:focus-within .search-input::placeholder {
+    color: var(--color-gray-400);
 }
 
 .search-toggle-btn {

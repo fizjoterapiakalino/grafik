@@ -1,0 +1,134 @@
+// ============================================
+// ZALECANE REGUŁY BEZPIECZEŃSTWA FIREBASE
+// ============================================
+// 
+// WAŻNE: Twoje obecne reguły (allow read, write: if true) są NIEBEZPIECZNE!
+// Każdy może czytać i modyfikować Twoje dane bezpośrednio przez API.
+//
+// Poniżej znajdziesz zalecane reguły dla Twojej aplikacji.
+// Skopiuj je do konsoli Firebase -> Firestore Database -> Rules
+//
+// ============================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // FUNKCJE POMOCNICZE
+    // ============================================
+    
+    // Sprawdź czy użytkownik jest zalogowany
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Sprawdź czy użytkownik jest adminem (na podstawie UID w dokumencie employees)
+    function isAdmin() {
+      // Sprawdź w głównym dokumencie schedules czy UID użytkownika ma rolę admin
+      let scheduleDoc = get(/databases/$(database)/documents/schedules/mainSchedule);
+      let employees = scheduleDoc.data.employees;
+      
+      // Iteruj przez pracowników i sprawdź czy któryś ma matching UID z rolą admin
+      // UWAGA: Firestore rules nie obsługują pętli, więc musimy to rozwiązać inaczej
+      // Alternatywnie: stwórz osobną kolekcję admins z UID jako kluczem
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    
+    // Sprawdź czy użytkownik jest przypisany do pracownika
+    function isEmployee() {
+      let scheduleDoc = get(/databases/$(database)/documents/schedules/mainSchedule);
+      let employees = scheduleDoc.data.employees;
+      // Podobnie jak wyżej - sprawdź czy UID istnieje w employees
+      return exists(/databases/$(database)/documents/employees/$(request.auth.uid));
+    }
+    
+    // ============================================
+    // REGUŁY DLA KOLEKCJI
+    // ============================================
+    
+    // Główny dokument grafiku
+    match /schedules/{document} {
+      // Każdy zalogowany może czytać
+      allow read: if isAuthenticated();
+      
+      // Tylko admin może zapisywać
+      allow write: if isAuthenticated() && isAdmin();
+    }
+    
+    // Urlopy
+    match /leaves/{document} {
+      // Każdy zalogowany może czytać
+      allow read: if isAuthenticated();
+      
+      // Tylko admin może zapisywać
+      allow write: if isAuthenticated() && isAdmin();
+    }
+    
+    // Backup
+    match /backups/{document} {
+      // Tylko admin może czytać i zapisywać
+      allow read, write: if isAuthenticated() && isAdmin();
+    }
+    
+    // Lista adminów (do weryfikacji)
+    match /admins/{userId} {
+      // Każdy zalogowany może sprawdzić czy jest adminem
+      allow read: if isAuthenticated();
+      
+      // Tylko istniejący admin może dodawać/usuwać adminów
+      allow write: if isAuthenticated() && isAdmin();
+    }
+    
+    // Lista powiązań UID -> pracownik
+    match /employees/{userId} {
+      // Każdy zalogowany może sprawdzić swoje powiązanie
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Tylko admin może zarządzać powiązaniami
+      allow write: if isAuthenticated() && isAdmin();
+    }
+    
+    // Test połączenia (dla connection monitor)
+    match /_connection_test/{document} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}
+
+// ============================================
+// UPROSZCZONE REGUŁY (TYMCZASOWE)
+// ============================================
+// Jeśli chcesz szybko zabezpieczyć dane bez pełnej
+// implementacji ról, użyj tych reguł:
+//
+// rules_version = '2';
+// service cloud.firestore {
+//   match /databases/{database}/documents {
+//     match /{document=**} {
+//       // Wymaga zalogowania do jakiejkolwiek operacji
+//       allow read, write: if request.auth != null;
+//     }
+//   }
+// }
+//
+// To wystarczy żeby zablokować anonimowy dostęp z zewnątrz.
+// ============================================
+
+// ============================================
+// JAK WDROŻYĆ TE REGUŁY:
+// ============================================
+// 
+// 1. Wejdź na https://console.firebase.google.com
+// 2. Wybierz projekt "grafikkalinowa-c1b41" (produkcja)
+// 3. Przejdź do Firestore Database -> Rules
+// 4. Skopiuj i wklej reguły powyżej
+// 5. Kliknij "Publish"
+//
+// UWAGA: Zanim wdrożysz pełne reguły, musisz:
+// - Stworzyć kolekcję "admins" z dokumentami gdzie ID = UID admina
+// - Stworzyć kolekcję "employees" z powiązaniami UID -> dane pracownika
+//
+// Na początek zalecam użycie UPROSZCZONYCH REGUŁ które wymagają
+// tylko zalogowania. To natychmiast zabezpieczy Twoje dane.
+// ============================================

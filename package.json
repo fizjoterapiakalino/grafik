@@ -37,5 +37,10 @@
         "typescript": "^5.9.3",
         "vite": "^7.3.0",
         "vite-plugin-static-copy": "^3.1.4"
+    },
+    "dependencies": {
+        "-": "^0.0.1",
+        "g": "^2.0.1",
+        "skild": "^0.11.1"
     }
 }

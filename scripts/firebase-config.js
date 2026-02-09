@@ -25,6 +25,11 @@ import {
     writeBatch,
     runTransaction,
     deleteField,
+    enableIndexedDbPersistence,
+    CACHE_SIZE_UNLIMITED,
+    initializeFirestore,
+    persistentLocalCache,
+    persistentMultipleTabManager,
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import {
     getAuth,
@@ -67,7 +72,37 @@ const firebaseConfig = isLocalDevelopment ? testFirebaseConfig : prodFirebaseCon
 
 // Inicjalizacja Firebase
 const app = initializeApp(firebaseConfig);
-const firestoreDb = getFirestore(app);
+
+// Inicjalizacja Firestore z włączoną persistencją offline
+// Używamy nowego API z persistentLocalCache dla lepszej obsługi offline
+let firestoreDb;
+try {
+    firestoreDb = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+            tabManager: persistentMultipleTabManager(),
+            cacheSizeBytes: CACHE_SIZE_UNLIMITED
+        })
+    });
+    console.log('✅ Firestore offline persistence enabled (multi-tab)');
+} catch (e) {
+    // Fallback dla starszych przeglądarek lub gdy persistence już włączona
+    console.warn('Firestore persistence fallback:', e.message);
+    firestoreDb = getFirestore(app);
+
+    // Próba włączenia starszym API
+    enableIndexedDbPersistence(firestoreDb, { forceOwnership: false })
+        .then(() => console.log('✅ Firestore offline persistence enabled (legacy mode)'))
+        .catch((err) => {
+            if (err.code === 'failed-precondition') {
+                console.warn('⚠️ Persistence failed: Multiple tabs open. Data will still sync but offline mode limited.');
+            } else if (err.code === 'unimplemented') {
+                console.warn('⚠️ Persistence not supported in this browser.');
+            } else {
+                console.error('Persistence error:', err);
+            }
+        });
+}
+
 const firebaseAuth = getAuth(app);
 
 /**
