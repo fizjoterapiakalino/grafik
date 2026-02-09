@@ -1,4 +1,5 @@
-/* Duplicate Entry Modal */
+/* scripts/schedule-modals.css - Modern Premium Styles */
+
 #duplicateModal {
     display: none;
     position: fixed;
@@ -6,79 +7,86 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(8px);
     z-index: 2000;
     justify-content: center;
     align-items: center;
+    padding: var(--spacing-md);
 }
 
 #duplicateModal .modal-content {
-    background-color: white;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    max-width: 400px;
-    width: 90%;
+    background: var(--color-white);
+    padding: var(--spacing-xl);
+    border-radius: var(--border-radius-lg);
+    box-shadow:
+        0 20px 25px -5px rgba(0, 0, 0, 0.1),
+        0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    max-width: 450px;
+    width: 100%;
     text-align: center;
+    border: 1px solid var(--color-gray-100);
+    animation: modalPopIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modalPopIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+#duplicateModal p {
+    color: var(--color-gray-600);
+    line-height: 1.6;
+    margin-bottom: var(--spacing-xl);
+    font-size: 1.05rem;
 }
 
 #duplicateModal .modal-buttons {
-    display: flex;
-    justify-content: space-around;
-    margin-top: 20px;
-    gap: 10px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--spacing-sm);
+}
+
+@media (min-width: 480px) {
+    #duplicateModal .modal-buttons {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    #duplicateModal .modal-buttons #cancelBtn {
+        grid-column: span 2;
+    }
 }
 
 #duplicateModal button {
-    /* Inherit from .action-btn */
+    font-weight: 700;
+    letter-spacing: 0.01em;
 }
 
 #duplicateModal #moveEntryBtn {
-    /* Mapped to .action-btn.primary in HTML/JS or manually here if classes not added */
-    /* Forcing styles to match components.css if classes are not present in HTML */
     background: linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%);
     color: white;
-    box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4);
-    border: none;
-    padding: 10px 20px;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-#duplicateModal #moveEntryBtn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.5);
 }
 
 #duplicateModal #addAnywayBtn {
     background: linear-gradient(135deg, var(--color-secondary-500) 0%, var(--color-secondary-600) 100%);
     color: white;
-    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.4);
-    border: none;
-    padding: 10px 20px;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-#duplicateModal #addAnywayBtn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.5);
 }
 
 #duplicateModal #cancelBtn {
-    background: transparent;
-    border: 1px solid var(--color-gray-300);
+    background: var(--color-gray-50);
+    border: 1px solid var(--color-gray-200);
     color: var(--color-gray-600);
-    padding: 10px 20px;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    transition: all 0.2s;
 }
 
 #duplicateModal #cancelBtn:hover {
-    background-color: var(--color-gray-50);
-    color: var(--color-gray-800);
-    border-color: var(--color-gray-400);
+    background: var(--color-gray-100);
+    color: var(--color-gray-900);
+    border-color: var(--color-gray-300);
 }

@@ -1,0 +1,694 @@
+/* styles/stations.css - PhysioResource Tracker Styles - Compact Version */
+
+/* ============================================
+   CSS VARIABLES FOR STATION STATES
+   Maps to main design system colors
+   ============================================ */
+:root {
+    /* Free: Success/Emerald */
+    --station-free: var(--color-success);
+    --station-free-bg: var(--color-success-light);
+    --station-free-border: var(--color-primary-400);
+
+    /* Occupied: Warning/Amber */
+    --station-occupied: var(--color-warning);
+    --station-occupied-bg: var(--color-warning-light);
+    --station-occupied-border: var(--color-warning);
+
+    /* Finished: Danger/Red */
+    --station-finished: var(--color-danger);
+    --station-finished-bg: var(--color-danger-light);
+    --station-finished-border: #f87171;
+
+    /* Ending: Critical Danger */
+    --station-ending: var(--color-danger-dark);
+    --station-ending-bg: #fecaca;
+    --station-ending-border: #f87171;
+}
+
+/* ============================================
+   MAIN CONTAINER
+   ============================================ */
+.stations-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 4px;
+}
+
+/* ============================================
+   HEADER SECTION - Compact
+   ============================================ */
+.stations-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    padding: 6px 12px;
+    background: var(--color-white);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.stations-header-left {
+    flex: 1;
+    min-width: 200px;
+}
+
+.stations-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-gray-800);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.stations-title i {
+    color: var(--color-primary-600);
+}
+
+.stations-subtitle {
+    display: none;
+}
+
+.stations-header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.status-legend {
+    display: flex;
+    gap: var(--spacing-sm);
+    font-size: 0.75rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--color-gray-600);
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.legend-dot.free {
+    background: var(--station-free);
+}
+
+.legend-dot.occupied {
+    background: var(--station-occupied);
+}
+
+.legend-dot.finished {
+    background: var(--station-finished);
+    animation: pulse-dot 1s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.3);
+    }
+}
+
+.sound-toggle-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    background: var(--color-primary-500);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.sound-toggle-btn:hover {
+    background: var(--color-primary-600);
+}
+
+.sound-toggle-btn.muted {
+    background: var(--color-gray-400);
+}
+
+/* ============================================
+   DESKTOP VIEW - GRID LAYOUT
+   ============================================ */
+.stations-desktop-view {
+    display: none;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-flow: dense;
+    gap: 6px;
+    align-items: start;
+}
+
+/* Large screens - show 3 columns with explicit grouping */
+@media (min-width: 1200px) {
+    .stations-desktop-view {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* Column 1: Hydroterapia, Pole magnetyczne, Aquavibron, Sala 21 (items 1-4) */
+    .stations-desktop-view> :nth-child(1),
+    .stations-desktop-view> :nth-child(2),
+    .stations-desktop-view> :nth-child(3),
+    .stations-desktop-view> :nth-child(4) {
+        grid-column: 1;
+    }
+
+    /* Column 2: Fizyko 18, Fizyko 22 (items 5-6) */
+    .stations-desktop-view> :nth-child(5),
+    .stations-desktop-view> :nth-child(6) {
+        grid-column: 2;
+    }
+
+    /* Column 3: Sala Gimnastyczna (item 7) */
+    .stations-desktop-view> :nth-child(7) {
+        grid-column: 3;
+        grid-row: 1 / span 6;
+    }
+
+    .stations-mobile-view {
+        display: none;
+    }
+}
+
+/* Medium screens - show grid with auto-fit */
+@media (min-width: 768px) and (max-width: 1199px) {
+    .stations-desktop-view {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
+    .stations-mobile-view {
+        display: none;
+    }
+}
+
+/* Room Panel - Compact */
+.room-panel {
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.room-panel-header {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--color-gray-700);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+}
+
+.room-panel-title {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.room-panel-title i {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.room-stat {
+    font-size: 0.75rem;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.room-panel-body {
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Room-specific header colors */
+.room-panel[data-room="hydro"] .room-panel-header {
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+}
+
+.room-panel[data-room="magnet"] .room-panel-header {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+}
+
+.room-panel[data-room="physio1"] .room-panel-header,
+.room-panel[data-room="physio2"] .room-panel-header {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.room-panel[data-room="aquavibron"] .room-panel-header {
+    background: linear-gradient(135deg, #14b8a6, #0d9488);
+}
+
+.room-panel[data-room="sala21"] .room-panel-header {
+    background: linear-gradient(135deg, #ec4899, #db2777);
+}
+
+.room-panel[data-room="gym"] .room-panel-header {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+/* ============================================
+   STATION CARDS - SIMPLE TYPE
+   ============================================ */
+.station-card.station-simple {
+    border-radius: var(--border-radius-sm);
+    transition: all 0.15s ease;
+    cursor: pointer;
+}
+
+.station-card.station-simple.free {
+    background: var(--station-free-bg);
+    border: 1px solid var(--station-free-border);
+}
+
+.station-card.station-simple.free:hover {
+    background: var(--station-free);
+    color: white;
+    transform: scale(1.02);
+}
+
+.station-card.station-simple.free:hover .station-duration {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.station-card.station-simple.occupied {
+    background: var(--station-occupied-bg);
+    border: 1px solid var(--station-occupied-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: default;
+}
+
+.station-card.station-simple.finished {
+    background: var(--station-finished-bg);
+    border: 1px solid var(--station-finished-border);
+    animation: pulse-card 1.5s ease-in-out infinite;
+}
+
+/* Ending state - last 60 seconds warning */
+.station-card.ending {
+    background: var(--station-ending-bg) !important;
+    border-color: var(--station-ending-border) !important;
+    animation: pulse-ending 0.8s ease-in-out infinite !important;
+}
+
+.station-card.ending .station-timer {
+    color: var(--station-ending) !important;
+    font-weight: 800;
+}
+
+@keyframes pulse-ending {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.6);
+        transform: scale(1);
+    }
+
+    50% {
+        box-shadow: 0 0 8px 4px rgba(220, 38, 38, 0.3);
+        transform: scale(1.02);
+    }
+}
+
+@keyframes pulse-card {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0);
+    }
+}
+
+.station-simple-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+}
+
+.station-timer-content {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 6px 10px;
+    flex: 1;
+}
+
+.station-finished-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 12px;
+    gap: 2px;
+}
+
+.station-name {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--color-gray-800);
+}
+
+.station-duration {
+    font-size: 0.75rem;
+    color: var(--color-gray-500);
+}
+
+.station-timer {
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-gray-800);
+}
+
+.station-release-hint {
+    font-size: 0.65rem;
+    color: var(--station-finished);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.station-cancel-btn {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.1);
+    color: var(--color-gray-600);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 6px;
+    transition: all 0.15s ease;
+}
+
+.station-cancel-btn:hover {
+    background: var(--color-danger);
+    color: white;
+}
+
+/* ============================================
+   STATION CARDS - MULTI TYPE
+   ============================================ */
+.station-card.station-multi {
+    border-radius: var(--border-radius-sm);
+    padding: var(--spacing-xs);
+    background: var(--color-gray-50);
+    border: 1px solid var(--color-gray-200);
+}
+
+.station-card.station-multi.occupied {
+    background: var(--station-occupied-bg);
+    border-color: var(--station-occupied-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.station-card.station-multi.finished {
+    background: var(--station-finished-bg);
+    border-color: var(--station-finished-border);
+    cursor: pointer;
+    animation: pulse-card 1.5s ease-in-out infinite;
+}
+
+.station-header {
+    margin-bottom: 6px;
+}
+
+.station-header .station-name {
+    font-size: 0.8rem;
+    color: var(--color-gray-600);
+}
+
+.station-occupied-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 1;
+    padding-right: var(--spacing-xs);
+}
+
+.station-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.station-treatment-name {
+    font-size: 0.7rem;
+    color: var(--color-gray-500);
+}
+
+.station-card.station-multi.finished .station-info {
+    text-align: center;
+}
+
+.station-card.station-multi.finished .station-release-hint {
+    margin-top: 4px;
+}
+
+/* Treatment Tiles */
+.treatment-tiles {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.treatment-tile {
+    flex: 1;
+    min-width: 60px;
+    padding: 6px 8px;
+    border: none;
+    border-radius: 4px;
+    background: var(--station-free);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    transition: all 0.15s ease;
+    font-family: inherit;
+}
+
+.treatment-tile:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+}
+
+.treatment-tile:disabled,
+.treatment-tile.disabled {
+    background: var(--color-gray-300);
+    color: var(--color-gray-500);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.treatment-tile-name {
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+
+.treatment-tile-time {
+    font-size: 0.65rem;
+    opacity: 0.8;
+}
+
+.treatment-tile-limit {
+    font-size: 0.6rem;
+    opacity: 0.7;
+}
+
+/* ============================================
+   MOBILE VIEW - ACCORDION
+   ============================================ */
+.stations-mobile-view {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+@media (min-width: 768px) {
+    .stations-mobile-view {
+        display: none;
+    }
+}
+
+.room-accordion {
+    background: white;
+    border-radius: var(--border-radius-sm);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.room-accordion-header {
+    padding: 10px 12px;
+    background: var(--color-gray-700);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.9rem;
+}
+
+.room-accordion-header.expanded {
+    border-bottom: 2px solid var(--color-primary-500);
+}
+
+/* Accordion header colors */
+.room-accordion[data-room="hydro"] .room-accordion-header {
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+}
+
+.room-accordion[data-room="magnet"] .room-accordion-header {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+}
+
+.room-accordion[data-room="physio1"] .room-accordion-header,
+.room-accordion[data-room="physio2"] .room-accordion-header {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.room-accordion[data-room="aquavibron"] .room-accordion-header {
+    background: linear-gradient(135deg, #14b8a6, #0d9488);
+}
+
+.room-accordion[data-room="sala21"] .room-accordion-header {
+    background: linear-gradient(135deg, #ec4899, #db2777);
+}
+
+.room-accordion[data-room="gym"] .room-accordion-header {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.room-accordion-title {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.room-accordion-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.room-accordion-status {
+    display: flex;
+    gap: 4px;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-dot.free {
+    background: var(--station-free);
+}
+
+.status-dot.occupied {
+    background: var(--station-occupied);
+}
+
+.status-dot.finished {
+    background: var(--station-finished);
+    animation: pulse-dot 1s ease-in-out infinite;
+}
+
+.room-accordion-arrow {
+    transition: transform 0.2s ease;
+    font-size: 0.8rem;
+}
+
+.room-accordion-header.expanded .room-accordion-arrow {
+    transform: rotate(180deg);
+}
+
+.room-accordion-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease-out;
+    background: var(--color-gray-50);
+}
+
+.room-accordion-body.expanded {
+    max-height: 800px;
+}
+
+.room-accordion-content {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Mobile adjustments */
+@media (max-width: 767px) {
+    .stations-header {
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+
+    .stations-title {
+        font-size: 1rem;
+    }
+
+    .status-legend {
+        font-size: 0.7rem;
+    }
+
+    .station-timer {
+        font-size: 1.5rem;
+    }
+
+    .treatment-tile {
+        padding: 10px 8px;
+    }
+
+    .treatment-tile-name {
+        font-size: 0.85rem;
+    }
+}
+
+/* ============================================
+   HIDE MODALS (no longer needed)
+   ============================================ */
+.treatment-modal,
+.confirm-modal {
+    display: none !important;
+}

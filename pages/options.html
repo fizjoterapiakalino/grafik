@@ -1,238 +1,295 @@
-<h1>Opcje Aplikacji</h1>
-
-<div class="options-container">
-    <!-- Panel lewy: Lista pracowników -->
-    <div class="employee-list-panel">
-        <h2>Zarządzaj pracownikami</h2>
-        <div class="search-container">
-            <i class="fas fa-search search-icon"></i>
-            <input type="text" id="employeeSearchInput" class="search-input" placeholder="Wyszukaj pracownika..." />
+<!-- Options Page - Clinical Dashboard Design -->
+<div class="options-page">
+    <!-- Page Header with Breadcrumb -->
+    <header class="page-header">
+        <div class="page-header-content">
+            <div class="page-title-group">
+                <h1 class="page-title">
+                    <i class="fas fa-cog"></i>
+                    Opcje Aplikacji
+                </h1>
+                <p class="page-subtitle">Zarządzaj pracownikami, ustawieniami i kopiami zapasowymi</p>
+            </div>
         </div>
-        <div id="employeeListContainer" class="employee-list-container">
-            <!-- Lista pracowników zostanie wstrzyknięta tutaj przez JS -->
-        </div>
-        <button id="addEmployeeBtn" class="action-btn primary" style="width: 100%; margin-top: 15px;">
-            <i class="fas fa-plus"></i> Dodaj nowego pracownika
-        </button>
-    </div>
+    </header>
 
-    <!-- Panel prawy: Szczegóły i edycja -->
-    <div class="employee-details-panel">
-        <div id="detailsPlaceholder" class="details-placeholder">
-            <i class="fas fa-arrow-left"></i>
-            <p>Wybierz pracownika z listy, aby zobaczyć szczegóły i opcje edycji.</p>
-        </div>
-
-        <div id="detailsEditForm" class="details-edit-form" style="display: none">
-            <!-- Sekcja: Dane podstawowe -->
-            <div class="form-section">
-                <h3 class="section-title"><i class="fas fa-user-edit"></i> Dane podstawowe</h3>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="employeeFirstNameInput">Imię</label>
-                        <input type="text" id="employeeFirstNameInput" placeholder="np. Jan" />
-                    </div>
-                    <div class="form-group">
-                        <label for="employeeLastNameInput">Nazwisko</label>
-                        <input type="text" id="employeeLastNameInput" placeholder="np. Kowalski" />
-                    </div>
+    <!-- Main Content Grid - Bento Layout -->
+    <div class="options-grid">
+        <!-- Employee List Card -->
+        <section class="options-card employee-list-card">
+            <div class="card-header">
+                <div class="card-header-icon">
+                    <i class="fas fa-users"></i>
                 </div>
-                <div class="form-group">
-                    <label for="employeeDisplayNameInput">Nazwa wyświetlana</label>
-                    <input type="text" id="employeeDisplayNameInput" placeholder="np. Jan K." />
-                    <span class="field-hint">Ta nazwa będzie widoczna w grafiku i na liście urlopów</span>
-                </div>
-                <div class="form-group">
-                    <label for="employeeNumberInput">Numer pracownika</label>
-                    <input type="text" id="employeeNumberInput" placeholder="np. 001" />
+                <div class="card-header-text">
+                    <h2 class="card-title">Pracownicy</h2>
+                    <span class="card-badge" id="employeeCountBadge">0</span>
                 </div>
             </div>
 
-            <!-- Sekcja: Urlopy -->
-            <div class="form-section">
-                <h3 class="section-title"><i class="fas fa-umbrella-beach"></i> Urlopy</h3>
-                <div class="form-group">
-                    <label for="leaveEntitlementInput">Urlop należny w roku</label>
-                    <div class="input-with-suffix">
-                        <input type="number" id="leaveEntitlementInput" min="0" value="26" />
-                        <span class="input-suffix">dni</span>
-                    </div>
-                    <span class="field-hint">Urlop zaległy możesz edytować w podsumowaniu rocznym na stronie
-                        urlopów</span>
-                </div>
+            <div class="search-wrapper">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" id="employeeSearchInput" class="search-input" placeholder="Szukaj pracownika..." />
+                <button class="search-clear-btn" id="clearEmployeeSearch" style="display: none;">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
 
-            <!-- Sekcja: Ustawienia -->
-            <div class="form-section">
-                <h3 class="section-title"><i class="fas fa-cog"></i> Ustawienia</h3>
-                <div class="form-group"
-                    data-tooltip="Określa przynależność pracownika do I lub II zmiany. Ułatwia planowanie obsady i filtrowanie grafiku.">
-                    <label for="employeeShiftGroup">Grupa zmianowa <span class="tooltip-indicator"
-                            style="margin-left: 5px; display: inline-block;"><i
-                                class="fas fa-info-circle"></i></span></label>
-                    <select id="employeeShiftGroup" class="form-select">
-                        <option value="">Brak przypisania</option>
-                        <option value="first">Pierwsza zmiana</option>
-                        <option value="second">Druga zmiana</option>
-                    </select>
-                </div>
-                <div class="checkbox-group">
-                    <div class="form-group form-group-checkbox"
-                        data-tooltip="Administratorzy mają pełny dostęp do edycji grafiku, urlopów i ustawień wszystkich pracowników">
-                        <input type="checkbox" id="employeeRoleAdmin" />
-                        <label for="employeeRoleAdmin">
-                            <i class="fas fa-key checkbox-icon"></i>
-                            Administrator
-                        </label>
-                        <span class="tooltip-indicator"><i class="fas fa-info-circle"></i></span>
-                    </div>
-                    <div class="form-group form-group-checkbox"
-                        data-tooltip="Pracownik nie będzie widoczny w grafiku, ale zachowa wszystkie dane w systemie">
-                        <input type="checkbox" id="employeeIsHidden" />
-                        <label for="employeeIsHidden">
-                            <i class="fas fa-eye-slash checkbox-icon"></i>
-                            Ukryty w grafiku
-                        </label>
-                        <span class="tooltip-indicator"><i class="fas fa-info-circle"></i></span>
-                    </div>
-                    <div class="form-group form-group-checkbox"
-                        data-tooltip="Pracownik widoczny tylko w Grafiku - nie pojawia się w urlopach ani podsumowaniach (tzw. skoczek)">
-                        <input type="checkbox" id="employeeIsScheduleOnly" />
-                        <label for="employeeIsScheduleOnly">
-                            <i class="fas fa-running checkbox-icon"></i>
-                            Tylko w grafiku
-                        </label>
-                        <span class="tooltip-indicator"><i class="fas fa-info-circle"></i></span>
-                    </div>
-                </div>
+            <div id="employeeListContainer" class="employee-list">
+                <!-- Lista pracowników - JS injection -->
             </div>
 
-            <!-- Sekcja: Przypisanie konta -->
-            <div class="form-section">
-                <h3 class="section-title"><i class="fas fa-link"></i> Przypisanie konta</h3>
-                <div class="form-group">
-                    <label for="employeeUidInput">Przypisany użytkownik (UID)</label>
-                    <div class="uid-input-group">
-                        <input type="text" id="employeeUidInput" readonly placeholder="Brak przypisanego użytkownika" />
+            <button id="addEmployeeBtn" class="add-employee-btn">
+                <i class="fas fa-plus"></i>
+                <span>Dodaj pracownika</span>
+            </button>
+        </section>
+
+        <!-- Employee Details Card -->
+        <section class="options-card employee-details-card">
+            <!-- Placeholder when no employee selected -->
+            <div id="detailsPlaceholder" class="details-placeholder">
+                <div class="placeholder-icon">
+                    <i class="fas fa-user-edit"></i>
+                </div>
+                <h3>Wybierz pracownika</h3>
+                <p>Kliknij pracownika z listy, aby wyświetlić i edytować szczegóły.</p>
+            </div>
+
+            <!-- Edit Form (hidden by default) -->
+            <div id="detailsEditForm" class="details-form" style="display: none">
+                <!-- Basic Info Section -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <i class="fas fa-id-card"></i>
+                        <h3>Dane podstawowe</h3>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label for="employeeFirstNameInput">Imię</label>
+                            <input type="text" id="employeeFirstNameInput" placeholder="np. Jan" />
+                        </div>
+                        <div class="form-field">
+                            <label for="employeeLastNameInput">Nazwisko</label>
+                            <input type="text" id="employeeLastNameInput" placeholder="np. Kowalski" />
+                        </div>
+                        <div class="form-field form-field-full">
+                            <label for="employeeDisplayNameInput">Nazwa wyświetlana</label>
+                            <input type="text" id="employeeDisplayNameInput" placeholder="np. Jan K." />
+                            <span class="field-hint">Widoczna w grafiku i na liście urlopów</span>
+                        </div>
+                        <div class="form-field">
+                            <label for="employeeNumberInput">Numer</label>
+                            <input type="text" id="employeeNumberInput" placeholder="np. 001" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Leave & Schedule Section -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <i class="fas fa-calendar-alt"></i>
+                        <h3>Urlopy i zmiany</h3>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label for="leaveEntitlementInput">Urlop roczny</label>
+                            <div class="input-with-unit">
+                                <input type="number" id="leaveEntitlementInput" min="0" value="26" />
+                                <span class="input-unit">dni</span>
+                            </div>
+                        </div>
+                        <div class="form-field">
+                            <label for="employeeShiftGroup">Grupa zmianowa</label>
+                            <div class="select-wrapper">
+                                <select id="employeeShiftGroup">
+                                    <option value="">Brak przypisania</option>
+                                    <option value="first">I zmiana</option>
+                                    <option value="second">II zmiana</option>
+                                </select>
+                                <i class="fas fa-chevron-down select-arrow"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Permissions Section -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <i class="fas fa-shield-alt"></i>
+                        <h3>Uprawnienia</h3>
+                    </div>
+                    <div class="toggle-group">
+                        <label class="toggle-item" data-tooltip="Pełny dostęp do edycji grafiku, urlopów i ustawień">
+                            <input type="checkbox" id="employeeRoleAdmin" />
+                            <span class="toggle-switch"></span>
+                            <span class="toggle-label">
+                                <i class="fas fa-crown"></i>
+                                Administrator
+                            </span>
+                        </label>
+                        <label class="toggle-item" data-tooltip="Pracownik nie będzie widoczny w grafiku">
+                            <input type="checkbox" id="employeeIsHidden" />
+                            <span class="toggle-switch"></span>
+                            <span class="toggle-label">
+                                <i class="fas fa-eye-slash"></i>
+                                Ukryty w grafiku
+                            </span>
+                        </label>
+                        <label class="toggle-item" data-tooltip="Widoczny tylko w Grafiku (nie w urlopach)">
+                            <input type="checkbox" id="employeeIsScheduleOnly" />
+                            <span class="toggle-switch"></span>
+                            <span class="toggle-label">
+                                <i class="fas fa-running"></i>
+                                Tylko grafik
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Account Link Section -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <i class="fas fa-link"></i>
+                        <h3>Konto użytkownika</h3>
+                    </div>
+                    <div class="uid-field">
+                        <input type="text" id="employeeUidInput" readonly placeholder="Brak przypisanego konta" />
                         <div class="uid-actions">
-                            <button id="assignUidBtn" class="action-btn secondary"
-                                title="Przypisz swoje konto do tego pracownika">
-                                <i class="fas fa-user-plus"></i> Przypisz do mnie
+                            <button id="assignUidBtn" class="uid-btn uid-btn-assign" title="Przypisz swoje konto">
+                                <i class="fas fa-user-plus"></i>
+                                <span>Przypisz</span>
                             </button>
-                            <button id="clearUidBtn" class="action-btn danger" title="Usuń przypisanie konta">
+                            <button id="clearUidBtn" class="uid-btn uid-btn-clear" title="Usuń przypisanie">
                                 <i class="fas fa-unlink"></i>
                             </button>
                         </div>
                     </div>
-                    <span class="field-hint">Przypisanie konta pozwala pracownikowi na logowanie się i edycję własnego
-                        grafiku</span>
+                    <span class="field-hint">Pozwala pracownikowi na logowanie i edycję własnego grafiku</span>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="form-actions">
+                    <button id="saveEmployeeBtn" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        Zapisz zmiany
+                    </button>
+                    <button id="deleteEmployeeBtn" class="btn btn-danger-outline">
+                        <i class="fas fa-trash-alt"></i>
+                        Usuń
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings Cards - Right Column -->
+        <aside class="options-sidebar">
+            <!-- Backup Card -->
+            <div class="options-card settings-card">
+                <div class="card-header compact">
+                    <div class="card-header-icon">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <h2 class="card-title">Kopia zapasowa</h2>
+                </div>
+                <div class="card-content">
+                    <div class="backup-status">
+                        <span class="backup-label">Ostatnia kopia:</span>
+                        <span class="backup-date" id="lastBackupDate">Nigdy</span>
+                    </div>
+                    <div class="backup-actions">
+                        <button id="createBackupBtn" class="btn btn-secondary">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            Utwórz kopię
+                        </button>
+                        <button id="restoreBackupBtn" class="btn btn-outline">
+                            <i class="fas fa-cloud-download-alt"></i>
+                            Przywróć
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Sticky footer z przyciskami akcji -->
-            <div class="form-actions-footer">
-                <button id="saveEmployeeBtn" class="action-btn primary">
-                    <i class="fas fa-save"></i> Zapisz zmiany
-                </button>
-                <button id="deleteEmployeeBtn" class="action-btn danger">
-                    <i class="fas fa-trash-alt"></i> Usuń pracownika
-                </button>
+            <!-- Color Settings Card -->
+            <div class="options-card settings-card">
+                <div class="card-header compact">
+                    <div class="card-header-icon rainbow">
+                        <i class="fas fa-palette"></i>
+                    </div>
+                    <h2 class="card-title">Kolory zabiegów</h2>
+                </div>
+                <div class="card-content">
+                    <div class="color-picker-grid">
+                        <div class="color-picker-item">
+                            <span class="color-swatch" id="colorMassagePreview"></span>
+                            <span class="color-name">Masaż</span>
+                            <input type="color" id="colorMassage" value="#f472b6" />
+                        </div>
+                        <div class="color-picker-item">
+                            <span class="color-swatch" id="colorPnfPreview"></span>
+                            <span class="color-name">PNF</span>
+                            <input type="color" id="colorPnf" value="#3b82f6" />
+                        </div>
+                        <div class="color-picker-item">
+                            <span class="color-swatch" id="colorEveryOtherDayPreview"></span>
+                            <span class="color-name">Co 2 dni</span>
+                            <input type="color" id="colorEveryOtherDay" value="#a855f7" />
+                        </div>
+                        <div class="color-picker-item">
+                            <span class="color-swatch" id="colorBreakPreview"></span>
+                            <span class="color-name">Przerwa</span>
+                            <input type="color" id="colorBreak" value="#64748b" />
+                        </div>
+                    </div>
+                    <button id="resetColorsBtn" class="btn btn-ghost">
+                        <i class="fas fa-undo"></i>
+                        Przywróć domyślne
+                    </button>
+                </div>
             </div>
-        </div>
+        </aside>
     </div>
 
-    <!-- Panel prawy: Backup i ustawienia -->
-    <div class="settings-panel">
-        <div class="backup-container">
-            <h2><i class="fas fa-database"></i> Kopia zapasowa</h2>
-            <div class="backup-controls">
-                <button id="createBackupBtn" class="action-btn secondary"><i class="fas fa-save"></i> Utwórz
-                    kopię</button>
-                <button id="restoreBackupBtn" class="action-btn outline">
-                    <i class="fas fa-undo"></i> Przywróć
-                </button>
-            </div>
-            <div class="backup-info">
-                <p>Ostatnia kopia: <span id="lastBackupDate">Nigdy</span></p>
-            </div>
-        </div>
-
-        <div class="color-settings-container">
-            <h2><i class="fas fa-palette"></i> Personalizacja kolorów</h2>
-            <p class="section-description">Dostosuj kolory typów zabiegów.</p>
-
-            <div class="color-settings-grid">
-                <div class="color-setting-item">
-                    <label for="colorMassage">
-                        <span class="color-preview" id="colorMassagePreview"></span>
-                        Masaż
-                    </label>
-                    <input type="color" id="colorMassage" value="#f472b6" />
-                </div>
-                <div class="color-setting-item">
-                    <label for="colorPnf">
-                        <span class="color-preview" id="colorPnfPreview"></span>
-                        PNF
-                    </label>
-                    <input type="color" id="colorPnf" value="#3b82f6" />
-                </div>
-                <div class="color-setting-item">
-                    <label for="colorEveryOtherDay">
-                        <span class="color-preview" id="colorEveryOtherDayPreview"></span>
-                        Co 2 dni
-                    </label>
-                    <input type="color" id="colorEveryOtherDay" value="#a855f7" />
-                </div>
-                <div class="color-setting-item">
-                    <label for="colorBreak">
-                        <span class="color-preview" id="colorBreakPreview"></span>
-                        Przerwa
-                    </label>
-                    <input type="color" id="colorBreak" value="#64748b" />
-                </div>
-            </div>
-
-            <div class="color-settings-actions">
-                <button id="resetColorsBtn" class="action-btn outline">
-                    <i class="fas fa-undo"></i> Przywróć domyślne
-                </button>
-            </div>
-        </div>
-    </div>
-
+    <!-- Delete Confirmation Modal -->
     <div id="deleteConfirmationModal" class="modal-overlay" style="display: none">
-        <div class="modal-content">
-            <h2 class="modal-title">Potwierdź usunięcie</h2>
-            <p>
-                Czy na pewno chcesz trwale usunąć pracownika <strong id="employeeNameToDelete"></strong>? Ta operacja
-                jest nieodwracalna.
-            </p>
-            <p>Aby potwierdzić, wpisz nazwę pracownika w polu poniżej:</p>
-            <div class="form-group">
-                <input type="text" id="deleteConfirmationInput" autocomplete="off" />
+        <div class="modal-dialog modal-danger">
+            <div class="modal-header">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h2>Potwierdź usunięcie</h2>
+            </div>
+            <div class="modal-body">
+                <p>Czy na pewno chcesz trwale usunąć pracownika <strong id="employeeNameToDelete"></strong>?</p>
+                <p class="modal-warning">Ta operacja jest nieodwracalna.</p>
+                <div class="form-field">
+                    <label>Wpisz nazwę pracownika, aby potwierdzić:</label>
+                    <input type="text" id="deleteConfirmationInput" autocomplete="off" />
+                </div>
             </div>
             <div class="modal-actions">
-                <button id="confirmDeleteBtn" class="action-btn danger" disabled>Usuń trwale</button>
-                <button id="cancelDeleteBtn" class="action-btn outline">Anuluj</button>
+                <button id="cancelDeleteBtn" class="btn btn-outline">Anuluj</button>
+                <button id="confirmDeleteBtn" class="btn btn-danger" disabled>Usuń trwale</button>
             </div>
         </div>
     </div>
 
+    <!-- Restore Confirmation Modal -->
     <div id="restoreConfirmationModal" class="modal-overlay" style="display: none">
-        <div class="modal-content">
-            <h2 class="modal-title">Potwierdź przywrócenie danych</h2>
-            <p>
-                Czy na pewno chcesz przywrócić dane z ostatniej kopii zapasowej?
-                <strong>Ta operacja nadpisze wszystkie aktualne dane w grafiku i urlopach.</strong> Ta operacja jest
-                nieodwracalna.
-            </p>
-            <p>Aby potwierdzić, wpisz "PRZYWRÓĆ" w polu poniżej:</p>
-            <div class="form-group">
-                <input type="text" id="restoreConfirmationInput" autocomplete="off" />
+        <div class="modal-dialog modal-warning">
+            <div class="modal-header">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h2>Potwierdź przywrócenie</h2>
+            </div>
+            <div class="modal-body">
+                <p>Czy na pewno chcesz przywrócić dane z ostatniej kopii zapasowej?</p>
+                <p class="modal-warning"><strong>Wszystkie aktualne dane zostaną nadpisane.</strong></p>
+                <div class="form-field">
+                    <label>Wpisz "PRZYWRÓĆ" aby potwierdzić:</label>
+                    <input type="text" id="restoreConfirmationInput" autocomplete="off" />
+                </div>
             </div>
             <div class="modal-actions">
-                <button id="confirmRestoreBtn" class="action-btn danger" disabled>Przywróć dane</button>
-                <button id="cancelRestoreBtn" class="action-btn outline">Anuluj</button>
+                <button id="cancelRestoreBtn" class="btn btn-outline">Anuluj</button>
+                <button id="confirmRestoreBtn" class="btn btn-warning" disabled>Przywróć dane</button>
             </div>
         </div>
     </div>

@@ -11,6 +11,8 @@ import { Changes } from './changes.js';
 import { ScrappedPdfs } from './scrapped-pdfs.js';
 import { Options } from './options.js';
 import { Login } from './login.js';
+import { Statistics } from './statistics.js';
+import { Stations } from './stations.js';
 
 const auth = authRaw as unknown as FirebaseAuthWrapper;
 
@@ -67,6 +69,16 @@ export const Router: RouterAPI = (() => {
             page: 'options',
             init: () => Options.init(),
             getModule: () => Options,
+        },
+        statistics: {
+            page: 'statistics',
+            init: () => Statistics.init(),
+            getModule: () => Statistics,
+        },
+        stations: {
+            page: 'stations',
+            init: () => Stations.init(),
+            getModule: () => Stations,
         },
         login: {
             page: 'login',

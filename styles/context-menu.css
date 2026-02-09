@@ -1,25 +1,25 @@
-/* --- Menu Kontekstowe --- */
+/* --- Premium Glassmorphism Context Menu --- */
 .context-menu {
     position: absolute;
     display: none;
-    background-color: #fff;
-    border: 1px solid #ddd;
-    padding: 5px 0;
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: var(--spacing-sm);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-lg), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
     z-index: 1100;
-    transition:
-        opacity 0.1s ease-in-out,
-        transform 0.1s ease-in-out;
+    transition: all var(--transition-normal);
     opacity: 0;
-    transform: scale(0.95);
-    min-width: 200px;
+    transform: scale(0.95) translateY(-10px);
+    min-width: 220px;
 }
 
 .context-menu.visible {
     display: block;
     opacity: 1;
-    transform: scale(1);
+    transform: scale(1) translateY(0);
 }
 
 .context-menu ul {
@@ -31,79 +31,96 @@
 .context-menu li {
     display: flex;
     align-items: center;
-    padding: 8px 15px;
+    padding: 10px 12px;
     cursor: pointer;
-    transition: background-color 0.2s;
-    color: #333;
-    font-size: 0.95em;
+    transition: all var(--transition-fast);
+    color: var(--color-gray-700);
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-radius: var(--border-radius);
+    margin-bottom: 2px;
+}
+
+.context-menu li:last-child {
+    margin-bottom: 0;
 }
 
 .context-menu li:hover {
-    background-color: #f2f2f2;
+    background-color: rgba(59, 130, 246, 0.08);
+    color: var(--color-secondary-700);
 }
 
 .context-menu li i {
     margin-right: 12px;
-    width: 1.2em;
+    width: 1.5em;
     text-align: center;
-    color: #555;
+    color: var(--color-gray-500);
+    font-size: 1.1em;
+    transition: color 0.15s ease;
+}
+
+.context-menu li:hover i {
+    color: var(--color-secondary-600);
 }
 
 /* Specjalny styl dla opcji usuwania/czyszczenia */
-.context-menu li.danger,
+.context-menu li.danger {
+    color: var(--color-danger);
+}
+
 .context-menu li.danger i {
-    color: #dc3545; /* Czerwony kolor ostrzegawczy */
+    color: var(--color-danger);
 }
 
 .context-menu li.danger:hover {
-    background-color: #f8d7da; /* Jasnoczerwone tło przy najechaniu */
+    background-color: rgba(239, 68, 68, 0.08);
+    color: var(--color-danger-dark);
 }
 
 /* Specjalny styl dla opcji informacyjnych */
-.context-menu li.info,
-.context-menu li.info i {
-    color: #007bff; /* Niebieski kolor informacyjny */
+.context-menu li.info {
+    color: var(--color-secondary-600);
+    border-bottom: 1px solid var(--color-gray-100);
+    margin-bottom: 6px;
+    padding-bottom: 12px;
+    border-radius: 0;
 }
 
 .context-menu li.info:hover {
-    background-color: #e9f5ff; /* Jasnoniebieskie tło przy najechaniu */
+    background-color: transparent;
 }
 
-/* --- Podmenu Historii --- */
+/* --- Premium Submenu --- */
 .context-submenu {
     display: none;
     position: absolute;
-    left: 100%;
-    top: -5px; /* Dopasuj, aby było na tej samej wysokości co element nadrzędny */
-    background-color: #fff;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    padding: 5px 0;
+    left: calc(100% + 5px);
+    top: 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: 6px;
     min-width: 180px;
-    z-index: 1101; /* Wyżej niż główne menu */
+    z-index: 1101;
+    animation: submenuFadeIn var(--transition-normal);
 }
 
-.context-menu li:hover > .context-submenu {
+@keyframes submenuFadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.context-menu li:hover>.context-submenu {
     display: block;
-}
-
-.context-submenu li {
-    padding: 8px 15px;
-}
-
-.context-submenu li:hover {
-    background-color: #f2f2f2;
-}
-
-.context-submenu li.empty-history {
-    color: #999;
-    font-style: italic;
-    cursor: default;
-}
-
-.context-submenu li.empty-history:hover {
-    background-color: transparent;
 }
 
 .context-menu li.has-submenu {
@@ -112,6 +129,6 @@
 
 .context-menu li.has-submenu .submenu-arrow {
     margin-left: auto;
-    font-size: 0.8em;
-    color: #999;
+    font-size: 0.7em;
+    color: var(--color-gray-400);
 }

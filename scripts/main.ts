@@ -2,6 +2,7 @@
 import { Router } from './router.js';
 import { BackupScheduler } from './backup-scheduler.js';
 import { UXEnhancements } from './ux-enhancements.js';
+import { ConnectionMonitor } from './connection-monitor.js';
 import './firebase-config.js';
 import './common.js';
 import './utils.js';
@@ -24,6 +25,7 @@ import { ColorPreferences } from './color-preferences.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     ColorPreferences.init(); // Apply saved color preferences
+    ConnectionMonitor.init(); // Monitor Firebase connection status
     Router.init();
     BackupScheduler.init();
     UXEnhancements.init();

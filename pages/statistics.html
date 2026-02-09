@@ -1,0 +1,224 @@
+<div class="statistics-header-controls">
+    <div class="view-tabs">
+        <button id="overviewViewBtn" class="tab-btn active">Przegląd</button>
+        <button id="leavesStatsBtn" class="tab-btn">Statystyki Urlopów</button>
+        <button id="scheduleStatsBtn" class="tab-btn">Statystyki Grafiku</button>
+        <button id="employeeStatsBtn" class="tab-btn">Pracownicy</button>
+    </div>
+    <div class="year-selector-container">
+        <label for="statsYearSelect">Rok:</label>
+        <select id="statsYearSelect" class="year-select"></select>
+    </div>
+</div>
+
+<div id="statisticsContent" class="statistics-content">
+    <!-- Overview View -->
+    <div id="overviewView" class="stats-view active">
+        <div class="stats-grid overview-grid">
+            <div class="stat-card primary" id="totalEmployeesCard">
+                <div class="stat-icon"><i class="fas fa-users"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="totalEmployeesValue">-</span>
+                    <span class="stat-label">Pracownicy</span>
+                </div>
+            </div>
+            <div class="stat-card success" id="totalPatientsCard">
+                <div class="stat-icon"><i class="fas fa-user-injured"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="totalPatientsValue">-</span>
+                    <span class="stat-label">Pacjenci (dziś)</span>
+                </div>
+            </div>
+            <div class="stat-card warning" id="onLeaveCard">
+                <div class="stat-icon"><i class="fas fa-plane-departure"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="onLeaveValue">-</span>
+                    <span class="stat-label">Na urlopie (dziś)</span>
+                </div>
+            </div>
+            <div class="stat-card info" id="totalLeaveDaysCard">
+                <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="totalLeaveDaysValue">-</span>
+                    <span class="stat-label">Dni urlopów (rok)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-row">
+            <div class="stats-chart-container">
+                <h3><i class="fas fa-chart-pie"></i> Podział typów urlopów</h3>
+                <div class="chart-wrapper">
+                    <canvas id="leaveTypesChart"></canvas>
+                </div>
+            </div>
+            <div class="stats-chart-container">
+                <h3><i class="fas fa-chart-line"></i> Trendy urlopowe (miesięcznie)</h3>
+                <div class="chart-wrapper">
+                    <canvas id="monthlyLeavesChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-row">
+            <div class="stats-chart-container full-width">
+                <h3><i class="fas fa-user-clock"></i> Obciążenie pracowników (pacjenci/tydzień)</h3>
+                <div class="chart-wrapper">
+                    <canvas id="employeeWorkloadChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaves Stats View -->
+    <div id="leavesStatsView" class="stats-view">
+        <div class="stats-grid">
+            <div class="stat-card info" id="vacationDaysCard">
+                <div class="stat-icon"><i class="fas fa-umbrella-beach"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="vacationDaysValue">-</span>
+                    <span class="stat-label">Dni wypoczynkowych</span>
+                </div>
+            </div>
+            <div class="stat-card warning" id="childCareDaysCard">
+                <div class="stat-icon"><i class="fas fa-baby"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="childCareDaysValue">-</span>
+                    <span class="stat-label">Dni opieki nad dzieckiem</span>
+                </div>
+            </div>
+            <div class="stat-card secondary" id="sickChildCareDaysCard">
+                <div class="stat-icon"><i class="fas fa-child"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="sickChildCareDaysValue">-</span>
+                    <span class="stat-label">Opieka - chore dziecko</span>
+                </div>
+            </div>
+            <div class="stat-card danger" id="familyCareDaysCard">
+                <div class="stat-icon"><i class="fas fa-house-user"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="familyCareDaysValue">-</span>
+                    <span class="stat-label">Opieka nad rodziną</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-table-container">
+            <h3><i class="fas fa-table"></i> Szczegóły urlopów pracowników</h3>
+            <table class="stats-table" id="leavesDetailsTable">
+                <thead>
+                    <tr>
+                        <th>Pracownik</th>
+                        <th>Wypoczynkowy</th>
+                        <th>Opieka (zdrowe dziecko)</th>
+                        <th>Opieka (chore dziecko)</th>
+                        <th>Opieka (rodzina)</th>
+                        <th>Wybicie za święto</th>
+                        <th>Razem</th>
+                    </tr>
+                </thead>
+                <tbody id="leavesDetailsBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Schedule Stats View -->
+    <div id="scheduleStatsView" class="stats-view">
+        <div class="stats-grid">
+            <div class="stat-card primary" id="uniquePatientsCard">
+                <div class="stat-icon"><i class="fas fa-user-friends"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="uniquePatientsValue">-</span>
+                    <span class="stat-label">Unikalnych pacjentów</span>
+                </div>
+            </div>
+            <div class="stat-card success" id="totalSlotsCard">
+                <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="totalSlotsValue">-</span>
+                    <span class="stat-label">Zajętych slotów</span>
+                </div>
+            </div>
+            <div class="stat-card warning" id="breaksCard">
+                <div class="stat-icon"><i class="fas fa-coffee"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="breaksValue">-</span>
+                    <span class="stat-label">Przerw</span>
+                </div>
+            </div>
+            <div class="stat-card info" id="treatmentTypesCard">
+                <div class="stat-icon"><i class="fas fa-hands"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="treatmentTypesValue">-</span>
+                    <span class="stat-label">Z masażem/PNF</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-row">
+            <div class="stats-chart-container">
+                <h3><i class="fas fa-chart-bar"></i> Pacjenci wg pracownika</h3>
+                <div class="chart-wrapper">
+                    <canvas id="patientsByEmployeeChart"></canvas>
+                </div>
+            </div>
+            <div class="stats-chart-container">
+                <h3><i class="fas fa-clock"></i> Pacjenci wg godziny</h3>
+                <div class="chart-wrapper">
+                    <canvas id="patientsByTimeChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Employee Stats View -->
+    <div id="employeeStatsView" class="stats-view">
+        <div class="stats-grid">
+            <div class="stat-card primary" id="activeEmployeesCard">
+                <div class="stat-icon"><i class="fas fa-user-check"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="activeEmployeesValue">-</span>
+                    <span class="stat-label">Aktywnych pracowników</span>
+                </div>
+            </div>
+            <div class="stat-card secondary" id="hiddenEmployeesCard">
+                <div class="stat-icon"><i class="fas fa-user-slash"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="hiddenEmployeesValue">-</span>
+                    <span class="stat-label">Ukrytych</span>
+                </div>
+            </div>
+            <div class="stat-card success" id="firstShiftCard">
+                <div class="stat-icon"><i class="fas fa-sun"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="firstShiftValue">-</span>
+                    <span class="stat-label">I Zmiana</span>
+                </div>
+            </div>
+            <div class="stat-card info" id="secondShiftCard">
+                <div class="stat-icon"><i class="fas fa-moon"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="secondShiftValue">-</span>
+                    <span class="stat-label">II Zmiana</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-table-container">
+            <h3><i class="fas fa-users"></i> Lista pracowników</h3>
+            <table class="stats-table" id="employeesTable">
+                <thead>
+                    <tr>
+                        <th>Pracownik</th>
+                        <th>Zmiana</th>
+                        <th>Status</th>
+                        <th>Urlop przysługujący</th>
+                        <th>Urlop wykorzystany</th>
+                        <th>Pozostało</th>
+                    </tr>
+                </thead>
+                <tbody id="employeesTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>

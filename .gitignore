@@ -20,6 +20,12 @@ npm-debug.log*
 *.swp
 *.swo
 
+
 # OS
 .DS_Store
 Thumbs.db
+_temp_debug/skills_index.json
+_temp_debug/skills/writing-skills/SKILL.md
+_temp_skills/skills/pdf
+_temp_debug/skills/xlsx
+_temp_debug/skills/loki-mode/examples/todo-app-generated/backend/.gitignore

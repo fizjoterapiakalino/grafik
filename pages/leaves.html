@@ -1,6 +1,7 @@
 <div class="leaves-header-controls">
     <div class="view-tabs">
-        <button id="monthlyViewBtn" class="tab-btn active">Widok Miesięczny</button>
+        <button id="ganttViewBtn" class="tab-btn active">Widok Gantt</button>
+        <button id="monthlyViewBtn" class="tab-btn">Widok Miesięczny</button>
         <button id="summaryViewBtn" class="tab-btn">Podsumowanie Roczne</button>
         <button id="careViewBtn" class="tab-btn">Opieka</button>
     </div>
@@ -10,22 +11,38 @@
     </div>
 </div>
 
-<div
-    id="leavesFilterContainer"
-    class="leaves-filter-container"
-    style="padding: 10px; background-color: #f8f9fa; border-radius: 5px; margin-bottom: 15px"
->
+<div id="leavesFilterContainer" class="leaves-filter-container"
+    style="padding: 10px; background-color: #f8f9fa; border-radius: 5px; margin-bottom: 15px">
     <div id="leavesLegend" class="leaves-legend"></div>
     <button id="currentYearBtn" class="action-btn secondary" style="margin-left: auto">Ten Rok</button>
+    <button id="toggleAllMonthsBtn" class="action-btn outline">Zwiń/Rozwiń wszystko</button>
     <button id="clearFiltersBtn" class="action-btn outline">Wyczyść filtry</button>
 </div>
 
-<table id="leavesTable" class="leaves-table">
-    <thead>
-        <tr id="leavesHeaderRow"></tr>
-    </thead>
-    <tbody id="leavesTableBody"></tbody>
-</table>
+<!-- Gantt View Container (Desktop) -->
+<div id="ganttViewContainer" class="gantt-container">
+    <div class="gantt-fixed-column">
+        <div class="gantt-employee-header">Pracownik</div>
+        <div class="gantt-employees-list" id="ganttEmployeesList"></div>
+    </div>
+    <div class="gantt-scroll-wrapper" id="ganttScrollWrapper">
+        <div class="gantt-timeline-header" id="ganttTimelineHeader"></div>
+        <div class="gantt-timeline-body" id="ganttTimelineBody"></div>
+    </div>
+</div>
+
+<!-- Gantt Mobile View (List) -->
+<div id="ganttMobileViewContainer" class="gantt-mobile-view"></div>
+
+<!-- Monthly View (existing) -->
+<div id="monthlyViewContainer" style="display: none;">
+    <table id="leavesTable" class="leaves-table">
+        <thead>
+            <tr id="leavesHeaderRow"></tr>
+        </thead>
+        <tbody id="leavesTableBody"></tbody>
+    </table>
+</div>
 
 <div id="careViewContainer" style="display: none"></div>
 
@@ -49,57 +66,69 @@
                 <button id="nextMonthBtn" class="nav-btn"><i class="fas fa-chevron-right"></i></button>
             </div>
         </div>
-        <div class="modal-footer">
-            <div
-                class="calendar-footer-top"
-                style="
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: flex-end;
-                    width: 100%;
-                    margin-bottom: 15px;
-                    flex-wrap: wrap;
-                    gap: 15px;
-                "
-            >
-                <div class="leave-type-selector" style="text-align: left">
-                    <label for="leaveTypeSelect">Wybierz typ urlopu</label>
-                    <div class="leave-type-input-group" style="display: flex; align-items: center; gap: 10px">
-                        <span
-                            id="leaveTypeColorIndicator"
-                            class="color-indicator-box"
-                            style="
-                                display: inline-block;
-                                width: 24px;
-                                height: 24px;
-                                border-radius: 4px;
-                                border: 1px solid #ccc;
-                            "
-                        ></span>
-                        <select id="leaveTypeSelect" class="modal-select" style="flex-grow: 1">
+        <div class="modal-footer premium-footer">
+            <div class="footer-bento-grid">
+                <!-- Select Leave Type Card -->
+                <div class="bento-card leave-selection-card">
+                    <div class="card-header">
+                        <i class="fas fa-umbrella-beach"></i>
+                        <span>Typ urlopu</span>
+                    </div>
+                    <div class="leave-type-input-group">
+                        <span id="leaveTypeColorIndicator" class="color-indicator-box"></span>
+                        <select id="leaveTypeSelect" class="modal-select">
                             <option value="vacation" selected>Wypoczynkowy</option>
-                            <option value="child_care_art_188">Opieka nad zdrowym dzieckiem</option>
-                            <option value="sick_child_care">Opieka nad chorym dzieckiem</option>
-                            <option value="family_member_care">Opieka chorym członkiem rodziny</option>
+                            <option value="child_care_art_188">Opieka (Art. 188)</option>
+                            <option value="sick_child_care">Opieka (Dziecko)</option>
+                            <option value="family_member_care">Opieka (Rodzina)</option>
                             <option value="schedule_pickup">Wybicie za święto</option>
                         </select>
                     </div>
                 </div>
-                <div class="calendar-selection-info" style="display: flex; gap: 20px; align-items: center">
-                    <p><strong>Start:</strong> <span id="startDatePreview">-</span></p>
-                    <p><strong>Koniec:</strong> <span id="endDatePreview">-</span></p>
-                    <p><strong>Zaplanowano dni:</strong> <span id="workdaysCounter">0</span></p>
+
+                <!-- Selection Info Cards -->
+                <div class="bento-card info-card">
+                    <div class="card-header">
+                        <i class="fas fa-calendar-day"></i>
+                        <span>Zakres</span>
+                    </div>
+                    <div class="selection-dates">
+                        <div class="date-box">
+                            <span class="label">Start</span>
+                            <span id="startDatePreview" class="value">-</span>
+                        </div>
+                        <div class="date-separator"><i class="fas fa-arrow-right"></i></div>
+                        <div class="date-box">
+                            <span class="label">Koniec</span>
+                            <span id="endDatePreview" class="value">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bento-card counter-card">
+                    <div class="card-header">
+                        <i class="fas fa-clock"></i>
+                        <span>Dni robocze</span>
+                    </div>
+                    <div id="workdaysCounter" class="counter-value">0</div>
                 </div>
             </div>
-            <div class="selection-mode-info">
-                <p><kbd>Ctrl</kbd> + klik, aby zaznaczyć pojedyncze dni.</p>
-            </div>
-            <!-- leaveTypeLegend removed as per request -->
-            <div class="modal-actions">
-                <button id="clearSelectionBtn" class="action-btn secondary">Wyczyść</button>
 
-                <button id="confirmSelectionBtn" class="action-btn primary">Zapisz i zamknij</button>
-                <button id="cancelSelectionBtn" class="action-btn outline">Anuluj</button>
+            <div class="modal-system-info">
+                <i class="fas fa-info-circle"></i>
+                <span>Użyj <kbd>Ctrl</kbd> + klik dla pojedynczych dni. Przeciągnij, aby zaznaczyć zakres.</span>
+            </div>
+
+            <div class="modal-actions-premium">
+                <button id="clearSelectionBtn" class="premium-btn secondary">
+                    <i class="fas fa-eraser"></i> Wyczyść
+                </button>
+                <div class="primary-actions">
+                    <button id="cancelSelectionBtn" class="premium-btn text">Anuluj</button>
+                    <button id="confirmSelectionBtn" class="premium-btn primary">
+                        <i class="fas fa-check-circle"></i> Zapisz i zamknij
+                    </button>
+                </div>
             </div>
         </div>
     </div>

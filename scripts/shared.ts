@@ -60,8 +60,10 @@ export const Shared: SharedAPI = (() => {
 
             const navLinks: NavLink[] = [
                 { href: '#schedule', text: 'Grafik', icon: 'fas fa-calendar-alt' },
+                { href: '#stations', text: 'Stanowiska', icon: 'fas fa-clinic-medical' },
                 { href: '#leaves', text: 'Urlopy', icon: 'fas fa-plane-departure' },
                 { href: '#changes', text: 'Harmonogram zmian', icon: 'fas fa-exchange-alt' },
+                { href: '#statistics', text: 'Statystyki', icon: 'fas fa-chart-bar' },
                 { href: '#scrapped-pdfs', text: 'ISO', icon: 'fas fa-file-pdf', id: 'navLinkIso' },
                 { href: '#options', text: 'Opcje', icon: 'fas fa-cogs' },
             ];
@@ -127,7 +129,19 @@ export const Shared: SharedAPI = (() => {
             footerInfo.innerHTML = '<p>&copy; 2025 Fizjoterapia Kalinowa. Wszelkie prawa zastrzeżone.</p>';
             navPanel.appendChild(footerInfo);
 
-            document.body.appendChild(hamburger);
+            if (headerRightMenu) {
+                headerRightMenu.appendChild(hamburger);
+            }
+
+            // Mobile floating hamburger (cloned to have separate event listener or just same logic)
+            const mobileHamburger = hamburger.cloneNode(true) as HTMLElement;
+            mobileHamburger.addEventListener('click', (e: MouseEvent) => {
+                e.stopPropagation();
+                navPanel.classList.toggle('visible');
+                mobileHamburger.classList.toggle('active');
+            });
+
+            document.body.appendChild(mobileHamburger);
             document.body.appendChild(navPanel);
 
             const updateActiveLink = (): void => {

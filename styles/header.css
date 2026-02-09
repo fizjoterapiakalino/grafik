@@ -1,418 +1,371 @@
+/* --- Clinical Slate Structural Navbar --- */
 .app-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 20px;
-    background-color: rgba(5, 150, 105, 0.85);
-    /* Emerald Green with opacity */
-    backdrop-filter: blur(10px);
-    /* Emerald Green Header */
+    padding: 0 24px;
+    height: 64px;
+    background: var(--color-primary-600);
     color: var(--color-white);
-    /* position: sticky removed - handled by flex layout */
     z-index: 1000;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    position: relative;
-    /* Ensure z-index context works reliably */
+    position: sticky;
+    top: 0;
+    border-bottom: 2px solid var(--color-primary-700);
+    box-shadow: var(--shadow-premium);
+}
+
+.app-header:hover {
+    box-shadow: var(--shadow-xl);
 }
 
 .banner-left-content {
     display: flex;
     align-items: center;
+    gap: 16px;
 }
 
 .banner-logo {
-    height: 40px;
-    margin-right: 15px;
+    height: 36px;
+    filter: grayscale(1) brightness(2);
 }
 
 .banner-title {
-    font-size: 1.5em;
-    font-weight: bold;
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: white;
 }
 
+/* Structural Header Data */
 .date-time-text {
-    font-size: 1em;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    font-weight: 500;
 }
 
 .header-right-menu {
     display: flex;
     align-items: center;
-    gap: 15px;
-    margin-right: 50px;
-    /* Przestrzeń na fixed hamburger na desktopie */
+    gap: 8px;
 }
 
+/* Schedule action buttons - context-dependent (require selected cell) */
 .schedule-action-buttons {
     display: flex;
-    gap: 10px;
-    margin-right: 15px;
-    /* Odstęp między przyciskami a wyszukiwarką */
+    align-items: center;
+    gap: 4px;
+    padding-right: 12px;
+    margin-right: 4px;
+    border-right: 1px solid rgba(255, 255, 255, 0.15);
 }
 
+/* Precision Action Buttons */
 .action-icon-btn {
-    background: none;
-    border: none;
-    color: rgba(255, 255, 255, 0.6);
-    /* Slightly more visible default */
-    font-size: 1.5em;
-    cursor: not-allowed;
-    /* Domyślnie nieaktywny kursor */
-    padding: 5px;
-    border-radius: 5px;
-    transition:
-        background-color 0.2s ease,
-        color 0.2s ease,
-        cursor 0.2s ease;
-}
-
-.action-icon-btn.active {
-    color: white;
-    /* Wyraźniejszy kolor, gdy aktywny */
-    cursor: pointer;
-}
-
-.action-icon-btn.active:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-    color: #f0f0f0;
-}
-
-.action-icon-btn.danger.active {
-    color: #dc3545;
-    /* Czerwony kolor dla przycisków "niebezpiecznych" aktywnych */
-}
-
-.action-icon-btn.danger.active:hover {
-    background-color: rgba(220, 53, 69, 0.2);
-    color: #fff;
-}
-
-.search-container {
-    position: relative;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 1rem;
     width: 40px;
-    /* Reserve space for icon */
     height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
+    border-radius: var(--border-radius-sm);
+    transition: all var(--transition-normal);
+}
+
+.action-icon-btn.active {
+    color: white;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.action-icon-btn.active:hover {
+    background: var(--color-primary-600);
+    border-color: var(--color-primary-600);
+    color: white;
+    transform: none;
+}
+
+.action-icon-btn.danger.active:hover {
+    background: var(--color-danger);
+    color: white;
+    border-color: var(--color-danger);
+}
+
+/* Header action buttons - always visible and slightly larger */
+.header-action-btn {
+    width: 42px;
+    height: 42px;
+    font-size: 1.1rem;
+    position: relative;
+}
+
+.header-action-btn .notification-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 10px;
+    height: 10px;
+    background: var(--color-danger);
+    border-radius: 50%;
+    border: 2px solid var(--color-gray-800);
+}
+
+/* Industrial Search Bar */
+.search-container {
+    height: 40px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--border-radius-sm);
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+}
+
+.search-container:focus-within {
+    background: white;
+    border-color: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .search-input {
-    padding: 8px 12px 8px 35px;
-    /* Add space for icon */
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    background-color: rgba(255, 255, 255, 0.15);
-    /* Glassy effect */
-    color: var(--color-white);
-    transition:
-        width 0.3s ease,
-        background-color 0.3s,
-        opacity 0.2s;
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 0.85rem;
     width: 0;
-    /* Hidden by default */
     opacity: 0;
-    pointer-events: none;
-    position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
+    transition: width 0.3s ease, opacity 0.2s;
+    outline: none;
 }
 
 .search-input.expanded {
     width: 200px;
     opacity: 1;
-    pointer-events: auto;
-    background-color: var(--color-white);
-    color: var(--color-gray-800);
+    padding: 0 8px;
+    color: white;
+}
+
+.search-container:focus-within .search-input {
+    color: var(--color-gray-900);
 }
 
 .search-input::placeholder {
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.5);
 }
 
-.search-input:focus {
-    background-color: var(--color-white);
-    color: var(--color-gray-800);
-    outline: none;
+.search-container:focus-within .search-input::placeholder {
+    color: var(--color-gray-400);
 }
 
 .search-toggle-btn {
-    background: none;
-    border: none;
-    color: var(--color-white);
-    font-size: 1.3em;
-    cursor: pointer;
-    padding: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    z-index: 3;
-    transition: transform 0.2s ease;
-}
-
-.search-toggle-btn:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 50%;
-}
-
-.clear-search-btn {
-    position: absolute;
-    right: 40px;
-    /* Move X to the left of the magnifying glass icon */
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    color: rgba(255, 255, 255, 0.7);
-    cursor: pointer;
-    font-size: 1.2em;
-    padding: 5px;
-    z-index: 4;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: color 0.2s ease;
-}
-
-.clear-search-btn:hover {
-    color: var(--color-white);
-}
-
-.search-input.expanded {
-    width: 250px;
-    opacity: 1;
-    pointer-events: auto;
-    background-color: var(--color-white);
-    color: var(--color-gray-800);
-    padding-right: 70px;
-    /* Room for both X and magnifying glass */
-}
-
-/* undo-button class removed, replaced by action-icon-btn */
-
-.save-status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 10px;
-    border-radius: 5px;
-    font-size: 0.9em;
-}
-
-.save-status.saving {
-    color: #f0ad4e;
-    /* Orange */
-}
-
-.save-status.saved {
-    color: #5cb85c;
-    /* Green */
-}
-
-.save-status.error {
-    color: #d9534f;
-    /* Red */
-}
-
-/* Hamburger Menu - Fixed position to avoid backdrop-filter trapping */
-.hamburger-menu {
-    position: fixed;
-    top: 10px;
-    right: 20px;
-    z-index: 3000;
-    font-size: 1.8em;
-    cursor: pointer;
     color: white;
-    width: 44px;
-    height: 44px;
+    font-size: 1.1rem;
+    background: none;
+    border: none;
+    width: 34px;
+    height: 34px;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.2s, background-color 0.2s, bottom 0.3s, right 0.3s;
+    transition: all var(--transition-normal);
 }
 
-.hamburger-menu:hover {
-    color: var(--color-primary-200);
+.search-container:focus-within .search-toggle-btn {
+    color: var(--color-primary-600);
 }
 
+/* --- Clinical Sidebar Panel --- */
 .nav-panel {
     position: fixed;
-    top: 60px;
-    /* Height of the header */
-    right: -300px;
-    /* Start off-screen */
-    width: 280px;
-    height: calc(100% - 60px);
-    background-color: #2c2c2c;
-    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.2);
-    transition: right 0.3s ease-in-out;
-    z-index: 1001;
+    top: 64px;
+    right: 0;
+    width: 300px;
+    height: calc(100vh - 64px);
+    background: var(--color-gray-900);
+    border-left: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.3);
+    z-index: 2000;
+    transform: translateX(100%);
+    transition: transform var(--transition-slow);
     display: flex;
     flex-direction: column;
+    overflow-y: auto;
+    opacity: 0;
 }
 
 .nav-panel.visible {
-    right: 0;
+    transform: translateX(0);
+    opacity: 1;
 }
 
+/* Sidebar Navigation List Refinement */
 .nav-panel .user-info {
-    padding: 15px 25px 10px;
-    color: #aaa;
-    font-size: 0.9em;
-    border-bottom: 1px solid #444;
-    margin-bottom: 10px;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.nav-panel .user-info::before {
+    content: 'PANEL SYSTEMOWY';
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: var(--color-primary-500);
+    letter-spacing: 0.05em;
+}
+
+#navPanelUserInfo {
+    color: white;
+    font-weight: 500;
+    font-size: 0.9rem;
 }
 
 .nav-panel ul {
     list-style: none;
     padding: 0;
     margin: 0;
-    overflow-y: auto;
 }
 
 .nav-panel .main-nav-list {
-    flex-grow: 1;
-    /* This list takes available space */
-}
-
-.nav-panel .logout-nav-list {
-    flex-grow: 0;
-    margin-top: auto;
-    /* Push to bottom if needed, though flex-grow on main list handles it */
-}
-
-.nav-panel li {
-    border-bottom: 1px solid #444;
-    /* Linia pod każdym elementem listy */
-}
-
-.nav-panel li:last-of-type {
-    border-bottom: none;
-    /* Brak linii pod ostatnim elementem */
+    flex: 1;
+    padding: 12px 0;
 }
 
 .nav-panel li a {
-    display: block;
-    padding: 15px 25px;
-    color: #f0f0f0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 24px;
+    color: rgba(255, 255, 255, 0.7);
     text-decoration: none;
-    font-size: 1.1em;
-    transition:
-        background-color 0.2s,
-        border-left-color 0.2s;
-    /* Dodaj transition dla border-left-color */
-    border-left: 5px solid transparent;
-    /* Niewidoczne obramowanie po lewej */
-}
-
-.nav-panel li a:hover,
-.nav-panel li a.active {
-    background-color: #444;
-    border-left-color: #007bff;
-    /* Niebieskie obramowanie po najechaniu/aktywnym */
-}
-
-/* Specjalny styl dla przycisku wylogowania */
-.nav-panel li#logoutBtnContainer a:hover {
-    background-color: #dc3545;
-    /* Czerwone tło po najechaniu */
-    border-left-color: #dc3545;
-    /* Czerwone obramowanie po najechaniu */
+    font-weight: 500;
+    font-size: 0.95rem;
+    transition: all var(--transition-normal);
+    border-left: 4px solid transparent;
 }
 
 .nav-panel li a i {
-    margin-right: 15px;
     width: 20px;
-    /* Align icons */
     text-align: center;
+    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.nav-panel li a:hover {
+    background: rgba(255, 255, 255, 0.03);
+    color: white;
+    border-left-color: var(--color-primary-600);
+}
+
+.nav-panel li a:hover i {
+    color: var(--color-primary-400);
+}
+
+.nav-panel li a.active {
+    background: rgba(13, 148, 136, 0.1);
+    color: var(--color-primary-400);
+    border-left-color: var(--color-primary-500);
+    font-weight: 600;
+}
+
+.nav-panel li a.active i {
+    color: var(--color-primary-400);
+}
+
+/* Logout Section */
+.nav-panel .logout-nav-list {
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(0, 0, 0, 0.1);
+}
+
+#logoutBtnContainer a:hover {
+    background: rgba(239, 68, 68, 0.1) !important;
+    color: #ef4444 !important;
+    border-left-color: #ef4444 !important;
+}
+
+#logoutBtnContainer a:hover i {
+    color: #ef4444 !important;
 }
 
 .footer-info {
-    padding: 20px;
+    padding: 24px;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.3);
     text-align: center;
-    font-size: 0.8em;
-    color: #888;
-    border-top: 1px solid #444;
-    margin-top: auto;
-    /* Przypnij stopkę do dołu */
-    background-color: #222;
-    /* Ciemniejsze tło dla stopki */
+    line-height: 1.5;
+    background: rgba(0, 0, 0, 0.2);
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-    .date-time-text {
-        display: none;
-    }
-
-    /* Ensure search container is visible on mobile */
-    .search-container {
-        display: block;
-    }
-
-    .header-right-menu {
-        margin-right: 0;
-    }
-
-    .hamburger-menu {
-        display: flex;
-        bottom: 30px;
-        right: 30px;
-        top: auto;
-        width: 60px;
-        height: 60px;
-        background-color: var(--color-primary-600);
-        border-radius: 50%;
-        box-shadow: var(--shadow-xl);
-        color: white;
-    }
-
-    .hamburger-menu:hover {
-        color: white;
-        background-color: var(--color-primary-700);
-    }
-
-    .hamburger-menu:active {
-        transform: scale(0.9);
-    }
-
-    .hamburger-menu i {
-        font-size: 1.5rem;
-    }
-}
-
-@media (max-width: 480px) {
-    .banner-title {
-        display: none;
-    }
-}
-
-/* Notification Badge */
-.notification-badge {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 10px;
-    height: 10px;
-    background-color: var(--color-danger);
-    border-radius: 50%;
-    border: 2px solid var(--color-primary-600);
-    /* Match header background */
-    display: none;
-    /* Hidden by default */
-}
-
-#btnIso {
-    position: relative;
-    /* For badge positioning */
-    color: rgba(255, 255, 255, 0.4);
-    /* Default state */
+/* Integrated Hamburger (Desktop) */
+.hamburger-menu {
+    width: 40px;
+    height: 40px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--border-radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    /* Always clickable */
+    transition: all var(--transition-normal);
+    color: white;
+    position: static;
 }
 
-#btnIso:hover {
-    color: white;
+.hamburger-menu:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.hamburger-menu.active {
+    background: var(--color-primary-800);
+    border-color: var(--color-primary-800);
+}
+
+/* Mobile Adjustments */
+@media (max-width: 768px) {
+    .app-header {
+        padding: 0 16px;
+    }
+
+    .app-header .hamburger-menu {
+        display: none;
+        /* Hide in navbar on mobile */
+    }
+
+    /* Floating Hamburger for mobile */
+    body>.hamburger-menu {
+        display: flex !important;
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        width: 56px;
+        height: 56px;
+        background: var(--color-primary-600);
+        color: white;
+        border-radius: 50%;
+        box-shadow: 0 8px 16px rgba(5, 150, 105, 0.4);
+        z-index: 3000;
+        cursor: pointer;
+        border: none;
+    }
+
+    body>.hamburger-menu:hover {
+        transform: scale(1.1);
+        background: var(--color-primary-500);
+    }
+}
+
+@media (min-width: 769px) {
+    body>.hamburger-menu {
+        display: none !important;
+        /* Hide floating on desktop */
+    }
 }

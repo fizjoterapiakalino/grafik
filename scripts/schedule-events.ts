@@ -263,9 +263,23 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
     };
 
     const _handleKeyDown = (event: KeyboardEvent): void => {
+        // Check if focus is on input or textarea - don't intercept keys
+        const focusedElement = document.activeElement as HTMLElement;
+        const isInInputField = focusedElement?.tagName === 'INPUT' ||
+            focusedElement?.tagName === 'TEXTAREA' ||
+            focusedElement?.closest('.search-container');
+
         if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
-            event.preventDefault();
-            _dependencies.undoLastAction();
+            // Allow undo even when in input, but prevent default
+            if (!isInInputField) {
+                event.preventDefault();
+                _dependencies.undoLastAction();
+            }
+            return;
+        }
+
+        // If in input field, don't intercept any other keys
+        if (isInInputField) {
             return;
         }
 
@@ -653,6 +667,32 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
             } else {
                 window.showToast('Wybierz komórkę do wyczyszczenia.', 3000);
             }
+        });
+
+        // Obsługa kliknięć w legendę dla podświetlania typu zabiegów
+        document.querySelectorAll('.compact-legend .legend-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const colorSpan = item.querySelector('.legend-dot');
+                if (!colorSpan) return;
+
+                const type = (item as HTMLElement).dataset.type;
+                if (!type) return;
+
+                const selector = type === 'break' ? '.break-cell' : `[data-is-${type}="true"]`;
+                const cells = document.querySelectorAll(selector);
+
+                if (cells.length === 0) {
+                    window.showToast(`Brak komórek typu: ${item.textContent?.trim()}`, 2000);
+                    return;
+                }
+
+                cells.forEach(cell => {
+                    cell.classList.add('legend-highlight');
+                    setTimeout(() => cell.classList.remove('legend-highlight'), 3000);
+                });
+
+                window.showToast(`Podświetlono ${cells.length} komórek: ${item.textContent?.trim()}`);
+            });
         });
     };
 

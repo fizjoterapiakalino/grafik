@@ -14,11 +14,9 @@
     left: 0;
     right: 0;
     height: 12px;
-    background-color: #f6f8fb;
-    /* Match body gradient start color */
+    background-color: var(--color-gray-100);
     display: block;
     z-index: 110;
-    /* Above table header */
     pointer-events: none;
 }
 
@@ -30,25 +28,71 @@
 .schedule-table {
     width: 100%;
     border-collapse: separate;
-    /* Changed from collapse to fix sticky header issues */
     border-spacing: 0;
     background-color: var(--color-white);
     box-shadow: var(--shadow-md);
-    /* border-radius removed to fix rendering issues */
-    /* overflow: hidden removed to fix sticky headers */
-    /* Note: This might clip sticky headers if container doesn't scroll, but usually fine */
     border: none;
-    min-width: 900px;
+    min-width: 100%;
+    border-radius: var(--border-radius);
 }
 
+/* --- Legend Highlighting --- */
+.legend-highlight {
+    animation: legendPulse 1s ease-in-out infinite alternate;
+    position: relative;
+    z-index: 10;
+    box-shadow: 0 0 15px var(--color-primary-400), inset 0 0 0 2px var(--color-primary-600) !important;
+}
+
+@keyframes legendPulse {
+    from {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+
+    to {
+        transform: scale(1.02);
+        filter: brightness(1.2);
+    }
+}
+
+/* Moduły pomocnicze - reszta pliku */
+
+/* Contrast-Enhanced Grid */
 .schedule-table th,
 .schedule-table td {
-    padding: 7px;
-    border: 1px solid var(--color-border-dark);
+    padding: 6px 4px;
+    border: 1px solid var(--color-gray-400);
+    /* Ultra-visible grid lines */
     text-align: center;
     white-space: normal;
     overflow-wrap: break-word;
     outline: none;
+    transition: background-color 0.1s ease;
+    font-size: 1.15rem;
+    line-height: 1.2;
+}
+
+/* Zebra Striping for Row Readability */
+.schedule-table tbody tr:nth-child(even) {
+    background-color: rgba(var(--color-primary-rgb), 0.04);
+}
+
+/* High-Contrast Interactive States */
+.schedule-table tr:hover td:not(.break-cell):not(:first-child) {
+    background-color: var(--color-primary-50) !important;
+    /* Brighter, identifiable hover */
+}
+
+/* Vertical column separation for employees */
+.schedule-table td:not(:first-child) {
+    border-left: 1px solid var(--color-gray-400);
+    /* Unified 1px thickness */
+}
+
+.schedule-table td:hover {
+    filter: brightness(0.98);
+    /* Slight depth on cell hover */
 }
 
 table.schedule-table thead tr th {
@@ -56,15 +100,17 @@ table.schedule-table thead tr th {
     color: var(--color-white);
     cursor: pointer;
     position: sticky;
-    top: 12px;
-    /* Stuck 12px below top of scroll parent to preserve gap */
+    top: 0;
     z-index: 100;
     white-space: nowrap;
     border: 1px solid var(--color-primary-700);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    /* Slightly stronger shadow */
     background-clip: padding-box;
-    transform: translateZ(0);
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 6px 4px;
+    font-family: var(--font-heading);
 }
 
 .schedule-table thead th:nth-child(even) {
@@ -84,28 +130,29 @@ table.schedule-table thead tr th {
 .workload-fill {
     height: 100%;
     border-radius: 2px;
-    transition: width 0.3s ease, background-color 0.3s ease;
+    transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.3s ease;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.3) 100%);
 }
 
 .workload-fill.low {
-    background-color: #22c55e;
-    /* Zielony - niskie obciążenie */
+    background-color: #10b981;
+    background: linear-gradient(90deg, #34d399, #10b981);
 }
 
 .workload-fill.medium {
-    background-color: #eab308;
-    /* Żółty - średnie obciążenie */
+    background-color: #f59e0b;
+    background: linear-gradient(90deg, #fbbf24, #f59e0b);
 }
 
 .workload-fill.high {
     background-color: #ef4444;
-    /* Czerwony - wysokie obciążenie */
+    background: linear-gradient(90deg, #f87171, #ef4444);
 }
 
 .workload-fill.overload {
     background-color: #8b5cf6;
-    /* Fioletowy - ponad normę (>100%) */
-    animation: pulseOverload 1.5s ease-in-out infinite;
+    background: linear-gradient(90deg, #a78bfa, #8b5cf6);
+    animation: pulseOverload 2s ease-in-out infinite;
 }
 
 @keyframes pulseOverload {
@@ -113,36 +160,39 @@ table.schedule-table thead tr th {
     0%,
     100% {
         opacity: 1;
+        filter: brightness(1);
     }
 
     50% {
-        opacity: 0.7;
+        opacity: 0.8;
+        filter: brightness(1.2);
     }
 }
 
 table.schedule-table thead tr th:first-child {
-    background-color: var(--color-gray-800);
+    background: var(--color-gray-800);
     left: 0;
     z-index: 101;
-    /* Higher than other headers */
-    width: 55px;
+    width: 50px;
+    /* Reduced from 60px */
     border: 1px solid var(--color-gray-900);
 }
 
 .schedule-table tbody td:first-child {
-    background-color: var(--color-gray-700);
+    background: var(--color-gray-800);
     color: var(--color-white);
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    font-size: 0.85em;
-    padding: 7px;
-    border-bottom: 1px solid var(--color-gray-600);
-    border-right: 1px solid var(--color-gray-600);
+    font-size: 0.85rem;
+    padding: 2px 4px;
+    border-bottom: 1px solid var(--color-gray-700);
+    border-right: 1px solid var(--color-primary-600);
+    /* Emerald anchor line - unified 1px */
     position: sticky;
     left: 0;
     z-index: 90;
-    /* Lower than header (100) and top-left header (101) */
+    box-shadow: 4px 0 10px rgba(0, 0, 0, 0.15);
 }
 
 .schedule-table td.editable-cell {
@@ -170,11 +220,15 @@ table.schedule-table thead tr th:first-child {
 /* --- Specjalne style komórek grafiku --- */
 /* Zwiększona specyficzność przez dodanie tbody tr td aby nadpisać inne style */
 table.schedule-table tbody tr td.break-cell {
-    background-color: var(--bg-break);
-    color: var(--color-white);
-    font-weight: bold;
-    text-align: center;
+    background-color: var(--color-gray-50) !important;
+    color: var(--color-primary-600) !important;
+    font-weight: 700;
+    font-style: italic;
+    letter-spacing: 0.1em;
+    font-size: 0.85rem;
+    text-transform: uppercase;
     cursor: default;
+    border: 1px solid var(--color-gray-200);
 }
 
 .pnf-text,
@@ -191,39 +245,73 @@ td.split-cell>div.massage-text>span {
 
 .every-other-day-text,
 td.split-cell>div.every-other-day-text>span {
-    color: var(--bg-every-other-day);
-    font-weight: bold;
+    position: relative;
 }
 
-/* --- Style dla legendy --- */
+.schedule-table tr.current-time-row td:first-child {
+    background: var(--color-primary-600) !important;
+    color: white;
+    font-weight: 800;
+    box-shadow: inset -4px 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.schedule-table tr.current-time-row td:first-child::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--color-primary-400);
+    animation: pulseGlow 2s infinite;
+}
+
+@keyframes pulseGlow {
+
+    0%,
+    100% {
+        opacity: 0.5;
+    }
+
+    50% {
+        opacity: 1;
+        box-shadow: 0 0 10px var(--color-primary-400);
+    }
+}
+
+/* --- Modern Schedule Legend --- */
 .schedule-legend {
-    margin-top: var(--spacing-lg);
-    padding: var(--spacing-md);
-    background-color: #f9f9f9;
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    margin-top: var(--spacing-xl);
+    padding: var(--spacing-lg);
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
     width: 100%;
     box-sizing: border-box;
-    display: flex;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
     align-items: center;
-    flex-wrap: wrap;
-    gap: var(--spacing-md);
+    gap: var(--spacing-lg);
 }
 
 .schedule-legend h3 {
     margin: 0;
-    color: var(--color-text);
-    font-size: 1.1em;
-    white-space: nowrap;
+    color: var(--color-gray-800);
+    font-size: 1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .patient-count-legend {
-    margin-left: auto;
-    font-weight: bold;
-    font-size: 1.1em;
-    color: var(--color-text);
-    white-space: nowrap;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--color-primary-700);
+    background: var(--color-primary-50);
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--color-primary-100);
 }
 
 .schedule-legend ul {
@@ -232,14 +320,28 @@ td.split-cell>div.every-other-day-text>span {
     margin: 0;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
 }
 
 .schedule-legend li {
     display: flex;
     align-items: center;
-    font-size: 0.95em;
-    color: var(--color-text-light);
+    font-size: 0.9em;
+    font-weight: 500;
+    color: var(--color-gray-700);
+    background: var(--color-gray-50);
+    padding: 6px 12px;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--color-gray-200);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.schedule-legend li:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+    background: var(--color-white);
+    border-color: var(--color-primary-200);
 }
 
 .legend-color {
@@ -428,14 +530,15 @@ td.split-cell {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: var(--spacing-sm);
+    padding: 4px 4px;
     text-align: center;
     overflow-wrap: break-word;
     word-wrap: break-word;
     white-space: normal;
     /* border-bottom removed to avoid double border */
     border-right: 1px solid var(--color-border);
-    font-size: 0.9em;
+    font-size: 1rem;
+    line-height: 1.1;
     color: var(--color-text);
 }
 
@@ -483,11 +586,20 @@ td.current-time-highlight {
     font-family: 'Font Awesome 5 Free';
     font-weight: 900;
     position: absolute;
-    top: 2px;
-    right: 2px;
+    top: -2px;
+    right: -2px;
     color: var(--color-danger);
-    font-size: 0.8em;
+    font-size: 0.85rem;
     animation: bell-ring 2s ease-in-out infinite;
+    text-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+    background: var(--color-white);
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-sm);
 }
 
 @keyframes bell-ring {
@@ -520,7 +632,7 @@ td.current-time-highlight {
     cursor: help;
 }
 
-/* --- Modal Styles --- */
+/* --- Modal Styles (extends components.css base styles) --- */
 .modal-overlay {
     display: none;
     position: fixed;
@@ -528,37 +640,52 @@ td.current-time-highlight {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
     z-index: 1000;
     justify-content: center;
     align-items: center;
     overflow: auto;
 }
 
+/* --- General Modal Refinements --- */
 .modal-content {
-    background-color: #fefefe;
-    padding: 20px;
-    border: 1px solid #888;
-    width: 80%;
-    max-width: 500px;
-    border-radius: var(--border-radius);
-    text-align: left;
-    box-shadow:
-        0 4px 8px 0 rgba(0, 0, 0, 0.2),
-        0 6px 20px 0 rgba(0, 0, 0, 0.19);
+    background: var(--color-white);
+    padding: var(--spacing-xl);
+    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--color-gray-100);
+    box-shadow: var(--shadow-xl);
+    overflow: hidden;
 }
 
-.modal-buttons {
-    margin-top: 20px;
+.modal-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-gray-800);
+    margin-bottom: var(--spacing-lg);
+    border-bottom: 2px solid var(--color-primary-50);
+    padding-bottom: var(--spacing-md);
 }
 
-.modal-buttons button {
-    padding: 10px 20px;
-    margin: 5px 10px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 16px;
+.modal-body {
+    padding: var(--spacing-md) 0;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-xl);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--color-gray-100);
+}
+
+.form-group label {
+    font-weight: 600;
+    color: var(--color-gray-700);
+    margin-bottom: var(--spacing-xs);
+    display: block;
+    font-size: 0.9rem;
 }
 
 #moveEntryBtn {
@@ -702,7 +829,7 @@ td.current-time-highlight {
         justify-content: center;
         text-align: center;
         cursor: pointer;
-        font-size: 0.9em;
+        font-size: calc(0.9em + 2px);
         /* Slightly smaller text */
         line-height: 1.3;
     }
@@ -712,7 +839,7 @@ td.current-time-highlight {
         /* Darker for better contrast */
         font-style: italic;
         background-color: var(--color-gray-50);
-        font-size: 0.85em;
+        font-size: calc(0.85em + 2px);
         /* Even smaller for empty slots */
         min-height: 24px;
         /* Smaller empty slots */
@@ -746,51 +873,198 @@ td.current-time-highlight {
     }
 }
 
-/* --- Style dla globalnego tooltipa pracownika --- */
-#globalEmployeeTooltip {
-    display: none;
-    position: absolute;
-    background-color: #1f2937;
-    color: #fff;
-    padding: 10px 14px;
-    border-radius: 8px;
-    white-space: nowrap;
-    z-index: 9999;
-    font-size: 0.85em;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    pointer-events: none;
+#duplicateModal .modal-content {
+    background-color: white;
+    padding: var(--spacing-lg);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-xl);
+    max-width: 450px;
+    width: 90%;
+    text-align: center;
+    border: 1px solid var(--color-gray-100);
+}
+
+/* --- Clinical Slate Footer Bar --- */
+.schedule-footer-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 32px;
+    padding: 8px 16px;
+    background: var(--color-gray-900);
+    color: white;
+    border-top: 2px solid var(--color-primary-600);
+    margin-top: 0;
+    font-family: var(--font-body);
+}
+
+.schedule-footer-bar #dayProgressContainer {
+    flex: 1;
+    max-width: 500px;
+}
+
+.compact-legend {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 6px 16px;
+    border-radius: var(--border-radius-sm);
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-#globalEmployeeTooltip p {
-    margin: 0;
-    padding: 3px 0;
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.legend-item:hover {
+    color: white;
+    transform: none;
+}
+
+.legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 1px;
+    /* Square dots for industrial look */
+}
+
+.patient-count-badge {
+    background: var(--color-primary-600);
+    color: white;
+    padding: 6px 14px;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Cleaned up redundant progress bar styles */
+.day-progress-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+}
+
+.day-progress-info {
+    min-width: fit-content;
+    display: flex;
+    flex-direction: column;
+}
+
+.day-progress-time {
+    font-size: 1.1rem !important;
+    color: white !important;
+    font-weight: 700 !important;
+    font-family: var(--font-body);
+}
+
+.day-prog.break-cell {
+    background-color: var(--color-gray-50) !important;
+    color: var(--color-primary-600) !important;
+    font-weight: 700;
+    font-style: italic;
+    letter-spacing: 0.1em;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    border: 1px solid var(--color-gray-200);
+}
+
+.day-progress-track {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.1) !important;
+    height: 6px !important;
+    border-radius: 3px;
+    position: relative;
+    min-width: 150px;
+}
+
+.day-progress-fill {
+    height: 100%;
+    background: var(--color-primary-600);
+    border-radius: 3px;
+    box-shadow: none !important;
+    transition: width 0.5s ease;
+}
+
+.day-progress-marker {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px !important;
+    height: 14px !important;
+    border-radius: 2px !important;
+    background: white !important;
+    border: none !important;
+    z-index: 2;
+}
+
+/* --- Premium Employee Tooltip --- */
+#globalEmployeeTooltip {
+    display: none;
+    position: absolute;
+    background: rgba(31, 41, 55, 0.95);
+    backdrop-filter: blur(8px);
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: 12px;
+    white-space: nowrap;
+    z-index: 9999;
+    font-size: 0.9rem;
+    box-shadow: var(--shadow-xl);
+    pointer-events: none;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    animation: tooltipFadeIn 0.2s ease-out;
+}
+
+@keyframes tooltipFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px) translateX(-50%);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) translateX(-50%);
+    }
 }
 
 #globalEmployeeTooltip .tooltip-name {
-    font-size: 1.1em;
-    font-weight: 600;
-    color: #fff;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    padding-bottom: 6px;
-    margin-bottom: 4px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-primary-300);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 8px;
+    margin-bottom: 8px;
 }
 
 #globalEmployeeTooltip .employee-number-tooltip {
-    font-size: 0.95em;
-    color: #9ca3af;
-}
-
-#globalEmployeeTooltip .employee-number-tooltip strong {
-    color: var(--color-primary, #10b981);
+    font-size: 0.85rem;
+    color: var(--color-gray-400);
 }
 
 #globalEmployeeTooltip .tooltip-workload {
-    font-size: 0.95em;
-    color: #9ca3af;
-    margin-top: 4px;
-    padding-top: 4px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.85rem;
+    color: var(--color-gray-300);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 /* Style dla ułożenia pól obok siebie w modalu */
