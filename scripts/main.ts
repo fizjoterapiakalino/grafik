@@ -21,6 +21,8 @@ import './changes.js';
 import './scrapped-pdfs.js';
 import './options.js';
 import './login.js';
+import './appointments.js';
+import './appointments-pdf.js';
 import { ColorPreferences } from './color-preferences.js';
 
 document.addEventListener('DOMContentLoaded', () => {

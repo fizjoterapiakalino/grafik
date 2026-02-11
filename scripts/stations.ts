@@ -1,5 +1,6 @@
 // scripts/stations.ts - PhysioResource Tracker Module
-import { db as dbRaw } from './firebase-config.js';
+import { db as dbRaw, auth as authRaw } from './firebase-config.js';
+import { EmployeeManager } from './employee-manager.js';
 
 // Type for Firebase db wrapper (compatible with existing codebase)
 interface DbWrapper {
@@ -16,6 +17,17 @@ interface DbWrapper {
 }
 
 const db = dbRaw as unknown as DbWrapper;
+const auth = authRaw as any;
+
+/**
+ * Wpis w kolejce
+ */
+interface QueueEntry {
+    employeeId: string;
+    treatmentId: string;
+    duration: number;
+    addedAt: number;
+}
 
 /**
  * Status stanowiska
@@ -45,6 +57,8 @@ interface Station {
     startTime?: number; // timestamp
     duration?: number; // minutes
     excludeTreatments?: string[]; // treatment IDs to hide for this station
+    employeeId?: string; // NEW: ID pracownika który zajął
+    queue?: QueueEntry[]; // NEW: lista oczekujących
 }
 
 /**
@@ -74,6 +88,8 @@ interface StationState {
     treatmentId?: string;
     startTime?: number;
     duration?: number;
+    employeeId?: string;
+    queue?: QueueEntry[];
 }
 
 /**
@@ -83,6 +99,10 @@ interface StationsAPI {
     init(): void;
     destroy(): void;
 }
+
+const THERAPY_MASSAGE_TREATMENT_ID = 'therapy_massage_20';
+const LEGACY_THERAPY_MASSAGE_IDS = new Set(['massage_treatment', 'therapy', 'gym_therapy', 'gym_massage']);
+const GLOBAL_SINGLE_DEVICE_TREATMENTS = new Set(['sollux']);
 
 /**
  * Moduł Stanowiska Zabiegowe
@@ -144,8 +164,7 @@ export const Stations: StationsAPI = (() => {
                 { id: 'sala21_2', name: 'Leżanka 2', roomId: 'sala21', status: 'FREE' },
             ],
             treatments: [
-                { id: 'massage_treatment', name: 'Masaż', shortName: 'Masaż', duration: 15 },
-                { id: 'therapy', name: 'Terapia', shortName: 'Terapia', duration: 20 },
+                { id: THERAPY_MASSAGE_TREATMENT_ID, name: 'Terapia/Masaż', shortName: 'Ter./Mas.', duration: 20 },
                 { id: 'prady_sala21', name: 'Prądy', shortName: 'Prądy', duration: 15 },
             ],
         },
@@ -165,7 +184,7 @@ export const Stations: StationsAPI = (() => {
                 { id: 'prady', name: 'Prądy', shortName: 'Prądy', duration: 15, limit: 2 },
                 { id: 'ultrasound', name: 'Ultradźwięki', shortName: 'UD', duration: 7.5, limit: 2 },
                 { id: 'laser', name: 'Laser', shortName: 'Laser', duration: 7.5, limit: 1 },
-                { id: 'sollux', name: 'Sollux', shortName: 'Sollux', duration: 15 },
+                { id: 'sollux', name: 'Sollux', shortName: 'Sollux', duration: 15, limit: 1 },
             ],
         },
         {
@@ -184,7 +203,7 @@ export const Stations: StationsAPI = (() => {
                 { id: 'prady', name: 'Prądy', shortName: 'Prądy', duration: 15, limit: 2 },
                 { id: 'ultrasound', name: 'Ultradźwięki', shortName: 'UD', duration: 7.5, limit: 2 },
                 { id: 'laser', name: 'Laser', shortName: 'Laser', duration: 7.5, limit: 1 },
-                { id: 'sollux', name: 'Sollux', shortName: 'Sollux', duration: 15 },
+                { id: 'sollux', name: 'Sollux', shortName: 'Sollux', duration: 15, limit: 1 },
             ],
         },
         {
@@ -202,8 +221,7 @@ export const Stations: StationsAPI = (() => {
                 { id: 'gym_5', name: 'Leżanka 5', roomId: 'gym', status: 'FREE' },
             ],
             treatments: [
-                { id: 'gym_therapy', name: 'Terapia', shortName: 'Terapia', duration: 20 },
-                { id: 'gym_massage', name: 'Masaż', shortName: 'Masaż', duration: 15 },
+                { id: THERAPY_MASSAGE_TREATMENT_ID, name: 'Terapia/Masaż', shortName: 'Ter./Mas.', duration: 20 },
                 { id: 'gym_odciazenie', name: 'Odciążenie', shortName: 'Odciąż.', duration: 15, limit: 2 },
             ],
         },
@@ -213,8 +231,18 @@ export const Stations: StationsAPI = (() => {
     let rooms: Room[] = [];
     let stationStates: Map<string, StationState> = new Map();
     let unsubscribe: (() => void) | null = null;
+    let unsubscribeAuth: (() => void) | null = null;
     let timerInterval: number | null = null;
     let soundEnabled = true;
+
+    // User session state
+    let currentEmployeeId: string | null = null;
+    let isCurrentUserAdmin = false;
+
+    // Pending queue action (for multi-room treatment selection)
+    let pendingQueueStation: Station | null = null;
+    let pendingQueueRoom: Room | null = null;
+    let activeMobileRoomId: string | null = null;
 
     /**
      * Initialize module
@@ -222,8 +250,21 @@ export const Stations: StationsAPI = (() => {
     const init = (): void => {
         console.log('Stations module initializing...');
 
+        // Setup auth state listener
+        unsubscribeAuth = auth.onAuthStateChanged((user: any) => {
+            if (user) {
+                const employee = EmployeeManager.getEmployeeByUid(user.uid);
+                currentEmployeeId = employee ? employee.id : null;
+                isCurrentUserAdmin = EmployeeManager.isUserAdmin(user.uid);
+            } else {
+                currentEmployeeId = null;
+                isCurrentUserAdmin = false;
+            }
+        });
+
         // Deep clone configuration
         rooms = JSON.parse(JSON.stringify(ROOMS_CONFIG));
+        activeMobileRoomId = rooms[0]?.id ?? null;
 
         // Initialize audio
         initAudio();
@@ -260,6 +301,11 @@ export const Stations: StationsAPI = (() => {
             unsubscribe = null;
         }
 
+        if (unsubscribeAuth) {
+            unsubscribeAuth();
+            unsubscribeAuth = null;
+        }
+
         if (timerInterval) {
             clearInterval(timerInterval);
             timerInterval = null;
@@ -268,8 +314,14 @@ export const Stations: StationsAPI = (() => {
         // Remove event listener
         document.removeEventListener('click', handleClick);
 
+        // Remove employee picker modal if exists
+        document.getElementById('employeePickerModal')?.remove();
+
         stationStates.clear();
         rooms = [];
+        pendingQueueStation = null;
+        pendingQueueRoom = null;
+        activeMobileRoomId = null;
     };
 
     /**
@@ -358,10 +410,83 @@ export const Stations: StationsAPI = (() => {
                 const prevState = previousStates.get(stationId);
                 if (!prevState || prevState.status !== 'FINISHED') {
                     playNotificationSound();
+                    const nextInQueue = state.queue?.[0];
+                    if (nextInQueue) {
+                        const nextName = EmployeeManager.getNameById(nextInQueue.employeeId);
+                        window.showToast?.(`Stanowisko gotowe. Następny: ${nextName}`, 3500);
+                    }
                     break;
                 }
             }
         }
+    };
+
+    /**
+     * Get active employee ID for an action (auto for user, picker for admin)
+     */
+    const getActiveEmployeeId = async (): Promise<string | null> => {
+        if (!isCurrentUserAdmin) {
+            return currentEmployeeId;
+        }
+
+        // Admin: show employee picker modal
+        return showEmployeePickerModal();
+    };
+
+    /**
+     * Show modal for admin to pick an employee
+     */
+    const showEmployeePickerModal = (): Promise<string | null> => {
+        return new Promise((resolve) => {
+            // Remove existing modal if any
+            document.getElementById('employeePickerModal')?.remove();
+
+            const employees = EmployeeManager.getAll();
+            const employeeButtons = Object.entries(employees)
+                .filter(([_, emp]) => !emp.isHidden)
+                .map(([id, emp]) => {
+                    const name = emp.displayName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim();
+                    const isCurrent = id === currentEmployeeId;
+                    return `
+                        <button class="emp-picker-btn ${isCurrent ? 'current' : ''}" data-emp-id="${id}">
+                            <span class="emp-picker-name">${name}</span>
+                        </button>
+                    `;
+                }).join('');
+
+            const modal = document.createElement('div');
+            modal.id = 'employeePickerModal';
+            modal.className = 'emp-picker-overlay';
+            modal.innerHTML = `
+                <div class="emp-picker-modal">
+                    <div class="emp-picker-header">
+                        <span>Wybierz pracownika</span>
+                        <button class="emp-picker-close"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="emp-picker-list">
+                        ${employeeButtons}
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            // Handle clicks
+            const handleModalClick = (e: MouseEvent) => {
+                const target = e.target as HTMLElement;
+                const btn = target.closest('[data-emp-id]') as HTMLElement;
+                if (btn) {
+                    modal.remove();
+                    resolve(btn.dataset.empId || null);
+                    return;
+                }
+                if (target.closest('.emp-picker-close') || target === modal) {
+                    modal.remove();
+                    resolve(null);
+                }
+            };
+
+            modal.addEventListener('click', handleModalClick);
+        });
     };
 
     /**
@@ -373,14 +498,24 @@ export const Stations: StationsAPI = (() => {
                 const state = stationStates.get(station.id);
                 if (state) {
                     station.status = state.status;
-                    station.treatmentId = state.treatmentId;
+                    station.treatmentId = normalizeTreatmentId(state.treatmentId);
                     station.startTime = state.startTime;
-                    station.duration = state.duration;
+                    station.duration = isTherapyMassageTreatment(state.treatmentId) ? 20 : state.duration;
+                    station.employeeId = state.employeeId;
+                    station.queue = [...(state.queue || [])]
+                        .map(entry => ({
+                            ...entry,
+                            treatmentId: normalizeTreatmentId(entry.treatmentId) || entry.treatmentId,
+                            duration: isTherapyMassageTreatment(entry.treatmentId) ? 20 : entry.duration,
+                        }))
+                        .sort((a, b) => a.addedAt - b.addedAt);
                 } else {
                     station.status = 'FREE';
                     station.treatmentId = undefined;
                     station.startTime = undefined;
                     station.duration = undefined;
+                    station.employeeId = undefined;
+                    station.queue = [];
                 }
             }
         }
@@ -403,10 +538,13 @@ export const Stations: StationsAPI = (() => {
                     treatmentId: station.treatmentId,
                     startTime: station.startTime,
                     duration: station.duration,
+                    employeeId: station.employeeId,
+                    queue: station.queue || [],
                 };
             } else {
                 stateData[station.id] = {
                     status: 'FREE',
+                    queue: station.queue || [],
                 };
             }
 
@@ -421,10 +559,17 @@ export const Stations: StationsAPI = (() => {
      * Start treatment on a station (for simple rooms)
      */
     const startSimpleTreatment = async (room: Room, station: Station): Promise<void> => {
+        const empId = await getActiveEmployeeId();
+        if (!empId) {
+            window.showToast?.('Nie wybrano pracownika', 2000);
+            return;
+        }
+
         station.status = 'OCCUPIED';
         station.treatmentId = station.id; // Use station ID as treatment ID for simple rooms
         station.startTime = Date.now();
         station.duration = room.defaultDuration;
+        station.employeeId = empId;
 
         await saveStationState(station);
 
@@ -436,10 +581,25 @@ export const Stations: StationsAPI = (() => {
      * Start treatment on a station (for multi-treatment rooms)
      */
     const startMultiTreatment = async (_room: Room, station: Station, treatment: Treatment): Promise<void> => {
+        const empId = await getActiveEmployeeId();
+        if (!empId) {
+            window.showToast?.('Nie wybrano pracownika', 2000);
+            return;
+        }
+        if (!isTreatmentAvailable(_room, treatment)) {
+            window.showToast?.('Ten zabieg jest chwilowo niedostępny', 2200);
+            return;
+        }
+        if (isTherapyMassageTreatment(treatment.id) && hasActiveTherapyMassage(empId, station.id)) {
+            window.showToast?.('Masz już aktywną Terapię/Masaż. Możesz tylko dodać się do kolejki.', 3000);
+            return;
+        }
+
         station.status = 'OCCUPIED';
-        station.treatmentId = treatment.id;
+        station.treatmentId = normalizeTreatmentId(treatment.id);
         station.startTime = Date.now();
         station.duration = treatment.duration;
+        station.employeeId = empId;
 
         await saveStationState(station);
 
@@ -451,15 +611,176 @@ export const Stations: StationsAPI = (() => {
      * Release a station
      */
     const releaseStation = async (station: Station): Promise<void> => {
+        // Check if user is allowed to release (owner or admin)
+        if (!isCurrentUserAdmin && station.employeeId && station.employeeId !== currentEmployeeId) {
+            window.showToast?.('Nie masz uprawnień do zwolnienia tego stanowiska', 3000);
+            return;
+        }
+
         station.status = 'FREE';
         station.treatmentId = undefined;
         station.startTime = undefined;
         station.duration = undefined;
+        station.employeeId = undefined;
+
+        // Process queue if exists
+        if (station.queue && station.queue.length > 0) {
+            await processQueue(station);
+            // processQueue already shows its own toast and plays sound
+        } else {
+            await saveStationState(station);
+            window.showToast?.('Stanowisko zwolnione', 1500);
+        }
+
+        updateAllStationCards();
+    };
+
+    /**
+     * Add employee to station queue
+     */
+    const addToQueue = async (station: Station, treatmentId: string, duration: number): Promise<void> => {
+        const empId = await getActiveEmployeeId();
+        if (!empId) {
+            window.showToast?.('Nie wybrano pracownika', 2000);
+            return;
+        }
+        const normalizedTreatmentId = normalizeTreatmentId(treatmentId) || treatmentId;
+        const normalizedDuration = isTherapyMassageTreatment(normalizedTreatmentId) ? 20 : duration;
+
+        // Initialize queue if not exists
+        if (!station.queue) {
+            station.queue = [];
+        }
+
+        // Limit queue size
+        if (station.queue.length >= 3) {
+            window.showToast?.('Kolejka jest pełna (max 3)', 2500);
+            return;
+        }
+
+        // Check if employee already in queue for this station
+        if (station.queue.some(q => q.employeeId === empId)) {
+            window.showToast?.('Jesteś już w kolejce', 2000);
+            return;
+        }
+
+        station.queue.push({
+            employeeId: empId,
+            treatmentId: normalizedTreatmentId,
+            duration: normalizedDuration,
+            addedAt: Date.now()
+        });
+        station.queue.sort((a, b) => a.addedAt - b.addedAt);
+
+        await saveStationState(station);
+        window.showToast?.('Dodano do kolejki', 2000);
+        updateAllStationCards();
+    };
+
+    /**
+     * Remove employee from station queue
+     */
+    const removeFromQueue = async (station: Station, employeeId: string): Promise<void> => {
+        if (!isCurrentUserAdmin && employeeId !== currentEmployeeId) {
+            window.showToast?.('Brak uprawnień', 2000);
+            return;
+        }
+
+        if (!station.queue) return;
+
+        station.queue = station.queue.filter(q => q.employeeId !== employeeId);
+        await saveStationState(station);
+        window.showToast?.('Usunięto z kolejki', 1500);
+        updateAllStationCards();
+    };
+
+    /**
+     * Process next person in queue
+     */
+    const processQueue = async (station: Station): Promise<void> => {
+        if (!station.queue || station.queue.length === 0) return;
+
+        const next = station.queue.shift();
+        if (!next) return;
+
+        station.status = 'OCCUPIED';
+        station.employeeId = next.employeeId;
+        station.treatmentId = normalizeTreatmentId(next.treatmentId);
+        station.startTime = Date.now();
+        station.duration = isTherapyMassageTreatment(next.treatmentId) ? 20 : next.duration;
 
         await saveStationState(station);
 
-        window.showToast?.('Zwolnione', 1500);
-        updateAllStationCards();
+        const empName = EmployeeManager.getNameById(next.employeeId);
+        window.showToast?.(`Następny: ${empName}`, 3000);
+        playNotificationSound();
+    };
+
+    /**
+     * Build short therapist label for station card
+     */
+    const getEmployeeLabel = (employeeId?: string): string => {
+        if (!employeeId) return '';
+
+        const fullName = EmployeeManager.getNameById(employeeId).trim();
+        if (!fullName) return '';
+
+        const parts = fullName.split(/\s+/).filter(Boolean);
+        if (parts.length >= 2) {
+            return `${parts[0][0]}.${parts[1][0]}.`.toUpperCase();
+        }
+
+        return parts[0].slice(0, 10);
+    };
+
+    /**
+     * Build queue treatment label
+     */
+    const getQueueTreatmentLabel = (room: Room, station: Station, entry: QueueEntry): string => {
+        const treatment = room.treatments.find(t => t.id === entry.treatmentId);
+        if (treatment) {
+            return `${treatment.shortName} ${entry.duration}'`;
+        }
+
+        if (room.type === 'simple') {
+            return `${station.name} ${entry.duration}'`;
+        }
+
+        return `${entry.duration}'`;
+    };
+
+    /**
+     * Normalize legacy treatment IDs to canonical IDs
+     */
+    const normalizeTreatmentId = (treatmentId?: string): string | undefined => {
+        if (!treatmentId) return treatmentId;
+        return LEGACY_THERAPY_MASSAGE_IDS.has(treatmentId) ? THERAPY_MASSAGE_TREATMENT_ID : treatmentId;
+    };
+
+    /**
+     * Checks whether treatment belongs to the merged Terapia/Masaż group
+     */
+    const isTherapyMassageTreatment = (treatmentId?: string): boolean => {
+        if (!treatmentId) return false;
+        const normalized = normalizeTreatmentId(treatmentId);
+        return normalized === THERAPY_MASSAGE_TREATMENT_ID;
+    };
+
+    /**
+     * Checks if employee currently occupies any Terapia/Masaż station
+     */
+    const hasActiveTherapyMassage = (employeeId: string, excludedStationId?: string): boolean => {
+        for (const room of rooms) {
+            for (const station of room.stations) {
+                if (excludedStationId && station.id === excludedStationId) continue;
+                if (station.employeeId !== employeeId) continue;
+                if (station.status !== 'OCCUPIED' && station.status !== 'FINISHED') continue;
+                if (isTherapyMassageTreatment(station.treatmentId)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     };
 
     /**
@@ -545,9 +866,12 @@ export const Stations: StationsAPI = (() => {
      * Count treatment usage in a room
      */
     const countTreatmentUsage = (room: Room, treatmentId: string): number => {
-        return room.stations.filter(s =>
+        const normalizedTreatmentId = normalizeTreatmentId(treatmentId) || treatmentId;
+        const relevantRooms = GLOBAL_SINGLE_DEVICE_TREATMENTS.has(normalizedTreatmentId) ? rooms : [room];
+
+        return relevantRooms.flatMap(r => r.stations).filter(s =>
             (s.status === 'OCCUPIED' || s.status === 'FINISHED') &&
-            s.treatmentId === treatmentId
+            normalizeTreatmentId(s.treatmentId) === normalizedTreatmentId
         ).length;
     };
 
@@ -555,6 +879,10 @@ export const Stations: StationsAPI = (() => {
      * Check if treatment is available in room
      */
     const isTreatmentAvailable = (room: Room, treatment: Treatment): boolean => {
+        const normalizedId = normalizeTreatmentId(treatment.id) || treatment.id;
+        if (GLOBAL_SINGLE_DEVICE_TREATMENTS.has(normalizedId)) {
+            return countTreatmentUsage(room, normalizedId) < 1;
+        }
         if (!treatment.limit) return true;
         return countTreatmentUsage(room, treatment.id) < treatment.limit;
     };
@@ -594,33 +922,44 @@ export const Stations: StationsAPI = (() => {
     };
 
     /**
-     * Render mobile accordion view
+     * Render mobile view with category tiles
      */
     const renderMobileView = (): void => {
         const container = document.getElementById('stationsMobileView');
         if (!container) return;
 
-        container.innerHTML = rooms.map(room => `
-            <div class="room-accordion" data-room="${room.id}">
-                <div class="room-accordion-header" data-accordion-room="${room.id}">
-                    <div class="room-accordion-title">
-                        <i class="fas ${room.icon}"></i>
-                        ${room.name}
-                    </div>
-                    <div class="room-accordion-info">
-                        <div class="room-accordion-status" data-room-status="${room.id}">
-                            ${renderStatusDots(room)}
+        const activeId = activeMobileRoomId;
+
+        const tilesHtml = rooms.map(room => {
+            const isActive = room.id === activeId;
+            return `
+                <div class="mobile-room-card ${isActive ? 'expanded' : ''}" data-mobile-room-card="${room.id}">
+                    <button class="mobile-room-tile ${isActive ? 'active' : ''}" data-mobile-room-tab="${room.id}" data-room="${room.id}">
+                        <span class="mobile-room-tile-title">
+                            <i class="fas ${room.icon}"></i>
+                            ${room.name}
+                        </span>
+                        <span class="mobile-room-tile-meta">
+                            <span class="mobile-room-status" data-room-status="${room.id}">
+                                ${renderStatusDots(room)}
+                            </span>
+                            <span class="mobile-room-count" data-room-mobile-stats="${room.id}">
+                                ${countFreeStations(room)}/${room.stations.length}
+                            </span>
+                        </span>
+                    </button>
+                    <div class="mobile-room-panel ${isActive ? 'active' : ''}" data-mobile-room-panel="${room.id}">
+                        <div class="room-accordion-content">
+                            ${room.stations.map(station => renderStationCard(room, station)).join('')}
                         </div>
-                        <i class="fas fa-chevron-down room-accordion-arrow"></i>
                     </div>
                 </div>
-                <div class="room-accordion-body" data-accordion-body="${room.id}">
-                    <div class="room-accordion-content">
-                        ${room.stations.map(station => renderStationCard(room, station)).join('')}
-                    </div>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <div class="mobile-room-tiles">${tilesHtml}</div>
+        `;
     };
 
     /**
@@ -640,54 +979,162 @@ export const Stations: StationsAPI = (() => {
         const statusClass = station.status.toLowerCase();
         const remaining = station.status === 'OCCUPIED' ? getRemainingTime(station) : 0;
         const treatment = room.treatments.find(t => t.id === station.treatmentId);
+        const employeeName = getEmployeeLabel(station.employeeId);
+        const queueHtml = renderQueueSection(room, station);
 
         if (room.type === 'simple') {
-            return renderSimpleStationCard(room, station, statusClass, remaining);
+            return renderSimpleStationCard(room, station, statusClass, remaining, employeeName, queueHtml);
         } else {
-            return renderMultiStationCard(room, station, statusClass, remaining, treatment);
+            return renderMultiStationCard(room, station, statusClass, remaining, treatment, employeeName, queueHtml);
         }
+    };
+
+    /**
+     * Render queue section for station card
+     */
+    const renderQueueSection = (room: Room, station: Station): string => {
+        const isPickerActive = pendingQueueStation?.id === station.id && pendingQueueRoom;
+
+        // Treatment picker tiles (shown inline when user clicks "Zakolejkuj się" on multi room)
+        const pickerHtml = isPickerActive ? `
+            <div class="queue-treatment-picker">
+                <div class="queue-picker-title">Wybierz zabieg:</div>
+                <div class="queue-picker-tiles">
+                    ${pendingQueueRoom!.treatments
+                .filter(t => !station.excludeTreatments?.includes(t.id))
+                .map(t => `
+                            <button class="queue-picker-tile" data-action="queue-treatment"
+                                    data-station="${station.id}" data-room="${room.id}" data-treatment="${t.id}">
+                                <span>${t.shortName}</span>
+                                <span class="queue-picker-time">${t.duration}'</span>
+                            </button>
+                        `).join('')}
+                </div>
+            </div>
+        ` : '';
+
+        if (!station.queue || station.queue.length === 0) {
+            // Show "Add to queue" button if station is not free
+            if (station.status !== 'FREE') {
+                if (room.type === 'simple') {
+                    return `
+                        <div class="station-queue-container">
+                            <button class="btn-add-queue" data-action="add-to-queue" data-station="${station.id}" data-room="${room.id}">
+                                <i class="fas fa-plus"></i> Zakolejkuj się
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="station-queue-container">
+                            <button class="btn-add-queue" data-action="show-queue-treatments" data-station="${station.id}" data-room="${room.id}">
+                                <i class="fas fa-plus"></i> Zakolejkuj się
+                            </button>
+                            ${pickerHtml}
+                        </div>
+                    `;
+                }
+            }
+            return '';
+        }
+
+        const queueList = station.queue.map((q, index) => {
+            const empName = EmployeeManager.getNameById(q.employeeId);
+            const treatmentName = getQueueTreatmentLabel(room, station, q);
+            const isOwn = q.employeeId === currentEmployeeId;
+            const canRemove = isCurrentUserAdmin || isOwn;
+
+            return `
+                <div class="queue-item ${isOwn ? 'own' : ''}">
+                    <span class="queue-index">${index + 1}.</span>
+                    <span class="queue-emp">${empName}</span>
+                    <span class="queue-treat">${treatmentName}</span>
+                    ${canRemove ? `
+                        <button class="btn-remove-queue" data-action="remove-from-queue" 
+                                data-station="${station.id}" data-room="${room.id}" data-employee="${q.employeeId}">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
+
+        const addButtonHtml = station.queue.length < 3 ? (
+            room.type === 'simple'
+                ? `<button class="btn-add-queue mini" data-action="add-to-queue" data-station="${station.id}" data-room="${room.id}"><i class="fas fa-plus"></i></button>`
+                : `<button class="btn-add-queue mini" data-action="show-queue-treatments" data-station="${station.id}" data-room="${room.id}"><i class="fas fa-plus"></i></button>`
+        ) : '';
+
+        const nextEntry = station.queue[0];
+        const nextPreviewHtml = station.status === 'FINISHED' && nextEntry ? `
+            <div class="queue-next">
+                <i class="fas fa-forward"></i> Następny: ${EmployeeManager.getNameById(nextEntry.employeeId)}
+            </div>
+        ` : '';
+
+        return `
+            <div class="station-queue-container">
+                <div class="queue-header">
+                    <i class="fas fa-list-ol"></i> Kolejka (${station.queue.length})
+                </div>
+                ${nextPreviewHtml}
+                <div class="queue-list">
+                    ${queueList}
+                </div>
+                ${addButtonHtml}
+                ${pickerHtml}
+            </div>
+        `;
     };
 
     /**
      * Render simple station card (single click to start)
      */
-    const renderSimpleStationCard = (room: Room, station: Station, statusClass: string, remaining: number): string => {
-        let content = '';
-
+    const renderSimpleStationCard = (room: Room, station: Station, statusClass: string, remaining: number, employeeName: string, queueHtml: string): string => {
         if (station.status === 'FREE') {
-            content = `
-                <div class="station-simple-content" data-action="start-simple" data-station="${station.id}" data-room="${room.id}">
-                    <span class="station-name">${station.name}</span>
-                    <span class="station-duration">${room.defaultDuration} min</span>
+            return `
+                <div class="station-card station-simple ${statusClass}" data-station-id="${station.id}">
+                    <div class="station-simple-content" data-action="start-simple" data-station="${station.id}" data-room="${room.id}">
+                        <span class="station-name">${station.name}</span>
+                        <span class="station-duration">${room.defaultDuration} min</span>
+                    </div>
                 </div>
             `;
         } else if (station.status === 'OCCUPIED') {
-            content = `
-                <div class="station-timer-content">
-                    <span class="station-name">${station.name}</span>
-                    <span class="station-timer">${formatTime(remaining)}</span>
+            return `
+                <div class="station-card station-simple ${statusClass}" data-station-id="${station.id}">
+                    <div class="station-timer-content">
+                        <div class="station-info">
+                            <span class="station-name">${station.name}</span>
+                            <span class="station-emp-name">${employeeName}</span>
+                        </div>
+                        <span class="station-timer">${formatTime(remaining)}</span>
+                        <button class="station-cancel-btn" data-action="cancel" data-station="${station.id}" data-room="${room.id}">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    ${queueHtml}
                 </div>
-                <button class="station-cancel-btn" data-action="cancel" data-station="${station.id}" data-room="${room.id}">
-                    <i class="fas fa-times"></i>
-                </button>
             `;
         } else {
-            content = `
-                <div class="station-finished-content" data-action="release" data-station="${station.id}" data-room="${room.id}">
-                    <span class="station-name">${station.name}</span>
-                    <span class="station-timer">00:00</span>
-                    <span class="station-release-hint">Kliknij aby zwolnić</span>
+            return `
+                <div class="station-card station-simple ${statusClass}" data-station-id="${station.id}">
+                    <div class="station-finished-content" data-action="release" data-station="${station.id}" data-room="${room.id}">
+                        <span class="station-name">${station.name}</span>
+                        <span class="station-emp-name">${employeeName}</span>
+                        <span class="station-timer">00:00</span>
+                        <span class="station-release-hint">Kliknij aby zwolnić</span>
+                    </div>
+                    ${queueHtml}
                 </div>
             `;
         }
-
-        return `<div class="station-card station-simple ${statusClass}" data-station-id="${station.id}">${content}</div>`;
     };
 
     /**
      * Render multi-treatment station card (treatment tiles visible)
      */
-    const renderMultiStationCard = (room: Room, station: Station, statusClass: string, remaining: number, treatment?: Treatment): string => {
+    const renderMultiStationCard = (room: Room, station: Station, statusClass: string, remaining: number, treatment: Treatment | undefined, employeeName: string, queueHtml: string): string => {
         if (station.status === 'FREE') {
             // Filter treatments based on station's excludeTreatments
             const availableTreatments = room.treatments.filter(t =>
@@ -696,9 +1143,18 @@ export const Stations: StationsAPI = (() => {
 
             // Show station name + treatment tiles
             const treatmentTiles = availableTreatments.map(t => {
-                const available = isTreatmentAvailable(room, t);
+                const blockedByOwnTherapyMassage = Boolean(
+                    currentEmployeeId &&
+                    !isCurrentUserAdmin &&
+                    isTherapyMassageTreatment(t.id) &&
+                    hasActiveTherapyMassage(currentEmployeeId, station.id)
+                );
+                const available = isTreatmentAvailable(room, t) && !blockedByOwnTherapyMassage;
                 const disabledClass = available ? '' : 'disabled';
                 const usageInfo = t.limit ? `${countTreatmentUsage(room, t.id)}/${t.limit}` : '';
+                const disabledTitle = blockedByOwnTherapyMassage
+                    ? 'Masz już aktywną Terapię/Masaż. Dodaj się do kolejki.'
+                    : '';
 
                 return `
                     <button class="treatment-tile ${disabledClass}" 
@@ -706,6 +1162,7 @@ export const Stations: StationsAPI = (() => {
                             data-station="${station.id}" 
                             data-room="${room.id}"
                             data-treatment="${t.id}"
+                            title="${disabledTitle}"
                             ${available ? '' : 'disabled'}>
                         <span class="treatment-tile-name">${t.shortName}</span>
                         <span class="treatment-tile-time">${t.duration}'</span>
@@ -730,28 +1187,31 @@ export const Stations: StationsAPI = (() => {
                     <div class="station-occupied-content">
                         <div class="station-info">
                             <span class="station-name">${station.name}</span>
+                            <span class="station-emp-name">${employeeName}</span>
                             <span class="station-treatment-name">${treatment?.shortName || ''}</span>
                         </div>
                         <span class="station-timer">${formatTime(remaining)}</span>
+                        <button class="station-cancel-btn" data-action="cancel" data-station="${station.id}" data-room="${room.id}">
+                            <i class="fas fa-times"></i>
+                        </button>
                     </div>
-                    <button class="station-cancel-btn" data-action="cancel" data-station="${station.id}" data-room="${room.id}">
-                        <i class="fas fa-times"></i>
-                    </button>
+                    ${queueHtml}
                 </div>
             `;
         } else {
             // FINISHED
             return `
-                <div class="station-card station-multi ${statusClass}" data-station-id="${station.id}" 
-                     data-action="release" data-station="${station.id}" data-room="${room.id}">
-                    <div class="station-finished-content">
+                <div class="station-card station-multi ${statusClass}" data-station-id="${station.id}">
+                    <div class="station-finished-content" data-action="release" data-station="${station.id}" data-room="${room.id}">
                         <div class="station-info">
                             <span class="station-name">${station.name}</span>
+                            <span class="station-emp-name">${employeeName}</span>
                             <span class="station-treatment-name">${treatment?.shortName || ''}</span>
                         </div>
                         <span class="station-timer">00:00</span>
+                        <span class="station-release-hint">Kliknij aby zwolnić</span>
                     </div>
-                    <span class="station-release-hint">Kliknij aby zwolnić</span>
+                    ${queueHtml}
                 </div>
             `;
         }
@@ -770,6 +1230,10 @@ export const Stations: StationsAPI = (() => {
             const statsEl = document.querySelector(`[data-room-stats="${room.id}"]`);
             if (statsEl) {
                 statsEl.textContent = `${countFreeStations(room)}/${room.stations.length}`;
+            }
+            const mobileStatsEl = document.querySelector(`[data-room-mobile-stats="${room.id}"]`);
+            if (mobileStatsEl) {
+                mobileStatsEl.textContent = `${countFreeStations(room)}/${room.stations.length}`;
             }
 
             // Update status dots
@@ -815,10 +1279,10 @@ export const Stations: StationsAPI = (() => {
     const handleClick = (e: MouseEvent): void => {
         const target = e.target as HTMLElement;
 
-        // Accordion toggle
-        const accordionHeader = target.closest('[data-accordion-room]') as HTMLElement;
-        if (accordionHeader && !target.closest('[data-action]')) {
-            toggleAccordion(accordionHeader.dataset.accordionRoom || '');
+        // Mobile room tile toggle
+        const roomTile = target.closest('[data-mobile-room-tab]') as HTMLElement;
+        if (roomTile && !target.closest('[data-action]')) {
+            setActiveMobileRoom(roomTile.dataset.mobileRoomTab || '');
             return;
         }
 
@@ -830,9 +1294,10 @@ export const Stations: StationsAPI = (() => {
             const stationId = actionEl.dataset.station;
             const roomId = actionEl.dataset.room;
             const treatmentId = actionEl.dataset.treatment;
+            const employeeId = actionEl.dataset.employee;
 
             if (action && stationId && roomId) {
-                handleAction(action, roomId, stationId, treatmentId);
+                handleAction(action, roomId, stationId, treatmentId, employeeId);
             }
         }
     };
@@ -840,7 +1305,7 @@ export const Stations: StationsAPI = (() => {
     /**
      * Handle action
      */
-    const handleAction = (action: string, roomId: string, stationId: string, treatmentId?: string): void => {
+    const handleAction = (action: string, roomId: string, stationId: string, treatmentId?: string, employeeId?: string): void => {
         const room = rooms.find(r => r.id === roomId);
         const station = room?.stations.find(s => s.id === stationId);
 
@@ -864,29 +1329,75 @@ export const Stations: StationsAPI = (() => {
             case 'release':
                 releaseStation(station);
                 break;
+            case 'add-to-queue':
+                // Simple rooms: add directly with default treatment
+                if (station.status !== 'FREE') {
+                    addToQueue(station, station.id, room.defaultDuration);
+                }
+                break;
+            case 'show-queue-treatments':
+                // Multi rooms: show treatment tiles for queue selection
+                if (station.status !== 'FREE') {
+                    showQueueTreatmentPicker(room, station);
+                }
+                break;
+            case 'queue-treatment':
+                // Treatment selected from queue picker
+                if (treatmentId) {
+                    const treatment = room.treatments.find(t => t.id === treatmentId);
+                    if (treatment) {
+                        addToQueue(station, treatment.id, treatment.duration);
+                    }
+                }
+                // Close the picker
+                pendingQueueStation = null;
+                pendingQueueRoom = null;
+                updateAllStationCards();
+                break;
+            case 'remove-from-queue':
+                if (employeeId) {
+                    removeFromQueue(station, employeeId);
+                }
+                break;
         }
     };
 
     /**
-     * Toggle accordion
+     * Show treatment picker tiles for queue selection (multi rooms)
      */
-    const toggleAccordion = (roomId: string): void => {
-        const header = document.querySelector(`[data-accordion-room="${roomId}"]`);
-        const body = document.querySelector(`[data-accordion-body="${roomId}"]`);
-
-        if (!header || !body) return;
-
-        const isExpanded = header.classList.contains('expanded');
-
-        // Close all accordions
-        document.querySelectorAll('.room-accordion-header').forEach(h => h.classList.remove('expanded'));
-        document.querySelectorAll('.room-accordion-body').forEach(b => b.classList.remove('expanded'));
-
-        // Open this one if it wasn't expanded
-        if (!isExpanded) {
-            header.classList.add('expanded');
-            body.classList.add('expanded');
+    const showQueueTreatmentPicker = (room: Room, station: Station): void => {
+        // Toggle: if already showing picker for this station, hide it
+        if (pendingQueueStation?.id === station.id) {
+            pendingQueueStation = null;
+            pendingQueueRoom = null;
+        } else {
+            pendingQueueStation = station;
+            pendingQueueRoom = room;
         }
+        updateAllStationCards();
+    };
+
+    /**
+     * Set active mobile room tile/panel
+     */
+    const setActiveMobileRoom = (roomId: string): void => {
+        if (!roomId) return;
+        activeMobileRoomId = activeMobileRoomId === roomId ? null : roomId;
+
+        document.querySelectorAll('.mobile-room-tile').forEach(tile => {
+            const isActive = (tile as HTMLElement).dataset.mobileRoomTab === activeMobileRoomId;
+            tile.classList.toggle('active', isActive);
+        });
+
+        document.querySelectorAll('.mobile-room-panel').forEach(panel => {
+            const isActive = (panel as HTMLElement).dataset.mobileRoomPanel === activeMobileRoomId;
+            panel.classList.toggle('active', isActive);
+        });
+
+        document.querySelectorAll('.mobile-room-card').forEach(card => {
+            const isActive = (card as HTMLElement).dataset.mobileRoomCard === activeMobileRoomId;
+            card.classList.toggle('expanded', isActive);
+        });
     };
 
     /**

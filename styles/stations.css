@@ -531,7 +531,7 @@
 }
 
 /* ============================================
-   MOBILE VIEW - ACCORDION
+   MOBILE VIEW - CATEGORY TILES
    ============================================ */
 .stations-mobile-view {
     display: flex;
@@ -545,71 +545,94 @@
     }
 }
 
-.room-accordion {
-    background: white;
-    border-radius: var(--border-radius-sm);
-    box-shadow: var(--shadow-sm);
-    overflow: hidden;
+.mobile-room-tiles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
 }
 
-.room-accordion-header {
-    padding: 10px 12px;
-    background: var(--color-gray-700);
+.mobile-room-card {
+    min-width: 0;
+}
+
+.mobile-room-card.expanded {
+    grid-column: 1 / -1;
+}
+
+.mobile-room-tile {
+    width: 100%;
+    min-height: 82px;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 10px 9px;
     color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    text-align: left;
+}
+
+.mobile-room-tile.active {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+    outline: 2px solid rgba(255, 255, 255, 0.65);
+}
+
+.mobile-room-tile-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mobile-room-tile-meta {
+    width: 100%;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    cursor: pointer;
-    user-select: none;
-    font-size: 0.9rem;
 }
 
-.room-accordion-header.expanded {
-    border-bottom: 2px solid var(--color-primary-500);
+.mobile-room-status {
+    display: flex;
+    gap: 4px;
 }
 
-/* Accordion header colors */
-.room-accordion[data-room="hydro"] .room-accordion-header {
+.mobile-room-count {
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.25);
+    padding: 1px 6px;
+    border-radius: 999px;
+}
+
+.mobile-room-tile[data-room="hydro"] {
     background: linear-gradient(135deg, #0ea5e9, #0284c7);
 }
 
-.room-accordion[data-room="magnet"] .room-accordion-header {
+.mobile-room-tile[data-room="magnet"] {
     background: linear-gradient(135deg, #8b5cf6, #7c3aed);
 }
 
-.room-accordion[data-room="physio1"] .room-accordion-header,
-.room-accordion[data-room="physio2"] .room-accordion-header {
+.mobile-room-tile[data-room="physio1"],
+.mobile-room-tile[data-room="physio2"] {
     background: linear-gradient(135deg, #f59e0b, #d97706);
 }
 
-.room-accordion[data-room="aquavibron"] .room-accordion-header {
+.mobile-room-tile[data-room="aquavibron"] {
     background: linear-gradient(135deg, #14b8a6, #0d9488);
 }
 
-.room-accordion[data-room="sala21"] .room-accordion-header {
+.mobile-room-tile[data-room="sala21"] {
     background: linear-gradient(135deg, #ec4899, #db2777);
 }
 
-.room-accordion[data-room="gym"] .room-accordion-header {
+.mobile-room-tile[data-room="gym"] {
     background: linear-gradient(135deg, #10b981, #059669);
-}
-
-.room-accordion-title {
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.room-accordion-info {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.room-accordion-status {
-    display: flex;
-    gap: 4px;
 }
 
 .status-dot {
@@ -631,24 +654,16 @@
     animation: pulse-dot 1s ease-in-out infinite;
 }
 
-.room-accordion-arrow {
-    transition: transform 0.2s ease;
-    font-size: 0.8rem;
+.mobile-room-panel {
+    display: none;
+    background: white;
+    border-radius: var(--border-radius-sm);
+    box-shadow: var(--shadow-sm);
+    margin-top: 6px;
 }
 
-.room-accordion-header.expanded .room-accordion-arrow {
-    transform: rotate(180deg);
-}
-
-.room-accordion-body {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.25s ease-out;
-    background: var(--color-gray-50);
-}
-
-.room-accordion-body.expanded {
-    max-height: 800px;
+.mobile-room-panel.active {
+    display: block;
 }
 
 .room-accordion-content {
@@ -683,6 +698,7 @@
     .treatment-tile-name {
         font-size: 0.85rem;
     }
+
 }
 
 /* ============================================
@@ -691,4 +707,300 @@
 .treatment-modal,
 .confirm-modal {
     display: none !important;
+}
+
+/* ============================================
+   THERAPIST AND QUEUE SYSTEM STYLES
+   ============================================ */
+
+.station-emp-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-primary-700);
+    background: rgba(255, 255, 255, 0.4);
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: auto;
+}
+
+.station-occupied-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 4px;
+    padding: 0 4px;
+}
+
+/* Queue Container */
+.station-queue-container {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px dashed rgba(0, 0, 0, 0.1);
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.queue-header {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--color-gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.queue-next {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--color-primary-700);
+    background: var(--color-primary-50);
+    border: 1px solid var(--color-primary-200);
+    border-radius: 4px;
+    padding: 4px 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.queue-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 6px;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    border: 1px solid transparent;
+}
+
+.queue-item.own {
+    background: var(--color-primary-50);
+    border-color: var(--color-primary-200);
+}
+
+.queue-index {
+    font-weight: 700;
+    color: var(--color-gray-400);
+    width: 12px;
+}
+
+.queue-emp {
+    font-weight: 600;
+    color: var(--color-gray-800);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.queue-treat {
+    font-size: 0.65rem;
+    color: var(--color-gray-500);
+    background: var(--color-gray-100);
+    padding: 0 4px;
+    border-radius: 2px;
+    white-space: nowrap;
+}
+
+/* Action Buttons */
+.btn-add-queue {
+    width: 100%;
+    padding: 5px;
+    background: var(--color-primary-500);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.btn-add-queue:hover {
+    background: var(--color-primary-600);
+    transform: translateY(-1px);
+}
+
+.btn-add-queue.mini {
+    width: 24px;
+    height: 24px;
+    margin: 0 auto;
+}
+
+.btn-remove-queue {
+    border: none;
+    background: transparent;
+    color: var(--color-gray-400);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: all 0.15s ease;
+}
+
+.btn-remove-queue:hover {
+    color: var(--color-danger);
+    background: var(--color-danger-light);
+}
+
+.queue-treatment-picker {
+    margin-top: 4px;
+    padding: 6px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid var(--color-gray-200);
+    border-radius: 6px;
+}
+
+.queue-picker-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--color-gray-700);
+    margin-bottom: 5px;
+}
+
+.queue-picker-tiles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.queue-picker-tile {
+    border: 1px solid var(--color-primary-200);
+    background: var(--color-primary-50);
+    color: var(--color-primary-700);
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.queue-picker-tile:hover {
+    background: var(--color-primary-100);
+    border-color: var(--color-primary-400);
+}
+
+.queue-picker-time {
+    font-size: 0.68rem;
+    color: var(--color-gray-600);
+}
+
+.emp-picker-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.38);
+    z-index: 1200;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 12px;
+}
+
+.emp-picker-modal {
+    width: min(520px, 96vw);
+    max-height: 78vh;
+    background: var(--color-white);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.emp-picker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--color-gray-200);
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--color-gray-800);
+}
+
+.emp-picker-close {
+    border: none;
+    background: transparent;
+    color: var(--color-gray-500);
+    cursor: pointer;
+    padding: 4px;
+}
+
+.emp-picker-close:hover {
+    color: var(--color-danger);
+}
+
+.emp-picker-list {
+    padding: 10px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.emp-picker-btn {
+    border: 1px solid var(--color-gray-200);
+    background: var(--color-gray-50);
+    color: var(--color-gray-800);
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+}
+
+.emp-picker-btn:hover {
+    border-color: var(--color-primary-400);
+    background: var(--color-primary-50);
+}
+
+.emp-picker-btn.current {
+    border-color: var(--color-primary-500);
+    background: var(--color-primary-100);
+}
+
+/* Finished state adjustments */
+.station-card.finished .station-emp-name {
+    margin-bottom: 4px;
+}
+
+.station-card.finished .station-release-hint {
+    margin-top: auto;
+    font-weight: 700;
+}
+
+/* Responsive adjustments */
+@media (max-width: 767px) {
+    .queue-item {
+        padding: 5px 8px;
+        font-size: 0.8rem;
+    }
+
+    .btn-add-queue {
+        padding: 8px;
+        font-size: 0.85rem;
+    }
+
+    .queue-picker-tiles,
+    .emp-picker-list {
+        grid-template-columns: 1fr;
+    }
 }

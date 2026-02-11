@@ -1,0 +1,82 @@
+﻿<!-- pages/appointments.html - Physiotherapy Appointment Scheduler -->
+<div class="appointments-container">
+    <!-- Header Section -->
+    <div class="appointments-header">
+        <div class="appointments-header-left">
+            <h1 class="appointments-title">
+                <i class="fas fa-clock"></i>
+                Planowanie Wizyt
+            </h1>
+            <p class="appointments-subtitle">Harmonogram stanowisk zabiegowych co 20 minut</p>
+        </div>
+        <div class="appointments-header-right">
+            <div id="saveStatus" class="save-status"></div>
+            <label for="appointmentsFilter" class="appointments-filter-label">Filtr:</label>
+            <select id="appointmentsFilter" class="appointments-filter-select" title="Filtruj wiersze">
+                <option value="all">Wszystkie</option>
+                <option value="active">Tylko aktywne</option>
+                <option value="ending_today">Kończące dziś</option>
+                <option value="ending_tomorrow">Kończące jutro</option>
+            </select>
+            <button id="printAppointmentsBtn" class="btn-secondary" title="Drukuj tabelę">
+                <i class="fas fa-print"></i> Drukuj
+            </button>
+            <button id="clearAppointmentsBtn" class="btn-secondary" title="Wyczyść wszystkie pola">
+                <i class="fas fa-eraser"></i> Wyczyść
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Table View -->
+    <div class="appointments-table-wrapper">
+        <table class="appointments-table" id="appointmentsTable">
+            <thead>
+                <tr>
+                    <th class="col-time">Godzina</th>
+                    <th class="col-station">Stanowisko 1</th>
+                    <th class="col-station">Stanowisko 2</th>
+                </tr>
+            </thead>
+            <tbody id="appointmentsTableBody">
+                <!-- Will be populated by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Patient Info Modal (Inspired by Schedule) -->
+    <div id="appointmentPatientInfoModal" class="modal-overlay" style="display: none">
+        <div class="modal-content">
+            <h2 class="modal-title">Informacje o pacjencie</h2>
+            <div class="modal-body">
+                <div class="form-group patient-name-row">
+                    <label for="modalPatientName">Imię i nazwisko:</label>
+                    <input type="text" id="modalPatientName" placeholder="Wpisz nazwisko pacjenta..." />
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="appointmentStartDate">Data rozpoczęcia:</label>
+                        <input type="date" id="appointmentStartDate" />
+                    </div>
+                    <div class="form-group">
+                        <label for="appointmentExtensionDays">Przedłużenie (dni):</label>
+                        <input type="number" id="appointmentExtensionDays" min="0" value="0" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="appointmentEndDate">Data zakończenia:</label>
+                    <input type="text" id="appointmentEndDate" readonly class="bold-large-font" />
+                </div>
+                <div class="form-group">
+                    <label for="appointmentAdditionalInfo">Informacje dodatkowe:</label>
+                    <textarea id="appointmentAdditionalInfo" rows="3" placeholder="Dodatkowe uwagi..."></textarea>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="savePatientInfoBtn" class="action-btn primary">Zapisz</button>
+                <button id="closePatientInfoBtn" class="action-btn outline">Anuluj</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
