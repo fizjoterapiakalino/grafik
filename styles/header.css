@@ -95,6 +95,13 @@
     border-color: var(--color-danger);
 }
 
+.action-icon-btn.btn-hydro-active.active {
+    color: #3b82f6;
+    /* Blue 500 */
+    border-color: rgba(59, 130, 246, 0.5);
+    background: rgba(59, 130, 246, 0.1);
+}
+
 /* Header action buttons - always visible and slightly larger */
 .header-action-btn {
     width: 42px;

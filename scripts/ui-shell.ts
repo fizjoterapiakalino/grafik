@@ -42,6 +42,9 @@ export const UIShell: UIShellAPI = (() => {
                     <div id="scheduleActionButtons" class="schedule-action-buttons">
                         <button id="btnPatientInfo" class="action-icon-btn" title="Informacje o pacjencie"><i class="fas fa-user-circle"></i></button>
                         <button id="btnAddBreak" class="action-icon-btn" title="Dodaj przerwę"><i class="fas fa-coffee"></i></button>
+                        <button id="btnHydrotherapy" class="action-icon-btn" title="Hydroterapia">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-waves-ladder-icon lucide-waves-ladder" style="vertical-align: middle;"><path d="M19 5a2 2 0 0 0-2 2v11"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M7 13h10"/><path d="M7 9h10"/><path d="M9 5a2 2 0 0 0-2 2v11"/></svg>
+                        </button>
                         <button id="btnClearCell" class="action-icon-btn danger" title="Wyczyść komórkę"><i class="fas fa-trash-alt"></i></button>
                     </div>
                     <button id="btnIso" class="action-icon-btn active header-action-btn" title="Dokumenty ISO"><i class="fas fa-file-alt"></i><span class="notification-badge" style="display: none;"></span></button>

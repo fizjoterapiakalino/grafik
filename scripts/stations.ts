@@ -144,30 +144,18 @@ export const Stations: StationsAPI = (() => {
             id: 'aquavibron',
             name: 'Aquavibron',
             icon: 'fa-wave-square',
-            type: 'simple',
+            type: 'multi',
             maxCapacity: 1,
             defaultDuration: 6,
             stations: [
                 { id: 'aquavibron_1', name: 'Aquavibron', roomId: 'aquavibron', status: 'FREE' },
             ],
-            treatments: [],
-        },
-        {
-            id: 'sala21',
-            name: 'Sala 21',
-            icon: 'fa-hands',
-            type: 'multi',
-            maxCapacity: 2,
-            defaultDuration: 15,
-            stations: [
-                { id: 'sala21_1', name: 'Leżanka 1', roomId: 'sala21', status: 'FREE' },
-                { id: 'sala21_2', name: 'Leżanka 2', roomId: 'sala21', status: 'FREE' },
-            ],
             treatments: [
+                { id: 'aquavibron_simple', name: 'Aquavibron', shortName: 'Aqua.', duration: 6 },
                 { id: THERAPY_MASSAGE_TREATMENT_ID, name: 'Terapia/Masaż', shortName: 'Ter./Mas.', duration: 20 },
-                { id: 'prady_sala21', name: 'Prądy', shortName: 'Prądy', duration: 15 },
             ],
         },
+
         {
             id: 'physio1',
             name: 'Fizyko 18',
@@ -204,6 +192,22 @@ export const Stations: StationsAPI = (() => {
                 { id: 'ultrasound', name: 'Ultradźwięki', shortName: 'UD', duration: 7.5, limit: 2 },
                 { id: 'laser', name: 'Laser', shortName: 'Laser', duration: 7.5, limit: 1 },
                 { id: 'sollux', name: 'Sollux', shortName: 'Sollux', duration: 15, limit: 1 },
+            ],
+        },
+        {
+            id: 'sala21',
+            name: 'Sala 21',
+            icon: 'fa-hands',
+            type: 'multi',
+            maxCapacity: 2,
+            defaultDuration: 15,
+            stations: [
+                { id: 'sala21_1', name: 'Leżanka 1', roomId: 'sala21', status: 'FREE' },
+                { id: 'sala21_2', name: 'Leżanka 2', roomId: 'sala21', status: 'FREE' },
+            ],
+            treatments: [
+                { id: THERAPY_MASSAGE_TREATMENT_ID, name: 'Terapia/Masaż', shortName: 'Ter./Mas.', duration: 20 },
+                { id: 'prady_sala21', name: 'Prądy', shortName: 'Prądy', duration: 15 },
             ],
         },
         {
@@ -424,19 +428,26 @@ export const Stations: StationsAPI = (() => {
     /**
      * Get active employee ID for an action (auto for user, picker for admin)
      */
-    const getActiveEmployeeId = async (): Promise<string | null> => {
-        if (!isCurrentUserAdmin) {
+    const getActiveEmployeeId = async (
+        options?: { forcePicker?: boolean; pickerTitle?: string }
+    ): Promise<string | null> => {
+        if (options?.forcePicker) {
+            return showEmployeePickerModal(options.pickerTitle);
+        }
+
+        // Dla zwykłych zabiegów zawsze używaj aktualnie zalogowanego pracownika.
+        // Jeśli konto admina nie ma przypisanego employeeId, dopiero wtedy fallback do pickera.
+        if (currentEmployeeId) {
             return currentEmployeeId;
         }
 
-        // Admin: show employee picker modal
-        return showEmployeePickerModal();
+        return isCurrentUserAdmin ? showEmployeePickerModal(options?.pickerTitle) : null;
     };
 
     /**
      * Show modal for admin to pick an employee
      */
-    const showEmployeePickerModal = (): Promise<string | null> => {
+    const showEmployeePickerModal = (title = 'Wybierz pracownika'): Promise<string | null> => {
         return new Promise((resolve) => {
             // Remove existing modal if any
             document.getElementById('employeePickerModal')?.remove();
@@ -460,7 +471,7 @@ export const Stations: StationsAPI = (() => {
             modal.innerHTML = `
                 <div class="emp-picker-modal">
                     <div class="emp-picker-header">
-                        <span>Wybierz pracownika</span>
+                        <span>${title}</span>
                         <button class="emp-picker-close"><i class="fas fa-times"></i></button>
                     </div>
                     <div class="emp-picker-list">
@@ -581,7 +592,11 @@ export const Stations: StationsAPI = (() => {
      * Start treatment on a station (for multi-treatment rooms)
      */
     const startMultiTreatment = async (_room: Room, station: Station, treatment: Treatment): Promise<void> => {
-        const empId = await getActiveEmployeeId();
+        const isTherapyMassage = isTherapyMassageTreatment(treatment.id);
+        const empId = await getActiveEmployeeId({
+            forcePicker: isTherapyMassage,
+            pickerTitle: isTherapyMassage ? 'Wybierz terapeutę' : undefined,
+        });
         if (!empId) {
             window.showToast?.('Nie wybrano pracownika', 2000);
             return;
@@ -590,7 +605,7 @@ export const Stations: StationsAPI = (() => {
             window.showToast?.('Ten zabieg jest chwilowo niedostępny', 2200);
             return;
         }
-        if (isTherapyMassageTreatment(treatment.id) && hasActiveTherapyMassage(empId, station.id)) {
+        if (isTherapyMassage && hasActiveTherapyMassage(empId, station.id)) {
             window.showToast?.('Masz już aktywną Terapię/Masaż. Możesz tylko dodać się do kolejki.', 3000);
             return;
         }
@@ -639,12 +654,16 @@ export const Stations: StationsAPI = (() => {
      * Add employee to station queue
      */
     const addToQueue = async (station: Station, treatmentId: string, duration: number): Promise<void> => {
-        const empId = await getActiveEmployeeId();
+        const normalizedTreatmentId = normalizeTreatmentId(treatmentId) || treatmentId;
+        const isTherapyMassage = isTherapyMassageTreatment(normalizedTreatmentId);
+        const empId = await getActiveEmployeeId({
+            forcePicker: isTherapyMassage,
+            pickerTitle: isTherapyMassage ? 'Wybierz terapeutę' : undefined,
+        });
         if (!empId) {
             window.showToast?.('Nie wybrano pracownika', 2000);
             return;
         }
-        const normalizedTreatmentId = normalizeTreatmentId(treatmentId) || treatmentId;
         const normalizedDuration = isTherapyMassageTreatment(normalizedTreatmentId) ? 20 : duration;
 
         // Initialize queue if not exists
@@ -901,22 +920,32 @@ export const Stations: StationsAPI = (() => {
         const container = document.getElementById('stationsDesktopView');
         if (!container) return;
 
-        container.innerHTML = rooms.map(room => `
-            <div class="room-panel" data-room="${room.id}">
-                <div class="room-panel-header">
-                    <div class="room-panel-title">
-                        <i class="fas ${room.icon}"></i>
-                        ${room.name}
+        const desktopColumns: Room[][] = [
+            rooms.slice(0, 3), // Hydro, Magnet, Aquavibron
+            rooms.slice(3, 5), // Fizyko 18, Fizyko 22
+            rooms.slice(5, 7), // Sala 21, Sala Gimnastyczna
+        ];
+
+        container.innerHTML = desktopColumns.map((columnRooms) => `
+            <div class="stations-column">
+                ${columnRooms.map(room => `
+                    <div class="room-panel" data-room="${room.id}">
+                        <div class="room-panel-header">
+                            <div class="room-panel-title">
+                                <i class="fas ${room.icon}"></i>
+                                ${room.name}
+                            </div>
+                            <div class="room-stats">
+                                <span class="room-stat" data-room-stats="${room.id}">
+                                    ${countFreeStations(room)}/${room.stations.length}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="room-panel-body">
+                            ${room.stations.map(station => renderStationCard(room, station)).join('')}
+                        </div>
                     </div>
-                    <div class="room-stats">
-                        <span class="room-stat" data-room-stats="${room.id}">
-                            ${countFreeStations(room)}/${room.stations.length}
-                        </span>
-                    </div>
-                </div>
-                <div class="room-panel-body">
-                    ${room.stations.map(station => renderStationCard(room, station)).join('')}
-                </div>
+                `).join('')}
             </div>
         `).join('');
     };

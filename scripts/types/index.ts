@@ -168,14 +168,18 @@ export interface CellState {
     isPnf?: boolean | null;
     /** Czy pacjent przychodzi co drugi dzień */
     isEveryOtherDay?: boolean | null;
+    /** Czy zabieg to hydroterapia */
+    isHydrotherapy?: boolean | null;
     /** Flagi dla górnej części split */
     isMassage1?: boolean | null;
     isPnf1?: boolean | null;
     isEveryOtherDay1?: boolean | null;
+    isHydrotherapy1?: boolean | null;
     /** Flagi dla dolnej części split */
     isMassage2?: boolean | null;
     isPnf2?: boolean | null;
     isEveryOtherDay2?: boolean | null;
+    isHydrotherapy2?: boolean | null;
     /** Dane leczenia (dla normalnej komórki) */
     treatmentStartDate?: string | null;
     treatmentExtensionDays?: number | null;

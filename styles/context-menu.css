@@ -50,7 +50,8 @@
     color: var(--color-secondary-700);
 }
 
-.context-menu li i {
+.context-menu li i,
+.context-menu li svg {
     margin-right: 12px;
     width: 1.5em;
     text-align: center;
@@ -59,7 +60,8 @@
     transition: color 0.15s ease;
 }
 
-.context-menu li:hover i {
+.context-menu li:hover i,
+.context-menu li:hover svg {
     color: var(--color-secondary-600);
 }
 

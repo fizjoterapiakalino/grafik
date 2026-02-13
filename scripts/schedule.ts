@@ -222,12 +222,15 @@ export const Schedule: ScheduleAPI = (() => {
                     isMassage2: part2?.dataset.isMassage === 'true',
                     isPnf1: part1?.dataset.isPnf === 'true',
                     isPnf2: part2?.dataset.isPnf === 'true',
+                    isHydrotherapy1: part1?.dataset.isHydrotherapy === 'true',
+                    isHydrotherapy2: part2?.dataset.isHydrotherapy === 'true',
                 };
             }
             return {
                 content: ScheduleUI.getElementText(cell),
                 isMassage: (cell as HTMLElement).dataset.isMassage === 'true',
                 isPnf: (cell as HTMLElement).dataset.isPnf === 'true',
+                isHydrotherapy: (cell as HTMLElement).dataset.isHydrotherapy === 'true',
             };
         },
 
@@ -263,6 +266,7 @@ export const Schedule: ScheduleAPI = (() => {
                         isMassage: realCellState[`isMassage${partIndex}`] as boolean,
                         isPnf: realCellState[`isPnf${partIndex}`] as boolean,
                         isEveryOtherDay: realCellState[`isEveryOtherDay${partIndex}`] as boolean,
+                        isHydrotherapy: realCellState[`isHydrotherapy${partIndex}`] as boolean,
                     };
                 }
             }
@@ -277,6 +281,7 @@ export const Schedule: ScheduleAPI = (() => {
                         state[`isMassage${partIndex}`] = safeCopy(tempState.isMassage);
                         state[`isPnf${partIndex}`] = safeCopy(tempState.isPnf);
                         state[`isEveryOtherDay${partIndex}`] = safeCopy(tempState.isEveryOtherDay);
+                        state[`isHydrotherapy${partIndex}`] = safeCopy(tempState.isHydrotherapy);
 
                         if (!state[`treatmentData${partIndex}`]) state[`treatmentData${partIndex}`] = {};
                         const treatmentData = state[`treatmentData${partIndex}`] as TreatmentData;
@@ -342,6 +347,7 @@ export const Schedule: ScheduleAPI = (() => {
                 state.isMassage = safeCopy(state[`isMassage${activePart}`]);
                 state.isPnf = safeCopy(state[`isPnf${activePart}`]);
                 state.isEveryOtherDay = safeCopy(state[`isEveryOtherDay${activePart}`]);
+                state.isHydrotherapy = safeCopy(state[`isHydrotherapy${activePart}`]);
 
                 const treatmentData = (state[`treatmentData${activePart}`] as TreatmentData) || {};
                 state.treatmentStartDate = safeCopy(treatmentData.startDate);
@@ -358,6 +364,9 @@ export const Schedule: ScheduleAPI = (() => {
                 state.isPnf2 = null;
                 state.isEveryOtherDay1 = null;
                 state.isEveryOtherDay2 = null;
+                state.isHydrotherapy1 = null;
+                state.isHydrotherapy2 = null;
+                state.isHydrotherapy = null;
                 state.treatmentData1 = null;
                 state.treatmentData2 = null;
 
@@ -377,6 +386,7 @@ export const Schedule: ScheduleAPI = (() => {
                     'isMassage', 'isPnf', 'isEveryOtherDay',
                     'treatmentStartDate', 'treatmentExtensionDays', 'treatmentEndDate', 'additionalInfo',
                     'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2',
+                    'isHydrotherapy', 'isHydrotherapy1', 'isHydrotherapy2',
                 ];
                 for (const key of contentKeys) {
                     if (Object.prototype.hasOwnProperty.call(state, key)) {

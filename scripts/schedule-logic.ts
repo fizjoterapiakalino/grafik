@@ -23,12 +23,15 @@ interface CellData {
     isMassage?: boolean;
     isPnf?: boolean;
     isEveryOtherDay?: boolean;
+    isHydrotherapy?: boolean;
     isMassage1?: boolean;
     isMassage2?: boolean;
     isPnf1?: boolean;
     isPnf2?: boolean;
     isEveryOtherDay1?: boolean;
+    isHydrotherapy1?: boolean;
     isEveryOtherDay2?: boolean;
+    isHydrotherapy2?: boolean;
     treatmentStartDate?: string;
     treatmentExtensionDays?: number;
     treatmentEndDate?: string;
@@ -45,6 +48,7 @@ interface PartData {
     isMassage: boolean;
     isPnf: boolean;
     isEveryOtherDay: boolean;
+    isHydrotherapy: boolean;
     treatmentEndDate?: string | null;
     daysRemaining?: number | null;
 }
@@ -111,7 +115,8 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
                 content: string | undefined,
                 isMassage: boolean | undefined,
                 isPnf: boolean | undefined,
-                isEveryOtherDay: boolean | undefined
+                isEveryOtherDay: boolean | undefined,
+                isHydrotherapy: boolean | undefined
             ): PartData => {
                 const part: PartData = {
                     text: capitalizeFirstLetter(content || ''),
@@ -119,11 +124,16 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
                     isMassage: !!isMassage,
                     isPnf: !!isPnf,
                     isEveryOtherDay: !!isEveryOtherDay,
+                    isHydrotherapy: !!isHydrotherapy,
                 };
 
                 if (isMassage) part.classes.push('massage-text');
                 if (isPnf) part.classes.push('pnf-text');
                 if (isEveryOtherDay) part.classes.push('every-other-day-text');
+                if (isHydrotherapy) {
+                    part.classes.push('hydrotherapy-text');
+                    part.classes.push('hydrotherapy-cell-bg'); // Helper class for partial split bg if needed
+                }
 
                 return part;
             };
@@ -133,7 +143,8 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
                     cellData.content1,
                     cellData.isMassage1,
                     cellData.isPnf1,
-                    cellData.isEveryOtherDay1
+                    cellData.isEveryOtherDay1,
+                    cellData.isHydrotherapy1
                 )
             );
 
@@ -142,7 +153,8 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
                     cellData.content2,
                     cellData.isMassage2,
                     cellData.isPnf2,
-                    cellData.isEveryOtherDay2
+                    cellData.isEveryOtherDay2,
+                    cellData.isHydrotherapy2
                 )
             );
 
@@ -195,10 +207,17 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
         if (cellData.isPnf) result.classes.push('pnf-text');
         if (cellData.isEveryOtherDay) result.classes.push('every-other-day-text');
 
-        if (result.text.trim() !== '') {
-            result.styles.backgroundColor = AppConfig.schedule.contentCellColor;
+        if (cellData.isHydrotherapy) {
+            result.text = 'Hydroterapia'; // Enforce text for full cell
+            result.classes.push('hydrotherapy-cell');
+            result.styles.backgroundColor = 'var(--bg-hydrotherapy)'; // Direct style application
         } else {
-            result.styles.backgroundColor = AppConfig.schedule.defaultCellColor;
+            // Apply default or content color only if NOT hydrotherapy
+            if (result.text.trim() !== '') {
+                result.styles.backgroundColor = AppConfig.schedule.contentCellColor;
+            } else {
+                result.styles.backgroundColor = AppConfig.schedule.defaultCellColor;
+            }
         }
 
         // Treatment End Marker for Normal

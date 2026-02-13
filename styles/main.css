@@ -105,6 +105,8 @@ body {
     --bg-pnf: var(--color-secondary-500);
     --bg-every-other-day: #a855f7;
     --bg-search-highlight: #bae6fd;
+    --bg-hydrotherapy: var(--color-info);
+    /* Blue */
 
     /* --- Spacing Scale --- */
     --spacing-xs: 4px;

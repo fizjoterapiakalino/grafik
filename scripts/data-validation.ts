@@ -48,6 +48,9 @@ export interface CellStateForValidation {
     isEveryOtherDay?: boolean | null;
     isEveryOtherDay1?: boolean | null;
     isEveryOtherDay2?: boolean | null;
+    isHydrotherapy?: boolean | null;
+    isHydrotherapy1?: boolean | null;
+    isHydrotherapy2?: boolean | null;
     treatmentStartDate?: string | null;
     treatmentExtensionDays?: number | null;
     treatmentEndDate?: string | null;
@@ -82,6 +85,9 @@ export const ALLOWED_CELL_KEYS = [
     'additionalInfo',
     'treatmentData1',
     'treatmentData2',
+    'isHydrotherapy',
+    'isHydrotherapy1',
+    'isHydrotherapy2',
     'history',
 ] as const;
 
@@ -213,6 +219,7 @@ export const validateCellState = (cellState: unknown): ValidationResultMultiple 
     const booleanFields = [
         'isSplit', 'isBreak', 'isMassage', 'isMassage1', 'isMassage2',
         'isPnf', 'isPnf1', 'isPnf2', 'isEveryOtherDay', 'isEveryOtherDay1', 'isEveryOtherDay2',
+        'isHydrotherapy', 'isHydrotherapy1', 'isHydrotherapy2',
     ] as const;
 
     for (const field of booleanFields) {

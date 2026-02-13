@@ -209,6 +209,20 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                     addBreakBtn.title = 'Dodaj przerwę';
                 }
             }
+
+            const hydrotherapyBtn = document.getElementById('btnHydrotherapy') as HTMLButtonElement | null;
+            if (hydrotherapyBtn) {
+                const isHydrotherapy = activeCell.classList.contains('hydrotherapy-cell') || activeCell.dataset.isHydrotherapy === 'true';
+                hydrotherapyBtn.classList.toggle('active', true);
+                if (isHydrotherapy) {
+                    hydrotherapyBtn.classList.add('btn-hydro-active');
+                    hydrotherapyBtn.title = 'Usuń Hydroterapię';
+                } else {
+                    hydrotherapyBtn.classList.remove('btn-hydro-active');
+                    hydrotherapyBtn.title = 'Dodaj Hydroterapię';
+                }
+                hydrotherapyBtn.disabled = activeCell.classList.contains('break-cell');
+            }
         }
     };
 
@@ -463,6 +477,20 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 condition: (cell: HTMLElement) => !cell.classList.contains('break-cell'),
             },
             {
+                id: 'contextHydrotherapy',
+                condition: (cell: HTMLElement) => !cell.classList.contains('break-cell') && !cell.classList.contains('split-cell'),
+                action: (cell: HTMLElement) => {
+                    _dependencies.updateCellState(cell, (state) => {
+                        state.content = 'Hydroterapia';
+                        state.isHydrotherapy = true;
+                        state.isMassage = false;
+                        state.isPnf = false;
+                        state.isEveryOtherDay = false;
+                        window.showToast('Dodano Hydroterapię');
+                    });
+                }
+            },
+            {
                 id: 'contextRemoveBreak',
                 class: 'danger',
                 action: (cell: HTMLElement) => {
@@ -634,6 +662,36 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 }
             } else {
                 window.showToast('Wybierz komórkę, aby zarządzać przerwą.', 3000);
+            }
+        });
+
+        document.getElementById('btnHydrotherapy')?.addEventListener('click', () => {
+            if (activeCell) {
+                if (activeCell.classList.contains('split-cell')) {
+                    window.showToast('Najpierw scal komórkę, aby dodać Hydroterapię.', 3000);
+                    return;
+                }
+                if (activeCell.classList.contains('break-cell')) {
+                    window.showToast('Najpierw usuń przerwę.', 3000);
+                    return;
+                }
+                _dependencies.updateCellState(activeCell, (state) => {
+                    const isCurrentlyHydro = state.isHydrotherapy === true;
+                    if (isCurrentlyHydro) {
+                        state.isHydrotherapy = false;
+                        state.content = '';
+                        window.showToast('Usunięto Hydroterapię');
+                    } else {
+                        state.content = 'Hydroterapia';
+                        state.isHydrotherapy = true;
+                        state.isMassage = false;
+                        state.isPnf = false;
+                        state.isEveryOtherDay = false;
+                        window.showToast('Dodano Hydroterapię');
+                    }
+                });
+            } else {
+                window.showToast('Wybierz komórkę, aby dodać Hydroterapię.', 3000);
             }
         });
 

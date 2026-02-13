@@ -20,6 +20,7 @@ interface CellData {
     isMassage?: boolean;
     isPnf?: boolean;
     isEveryOtherDay?: boolean;
+    isHydrotherapy?: boolean;
     [key: string]: unknown;
 }
 
@@ -50,6 +51,63 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
     let _currentTimeInterval: ReturnType<typeof setInterval> | null = null;
     let _leavesData: Record<string, LeaveEntry[]> = {};
     let _leavesLoaded = false;
+    let _stationsUnsubscribe: (() => void) | null = null;
+    let _stationOverlayInterval: ReturnType<typeof setInterval> | null = null;
+
+    interface StationRealtimeState {
+        status?: string;
+        treatmentId?: string;
+        startTime?: number;
+        duration?: number;
+        employeeId?: string;
+    }
+
+    interface EmployeeStationOverlayData {
+        stationId: string;
+        stationName: string;
+        roomName: string;
+        treatmentName: string;
+        startTime: number;
+        durationMinutes: number;
+        endTime: number;
+    }
+
+    const THERAPY_MASSAGE_TREATMENT_ID = 'therapy_massage_20';
+    const LEGACY_THERAPY_MASSAGE_IDS = new Set(['massage_treatment', 'therapy', 'gym_therapy', 'gym_massage']);
+
+    const STATION_META: Record<string, { room: string; station: string }> = {
+        hydro_1: { room: 'Hydroterapia', station: 'Wanna duza' },
+        hydro_2: { room: 'Hydroterapia', station: 'Wanna mala' },
+        hydro_3: { room: 'Hydroterapia', station: 'Wirowka' },
+        magnet_1: { room: 'Pole magnetyczne', station: 'Aparat maly' },
+        magnet_2: { room: 'Pole magnetyczne', station: 'Aparat duzy' },
+        aquavibron_1: { room: 'Aquavibron', station: 'Aquavibron' },
+        sala21_1: { room: 'Sala 21', station: 'Lezanka 1' },
+        sala21_2: { room: 'Sala 21', station: 'Lezanka 2' },
+        physio1_1: { room: 'Fizyko 18', station: 'Lezanka 1' },
+        physio1_2: { room: 'Fizyko 18', station: 'Lezanka 2' },
+        physio1_3: { room: 'Fizyko 18', station: 'Krzeslo' },
+        physio2_1: { room: 'Fizyko 22', station: 'Lezanka 1' },
+        physio2_2: { room: 'Fizyko 22', station: 'Lezanka 2' },
+        physio2_3: { room: 'Fizyko 22', station: 'Krzeslo' },
+        gym_1: { room: 'Sala Gimnastyczna', station: 'Lezanka 1' },
+        gym_2: { room: 'Sala Gimnastyczna', station: 'Lezanka 2' },
+        gym_3: { room: 'Sala Gimnastyczna', station: 'Lezanka 3' },
+        gym_4: { room: 'Sala Gimnastyczna', station: 'Lezanka 4' },
+        gym_5: { room: 'Sala Gimnastyczna', station: 'Lezanka 5' },
+    };
+
+    const TREATMENT_LABELS: Record<string, string> = {
+        [THERAPY_MASSAGE_TREATMENT_ID]: 'Ter./Mas.',
+        prady: 'Prady',
+        prady_sala21: 'Prady',
+        ultrasound: 'UD',
+        laser: 'Laser',
+        sollux: 'Sollux',
+        gym_odciazenie: 'Odciazenie',
+    };
+
+    let _employeeStationOverlays: Record<string, EmployeeStationOverlayData> = {};
 
     const _createEmployeeTooltip = (): void => {
         const existing = document.getElementById('globalEmployeeTooltip') as HTMLDivElement | null;
@@ -118,6 +176,199 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         if (_employeeTooltip) {
             _employeeTooltip.style.display = 'none';
         }
+    };
+
+    const _normalizeTreatmentId = (treatmentId?: string): string | undefined => {
+        if (!treatmentId) return treatmentId;
+        return LEGACY_THERAPY_MASSAGE_IDS.has(treatmentId) ? THERAPY_MASSAGE_TREATMENT_ID : treatmentId;
+    };
+
+    const _formatCountdown = (seconds: number): string => {
+        const safeSeconds = Math.max(0, Math.ceil(seconds));
+        const minutes = Math.floor(safeSeconds / 60);
+        const secs = safeSeconds % 60;
+        return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const _resolveStationMeta = (stationId: string): { room: string; station: string } => {
+        const known = STATION_META[stationId];
+        if (known) return known;
+        return {
+            room: 'Stanowisko',
+            station: stationId.replace(/_/g, ' '),
+        };
+    };
+
+    const _resolveTreatmentName = (state: StationRealtimeState, stationId: string): string => {
+        const normalized = _normalizeTreatmentId(state.treatmentId);
+        if (normalized && TREATMENT_LABELS[normalized]) {
+            return TREATMENT_LABELS[normalized];
+        }
+        if (!normalized || normalized === stationId) {
+            return 'Standard';
+        }
+        return normalized.replace(/_/g, ' ');
+    };
+
+    const _refreshStationOverlayTimers = (): void => {
+        document.querySelectorAll<HTMLElement>('.employee-station-overlay-timer[data-end-time]').forEach((timerEl) => {
+            const endTimeRaw = timerEl.dataset.endTime;
+            if (!endTimeRaw) return;
+            const endTime = Number(endTimeRaw);
+            if (Number.isNaN(endTime)) return;
+            const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+            timerEl.textContent = _formatCountdown(remaining);
+            timerEl.classList.toggle('is-finished', remaining <= 0);
+            timerEl.classList.toggle('is-warning', remaining > 0 && remaining <= 120);
+        });
+    };
+
+    const _clearOverlayColumnWidths = (): void => {
+        document.querySelectorAll<HTMLTableCellElement>('th.employee-header[data-overlay-expanded="true"]').forEach((th) => {
+            delete th.dataset.overlayExpanded;
+            th.style.minWidth = '';
+        });
+
+        document.querySelectorAll<HTMLTableCellElement>('#mainScheduleTable tbody td[data-overlay-expanded="true"]').forEach((td) => {
+            delete td.dataset.overlayExpanded;
+            td.style.minWidth = '';
+        });
+    };
+
+    const _clearOverlayColumnLocks = (): void => {
+        document.querySelectorAll<HTMLTableCellElement>('th.employee-header.station-column-locked').forEach((th) => {
+            th.classList.remove('station-column-locked');
+        });
+
+        document.querySelectorAll<HTMLTableCellElement>('#mainScheduleTable tbody td.station-column-locked').forEach((td) => {
+            td.classList.remove('station-column-locked');
+            td.removeAttribute('aria-disabled');
+
+            if (td.dataset.overlayPrevTabindex !== undefined) {
+                const prevTabIndex = td.dataset.overlayPrevTabindex;
+                if (prevTabIndex === '') {
+                    td.removeAttribute('tabindex');
+                } else {
+                    td.setAttribute('tabindex', prevTabIndex);
+                }
+                delete td.dataset.overlayPrevTabindex;
+            }
+        });
+    };
+
+    const _lockColumnForActiveStation = (employeeId: string): void => {
+        const headerCell = document.querySelector<HTMLTableCellElement>(`#tableHeaderRow th.employee-header[data-employee-index="${employeeId}"]`);
+        if (headerCell) {
+            headerCell.classList.add('station-column-locked');
+        }
+
+        document.querySelectorAll<HTMLTableCellElement>(`#mainScheduleTable tbody td[data-employee-index="${employeeId}"]`).forEach((td) => {
+            td.classList.add('station-column-locked');
+            td.setAttribute('aria-disabled', 'true');
+            if (td.dataset.overlayPrevTabindex === undefined) {
+                td.dataset.overlayPrevTabindex = td.getAttribute('tabindex') ?? '';
+            }
+            td.setAttribute('tabindex', '-1');
+        });
+    };
+
+    const _expandColumnToFitOverlay = (employeeId: string, headerCell: HTMLTableCellElement, overlayEl: HTMLElement): void => {
+        const card = overlayEl.querySelector<HTMLElement>('.employee-station-overlay-card');
+        if (!card) return;
+
+        const currentWidth = Math.ceil(headerCell.getBoundingClientRect().width);
+        const neededWidth = Math.ceil(card.scrollWidth + 12);
+        if (neededWidth <= currentWidth) return;
+
+        const widthPx = `${neededWidth}px`;
+        headerCell.style.minWidth = widthPx;
+        headerCell.dataset.overlayExpanded = 'true';
+
+        document.querySelectorAll<HTMLTableCellElement>(`#mainScheduleTable tbody td[data-employee-index="${employeeId}"]`).forEach((td) => {
+            td.style.minWidth = widthPx;
+            td.dataset.overlayExpanded = 'true';
+        });
+    };
+
+    const _renderEmployeeStationOverlays = (): void => {
+        const headerRow = document.getElementById('tableHeaderRow') as HTMLTableRowElement | null;
+        if (!headerRow) return;
+
+        headerRow.querySelectorAll('.employee-station-overlay').forEach((el) => el.remove());
+        _clearOverlayColumnWidths();
+        _clearOverlayColumnLocks();
+
+        if (window.innerWidth <= 768) return;
+
+        Object.entries(_employeeStationOverlays).forEach(([employeeId, overlay]) => {
+            const headerCell = headerRow.querySelector<HTMLTableCellElement>(`th.employee-header[data-employee-index="${employeeId}"]`);
+            if (!headerCell) return;
+
+            const overlayEl = document.createElement('div');
+            overlayEl.className = 'employee-station-overlay';
+            overlayEl.innerHTML = `
+                <div class="employee-station-overlay-card">
+                    <div class="employee-station-overlay-room">${overlay.roomName}</div>
+                    <div class="employee-station-overlay-station">${overlay.stationName}</div>
+                    <div class="employee-station-overlay-treatment">${overlay.treatmentName}</div>
+                    <div class="employee-station-overlay-timer" data-end-time="${overlay.endTime}">${_formatCountdown(Math.ceil((overlay.endTime - Date.now()) / 1000))}</div>
+                </div>
+            `;
+
+            headerCell.appendChild(overlayEl);
+            _expandColumnToFitOverlay(employeeId, headerCell, overlayEl);
+            _lockColumnForActiveStation(employeeId);
+        });
+
+        _refreshStationOverlayTimers();
+    };
+
+    const _updateEmployeeStationOverlays = (rawData: Record<string, unknown>): void => {
+        const nextOverlays: Record<string, EmployeeStationOverlayData> = {};
+
+        for (const [stationId, rawState] of Object.entries(rawData)) {
+            if (stationId === '_lastUpdated') continue;
+            if (!rawState || typeof rawState !== 'object') continue;
+
+            const state = rawState as StationRealtimeState;
+            if (state.status !== 'OCCUPIED' || !state.employeeId || !state.startTime || !state.duration) continue;
+
+            const meta = _resolveStationMeta(stationId);
+            const endTime = state.startTime + state.duration * 60 * 1000;
+            const candidate: EmployeeStationOverlayData = {
+                stationId,
+                stationName: meta.station,
+                roomName: meta.room,
+                treatmentName: _resolveTreatmentName(state, stationId),
+                startTime: state.startTime,
+                durationMinutes: state.duration,
+                endTime,
+            };
+
+            const existing = nextOverlays[state.employeeId];
+            if (!existing || candidate.startTime > existing.startTime) {
+                nextOverlays[state.employeeId] = candidate;
+            }
+        }
+
+        _employeeStationOverlays = nextOverlays;
+        _renderEmployeeStationOverlays();
+    };
+
+    const _subscribeToStationState = (): void => {
+        _stationsUnsubscribe?.();
+        _stationsUnsubscribe = null;
+
+        const stationDocRef = db.collection('stations').doc('state');
+        _stationsUnsubscribe = stationDocRef.onSnapshot(
+            (snapshot) => {
+                const data = snapshot.exists ? (snapshot.data() as Record<string, unknown>) : {};
+                _updateEmployeeStationOverlays(data || {});
+            },
+            (error) => {
+                console.error('Blad subskrypcji stanowisk w schedule:', error);
+            }
+        );
     };
 
     /**
@@ -331,6 +582,14 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
     const initialize = (appState: AppState): void => {
         _appState = appState;
         _createEmployeeTooltip();
+        _subscribeToStationState();
+
+        if (_stationOverlayInterval) {
+            clearInterval(_stationOverlayInterval);
+        }
+        _stationOverlayInterval = setInterval(() => {
+            _refreshStationOverlayTimers();
+        }, 1000);
 
         // Załaduj dane o urlopach i harmonogramie zmian w tle
         Promise.all([_loadLeavesData(), _loadChangesData()]).then(() => {
@@ -372,6 +631,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         delete cell.dataset.isMassage;
         delete cell.dataset.isPnf;
         delete cell.dataset.isEveryOtherDay;
+        delete cell.dataset.isHydrotherapy;
 
         if (cell.tagName === 'TH') {
             cell.textContent = cellObj.content || '';
@@ -411,6 +671,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                 if (part.isMassage) div.dataset.isMassage = 'true';
                 if (part.isPnf) div.dataset.isPnf = 'true';
                 if (part.isEveryOtherDay) div.dataset.isEveryOtherDay = 'true';
+                if (part.isHydrotherapy) div.dataset.isHydrotherapy = 'true';
 
                 // Dodaj tooltip z datą końca zabiegu
                 if (part.treatmentEndDate) {
@@ -441,6 +702,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             if (cellObj.isMassage) cell.dataset.isMassage = 'true';
             if (cellObj.isPnf) cell.dataset.isPnf = 'true';
             if (cellObj.isEveryOtherDay) cell.dataset.isEveryOtherDay = 'true';
+            if (cellObj.isHydrotherapy) cell.dataset.isHydrotherapy = 'true';
 
             // Dodaj tooltip z datą końca zabiegu
             if (displayData.treatmentEndDate) {
@@ -747,6 +1009,8 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             th.addEventListener('mouseout', _hideEmployeeTooltip);
         }
 
+        _renderEmployeeStationOverlays();
+
         for (let hour = AppConfig.schedule.startHour; hour <= AppConfig.schedule.endHour; hour++) {
             for (let minute = 0; minute < 60; minute += 30) {
                 if (hour === AppConfig.schedule.endHour && minute === 30) continue;
@@ -807,6 +1071,15 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             clearInterval(_currentTimeInterval);
             _currentTimeInterval = null;
         }
+        if (_stationOverlayInterval) {
+            clearInterval(_stationOverlayInterval);
+            _stationOverlayInterval = null;
+        }
+        if (_stationsUnsubscribe) {
+            _stationsUnsubscribe();
+            _stationsUnsubscribe = null;
+        }
+        _employeeStationOverlays = {};
     };
 
     return {

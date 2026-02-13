@@ -7,6 +7,7 @@ dist/
 # Environment/Secrets
 firebase-config.js
 firebase-config.ts
+scripts/firebase-config.js
 
 # Documentation (auto-generated)
 documentation.md
@@ -29,6 +30,4 @@ _temp_debug/skills/writing-skills/SKILL.md
 _temp_skills/skills/pdf
 _temp_debug/skills/xlsx
 _temp_debug/skills/loki-mode/examples/todo-app-generated/backend/.gitignore
-.agent/skills/ui-ux-pro-max/scripts/__pycache__/
 
-.agent/skills/ui-ux-pro-max/scripts/__pycache__/design_system.cpython-313.pyc

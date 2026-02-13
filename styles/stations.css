@@ -152,48 +152,23 @@
 .stations-desktop-view {
     display: none;
     grid-template-columns: repeat(3, 1fr);
-    grid-auto-flow: dense;
     gap: 6px;
     align-items: start;
 }
 
-/* Large screens - show 3 columns with explicit grouping */
-@media (min-width: 1200px) {
-    .stations-desktop-view {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-    }
-
-    /* Column 1: Hydroterapia, Pole magnetyczne, Aquavibron, Sala 21 (items 1-4) */
-    .stations-desktop-view> :nth-child(1),
-    .stations-desktop-view> :nth-child(2),
-    .stations-desktop-view> :nth-child(3),
-    .stations-desktop-view> :nth-child(4) {
-        grid-column: 1;
-    }
-
-    /* Column 2: Fizyko 18, Fizyko 22 (items 5-6) */
-    .stations-desktop-view> :nth-child(5),
-    .stations-desktop-view> :nth-child(6) {
-        grid-column: 2;
-    }
-
-    /* Column 3: Sala Gimnastyczna (item 7) */
-    .stations-desktop-view> :nth-child(7) {
-        grid-column: 3;
-        grid-row: 1 / span 6;
-    }
-
-    .stations-mobile-view {
-        display: none;
-    }
+.stations-column {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-self: start;
 }
 
-/* Medium screens - show grid with auto-fit */
-@media (min-width: 768px) and (max-width: 1199px) {
+/* Desktop/tablet: always show 3 side-by-side sections */
+@media (min-width: 768px) {
     .stations-desktop-view {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
     }
 
     .stations-mobile-view {
