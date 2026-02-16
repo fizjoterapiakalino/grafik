@@ -11,7 +11,9 @@ interface AppointmentCell {
 interface AppointmentData {
     [time: string]: {
         station1?: AppointmentCell;
+        station1b?: AppointmentCell;
         station2?: AppointmentCell;
+        station2b?: AppointmentCell;
     }
 }
 
@@ -20,22 +22,37 @@ interface AppointmentData {
  */
 export const printAppointmentsToPdf = (data: AppointmentData): void => {
     const headers = [
-        { text: 'Godz.', style: 'tableHeader', fillColor: PdfColors.slate800, color: PdfColors.white },
-        { text: 'Stanowisko 1', style: 'tableHeader', fillColor: PdfColors.emerald600, color: PdfColors.white },
-        { text: 'Stanowisko 2', style: 'tableHeader', fillColor: PdfColors.emerald600, color: PdfColors.white }
+        [
+            { text: 'Godz.', style: 'tableHeader', fillColor: PdfColors.slate800, color: PdfColors.white, rowSpan: 2 },
+            { text: 'Stanowisko 1', style: 'tableHeader', fillColor: PdfColors.emerald600, color: PdfColors.white, colSpan: 2 },
+            {},
+            { text: 'Stanowisko 2', style: 'tableHeader', fillColor: PdfColors.emerald600, color: PdfColors.white, colSpan: 2 },
+            {}
+        ],
+        [
+            {},
+            { text: 'A', style: 'tableHeader', fillColor: PdfColors.emerald600, color: PdfColors.white },
+            { text: 'B', style: 'tableHeader', fillColor: PdfColors.emerald600, color: PdfColors.white },
+            { text: 'A', style: 'tableHeader', fillColor: PdfColors.emerald600, color: PdfColors.white },
+            { text: 'B', style: 'tableHeader', fillColor: PdfColors.emerald600, color: PdfColors.white }
+        ]
     ];
 
     const slots = generateTimeSlots();
 
     const body = slots.map(time => {
         const rowData = data[time] || {};
-        const name1 = (rowData.station1?.patientName || '').trim();
-        const name2 = (rowData.station2?.patientName || '').trim();
+        const name1a = (rowData.station1?.patientName || '').trim();
+        const name1b = (rowData.station1b?.patientName || '').trim();
+        const name2a = (rowData.station2?.patientName || '').trim();
+        const name2b = (rowData.station2b?.patientName || '').trim();
 
         return [
             { text: time, alignment: 'center', bold: true, fillColor: PdfColors.slate50, fontSize: 9.5, margin: [0, 1, 0, 1] },
-            { text: name1, fontSize: 10, margin: [0, 1, 0, 1], noWrap: true },
-            { text: name2, fontSize: 10, margin: [0, 1, 0, 1], noWrap: true }
+            { text: name1a, fontSize: 10, margin: [0, 1, 0, 1], noWrap: true },
+            { text: name1b, fontSize: 10, margin: [0, 1, 0, 1], noWrap: true },
+            { text: name2a, fontSize: 10, margin: [0, 1, 0, 1], noWrap: true },
+            { text: name2b, fontSize: 10, margin: [0, 1, 0, 1], noWrap: true }
         ];
     });
 
@@ -59,9 +76,9 @@ export const printAppointmentsToPdf = (data: AppointmentData): void => {
             { text: `Data wydruku: ${new Date().toLocaleDateString('pl-PL')}`, alignment: 'center', fontSize: 8, margin: [0, 0, 0, 8] },
             {
                 table: {
-                    headerRows: 1,
-                    widths: [50, '*', '*'],
-                    body: [headers, ...body],
+                    headerRows: 2,
+                    widths: [35, '*', '*', '*', '*'],
+                    body: [...headers, ...body],
                     dontBreakRows: true,
                     keepWithHeaderRows: 1,
                 },
@@ -93,7 +110,7 @@ export const printAppointmentsToPdf = (data: AppointmentData): void => {
 function generateTimeSlots(): string[] {
     const slots: string[] = [];
     let curHour = 7;
-    let curMin = 0;
+    let curMin = 20;
     while (curHour < 17 || (curHour === 17 && curMin <= 40)) {
         slots.push(`${curHour.toString().padStart(2, '0')}:${curMin.toString().padStart(2, '0')}`);
         curMin += 20;

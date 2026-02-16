@@ -7,7 +7,8 @@
                 <i class="fas fa-clock"></i>
                 Planowanie Wizyt
             </h1>
-            <p class="appointments-subtitle">Harmonogram stanowisk zabiegowych co 20 minut</p>
+            <p class="appointments-subtitle">Harmonogram stanowisk zabiegowych co 20 minut. <b>Przytrzymaj CTRL +
+                    Przeciągnij, aby skopiować.</b></p>
         </div>
         <div class="appointments-header-right">
             <div id="saveStatus" class="save-status"></div>
@@ -32,9 +33,15 @@
         <table class="appointments-table" id="appointmentsTable">
             <thead>
                 <tr>
-                    <th class="col-time">Godzina</th>
-                    <th class="col-station">Stanowisko 1</th>
-                    <th class="col-station">Stanowisko 2</th>
+                    <th rowspan="2" class="col-time">Godzina</th>
+                    <th colspan="2" class="col-station">Stanowisko 1</th>
+                    <th colspan="2" class="col-station">Stanowisko 2</th>
+                </tr>
+                <tr>
+                    <th class="col-sub-station">A</th>
+                    <th class="col-sub-station">B</th>
+                    <th class="col-sub-station">A</th>
+                    <th class="col-sub-station">B</th>
                 </tr>
             </thead>
             <tbody id="appointmentsTableBody">
@@ -78,5 +85,3 @@
         </div>
     </div>
 </div>
-
-

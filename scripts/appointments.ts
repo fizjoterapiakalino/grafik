@@ -25,13 +25,15 @@ interface AppointmentCell {
     additionalInfo?: string;
 }
 
-type StationKey = 'station1' | 'station2';
+type StationKey = 'station1' | 'station1b' | 'station2' | 'station2b';
 type FilterMode = 'all' | 'active' | 'ending_today' | 'ending_tomorrow';
 
 interface AppointmentData {
     [key: string]: {
         station1?: AppointmentCell;
+        station1b?: AppointmentCell;
         station2?: AppointmentCell;
+        station2b?: AppointmentCell;
     }
 }
 
@@ -92,7 +94,7 @@ export const Appointments: AppointmentsAPI = (() => {
     const generateTimeSlots = (): string[] => {
         const slots: string[] = [];
         let curHour = 7;
-        let curMin = 0;
+        let curMin = 20;
 
         while (curHour < 17 || (curHour === 17 && curMin <= 40)) {
             const timeString = `${curHour.toString().padStart(2, '0')}:${curMin.toString().padStart(2, '0')}`;
@@ -153,7 +155,9 @@ export const Appointments: AppointmentsAPI = (() => {
             const rowData = appointmentData[time] || {};
             const showRow =
                 isCellMatchingFilter(rowData.station1, mode, todayStr, tomorrowStr) ||
-                isCellMatchingFilter(rowData.station2, mode, todayStr, tomorrowStr);
+                isCellMatchingFilter(rowData.station1b, mode, todayStr, tomorrowStr) ||
+                isCellMatchingFilter(rowData.station2, mode, todayStr, tomorrowStr) ||
+                isCellMatchingFilter(rowData.station2b, mode, todayStr, tomorrowStr);
             htmlRow.style.display = showRow ? '' : 'none';
         });
     };
@@ -165,9 +169,13 @@ export const Appointments: AppointmentsAPI = (() => {
         const rowData = appointmentData[time];
         if (!rowData) return null;
 
-        const otherStation: StationKey = station === 'station1' ? 'station2' : 'station1';
-        const otherName = normalizePatientName(rowData[otherStation]?.patientName);
-        return otherName === normalized ? otherStation : null;
+        const stations: StationKey[] = ['station1', 'station1b', 'station2', 'station2b'];
+        for (const s of stations) {
+            if (s === station) continue;
+            const otherName = normalizePatientName(rowData[s]?.patientName);
+            if (otherName === normalized) return s;
+        }
+        return null;
     };
 
     const buildUpdatedCellFromText = (time: string, station: StationKey, rawValue: string): AppointmentCell | null => {
@@ -217,7 +225,7 @@ export const Appointments: AppointmentsAPI = (() => {
     const cleanupEmptyRow = (time: string): void => {
         const row = appointmentData[time];
         if (!row) return;
-        if (!row.station1 && !row.station2) {
+        if (!row.station1 && !row.station1b && !row.station2 && !row.station2b) {
             delete appointmentData[time];
         }
     };
@@ -225,12 +233,13 @@ export const Appointments: AppointmentsAPI = (() => {
     const compactAppointmentData = (): AppointmentData => {
         const compact: AppointmentData = {};
         for (const [time, row] of Object.entries(appointmentData)) {
-            const station1 = row.station1;
-            const station2 = row.station2;
-            if (station1 || station2) {
+            const hasAny = row.station1 || row.station1b || row.station2 || row.station2b;
+            if (hasAny) {
                 compact[time] = {
-                    ...(station1 ? { station1 } : {}),
-                    ...(station2 ? { station2 } : {}),
+                    ...(row.station1 ? { station1: row.station1 } : {}),
+                    ...(row.station1b ? { station1b: row.station1b } : {}),
+                    ...(row.station2 ? { station2: row.station2 } : {}),
+                    ...(row.station2b ? { station2b: row.station2b } : {}),
                 };
             }
         }
@@ -258,25 +267,21 @@ export const Appointments: AppointmentsAPI = (() => {
         if (!body) return;
 
         const timeSlots = generateTimeSlots();
+        const stations: StationKey[] = ['station1', 'station1b', 'station2', 'station2b'];
+
         body.innerHTML = timeSlots.map(time => `
             <tr data-time="${time}">
                 <td class="col-time">${time}</td>
-                <td class="cell-target" data-time="${time}" data-station="station1">
-                    <div class="editable-cell-container" draggable="true">
-                        <span class="cell-text" contenteditable="true"></span>
-                        <i class="fas fa-trash-alt appointment-delete-icon" style="display:none" title="Usuń pacjenta"></i>
-                        <i class="fas fa-info-circle appointment-info-icon" style="display:none" title="Szczegóły pacjenta"></i>
-                        <span class="cell-info-indicator"></span>
-                    </div>
-                </td>
-                <td class="cell-target" data-time="${time}" data-station="station2">
-                    <div class="editable-cell-container" draggable="true">
-                        <span class="cell-text" contenteditable="true"></span>
-                        <i class="fas fa-trash-alt appointment-delete-icon" style="display:none" title="Usuń pacjenta"></i>
-                        <i class="fas fa-info-circle appointment-info-icon" style="display:none" title="Szczegóły pacjenta"></i>
-                        <span class="cell-info-indicator"></span>
-                    </div>
-                </td>
+                ${stations.map(station => `
+                    <td class="cell-target" data-time="${time}" data-station="${station}">
+                        <div class="editable-cell-container" draggable="true">
+                            <span class="cell-text" contenteditable="true"></span>
+                            <i class="fas fa-trash-alt appointment-delete-icon" style="display:none" title="Usuń pacjenta"></i>
+                            <i class="fas fa-info-circle appointment-info-icon" style="display:none" title="Szczegóły pacjenta"></i>
+                            <span class="cell-info-indicator"></span>
+                        </div>
+                    </td>
+                `).join('')}
             </tr>
         `).join('');
     };
@@ -386,12 +391,14 @@ export const Appointments: AppointmentsAPI = (() => {
 
     const saveAppointment = async (time: string, station: StationKey, data: AppointmentCell | null): Promise<boolean> => {
         try {
+            /* Tymczasowo wyłączone sprawdzanie duplikatów
             const conflictStation = data?.patientName ? findPatientConflictStation(time, station, data.patientName) : null;
             if (conflictStation) {
                 window.showToast?.('Pacjent jest już wpisany w tym samym czasie na drugim stanowisku.', 3000);
                 if (window.setSaveStatus) window.setSaveStatus('error');
                 return false;
             }
+            */
 
             if (!appointmentData[time]) appointmentData[time] = {};
             if (data) {
@@ -459,15 +466,35 @@ export const Appointments: AppointmentsAPI = (() => {
         const signal = listenersAbortController.signal;
 
         const setCursorToEnd = (element: HTMLElement) => {
+            if (!element.innerText) return;
             const range = document.createRange();
             const selection = window.getSelection();
-            if (selection && element.childNodes.length > 0) {
-                range.setStart(element.childNodes[0], element.innerText.length);
+            if (!selection) return;
+
+            if (element.childNodes.length === 0) {
+                element.appendChild(document.createTextNode(''));
+            }
+
+            const node = element.childNodes[0];
+            const length = node.nodeValue ? node.nodeValue.length : 0;
+
+            try {
+                range.setStart(node, length);
                 range.collapse(true);
                 selection.removeAllRanges();
                 selection.addRange(range);
+            } catch (err) {
+                // Fallback for edge cases
+                console.warn('Set cursor failed', err);
             }
         };
+
+        body.addEventListener('focusin', (e) => {
+            const textEl = e.target as HTMLElement;
+            if (!textEl.classList.contains('cell-text')) return;
+            // Delay slightly to override default browser placement
+            setTimeout(() => setCursorToEnd(textEl), 0);
+        }, { signal });
 
         body.addEventListener('input', (e) => {
             const textEl = e.target as HTMLElement;
@@ -619,11 +646,13 @@ export const Appointments: AppointmentsAPI = (() => {
                 return;
             }
 
+            /* Tymczasowo wyłączone sprawdzanie duplikatów przy dropie
             const conflictStation = findPatientConflictStation(targetTime, targetStation, sourceData.patientName);
             if (conflictStation) {
                 window.showToast?.('Pacjent jest już wpisany w tym samym czasie na drugim stanowisku.', 3000);
                 return;
             }
+            */
 
             if (!appointmentData[targetTime]) appointmentData[targetTime] = {};
             if (!appointmentData[sourceTime]) appointmentData[sourceTime] = {};
@@ -633,15 +662,19 @@ export const Appointments: AppointmentsAPI = (() => {
             cancelPendingCellSave(targetTime, targetStation);
 
             appointmentData[targetTime][targetStation] = { ...sourceData };
-            delete appointmentData[sourceTime][sourceStation];
-            cleanupEmptyRow(sourceTime);
+
+            const isCopying = e.ctrlKey;
+            if (!isCopying) {
+                delete appointmentData[sourceTime][sourceStation];
+                cleanupEmptyRow(sourceTime);
+            }
             updateUIContent();
 
             try {
                 if (window.setSaveStatus) window.setSaveStatus('saving');
                 await persistAllAppointments();
                 if (window.setSaveStatus) window.setSaveStatus('saved');
-                window.showToast?.('Przeniesiono pacjenta');
+                window.showToast?.(isCopying ? 'Skopiowano pacjenta' : 'Przeniesiono pacjenta');
             } catch (error) {
                 console.error('Error moving appointment:', error);
                 if (window.setSaveStatus) window.setSaveStatus('error');

@@ -146,28 +146,35 @@
 .appointments-container .appointments-table th {
     background: var(--color-primary-600);
     color: var(--color-white);
-    padding: var(--spacing-md);
-    text-align: left;
+    padding: var(--spacing-sm);
+    text-align: center;
     font-weight: 600;
     font-size: 0.95rem;
     position: sticky;
     top: 0;
     z-index: 10;
+    border: 1px solid var(--color-primary-700);
 }
 
 .appointments-container .appointments-table td {
     padding: 0;
-    border-bottom: 1px solid var(--color-gray-100);
+    border: 1px solid var(--color-gray-300);
     height: 48px;
 }
 
 .appointments-container .col-time {
-    width: 120px;
+    width: 90px;
     text-align: center !important;
     background: var(--color-gray-50);
     font-weight: 600;
     color: var(--color-gray-700);
-    border-right: 1px solid var(--color-gray-200);
+    border-right: 2px solid var(--color-gray-300);
+}
+
+.appointments-container .col-sub-station {
+    background: var(--color-primary-500) !important;
+    font-size: 0.8rem !important;
+    padding: 4px !important;
 }
 
 /* --- Modals & Forms (Scoped to avoid breaking Schedule) --- */
