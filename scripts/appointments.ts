@@ -111,7 +111,7 @@ export const Appointments: AppointmentsAPI = (() => {
 
     const getCellKey = (time: string, station: StationKey): string => `${time}__${station}`;
 
-    const normalizePatientName = (name?: string): string => (name || '').trim().toLocaleLowerCase('pl-PL');
+    // const normalizePatientName = (name?: string): string => (name || '').trim().toLocaleLowerCase('pl-PL');
 
     const getCurrentFilterMode = (): FilterMode => {
         const filterEl = document.getElementById('appointmentsFilter') as HTMLSelectElement | null;
@@ -162,6 +162,7 @@ export const Appointments: AppointmentsAPI = (() => {
         });
     };
 
+    /* Tymczasowo wyłączone - funkcja nieużywana przy wyłączonym sprawdzaniu duplikatów
     const findPatientConflictStation = (time: string, station: StationKey, patientName: string): StationKey | null => {
         const normalized = normalizePatientName(patientName);
         if (!normalized) return null;
@@ -177,6 +178,7 @@ export const Appointments: AppointmentsAPI = (() => {
         }
         return null;
     };
+    */
 
     const buildUpdatedCellFromText = (time: string, station: StationKey, rawValue: string): AppointmentCell | null => {
         const currentCellData = appointmentData[time]?.[station] || { patientName: '' };
