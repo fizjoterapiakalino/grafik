@@ -40,7 +40,7 @@ export interface DragDropAPI {
 const CONTENT_KEYS = [
     'content', 'content1', 'content2', 'isSplit', 'isMassage', 'isPnf', 'isEveryOtherDay',
     'treatmentStartDate', 'treatmentExtensionDays', 'treatmentEndDate', 'additionalInfo',
-    'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2'
+    'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2', 'isHydrotherapy'
 ] as const;
 
 /**
@@ -64,7 +64,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
         // Sprawdź czy przeciągamy część podzielonej komórki
         if (target.hasAttribute('data-split-part')) {
             const parentCell = target.closest('td.editable-cell') as HTMLTableCellElement | null;
-            if (parentCell && !parentCell.classList.contains('break-cell') && event.dataTransfer) {
+            if (parentCell && !parentCell.classList.contains('break-cell') && !parentCell.classList.contains('hydrotherapy-cell') && event.dataTransfer) {
                 draggedCell = parentCell;
                 draggedSplitPart = parseInt(target.getAttribute('data-split-part')!, 10);
                 event.dataTransfer.setData(
@@ -90,7 +90,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
         // Standardowe przeciąganie całej komórki
         const cellTarget = target.closest('td.editable-cell') as HTMLTableCellElement | null;
 
-        if (cellTarget && !cellTarget.classList.contains('break-cell') && event.dataTransfer) {
+        if (cellTarget && !cellTarget.classList.contains('break-cell') && !cellTarget.classList.contains('hydrotherapy-cell') && event.dataTransfer) {
             draggedCell = cellTarget;
             draggedSplitPart = null;
             event.dataTransfer.setData(
@@ -118,7 +118,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
         // Usuń poprzednie podświetlenia
         document.querySelectorAll('.drag-over-target').forEach((el) => el.classList.remove('drag-over-target'));
 
-        if (dropTargetCell && !dropTargetCell.classList.contains('break-cell') && draggedCell !== dropTargetCell && event.dataTransfer) {
+        if (dropTargetCell && !dropTargetCell.classList.contains('break-cell') && !dropTargetCell.classList.contains('hydrotherapy-cell') && draggedCell !== dropTargetCell && event.dataTransfer) {
             event.dataTransfer.dropEffect = 'move';
 
             // Sprawdź czy przeciągamy nad częścią split komórki
@@ -161,7 +161,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
         // Usuń podświetlenia
         document.querySelectorAll('.drag-over-target').forEach((el) => el.classList.remove('drag-over-target'));
 
-        if (dropTargetCell && !dropTargetCell.classList.contains('break-cell') && draggedCell && draggedCell !== dropTargetCell) {
+        if (dropTargetCell && !dropTargetCell.classList.contains('break-cell') && !dropTargetCell.classList.contains('hydrotherapy-cell') && draggedCell && draggedCell !== dropTargetCell) {
             const sourceTime = draggedCell.dataset.time!;
             const sourceIndex = draggedCell.dataset.employeeIndex!;
             const targetTime = dropTargetCell.dataset.time!;

@@ -208,7 +208,7 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
         if (cellData.isEveryOtherDay) result.classes.push('every-other-day-text');
 
         if (cellData.isHydrotherapy) {
-            result.text = 'Hydroterapia'; // Enforce text for full cell
+            result.text = 'Hydro.'; // Enforce text for full cell
             result.classes.push('hydrotherapy-cell');
             result.styles.backgroundColor = 'var(--bg-hydrotherapy)'; // Direct style application
         } else {
@@ -253,7 +253,7 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
         Object.values(scheduleCells).forEach((employeeCells) => {
             if (!employeeCells) return;
             Object.values(employeeCells).forEach((cell) => {
-                if (cell.isBreak) return;
+                if (cell.isBreak || cell.isHydrotherapy) return;
 
                 if (cell.isSplit) {
                     if (cell.content1 && cell.content1.trim()) count++;

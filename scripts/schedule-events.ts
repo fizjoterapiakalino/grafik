@@ -190,6 +190,7 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
             if (patientInfoBtn) {
                 const hasPatientInfo =
                     !activeCell.classList.contains('break-cell') &&
+                    !activeCell.classList.contains('hydrotherapy-cell') &&
                     _dependencies.ui.getElementText(activeCell).trim() !== '';
                 patientInfoBtn.classList.toggle('active', hasPatientInfo);
                 patientInfoBtn.disabled = !hasPatientInfo;
@@ -216,10 +217,10 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 hydrotherapyBtn.classList.toggle('active', true);
                 if (isHydrotherapy) {
                     hydrotherapyBtn.classList.add('btn-hydro-active');
-                    hydrotherapyBtn.title = 'Usuń Hydroterapię';
+                    hydrotherapyBtn.title = 'Usuń Hydro.';
                 } else {
                     hydrotherapyBtn.classList.remove('btn-hydro-active');
-                    hydrotherapyBtn.title = 'Dodaj Hydroterapię';
+                    hydrotherapyBtn.title = 'Dodaj Hydro.';
                 }
                 hydrotherapyBtn.disabled = activeCell.classList.contains('break-cell');
             }
@@ -455,7 +456,9 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 id: 'contextPatientInfo',
                 class: 'info',
                 condition: (cell: HTMLElement) =>
-                    !cell.classList.contains('break-cell') && _dependencies.ui.getElementText(cell).trim() !== '',
+                    !cell.classList.contains('break-cell') &&
+                    !cell.classList.contains('hydrotherapy-cell') &&
+                    _dependencies.ui.getElementText(cell).trim() !== '',
                 action: (_cell: HTMLElement, event?: MouseEvent) =>
                     _dependencies.openPatientInfoModal(
                         (event?.target as HTMLElement)?.closest('div[tabindex="0"]') as HTMLElement ||
@@ -481,12 +484,12 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 condition: (cell: HTMLElement) => !cell.classList.contains('break-cell') && !cell.classList.contains('split-cell'),
                 action: (cell: HTMLElement) => {
                     _dependencies.updateCellState(cell, (state) => {
-                        state.content = 'Hydroterapia';
+                        state.content = 'Hydro.';
                         state.isHydrotherapy = true;
                         state.isMassage = false;
                         state.isPnf = false;
                         state.isEveryOtherDay = false;
-                        window.showToast('Dodano Hydroterapię');
+                        window.showToast('Dodano Hydro.');
                     });
                 }
             },
@@ -668,7 +671,7 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
         document.getElementById('btnHydrotherapy')?.addEventListener('click', () => {
             if (activeCell) {
                 if (activeCell.classList.contains('split-cell')) {
-                    window.showToast('Najpierw scal komórkę, aby dodać Hydroterapię.', 3000);
+                    window.showToast('Najpierw scal komórkę, aby dodać Hydro.', 3000);
                     return;
                 }
                 if (activeCell.classList.contains('break-cell')) {
@@ -680,14 +683,14 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                     if (isCurrentlyHydro) {
                         state.isHydrotherapy = false;
                         state.content = '';
-                        window.showToast('Usunięto Hydroterapię');
+                        window.showToast('Usunięto Hydro.');
                     } else {
-                        state.content = 'Hydroterapia';
+                        state.content = 'Hydro.';
                         state.isHydrotherapy = true;
                         state.isMassage = false;
                         state.isPnf = false;
                         state.isEveryOtherDay = false;
-                        window.showToast('Dodano Hydroterapię');
+                        window.showToast('Dodano Hydro.');
                     }
                 });
             } else {

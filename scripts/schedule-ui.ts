@@ -558,8 +558,8 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                 const cellData = _appState.scheduleCells[timeString]?.[employeeIndex];
 
                 if (cellData) {
-                    if (cellData.isBreak) {
-                        // Przerwa liczy się jako pełny slot
+                    if (cellData.isBreak || cellData.isHydrotherapy) {
+                        // Przerwa i Hydro liczy się jako pełny slot
                         filled++;
                     } else if (cellData.isSplit) {
                         // Podzielona komórka - każda zajęta część = 1 (umożliwia przekroczenie 100%)
