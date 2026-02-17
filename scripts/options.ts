@@ -47,6 +47,8 @@ export const Options: OptionsAPI = (() => {
     let createBackupBtn: HTMLElement | null;
     let restoreBackupBtn: HTMLElement | null;
     let lastBackupDateSpan: HTMLElement | null;
+    let pwaInstallCard: HTMLElement | null;
+    let installAppBtn: HTMLElement | null;
 
     const displayLastBackupDate = async (): Promise<void> => {
         try {
@@ -528,6 +530,8 @@ export const Options: OptionsAPI = (() => {
         createBackupBtn = document.getElementById('createBackupBtn');
         restoreBackupBtn = document.getElementById('restoreBackupBtn');
         lastBackupDateSpan = document.getElementById('lastBackupDate');
+        pwaInstallCard = document.getElementById('pwaInstallCard');
+        installAppBtn = document.getElementById('installAppBtn');
 
         resetDetailsPanel();
         showLoading(true);
@@ -550,6 +554,14 @@ export const Options: OptionsAPI = (() => {
         clearUidBtn?.addEventListener('click', handleClearUid);
         createBackupBtn?.addEventListener('click', createBackup);
         restoreBackupBtn?.addEventListener('click', handleRestoreBackup);
+        installAppBtn?.addEventListener('click', () => {
+            (window as any).installPWA?.();
+        });
+
+        // Listen for PWA installability
+        window.addEventListener('pwa-installable', updatePWAUI);
+        window.addEventListener('pwa-installed', updatePWAUI);
+        updatePWAUI();
 
         // Clear search button
         const clearSearchBtn = document.getElementById('clearEmployeeSearch');
@@ -648,6 +660,25 @@ export const Options: OptionsAPI = (() => {
     };
 
     /**
+     * Updates PWA installation UI based on availability
+     */
+    const updatePWAUI = (): void => {
+        if (!pwaInstallCard) return;
+
+        // Check if app is already installed or prompt is not available
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+            || (window.navigator as any).standalone
+            || document.referrer.includes('android-app://');
+
+        if (isStandalone) {
+            pwaInstallCard.style.display = 'none';
+        } else {
+            // Show card even if prompt is not ready - window.installPWA will handle the toast message
+            pwaInstallCard.style.display = 'block';
+        }
+    };
+
+    /**
      * Aktualizuje preview koloru
      */
     const updateColorPreview = (previewId: string, color: string): void => {
@@ -666,6 +697,8 @@ export const Options: OptionsAPI = (() => {
         clearUidBtn?.removeEventListener('click', handleClearUid);
         createBackupBtn?.removeEventListener('click', createBackup);
         restoreBackupBtn?.removeEventListener('click', handleRestoreBackup);
+        window.removeEventListener('pwa-installable', updatePWAUI);
+        window.removeEventListener('pwa-installed', updatePWAUI);
         debugLog('Options module destroyed');
     };
 

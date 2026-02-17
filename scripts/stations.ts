@@ -207,7 +207,6 @@ export const Stations: StationsAPI = (() => {
             ],
             treatments: [
                 { id: THERAPY_MASSAGE_TREATMENT_ID, name: 'Terapia/Masaż', shortName: 'Ter./Mas.', duration: 20 },
-                { id: 'prady_sala21', name: 'Prądy', shortName: 'Prądy', duration: 15 },
             ],
         },
         {
@@ -849,7 +848,7 @@ export const Stations: StationsAPI = (() => {
                         saveStationState(station);
                     }
 
-                    updateTimerDisplay(station.id, remaining);
+                    updateTimerDisplay(station.id, remaining, station.treatmentId);
                 }
             }
         }
@@ -863,8 +862,12 @@ export const Stations: StationsAPI = (() => {
     /**
      * Update timer display for a specific station
      */
-    const updateTimerDisplay = (stationId: string, seconds: number): void => {
+    const updateTimerDisplay = (stationId: string, seconds: number, treatmentId?: string): void => {
         const stationCards = document.querySelectorAll(`[data-station-id="${stationId}"]`);
+
+        // Threshold: 5 minutes (300s) for Therapy/Massage, 1 minute (60s) for others
+        const threshold = isTherapyMassageTreatment(treatmentId) ? 300 : 60;
+
         stationCards.forEach(card => {
             // Update timer text
             const timerEl = card.querySelector('.station-timer');
@@ -872,8 +875,8 @@ export const Stations: StationsAPI = (() => {
                 timerEl.textContent = formatTime(seconds);
             }
 
-            // Add/remove ending warning class (last 60 seconds)
-            if (seconds > 0 && seconds <= 60) {
+            // Add/remove ending warning class
+            if (seconds > 0 && seconds <= threshold) {
                 card.classList.add('ending');
             } else {
                 card.classList.remove('ending');

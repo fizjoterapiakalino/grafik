@@ -49,9 +49,11 @@ export const Appointments: AppointmentsAPI = (() => {
     let appointmentData: AppointmentData = {};
     let currentEditingCell: { time: string, station: StationKey } | null = null;
     let draggedData: { time: string, station: StationKey } | null = null;
+    let pendingDeleteCell: { time: string, station: StationKey } | null = null;
     let listenersAbortController: AbortController | null = null;
     let saveDebounceTimers: Map<string, number> = new Map();
     let pendingCellUpdates: Map<string, AppointmentCell | null> = new Map();
+    let isMoving: boolean = false; // Flag to prevent race conditions during move
 
     const init = async (): Promise<void> => {
         console.log('Appointments module initializing...');
@@ -294,6 +296,9 @@ export const Appointments: AppointmentsAPI = (() => {
         unsubscribe = docRef.onSnapshot(
             (snapshot) => {
                 if (snapshot.exists) {
+                    // Don't overwrite local state if we are in the middle of a move operation
+                    if (isMoving) return;
+
                     const data = snapshot.data() as AppointmentData;
                     appointmentData = data || {};
                     updateUIContent();
@@ -571,9 +576,36 @@ export const Appointments: AppointmentsAPI = (() => {
 
                 const time = target.dataset.time || '';
                 const station = target.dataset.station as StationKey;
-                if (confirm('Usunąć pacjenta z tej komórki?')) {
-                    cancelPendingCellSave(time, station);
-                    void saveAppointment(time, station, null);
+
+                pendingDeleteCell = { time, station };
+                const modal = document.getElementById('appointmentDeleteConfirmModal');
+                if (modal) {
+                    modal.classList.add('is-popover');
+                    const modalContent = modal.querySelector('.modal-content') as HTMLElement;
+
+                    // Position calculations
+                    const rect = deleteIcon.getBoundingClientRect();
+                    const popoverWidth = 220;
+                    const popoverHeight = 100; // estimated
+
+                    let top = rect.bottom + window.scrollY + 5;
+                    let left = rect.left + window.scrollX - (popoverWidth / 2) + (rect.width / 2);
+
+                    // Boundary checks
+                    if (left < 10) left = 10;
+                    if (left + popoverWidth > window.innerWidth - 10) {
+                        left = window.innerWidth - popoverWidth - 10;
+                    }
+                    if (top + popoverHeight > window.innerHeight + window.scrollY - 10) {
+                        top = rect.top + window.scrollY - popoverHeight - 5;
+                    }
+
+                    if (modalContent) {
+                        modalContent.style.top = `${top}px`;
+                        modalContent.style.left = `${left}px`;
+                    }
+
+                    modal.style.display = 'flex';
                 }
                 return;
             }
@@ -642,6 +674,8 @@ export const Appointments: AppointmentsAPI = (() => {
             const sourceData = appointmentData[sourceTime]?.[sourceStation];
             if (!sourceData) return;
 
+            isMoving = true; // Lock onSnapshot updates
+
             const destinationData = appointmentData[targetTime]?.[targetStation];
             if (destinationData?.patientName) {
                 window.showToast?.('To pole jest już zajęte. Najpierw je wyczyść.', 2500);
@@ -680,6 +714,8 @@ export const Appointments: AppointmentsAPI = (() => {
             } catch (error) {
                 console.error('Error moving appointment:', error);
                 if (window.setSaveStatus) window.setSaveStatus('error');
+            } finally {
+                isMoving = false; // Release lock
             }
         }, { signal });
 
@@ -735,6 +771,39 @@ export const Appointments: AppointmentsAPI = (() => {
 
         if (filterSelect) {
             filterSelect.addEventListener('change', applyRowFilterVisibility, { signal });
+        }
+
+        // Delete Confirmation Modal Listeners
+        const confirmDeleteBtn = document.getElementById('confirmDeleteAppointmentBtn');
+        const cancelDeleteBtn = document.getElementById('cancelDeleteAppointmentBtn');
+        const deleteModal = document.getElementById('appointmentDeleteConfirmModal');
+
+        if (confirmDeleteBtn) {
+            confirmDeleteBtn.addEventListener('click', async () => {
+                if (pendingDeleteCell) {
+                    const { time, station } = pendingDeleteCell;
+                    cancelPendingCellSave(time, station);
+                    await saveAppointment(time, station, null);
+                }
+                if (deleteModal) deleteModal.style.display = 'none';
+                pendingDeleteCell = null;
+            }, { signal });
+        }
+
+        if (cancelDeleteBtn) {
+            cancelDeleteBtn.addEventListener('click', () => {
+                if (deleteModal) deleteModal.style.display = 'none';
+                pendingDeleteCell = null;
+            }, { signal });
+        }
+
+        if (deleteModal) {
+            deleteModal.addEventListener('click', (e) => {
+                if (e.target === deleteModal) {
+                    deleteModal.style.display = 'none';
+                    pendingDeleteCell = null;
+                }
+            }, { signal });
         }
     };
 

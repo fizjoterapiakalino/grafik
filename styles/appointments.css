@@ -204,14 +204,82 @@
 }
 
 @keyframes appointmentsModalSlideUp {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- Inline Confirmation Popover --- */
+#appointmentDeleteConfirmModal.is-popover {
+    background: transparent;
+    backdrop-filter: none;
+    pointer-events: none;
+    display: none;
+    justify-content: flex-start;
+    align-items: flex-start;
+}
+
+#appointmentDeleteConfirmModal.is-popover .modal-content {
+    position: absolute;
+    width: 220px;
+    padding: 12px;
+    margin: 0;
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    box-shadow: var(--shadow-lg);
+    pointer-events: auto;
+    animation: appointmentsPopoverFadeIn 0.2s ease-out;
+    z-index: 2001;
+}
+
+#appointmentDeleteConfirmModal.is-popover .modal-body {
+    padding: 0 0 10px 0;
+}
+
+#appointmentDeleteConfirmModal.is-popover .modal-body p {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+#appointmentDeleteConfirmModal.is-popover .modal-title {
+    display: none;
+    /* Hide title in popover mode */
+}
+
+#appointmentDeleteConfirmModal.is-popover .modal-actions {
+    margin-top: 0;
+    gap: 8px;
+    justify-content: center;
+}
+
+#appointmentDeleteConfirmModal.is-popover .action-btn {
+    padding: 6px 16px;
+    font-size: 0.85rem;
+    flex: 1;
+}
+
+/* Transparent backdrop for popover to detect click outside */
+#appointmentDeleteConfirmModal.is-popover::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: transparent;
+    pointer-events: auto;
+    z-index: -1;
+}
+
+@keyframes appointmentsPopoverFadeIn {
     from {
         opacity: 0;
-        transform: translateY(20px);
+        transform: scale(0.95) translateY(-5px);
     }
 
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: scale(1) translateY(0);
     }
 }
 

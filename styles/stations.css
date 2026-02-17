@@ -285,7 +285,7 @@
     animation: pulse-card 1.5s ease-in-out infinite;
 }
 
-/* Ending state - last 60 seconds warning */
+/* Ending state - warning threshold: 5min for Therapy/Massage, 1min for others */
 .station-card.ending {
     background: var(--station-ending-bg) !important;
     border-color: var(--station-ending-border) !important;
@@ -358,8 +358,8 @@
 }
 
 .station-timer {
-    font-size: 1.25rem;
-    font-weight: 700;
+    font-size: 1.6rem;
+    font-weight: 800;
     font-variant-numeric: tabular-nums;
     color: var(--color-gray-800);
 }
@@ -663,11 +663,15 @@
     }
 
     .station-timer {
-        font-size: 1.5rem;
+        font-size: 2.5rem;
+        font-weight: 900;
+        line-height: 1;
+        margin: 0;
     }
 
     .treatment-tile {
-        padding: 10px 8px;
+        padding: 12px 8px;
+        /* Bigger tiles for touch */
     }
 
     .treatment-tile-name {
@@ -716,6 +720,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    border-top: 1px dashed rgba(0, 0, 0, 0.1);
 }
 
 .queue-header {
@@ -791,13 +796,13 @@
 /* Action Buttons */
 .btn-add-queue {
     width: 100%;
-    padding: 5px;
+    padding: 8px 12px;
     background: var(--color-primary-500);
     color: white;
     border: none;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 700;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
@@ -833,38 +838,44 @@
 }
 
 .queue-treatment-picker {
-    margin-top: 4px;
-    padding: 6px;
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid var(--color-gray-200);
-    border-radius: 6px;
+    margin-top: 6px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid var(--color-primary-200);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .queue-picker-title {
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 0.8rem;
+    font-weight: 700;
     color: var(--color-gray-700);
-    margin-bottom: 5px;
+    white-space: nowrap;
 }
 
 .queue-picker-tiles {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 6px;
+    flex: 1;
 }
 
 .queue-picker-tile {
-    border: 1px solid var(--color-primary-200);
-    background: var(--color-primary-50);
-    color: var(--color-primary-700);
-    border-radius: 4px;
-    padding: 4px 6px;
-    font-size: 0.72rem;
-    font-weight: 600;
+    border: 1px solid var(--color-primary-300);
+    background: var(--color-primary-500);
+    color: white;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 0.85rem;
+    font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
+    gap: 12px;
+    transition: all 0.2s ease;
 }
 
 .queue-picker-tile:hover {
@@ -873,8 +884,11 @@
 }
 
 .queue-picker-time {
-    font-size: 0.68rem;
-    color: var(--color-gray-600);
+    font-size: 0.75rem;
+    opacity: 0.9;
+    background: rgba(0, 0, 0, 0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
 }
 
 .emp-picker-overlay {
@@ -889,11 +903,11 @@
 }
 
 .emp-picker-modal {
-    width: min(520px, 96vw);
-    max-height: 78vh;
+    width: min(600px, 98vw);
+    max-height: 85vh;
     background: var(--color-white);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-lg);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-xl);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -903,11 +917,11 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--color-gray-200);
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: var(--color-gray-800);
+    padding: 14px 16px;
+    border-bottom: 2px solid var(--color-gray-100);
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--color-gray-900);
 }
 
 .emp-picker-close {
@@ -932,14 +946,15 @@
 
 .emp-picker-btn {
     border: 1px solid var(--color-gray-200);
-    background: var(--color-gray-50);
+    background: var(--color-background-soft);
     color: var(--color-gray-800);
-    border-radius: 6px;
-    padding: 8px;
-    font-size: 0.82rem;
-    font-weight: 600;
+    border-radius: 8px;
+    padding: 16px 14px;
+    font-size: 1.05rem;
+    font-weight: 700;
     cursor: pointer;
-    text-align: left;
+    text-align: center;
+    transition: all 0.2s ease;
 }
 
 .emp-picker-btn:hover {
@@ -970,12 +985,32 @@
     }
 
     .btn-add-queue {
-        padding: 8px;
-        font-size: 0.85rem;
+        padding: 12px 16px;
+        font-size: 1rem;
+        border-radius: 8px;
     }
 
-    .queue-picker-tiles,
-    .emp-picker-list {
+    .queue-picker-tiles {
         grid-template-columns: 1fr;
+    }
+
+    .queue-picker-tile {
+        padding: 14px 16px;
+        font-size: 1rem;
+    }
+
+    .emp-picker-list {
+        grid-template-columns: repeat(2, 1fr);
+        padding: 12px;
+        gap: 8px;
+    }
+
+    .emp-picker-btn {
+        padding: 18px 12px;
+        font-size: 1.1rem;
+    }
+
+    .emp-picker-modal {
+        max-height: 92vh;
     }
 }

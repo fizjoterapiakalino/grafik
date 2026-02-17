@@ -1,0 +1,109 @@
+/* styles/pwa.css - PWA Update Banner Styles */
+
+/* ============================================
+   PWA UPDATE BANNER
+   Shown when a new version is available
+   ============================================ */
+#pwa-update-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10001;
+    background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-600));
+    color: white;
+    padding: 10px 16px;
+    box-shadow: var(--shadow-lg);
+    animation: pwa-slide-down 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes pwa-slide-down {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.pwa-update-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 1200px;
+    margin: 0 auto;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.pwa-update-content>i {
+    font-size: 1.1rem;
+    opacity: 0.9;
+}
+
+.pwa-update-content>span {
+    flex: 1;
+}
+
+.pwa-update-accept {
+    padding: 6px 16px;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    border-radius: var(--border-radius);
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    font-family: inherit;
+}
+
+.pwa-update-accept:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: white;
+    transform: scale(1.03);
+}
+
+.pwa-update-dismiss {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 0.85rem;
+}
+
+.pwa-update-dismiss:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .pwa-update-content {
+        font-size: 0.82rem;
+        gap: 8px;
+    }
+
+    .pwa-update-content>i {
+        display: none;
+    }
+
+    .pwa-update-accept {
+        padding: 5px 12px;
+        font-size: 0.8rem;
+    }
+}
