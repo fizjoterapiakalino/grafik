@@ -259,10 +259,12 @@ export const Stations: StationsAPI = (() => {
                 const employee = EmployeeManager.getEmployeeByUid(user.uid);
                 currentEmployeeId = employee ? employee.id : null;
                 isCurrentUserAdmin = EmployeeManager.isUserAdmin(user.uid);
+                console.log('Stations Auth Update:', { id: currentEmployeeId, isAdmin: isCurrentUserAdmin });
             } else {
                 currentEmployeeId = null;
                 isCurrentUserAdmin = false;
             }
+            updateAllStationCards();
         });
 
         // Deep clone configuration
@@ -430,17 +432,26 @@ export const Stations: StationsAPI = (() => {
     const getActiveEmployeeId = async (
         options?: { forcePicker?: boolean; pickerTitle?: string }
     ): Promise<string | null> => {
+        const user = auth.currentUser;
+        const currentUid = user?.uid;
+        const isAdmin = currentUid ? EmployeeManager.isUserAdmin(currentUid) : false;
+        const currentEmp = currentUid ? EmployeeManager.getEmployeeByUid(currentUid) : null;
+        const effectiveEmpId = currentEmp?.id || null;
+
         if (options?.forcePicker) {
-            return showEmployeePickerModal(options.pickerTitle);
+            if (isAdmin) {
+                return showEmployeePickerModal(options.pickerTitle);
+            }
+            return effectiveEmpId;
         }
 
         // Dla zwykłych zabiegów zawsze używaj aktualnie zalogowanego pracownika.
         // Jeśli konto admina nie ma przypisanego employeeId, dopiero wtedy fallback do pickera.
-        if (currentEmployeeId) {
-            return currentEmployeeId;
+        if (effectiveEmpId) {
+            return effectiveEmpId;
         }
 
-        return isCurrentUserAdmin ? showEmployeePickerModal(options?.pickerTitle) : null;
+        return isAdmin ? showEmployeePickerModal(options?.pickerTitle) : null;
     };
 
     /**
@@ -631,16 +642,18 @@ export const Stations: StationsAPI = (() => {
             return;
         }
 
+        const nextInQueue = station.queue?.[0];
+        const isNextTherapy = nextInQueue && isTherapyMassageTreatment(nextInQueue.treatmentId);
+
         station.status = 'FREE';
         station.treatmentId = undefined;
         station.startTime = undefined;
         station.duration = undefined;
         station.employeeId = undefined;
 
-        // Process queue if exists
-        if (station.queue && station.queue.length > 0) {
+        // If next in queue is Therapy/Massage — do NOT auto-start, require manual 'Rozpocznij'
+        if (nextInQueue && !isNextTherapy) {
             await processQueue(station);
-            // processQueue already shows its own toast and plays sound
         } else {
             await saveStationState(station);
             window.showToast?.('Stanowisko zwolnione', 1500);
@@ -715,11 +728,43 @@ export const Stations: StationsAPI = (() => {
     /**
      * Process next person in queue
      */
-    const processQueue = async (station: Station): Promise<void> => {
+    const processQueue = async (station: Station, isManual = false): Promise<void> => {
         if (!station.queue || station.queue.length === 0) return;
 
-        const next = station.queue.shift();
+        const next = station.queue[0];
         if (!next) return;
+
+        // Robust permission check - use fresh data if possible
+        const user = auth.currentUser;
+        const currentUid = user?.uid;
+        const currentEmp = currentUid ? EmployeeManager.getEmployeeByUid(currentUid) : null;
+        const isAdmin = currentUid ? EmployeeManager.isUserAdmin(currentUid) : false;
+        const effectiveEmpId = currentEmp?.id || null;
+
+        console.log('--- Queue Process Check ---');
+        console.log('Action Type:', isManual ? 'MANUAL (User Clicked)' : 'AUTO (System/Release)');
+        console.log('Current User:', { uid: currentUid, empId: effectiveEmpId, isAdmin });
+        console.log('Queued Item:', { nextEmpId: next.employeeId, treatmentId: next.treatmentId });
+
+        // If it's a manual start (button clicked), verify permissions
+        if (isManual) {
+            if (!currentUid || !effectiveEmpId) {
+                console.warn('BLOCK: User not identified as employee');
+                window.showToast?.('Błąd: Nie rozpoznano pracownika. Zaloguj się ponownie.', 4000);
+                return;
+            }
+
+            if (!isAdmin && next.employeeId !== effectiveEmpId) {
+                console.warn('BLOCK: User is not admin and does not own this queue entry');
+                window.showToast?.('Możesz rozpocząć tylko własny zabieg', 3000);
+                return;
+            }
+
+            console.log('Permission granted for manual start');
+        }
+
+        // Proceed and remove from queue
+        station.queue.shift();
 
         station.status = 'OCCUPIED';
         station.employeeId = next.employeeId;
@@ -814,6 +859,35 @@ export const Stations: StationsAPI = (() => {
     };
 
     /**
+     * Get approximate waiting time (seconds) before queue entry can start
+     */
+    const getQueueWaitSeconds = (station: Station, queueIndex: number): number => {
+        let waitSeconds = 0;
+
+        if (station.status === 'OCCUPIED') {
+            waitSeconds += getRemainingTime(station);
+        }
+
+        for (let i = 0; i < queueIndex; i += 1) {
+            const entry = station.queue?.[i];
+            if (!entry) continue;
+            waitSeconds += Math.ceil(entry.duration * 60);
+        }
+
+        return Math.max(0, waitSeconds);
+    };
+
+    /**
+     * Format queue ETA as clock time (HH:MM)
+     */
+    const formatQueueEta = (waitSeconds: number): string => {
+        const startAt = new Date(Date.now() + Math.max(0, waitSeconds) * 1000);
+        const hours = startAt.getHours().toString().padStart(2, '0');
+        const minutes = startAt.getMinutes().toString().padStart(2, '0');
+        return `${hours}:${minutes}`;
+    };
+
+    /**
      * Format time as MM:SS
      */
     const formatTime = (seconds: number): string => {
@@ -843,13 +917,32 @@ export const Stations: StationsAPI = (() => {
                     const remaining = getRemainingTime(station);
 
                     if (remaining <= 0) {
-                        station.status = 'FINISHED';
+                        const nextInQueue = station.queue?.[0];
+                        const isNextTherapy = nextInQueue && isTherapyMassageTreatment(nextInQueue.treatmentId);
+
+                        if (nextInQueue && !isNextTherapy) {
+                            // Normal queue: set FINISHED so user clicks to release and auto-processes queue
+                            station.status = 'FINISHED';
+                        } else if (isNextTherapy) {
+                            // Therapy/Massage next: go straight to FREE so 'Rozpocznij' button appears
+                            station.status = 'FREE';
+                            station.treatmentId = undefined;
+                            station.startTime = undefined;
+                            station.duration = undefined;
+                            station.employeeId = undefined;
+                        } else {
+                            // No queue: normal FINISHED
+                            station.status = 'FINISHED';
+                        }
+
                         hasFinishedTransition = true;
                         saveStationState(station);
                     }
 
                     updateTimerDisplay(station.id, remaining, station.treatmentId);
                 }
+
+                updateQueueEtaDisplay(station);
             }
         }
 
@@ -881,6 +974,24 @@ export const Stations: StationsAPI = (() => {
             } else {
                 card.classList.remove('ending');
             }
+        });
+    };
+
+    /**
+     * Refresh queue ETA labels for a station
+     */
+    const updateQueueEtaDisplay = (station: Station): void => {
+        if (!station.queue || station.queue.length === 0) return;
+
+        const stationCards = document.querySelectorAll(`[data-station-id="${station.id}"]`);
+        stationCards.forEach(card => {
+            const etaElements = card.querySelectorAll<HTMLElement>('.queue-eta[data-queue-index]');
+            etaElements.forEach(etaEl => {
+                const index = Number(etaEl.dataset.queueIndex);
+                if (Number.isNaN(index)) return;
+                const waitSeconds = getQueueWaitSeconds(station, index);
+                etaEl.textContent = formatQueueEta(waitSeconds);
+            });
         });
     };
 
@@ -1014,11 +1125,43 @@ export const Stations: StationsAPI = (() => {
         const employeeName = getEmployeeLabel(station.employeeId);
         const queueHtml = renderQueueSection(room, station);
 
+        // Special case: station is FREE but next in queue is Therapy/Massage
+        // Show 'awaiting start' card to prevent bypassing the queue
+        const nextInQueue = station.queue?.[0];
+        const isAwaitingTherapyStart = station.status === 'FREE' && nextInQueue && isTherapyMassageTreatment(nextInQueue.treatmentId);
+
+        if (isAwaitingTherapyStart) {
+            return renderAwaitingStartCard(room, station, nextInQueue!, queueHtml);
+        }
+
         if (room.type === 'simple') {
             return renderSimpleStationCard(room, station, statusClass, remaining, employeeName, queueHtml);
         } else {
             return renderMultiStationCard(room, station, statusClass, remaining, treatment, employeeName, queueHtml);
         }
+    };
+
+    /**
+     * Render a station card in 'awaiting start' mode (FREE but Therapy/Massage queued)
+     */
+    const renderAwaitingStartCard = (room: Room, station: Station, nextEntry: QueueEntry, queueHtml: string): string => {
+        const nextName = EmployeeManager.getNameById(nextEntry.employeeId);
+        return `
+            <div class="station-card ${room.type === 'simple' ? 'station-simple' : 'station-multi'} awaiting-start" data-station-id="${station.id}">
+                <div class="station-awaiting-content">
+                    <span class="station-name">${station.name}</span>
+                    <div class="queue-next-action">
+                        <div class="queue-next-info">
+                            <i class="fas fa-user-clock"></i> Czeka: ${nextName}
+                        </div>
+                        <button class="btn-start-queue" data-action="start-queue" data-station="${station.id}" data-room="${room.id}">
+                            <i class="fas fa-play"></i> Rozpocznij
+                        </button>
+                    </div>
+                </div>
+                ${queueHtml}
+            </div>
+        `;
     };
 
     /**
@@ -1073,6 +1216,7 @@ export const Stations: StationsAPI = (() => {
         const queueList = station.queue.map((q, index) => {
             const empName = EmployeeManager.getNameById(q.employeeId);
             const treatmentName = getQueueTreatmentLabel(room, station, q);
+            const queueEta = formatQueueEta(getQueueWaitSeconds(station, index));
             const isOwn = q.employeeId === currentEmployeeId;
             const canRemove = isCurrentUserAdmin || isOwn;
 
@@ -1081,6 +1225,7 @@ export const Stations: StationsAPI = (() => {
                     <span class="queue-index">${index + 1}.</span>
                     <span class="queue-emp">${empName}</span>
                     <span class="queue-treat">${treatmentName}</span>
+                    <span class="queue-eta" data-queue-index="${index}">${queueEta}</span>
                     ${canRemove ? `
                         <button class="btn-remove-queue" data-action="remove-from-queue" 
                                 data-station="${station.id}" data-room="${room.id}" data-employee="${q.employeeId}">
@@ -1098,11 +1243,14 @@ export const Stations: StationsAPI = (() => {
         ) : '';
 
         const nextEntry = station.queue[0];
-        const nextPreviewHtml = station.status === 'FINISHED' && nextEntry ? `
-            <div class="queue-next">
-                <i class="fas fa-forward"></i> Następny: ${EmployeeManager.getNameById(nextEntry.employeeId)}
-            </div>
-        ` : '';
+        let nextPreviewHtml = '';
+        if (station.status === 'FINISHED' && nextEntry) {
+            nextPreviewHtml = `
+                <div class="queue-next">
+                    <i class="fas fa-forward"></i> Następny: ${EmployeeManager.getNameById(nextEntry.employeeId)}
+                </div>
+            `;
+        }
 
         return `
             <div class="station-queue-container">
@@ -1390,6 +1538,9 @@ export const Stations: StationsAPI = (() => {
                 if (employeeId) {
                     removeFromQueue(station, employeeId);
                 }
+                break;
+            case 'start-queue':
+                processQueue(station, true);
                 break;
         }
     };

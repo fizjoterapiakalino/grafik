@@ -60,6 +60,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         startTime?: number;
         duration?: number;
         employeeId?: string;
+        queue?: { employeeId: string; treatmentId: string; duration: number }[];
     }
 
     interface EmployeeStationOverlayData {
@@ -67,9 +68,10 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         stationName: string;
         roomName: string;
         treatmentName: string;
-        startTime: number;
-        durationMinutes: number;
-        endTime: number;
+        startTime?: number;
+        durationMinutes?: number;
+        endTime?: number;
+        isQueue?: boolean;
     }
 
     const THERAPY_MASSAGE_TREATMENT_ID = 'therapy_massage_20';
@@ -199,8 +201,8 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         };
     };
 
-    const _resolveTreatmentName = (state: StationRealtimeState, stationId: string): string => {
-        const normalized = _normalizeTreatmentId(state.treatmentId);
+    const _resolveTreatmentName = (treatmentId: string | undefined, stationId: string): string => {
+        const normalized = _normalizeTreatmentId(treatmentId);
         if (normalized && TREATMENT_LABELS[normalized]) {
             return TREATMENT_LABELS[normalized];
         }
@@ -219,7 +221,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
             timerEl.textContent = _formatCountdown(remaining);
             timerEl.classList.toggle('is-finished', remaining <= 0);
-            timerEl.classList.toggle('is-warning', remaining > 0 && remaining <= 120);
+            timerEl.classList.toggle('is-warning', remaining > 0 && remaining <= 300);
         });
     };
 
@@ -307,11 +309,14 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             const overlayEl = document.createElement('div');
             overlayEl.className = 'employee-station-overlay';
             overlayEl.innerHTML = `
-                <div class="employee-station-overlay-card">
+                <div class="employee-station-overlay-card ${overlay.isQueue ? 'is-queue' : ''}">
                     <div class="employee-station-overlay-room">${overlay.roomName}</div>
                     <div class="employee-station-overlay-station">${overlay.stationName}</div>
                     <div class="employee-station-overlay-treatment">${overlay.treatmentName}</div>
-                    <div class="employee-station-overlay-timer" data-end-time="${overlay.endTime}">${_formatCountdown(Math.ceil((overlay.endTime - Date.now()) / 1000))}</div>
+                    ${overlay.isQueue
+                    ? '<div class="employee-station-overlay-queue-label">W kolejce</div>'
+                    : `<div class="employee-station-overlay-timer" data-end-time="${overlay.endTime}">${_formatCountdown(Math.ceil(((overlay.endTime || 0) - Date.now()) / 1000))}</div>`
+                }
                 </div>
             `;
 
@@ -331,23 +336,42 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             if (!rawState || typeof rawState !== 'object') continue;
 
             const state = rawState as StationRealtimeState;
-            if (state.status !== 'OCCUPIED' || !state.employeeId || !state.startTime || !state.duration) continue;
-
             const meta = _resolveStationMeta(stationId);
-            const endTime = state.startTime + state.duration * 60 * 1000;
-            const candidate: EmployeeStationOverlayData = {
-                stationId,
-                stationName: meta.station,
-                roomName: meta.room,
-                treatmentName: _resolveTreatmentName(state, stationId),
-                startTime: state.startTime,
-                durationMinutes: state.duration,
-                endTime,
-            };
 
-            const existing = nextOverlays[state.employeeId];
-            if (!existing || candidate.startTime > existing.startTime) {
-                nextOverlays[state.employeeId] = candidate;
+            // Handle current occupant
+            if (state.status === 'OCCUPIED' && state.employeeId && state.startTime && state.duration) {
+                const endTime = state.startTime + state.duration * 60 * 1000;
+                const candidate: EmployeeStationOverlayData = {
+                    stationId,
+                    stationName: meta.station,
+                    roomName: meta.room,
+                    treatmentName: _resolveTreatmentName(state.treatmentId, stationId),
+                    startTime: state.startTime,
+                    durationMinutes: state.duration,
+                    endTime,
+                };
+
+                const existing = nextOverlays[state.employeeId];
+                if (!existing || candidate.startTime! > (existing.startTime || 0)) {
+                    nextOverlays[state.employeeId] = candidate;
+                }
+            }
+
+            // Handle first person in queue
+            if (state.queue && state.queue.length > 0) {
+                const nextInQueue = state.queue[0];
+                const empId = nextInQueue.employeeId;
+
+                // Only show queue if employee is not already occupied (occupied takes precedence)
+                if (!nextOverlays[empId]) {
+                    nextOverlays[empId] = {
+                        stationId,
+                        stationName: meta.station,
+                        roomName: meta.room,
+                        treatmentName: _resolveTreatmentName(nextInQueue.treatmentId, stationId),
+                        isQueue: true,
+                    };
+                }
             }
         }
 

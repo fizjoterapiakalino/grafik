@@ -875,7 +875,10 @@ export const Changes: ChangesAPI = (() => {
             `;
 
             tr.innerHTML = `
-                <td>${start.getUTCDate()}.${(start.getUTCMonth() + 1).toString().padStart(2, '0')} - ${end.getUTCDate()}.${(end.getUTCMonth() + 1).toString().padStart(2, '0')}</td>
+                <td class="period-cell">
+                    <span class="collapse-toggle"><i class="fas fa-chevron-down"></i></span>
+                    ${start.getUTCDate()}.${(start.getUTCMonth() + 1).toString().padStart(2, '0')} - ${end.getUTCDate()}.${(end.getUTCMonth() + 1).toString().padStart(2, '0')}
+                </td>
                 <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                 <td class="leaves-cell"></td>
                 <td class="actions-cell">${actionBtnsHtml}</td>
@@ -991,6 +994,11 @@ export const Changes: ChangesAPI = (() => {
 
             if (periodEnd < today) {
                 tr.classList.add('past-period');
+                tr.classList.add('collapsed');
+                tr.classList.remove('expanded');
+            } else {
+                tr.classList.add('expanded');
+                tr.classList.remove('collapsed');
             }
         });
     };
@@ -1739,8 +1747,8 @@ export const Changes: ChangesAPI = (() => {
         await refreshView();
         await EmployeeManager.load();
 
-        // Setup mobile accordion
-        setupMobileAccordion();
+        // Setup accordion (expand/collapse)
+        setupAccordion();
 
         // Inicjalizacja szablonów
         initTemplateUI();
@@ -1765,14 +1773,14 @@ export const Changes: ChangesAPI = (() => {
         window.initializeContextMenu('changesContextMenu', '#changesTableBody td:not(.leaves-cell)', contextMenuItems);
     };
 
-    const setupMobileAccordion = (): void => {
-        // Only setup on mobile screens
-        if (window.innerWidth > 768) return;
-
+    /**
+     * Inicjalizuje funkcjonalność zwijania i rozwijania wierszy
+     */
+    const setupAccordion = (): void => {
         const tableBody = document.getElementById('changesTableBody');
         if (!tableBody) return;
 
-        // Add click handlers for accordion toggle
+        // Obsługa kliknięcia na pierwszą kolumnę (przełączanie zwijania)
         tableBody.addEventListener('click', (event: Event) => {
             const target = event.target as HTMLElement;
             const firstCell = target.closest('td:first-child');
@@ -1780,16 +1788,22 @@ export const Changes: ChangesAPI = (() => {
             if (firstCell) {
                 const row = firstCell.closest('tr');
                 if (row) {
-                    row.classList.toggle('expanded');
+                    const isCollapsed = row.classList.contains('collapsed');
+                    if (isCollapsed) {
+                        row.classList.remove('collapsed');
+                        row.classList.add('expanded');
+                    } else {
+                        row.classList.add('collapsed');
+                        row.classList.remove('expanded');
+                    }
                 }
                 event.stopPropagation();
             }
         }, true);
 
-        // Find and expand current period
+        // Znajdź i rozwiń bieżący okres
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-
 
         const rows = tableBody.querySelectorAll('tr');
         rows.forEach((row) => {
@@ -1801,10 +1815,12 @@ export const Changes: ChangesAPI = (() => {
                 const periodStart = new Date(startDateStr);
                 const periodEnd = new Date(endDateStr);
 
-                // Check if today falls within this period
+                // Sprawdź czy dzisiaj wypada w tym okresie
                 if (today >= periodStart && today <= periodEnd) {
                     tr.classList.add('expanded', 'current-period');
-                    // Scroll to current period
+                    tr.classList.remove('collapsed');
+
+                    // Przewiń do bieżącego okresu tylko jeśli to ładowanie początkowe
                     setTimeout(() => {
                         tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }, 100);

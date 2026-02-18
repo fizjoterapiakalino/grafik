@@ -97,6 +97,10 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
 
         if (!cellData) return result;
 
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
         // Handle Break
         if (cellData.isBreak) {
             result.text = AppConfig.schedule.breakText;
@@ -158,11 +162,6 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
                 )
             );
 
-            // Treatment End Markers for Split
-            const todayStr = new Date().toISOString().split('T')[0];
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
             // Part 1
             let endDate1: string | null = cellData.treatmentData1?.endDate
                 ? cellData.treatmentData1.endDate.toString().trim()
@@ -170,7 +169,7 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
             if (!endDate1 && cellData.treatmentData1?.startDate && cellData.content1) {
                 endDate1 = calculateEndDate(cellData.treatmentData1.startDate, cellData.treatmentData1.extensionDays || 0);
             }
-            if (endDate1) {
+            if (endDate1 && result.parts[0].text.trim() !== '') {
                 result.parts[0].treatmentEndDate = endDate1;
                 const endDateObj = new Date(endDate1 + 'T00:00:00');
                 const diffTime = endDateObj.getTime() - today.getTime();
@@ -187,7 +186,7 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
             if (!endDate2 && cellData.treatmentData2?.startDate && cellData.content2) {
                 endDate2 = calculateEndDate(cellData.treatmentData2.startDate, cellData.treatmentData2.extensionDays || 0);
             }
-            if (endDate2) {
+            if (endDate2 && result.parts[1].text.trim() !== '') {
                 result.parts[1].treatmentEndDate = endDate2;
                 const endDateObj = new Date(endDate2 + 'T00:00:00');
                 const diffTime = endDateObj.getTime() - today.getTime();
@@ -220,11 +219,6 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
             }
         }
 
-        // Treatment End Marker for Normal
-        const todayStr = new Date().toISOString().split('T')[0];
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
         let endDateStr: string | null = cellData.treatmentEndDate
             ? cellData.treatmentEndDate.toString().trim()
             : null;
@@ -233,7 +227,7 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
             endDateStr = calculateEndDate(cellData.treatmentStartDate, cellData.treatmentExtensionDays || 0);
         }
 
-        if (endDateStr) {
+        if (endDateStr && result.text.trim() !== '') {
             result.treatmentEndDate = endDateStr;
             const endDateObj = new Date(endDateStr + 'T00:00:00');
             const diffTime = endDateObj.getTime() - today.getTime();

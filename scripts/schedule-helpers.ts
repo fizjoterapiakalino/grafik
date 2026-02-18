@@ -240,6 +240,15 @@ const updateSplitCellPart = (
 
     let treatmentData = cellState[treatmentKey] as TreatmentData | undefined;
 
+    if (newContent === '') {
+        delete cellState[treatmentKey];
+        delete cellState[`isMassage${part}`];
+        delete cellState[`isPnf${part}`];
+        delete cellState[`isEveryOtherDay${part}`];
+        delete cellState[`isHydrotherapy${part}`];
+        return;
+    }
+
     if (isDifferentPatient) {
         // Nowy pacjent w tej części - resetuj dane leczenia
         treatmentData = {
@@ -268,6 +277,19 @@ const updateSplitCellPart = (
 const updateNormalCell = (cellState: CellState, newText: string): void => {
     const oldContent = (cellState.content || '').trim().toLowerCase();
     const newContent = newText.trim().toLowerCase();
+
+    if (newContent === '') {
+        cellState.content = '';
+        cellState.treatmentStartDate = null;
+        cellState.treatmentExtensionDays = null;
+        cellState.treatmentEndDate = null;
+        cellState.additionalInfo = null;
+        cellState.isMassage = null;
+        cellState.isPnf = null;
+        cellState.isEveryOtherDay = null;
+        cellState.isHydrotherapy = null;
+        return;
+    }
 
     // Sprawdź czy zawartość się zmieniła (inny pacjent)
     const contentChanged = oldContent !== newContent && newContent !== '';

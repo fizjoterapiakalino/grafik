@@ -214,6 +214,26 @@ table.schedule-table thead tr th {
     color: #fecaca;
 }
 
+.employee-station-overlay-card.is-queue {
+    border-color: rgba(234, 179, 8, 0.6);
+}
+
+.employee-station-overlay-queue-label {
+    align-self: center;
+    text-align: center;
+    background: rgba(234, 179, 8, 0.22);
+    border: 1px solid rgba(234, 179, 8, 0.55);
+    border-radius: 8px;
+    color: #fef08a;
+    font-size: 0.9rem;
+    font-weight: 800;
+    line-height: 1;
+    min-width: 86px;
+    padding: 6px 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
 .schedule-table td.station-column-locked {
     pointer-events: none;
     filter: blur(1.8px) saturate(0.85);
