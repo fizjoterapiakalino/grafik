@@ -100,6 +100,11 @@ interface StationsAPI {
     destroy(): void;
 }
 
+type RoomVisibilityMap = Record<string, boolean>;
+type DesktopColumnsCount = 1 | 2 | 3;
+type RoomLayoutSettings = Record<DesktopColumnsCount, string[][]>;
+const DESKTOP_COLUMNS_OPTIONS: DesktopColumnsCount[] = [1, 2, 3];
+
 const THERAPY_MASSAGE_TREATMENT_ID = 'therapy_massage_20';
 const LEGACY_THERAPY_MASSAGE_IDS = new Set(['massage_treatment', 'therapy', 'gym_therapy', 'gym_massage']);
 const GLOBAL_SINGLE_DEVICE_TREATMENTS = new Set(['sollux']);
@@ -237,8 +242,14 @@ export const Stations: StationsAPI = (() => {
     let unsubscribeAuth: (() => void) | null = null;
     let timerInterval: number | null = null;
     let soundEnabled = true;
+    let roomVisibility: Map<string, boolean> = new Map();
+    let desktopColumnsCount: DesktopColumnsCount = 3;
+    let roomLayoutSettings: RoomLayoutSettings = { 1: [], 2: [], 3: [] };
+    let isLayoutEditMode = false;
+    let draggedRoomId: string | null = null;
 
     // User session state
+    let currentUserUid: string | null = null;
     let currentEmployeeId: string | null = null;
     let isCurrentUserAdmin = false;
 
@@ -256,20 +267,34 @@ export const Stations: StationsAPI = (() => {
         // Setup auth state listener
         unsubscribeAuth = auth.onAuthStateChanged((user: any) => {
             if (user) {
+                currentUserUid = user.uid;
                 const employee = EmployeeManager.getEmployeeByUid(user.uid);
                 currentEmployeeId = employee ? employee.id : null;
                 isCurrentUserAdmin = EmployeeManager.isUserAdmin(user.uid);
                 console.log('Stations Auth Update:', { id: currentEmployeeId, isAdmin: isCurrentUserAdmin });
             } else {
+                currentUserUid = null;
                 currentEmployeeId = null;
                 isCurrentUserAdmin = false;
             }
+
+            loadRoomVisibilitySettings();
+            loadDesktopColumnsSettings();
+            loadRoomLayoutSettings();
+            normalizeActiveMobileRoom();
+            renderDesktopView();
+            renderMobileView();
+            renderSectionsOptionsList();
             updateAllStationCards();
         });
 
         // Deep clone configuration
         rooms = JSON.parse(JSON.stringify(ROOMS_CONFIG));
         activeMobileRoomId = rooms[0]?.id ?? null;
+        loadRoomVisibilitySettings();
+        loadDesktopColumnsSettings();
+        loadRoomLayoutSettings();
+        normalizeActiveMobileRoom();
 
         // Initialize audio
         initAudio();
@@ -293,6 +318,7 @@ export const Stations: StationsAPI = (() => {
 
         // Update sound button state
         updateSoundButton();
+        renderSectionsOptionsList();
 
         console.log('Stations module initialized');
     };
@@ -324,9 +350,16 @@ export const Stations: StationsAPI = (() => {
 
         stationStates.clear();
         rooms = [];
+        roomVisibility.clear();
+        currentUserUid = null;
+        desktopColumnsCount = 3;
+        roomLayoutSettings = { 1: [], 2: [], 3: [] };
+        isLayoutEditMode = false;
+        draggedRoomId = null;
         pendingQueueStation = null;
         pendingQueueRoom = null;
         activeMobileRoomId = null;
+        closeSectionsOptionsModal();
     };
 
     /**
@@ -684,8 +717,8 @@ export const Stations: StationsAPI = (() => {
         }
 
         // Limit queue size
-        if (station.queue.length >= 3) {
-            window.showToast?.('Kolejka jest pełna (max 3)', 2500);
+        if (station.queue.length >= 5) {
+            window.showToast?.('Kolejka jest pełna (max 5)', 2500);
             return;
         }
 
@@ -1028,19 +1061,534 @@ export const Stations: StationsAPI = (() => {
     };
 
     /**
+     * Build localStorage key for room visibility (per user)
+     */
+    const getRoomVisibilityStorageKey = (): string => {
+        const userKey = currentUserUid || currentEmployeeId || 'anonymous';
+        return `stationsRoomVisibility:${userKey}`;
+    };
+
+    /**
+     * Build localStorage key for desktop columns count (per user)
+     */
+    const getDesktopColumnsStorageKey = (): string => {
+        const userKey = currentUserUid || currentEmployeeId || 'anonymous';
+        return `stationsDesktopColumns:${userKey}`;
+    };
+
+    /**
+     * Build localStorage key for room layout settings (per user)
+     */
+    const getRoomLayoutStorageKey = (): string => {
+        const userKey = currentUserUid || currentEmployeeId || 'anonymous';
+        return `stationsRoomLayout:${userKey}`;
+    };
+
+    /**
+     * Load room visibility from localStorage for current user
+     */
+    const loadRoomVisibilitySettings = (): void => {
+        const defaults: RoomVisibilityMap = {};
+        for (const room of rooms) {
+            defaults[room.id] = true;
+        }
+
+        if (rooms.length === 0) {
+            roomVisibility = new Map();
+            return;
+        }
+
+        const raw = localStorage.getItem(getRoomVisibilityStorageKey());
+        if (!raw) {
+            roomVisibility = new Map(Object.entries(defaults));
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(raw) as RoomVisibilityMap;
+            const merged: RoomVisibilityMap = {};
+            for (const room of rooms) {
+                merged[room.id] = parsed[room.id] !== false;
+            }
+            roomVisibility = new Map(Object.entries(merged));
+        } catch {
+            roomVisibility = new Map(Object.entries(defaults));
+        }
+    };
+
+    /**
+     * Save room visibility to localStorage for current user
+     */
+    const saveRoomVisibilitySettings = (): void => {
+        const payload = Object.fromEntries(roomVisibility.entries());
+        localStorage.setItem(getRoomVisibilityStorageKey(), JSON.stringify(payload));
+    };
+
+    /**
+     * Load desktop columns count from localStorage for current user
+     */
+    const loadDesktopColumnsSettings = (): void => {
+        const raw = localStorage.getItem(getDesktopColumnsStorageKey());
+        const value = Number(raw);
+        if (value === 1 || value === 2 || value === 3) {
+            desktopColumnsCount = value;
+            return;
+        }
+        desktopColumnsCount = 3;
+    };
+
+    /**
+     * Save desktop columns count to localStorage for current user
+     */
+    const saveDesktopColumnsSettings = (): void => {
+        localStorage.setItem(getDesktopColumnsStorageKey(), String(desktopColumnsCount));
+    };
+
+    /**
+     * Create default room layout for a specific columns count
+     */
+    const createDefaultColumnsLayout = (columnsCount: DesktopColumnsCount): string[][] => {
+        const columns: string[][] = Array.from({ length: columnsCount }, () => []);
+        rooms.forEach((room, index) => {
+            columns[index % columnsCount]?.push(room.id);
+        });
+        return columns;
+    };
+
+    /**
+     * Normalize room layout: valid room IDs, no duplicates, all rooms present
+     */
+    const normalizeColumnsLayout = (columnsCount: DesktopColumnsCount, rawLayout?: unknown): string[][] => {
+        const normalized = Array.from({ length: columnsCount }, () => [] as string[]);
+        const validRoomIds = new Set(rooms.map(room => room.id));
+        const seen = new Set<string>();
+
+        if (Array.isArray(rawLayout)) {
+            for (let colIndex = 0; colIndex < columnsCount; colIndex += 1) {
+                const column = rawLayout[colIndex];
+                if (!Array.isArray(column)) continue;
+
+                for (const roomId of column) {
+                    if (typeof roomId !== 'string') continue;
+                    if (!validRoomIds.has(roomId)) continue;
+                    if (seen.has(roomId)) continue;
+                    normalized[colIndex]?.push(roomId);
+                    seen.add(roomId);
+                }
+            }
+        }
+
+        const pickTargetColumn = (): number => {
+            let target = 0;
+            let smallest = Number.POSITIVE_INFINITY;
+            for (let i = 0; i < normalized.length; i += 1) {
+                const size = normalized[i]?.length ?? 0;
+                if (size < smallest) {
+                    smallest = size;
+                    target = i;
+                }
+            }
+            return target;
+        };
+
+        for (const room of rooms) {
+            if (seen.has(room.id)) continue;
+            const target = pickTargetColumn();
+            normalized[target]?.push(room.id);
+            seen.add(room.id);
+        }
+
+        return normalized;
+    };
+
+    /**
+     * Get room layout for selected columns count
+     */
+    const getColumnsLayout = (columnsCount: DesktopColumnsCount): string[][] => {
+        const normalized = normalizeColumnsLayout(columnsCount, roomLayoutSettings[columnsCount]);
+        roomLayoutSettings[columnsCount] = normalized;
+        return normalized;
+    };
+
+    /**
+     * Load room layout settings from localStorage for current user
+     */
+    const loadRoomLayoutSettings = (): void => {
+        const parsedByColumns: Partial<Record<DesktopColumnsCount, unknown>> = {};
+        const raw = localStorage.getItem(getRoomLayoutStorageKey());
+
+        if (raw) {
+            try {
+                const parsed = JSON.parse(raw) as Record<string, unknown>;
+                parsedByColumns[1] = parsed?.['1'];
+                parsedByColumns[2] = parsed?.['2'];
+                parsedByColumns[3] = parsed?.['3'];
+            } catch {
+                // Ignore and fallback to defaults
+            }
+        }
+
+        roomLayoutSettings = {
+            1: normalizeColumnsLayout(1, parsedByColumns[1] ?? createDefaultColumnsLayout(1)),
+            2: normalizeColumnsLayout(2, parsedByColumns[2] ?? createDefaultColumnsLayout(2)),
+            3: normalizeColumnsLayout(3, parsedByColumns[3] ?? createDefaultColumnsLayout(3)),
+        };
+    };
+
+    /**
+     * Save room layout settings to localStorage for current user
+     */
+    const saveRoomLayoutSettings = (): void => {
+        const payload = {
+            1: roomLayoutSettings[1],
+            2: roomLayoutSettings[2],
+            3: roomLayoutSettings[3],
+        };
+        localStorage.setItem(getRoomLayoutStorageKey(), JSON.stringify(payload));
+    };
+
+    /**
+     * Check whether room should be visible
+     */
+    const isRoomVisible = (roomId: string): boolean => {
+        return roomVisibility.get(roomId) !== false;
+    };
+
+    /**
+     * Keep active mobile section valid after room visibility changes
+     */
+    const normalizeActiveMobileRoom = (): void => {
+        const visibleRooms = rooms.filter(room => isRoomVisible(room.id));
+        if (!visibleRooms.length) {
+            activeMobileRoomId = null;
+            return;
+        }
+
+        if (!activeMobileRoomId || !isRoomVisible(activeMobileRoomId)) {
+            activeMobileRoomId = visibleRooms[0]?.id ?? null;
+        }
+    };
+
+    /**
+     * Count station statuses for a set of rooms (mobile summary).
+     */
+    const countStationsByStatus = (scopeRooms: Room[]): { free: number; occupied: number; finished: number } => {
+        let free = 0;
+        let occupied = 0;
+        let finished = 0;
+
+        scopeRooms.forEach((room) => {
+            room.stations.forEach((station) => {
+                if (station.status === 'FREE') free += 1;
+                if (station.status === 'OCCUPIED') occupied += 1;
+                if (station.status === 'FINISHED') finished += 1;
+            });
+        });
+
+        return { free, occupied, finished };
+    };
+
+    /**
+     * Update operational attention bar (what needs action now).
+     */
+    const updateAttentionBar = (): void => {
+        const bar = document.getElementById('stationsAttentionBar');
+        if (!bar) return;
+
+        const visibleRooms = rooms.filter(room => isRoomVisible(room.id));
+        const scopeRooms = visibleRooms.length > 0 ? visibleRooms : rooms;
+        const allStations = scopeRooms.flatMap(room => room.stations);
+
+        const occupiedNow = allStations.filter(station => station.status === 'OCCUPIED').length;
+        const queuedPeople = allStations.reduce((sum, station) => sum + (station.queue?.length || 0), 0);
+        const toRelease = allStations.filter(station => station.status === 'FINISHED').length;
+        const awaitingStart = allStations.filter(station => isAwaitingTherapyStartStation(station)).length;
+        const fullQueues = allStations.filter(station => (station.queue?.length || 0) >= 5).length;
+
+        const items: string[] = [];
+        if (occupiedNow > 0) {
+            items.push(`<div class="attention-item"><i class="fas fa-hourglass-half"></i> ${occupiedNow} zabiegi w toku</div>`);
+        }
+        if (queuedPeople > 0) {
+            items.push(`<div class="attention-item"><i class="fas fa-user-friends"></i> ${queuedPeople} osoby w kolejce</div>`);
+        }
+        if (toRelease > 0) {
+            items.push(`<div class="attention-item"><i class="fas fa-flag"></i> ${toRelease} stanowiska do zwolnienia</div>`);
+        }
+        if (awaitingStart > 0) {
+            items.push(`<div class="attention-item"><i class="fas fa-play-circle"></i> ${awaitingStart} stanowiska czekają na rozpoczęcie</div>`);
+        }
+        if (fullQueues > 0) {
+            items.push(`<div class="attention-item"><i class="fas fa-users"></i> ${fullQueues} stanowiska mają pełną kolejkę</div>`);
+        }
+
+        if (items.length === 0) {
+            bar.classList.remove('active');
+            bar.innerHTML = '';
+            return;
+        }
+
+        bar.innerHTML = `
+            <div class="attention-title">Co wymaga uwagi teraz</div>
+            <div class="attention-items">${items.join('')}</div>
+        `;
+        bar.classList.add('active');
+    };
+
+    /**
+     * Apply predefined UI preset in settings modal.
+     */
+    const applySettingsPreset = (preset: 'compact' | 'standard' | 'focus'): void => {
+        const visibleMap: RoomVisibilityMap = {};
+        rooms.forEach((room) => { visibleMap[room.id] = true; });
+
+        if (preset === 'compact') {
+            desktopColumnsCount = 3;
+            roomLayoutSettings[3] = createDefaultColumnsLayout(3);
+        }
+
+        if (preset === 'standard') {
+            desktopColumnsCount = 2;
+            roomLayoutSettings[2] = createDefaultColumnsLayout(2);
+        }
+
+        if (preset === 'focus') {
+            desktopColumnsCount = 1;
+            roomLayoutSettings[1] = createDefaultColumnsLayout(1);
+        }
+
+        roomVisibility = new Map(Object.entries(visibleMap));
+        saveRoomVisibilitySettings();
+        saveDesktopColumnsSettings();
+        saveRoomLayoutSettings();
+
+        normalizeActiveMobileRoom();
+        renderDesktopView();
+        renderMobileView();
+        renderSectionsOptionsList();
+        updateAllStationCards();
+    };
+
+    /**
+     * Restore default settings state.
+     */
+    const resetSettingsToDefaults = (): void => {
+        roomVisibility = new Map(rooms.map((room) => [room.id, true]));
+        desktopColumnsCount = 3;
+        roomLayoutSettings = {
+            1: createDefaultColumnsLayout(1),
+            2: createDefaultColumnsLayout(2),
+            3: createDefaultColumnsLayout(3),
+        };
+
+        saveRoomVisibilitySettings();
+        saveDesktopColumnsSettings();
+        saveRoomLayoutSettings();
+        normalizeActiveMobileRoom();
+        renderDesktopView();
+        renderMobileView();
+        renderSectionsOptionsList();
+        updateAllStationCards();
+    };
+
+    /**
+     * Station waits for manual start when it's free but first queue item is Terapia/Masaż.
+     */
+    const isAwaitingTherapyStartStation = (station: Station): boolean => {
+        const nextInQueue = station.queue?.[0];
+        return station.status === 'FREE' && Boolean(nextInQueue && isTherapyMassageTreatment(nextInQueue.treatmentId));
+    };
+
+    /**
+     * Render options list inside modal
+     */
+    const renderSectionsOptionsList = (): void => {
+        const optionsList = document.getElementById('sectionsOptionsList');
+        if (!optionsList) return;
+
+        const columnOptionsHtml = DESKTOP_COLUMNS_OPTIONS.map((count) => `
+            <label class="section-columns-option-item">
+                <input
+                    class="section-columns-radio"
+                    type="radio"
+                    name="stationsDesktopColumns"
+                    data-columns-count="${count}"
+                    ${desktopColumnsCount === count ? 'checked' : ''}
+                />
+                <span>${count} kolumna${count === 1 ? '' : count === 2 ? 'y' : ''}</span>
+            </label>
+        `).join('');
+
+        const roomById = new Map(rooms.map(room => [room.id, room] as const));
+        const editColumns = getColumnsLayout(desktopColumnsCount);
+        const editColumnsHtml = editColumns.map((roomIds, columnIndex) => {
+            const cardsHtml = roomIds.map((roomId) => {
+                const room = roomById.get(roomId);
+                if (!room) return '';
+                const hiddenBadge = isRoomVisible(roomId) ? '' : '<span class="layout-edit-room-badge">Ukryta</span>';
+                return `
+                    <div class="layout-edit-room" draggable="true" data-layout-room-id="${room.id}" data-layout-column="${columnIndex}">
+                        <i class="fas ${room.icon}"></i>
+                        <span>${room.name}</span>
+                        ${hiddenBadge}
+                    </div>
+                `;
+            }).join('');
+
+            const emptyHtml = cardsHtml ? '' : '<div class="layout-edit-column-empty">Przeciągnij sekcję tutaj</div>';
+            return `
+                <div class="layout-edit-column" data-layout-column="${columnIndex}">
+                    <div class="layout-edit-column-title">Kolumna ${columnIndex + 1}</div>
+                    <div class="layout-edit-column-body" data-layout-column="${columnIndex}">
+                        ${cardsHtml}
+                        ${emptyHtml}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        if (isLayoutEditMode) {
+            optionsList.innerHTML = `
+                <div class="section-columns-options-group">
+                    <div class="section-options-group-title">Tryb edycji układu (${desktopColumnsCount} kol.)</div>
+                    <div class="layout-edit-help">Przeciągnij sekcję i upuść do wybranej kolumny.</div>
+                    <div class="layout-edit-columns layout-edit-columns-${desktopColumnsCount}">
+                        ${editColumnsHtml}
+                    </div>
+                    <button class="section-layout-edit-btn done" type="button" data-layout-action="close-edit">
+                        Zakończ edycję
+                    </button>
+                </div>
+            `;
+            return;
+        }
+
+        optionsList.innerHTML = `
+            <div class="section-columns-options-group">
+                <div class="section-options-group-title">Układ desktop</div>
+                <div class="section-columns-options-row">
+                    ${columnOptionsHtml}
+                </div>
+                <div class="section-presets-row">
+                    <button class="section-preset-btn" type="button" data-layout-preset="compact">Kompakt</button>
+                    <button class="section-preset-btn" type="button" data-layout-preset="standard">Standard</button>
+                    <button class="section-preset-btn" type="button" data-layout-preset="focus">Skupienie</button>
+                </div>
+                <button class="section-layout-edit-btn" type="button" data-layout-action="open-edit">
+                    Zmień układ sekcji
+                </button>
+                <button class="section-layout-reset-btn" type="button" data-layout-action="reset">
+                    Przywróć domyślne
+                </button>
+            </div>
+            <div class="section-options-group-title">Widoczność sekcji</div>
+            ${rooms.map(room => `
+            <label class="section-option-item">
+                <span class="section-option-label">${room.name}</span>
+                <input
+                    class="section-option-checkbox"
+                    type="checkbox"
+                    data-section-room-id="${room.id}"
+                    ${isRoomVisible(room.id) ? 'checked' : ''}
+                />
+            </label>
+            `).join('')}
+        `;
+    };
+
+    /**
+     * Open section options modal
+     */
+    const openSectionsOptionsModal = (): void => {
+        const modal = document.getElementById('stationsSectionsModal');
+        if (!modal) return;
+        isLayoutEditMode = false;
+        draggedRoomId = null;
+        renderSectionsOptionsList();
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden', 'false');
+    };
+
+    /**
+     * Close section options modal
+     */
+    const closeSectionsOptionsModal = (): void => {
+        const modal = document.getElementById('stationsSectionsModal');
+        if (!modal) return;
+        isLayoutEditMode = false;
+        draggedRoomId = null;
+        renderSectionsOptionsList();
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+    };
+
+    /**
+     * Move room between columns in editable layout
+     */
+    const moveRoomInLayout = (
+        columnsCount: DesktopColumnsCount,
+        roomId: string,
+        targetColumnIndex: number,
+        beforeRoomId?: string
+    ): void => {
+        const current = getColumnsLayout(columnsCount).map(column => [...column]);
+        if (!current[targetColumnIndex]) return;
+
+        for (const column of current) {
+            const idx = column.indexOf(roomId);
+            if (idx >= 0) {
+                column.splice(idx, 1);
+            }
+        }
+
+        const targetColumn = current[targetColumnIndex];
+        if (!targetColumn) return;
+
+        if (beforeRoomId && beforeRoomId !== roomId) {
+            const beforeIdx = targetColumn.indexOf(beforeRoomId);
+            if (beforeIdx >= 0) {
+                targetColumn.splice(beforeIdx, 0, roomId);
+            } else {
+                targetColumn.push(roomId);
+            }
+        } else {
+            targetColumn.push(roomId);
+        }
+
+        roomLayoutSettings[columnsCount] = normalizeColumnsLayout(columnsCount, current);
+        saveRoomLayoutSettings();
+        renderDesktopView();
+        updateAllStationCards();
+        renderSectionsOptionsList();
+    };
+
+    /**
      * Render desktop grid view
      */
     const renderDesktopView = (): void => {
         const container = document.getElementById('stationsDesktopView');
         if (!container) return;
 
-        const desktopColumns: Room[][] = [
-            rooms.slice(0, 3), // Hydro, Magnet, Aquavibron
-            rooms.slice(3, 5), // Fizyko 18, Fizyko 22
-            rooms.slice(5, 7), // Sala 21, Sala Gimnastyczna
-        ];
+        const roomById = new Map(rooms.map(room => [room.id, room] as const));
+        const visibleRoomIds = new Set(rooms.filter(room => isRoomVisible(room.id)).map(room => room.id));
+        const layoutColumns = getColumnsLayout(desktopColumnsCount);
+        const desktopColumns: Room[][] = layoutColumns.map(column => column
+            .filter(roomId => visibleRoomIds.has(roomId))
+            .map(roomId => roomById.get(roomId))
+            .filter((room): room is Room => Boolean(room))
+        );
+        const hasVisibleRooms = desktopColumns.some(column => column.length > 0);
 
-        container.innerHTML = desktopColumns.map((columnRooms) => `
+        if (!hasVisibleRooms) {
+            container.style.gridTemplateColumns = '';
+            container.innerHTML = '<div class="stations-empty-state">Brak widocznych sekcji. Włącz je w opcjach.</div>';
+            return;
+        }
+
+        container.style.gridTemplateColumns = `repeat(${desktopColumnsCount}, minmax(0, calc((100% - 12px) / 3)))`;
+
+        container.innerHTML = desktopColumns
+            .map((columnRooms) => `
             <div class="stations-column">
                 ${columnRooms.map(room => `
                     <div class="room-panel" data-room="${room.id}">
@@ -1071,9 +1619,24 @@ export const Stations: StationsAPI = (() => {
         const container = document.getElementById('stationsMobileView');
         if (!container) return;
 
-        const activeId = activeMobileRoomId;
+        const visibleRooms = rooms.filter(room => isRoomVisible(room.id));
+        if (visibleRooms.length === 0) {
+            container.innerHTML = '<div class="stations-empty-state">Brak widocznych sekcji. Włącz je w opcjach.</div>';
+            return;
+        }
 
-        const tilesHtml = rooms.map(room => {
+        const activeId = activeMobileRoomId;
+        const totals = countStationsByStatus(visibleRooms);
+        const chipsHtml = visibleRooms.map((room) => {
+            const isActive = room.id === activeId;
+            return `
+                <button class="mobile-room-chip ${isActive ? 'active' : ''}" data-mobile-room-chip="${room.id}">
+                    ${room.name}
+                </button>
+            `;
+        }).join('');
+
+        const tilesHtml = visibleRooms.map(room => {
             const isActive = room.id === activeId;
             return `
                 <div class="mobile-room-card ${isActive ? 'expanded' : ''}" data-mobile-room-card="${room.id}">
@@ -1101,6 +1664,14 @@ export const Stations: StationsAPI = (() => {
         }).join('');
 
         container.innerHTML = `
+            <div class="mobile-sticky-toolbar">
+                <div class="mobile-sticky-stats">
+                    <span class="mobile-sticky-pill free">Wolne ${totals.free}</span>
+                    <span class="mobile-sticky-pill occupied">Zajęte ${totals.occupied}</span>
+                    <span class="mobile-sticky-pill finished">Gotowe ${totals.finished}</span>
+                </div>
+                <div class="mobile-room-chips">${chipsHtml}</div>
+            </div>
             <div class="mobile-room-tiles">${tilesHtml}</div>
         `;
     };
@@ -1128,7 +1699,7 @@ export const Stations: StationsAPI = (() => {
         // Special case: station is FREE but next in queue is Therapy/Massage
         // Show 'awaiting start' card to prevent bypassing the queue
         const nextInQueue = station.queue?.[0];
-        const isAwaitingTherapyStart = station.status === 'FREE' && nextInQueue && isTherapyMassageTreatment(nextInQueue.treatmentId);
+        const isAwaitingTherapyStart = isAwaitingTherapyStartStation(station);
 
         if (isAwaitingTherapyStart) {
             return renderAwaitingStartCard(room, station, nextInQueue!, queueHtml);
@@ -1146,17 +1717,24 @@ export const Stations: StationsAPI = (() => {
      */
     const renderAwaitingStartCard = (room: Room, station: Station, nextEntry: QueueEntry, queueHtml: string): string => {
         const nextName = EmployeeManager.getNameById(nextEntry.employeeId);
+        const addQueueAction = room.type === 'simple' ? 'add-to-queue' : 'show-queue-treatments';
         return `
             <div class="station-card ${room.type === 'simple' ? 'station-simple' : 'station-multi'} awaiting-start" data-station-id="${station.id}">
                 <div class="station-awaiting-content">
                     <span class="station-name">${station.name}</span>
+                    <span class="station-reserved-badge">Zarezerwowane, odliczanie nieaktywne</span>
                     <div class="queue-next-action">
                         <div class="queue-next-info">
                             <i class="fas fa-user-clock"></i> Czeka: ${nextName}
                         </div>
-                        <button class="btn-start-queue" data-action="start-queue" data-station="${station.id}" data-room="${room.id}">
-                            <i class="fas fa-play"></i> Rozpocznij
-                        </button>
+                        <div class="awaiting-actions-row">
+                            <button class="btn-start-queue" data-action="start-queue" data-station="${station.id}" data-room="${room.id}">
+                                <i class="fas fa-play"></i> Rozpocznij
+                            </button>
+                            <button class="btn-awaiting-queue" data-action="${addQueueAction}" data-station="${station.id}" data-room="${room.id}">
+                                <i class="fas fa-plus"></i> Zakolejkuj się
+                            </button>
+                        </div>
                     </div>
                 </div>
                 ${queueHtml}
@@ -1236,7 +1814,7 @@ export const Stations: StationsAPI = (() => {
             `;
         }).join('');
 
-        const addButtonHtml = station.queue.length < 3 ? (
+        const addButtonHtml = (station.status === 'OCCUPIED' && station.queue.length < 5) ? (
             room.type === 'simple'
                 ? `<button class="btn-add-queue mini" data-action="add-to-queue" data-station="${station.id}" data-room="${room.id}"><i class="fas fa-plus"></i></button>`
                 : `<button class="btn-add-queue mini" data-action="show-queue-treatments" data-station="${station.id}" data-room="${room.id}"><i class="fas fa-plus"></i></button>`
@@ -1335,6 +1913,33 @@ export const Stations: StationsAPI = (() => {
                 const disabledTitle = blockedByOwnTherapyMassage
                     ? 'Masz już aktywną Terapię/Masaż. Dodaj się do kolejki.'
                     : '';
+                const isTherapyMassage = isTherapyMassageTreatment(t.id);
+
+                if (isTherapyMassage) {
+                    return `
+                        <div class="treatment-tile-group">
+                            <button class="treatment-tile ${disabledClass}" 
+                                    data-action="start-treatment" 
+                                    data-station="${station.id}" 
+                                    data-room="${room.id}"
+                                    data-treatment="${t.id}"
+                                    title="${disabledTitle}"
+                                    ${available ? '' : 'disabled'}>
+                                <span class="treatment-tile-name">${t.shortName}</span>
+                                <span class="treatment-tile-time">${t.duration}'</span>
+                                ${usageInfo ? `<span class="treatment-tile-limit">${usageInfo}</span>` : ''}
+                            </button>
+                            <button class="therapy-queue-btn"
+                                    data-action="reserve-therapy-slot"
+                                    data-station="${station.id}"
+                                    data-room="${room.id}"
+                                    data-treatment="${t.id}"
+                                    title="Zakolejkuj się (rezerwacja stanowiska)">
+                                <i class="fas fa-user-plus"></i>
+                            </button>
+                        </div>
+                    `;
+                }
 
                 return `
                     <button class="treatment-tile ${disabledClass}" 
@@ -1422,6 +2027,8 @@ export const Stations: StationsAPI = (() => {
                 statusDotsEl.innerHTML = renderStatusDots(room);
             }
         }
+
+        updateAttentionBar();
     };
 
     /**
@@ -1451,6 +2058,134 @@ export const Stations: StationsAPI = (() => {
         // Sound toggle
         const soundBtn = document.getElementById('toggleSoundBtn');
         soundBtn?.addEventListener('click', toggleSound);
+
+        const openOptionsBtn = document.getElementById('openSectionsOptionsBtn');
+        openOptionsBtn?.addEventListener('click', openSectionsOptionsModal);
+
+        const closeOptionsBtn = document.getElementById('closeSectionsOptionsBtn');
+        closeOptionsBtn?.addEventListener('click', closeSectionsOptionsModal);
+
+        const sectionsModal = document.getElementById('stationsSectionsModal');
+        sectionsModal?.addEventListener('click', (e) => {
+            if (e.target === sectionsModal) {
+                closeSectionsOptionsModal();
+            }
+        });
+
+        const sectionsOptionsList = document.getElementById('sectionsOptionsList');
+        sectionsOptionsList?.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            const presetBtn = target.closest('[data-layout-preset]') as HTMLElement | null;
+            if (presetBtn) {
+                const preset = presetBtn.dataset.layoutPreset;
+                if (preset === 'compact' || preset === 'standard' || preset === 'focus') {
+                    applySettingsPreset(preset);
+                }
+                return;
+            }
+
+            const layoutActionEl = target.closest('[data-layout-action]') as HTMLElement | null;
+            if (!layoutActionEl) return;
+
+            const action = layoutActionEl.dataset.layoutAction;
+            if (action === 'open-edit') {
+                isLayoutEditMode = true;
+                renderSectionsOptionsList();
+                return;
+            }
+
+            if (action === 'close-edit') {
+                isLayoutEditMode = false;
+                draggedRoomId = null;
+                renderSectionsOptionsList();
+                return;
+            }
+
+            if (action === 'reset') {
+                resetSettingsToDefaults();
+            }
+        });
+
+        sectionsOptionsList?.addEventListener('change', (e) => {
+            const target = e.target as HTMLInputElement | null;
+            if (!target) return;
+
+            if (target.type === 'checkbox') {
+                const roomId = target.dataset.sectionRoomId;
+                if (!roomId) return;
+                roomVisibility.set(roomId, target.checked);
+                saveRoomVisibilitySettings();
+            }
+
+            if (target.type === 'radio') {
+                const columnsCount = Number(target.dataset.columnsCount);
+                if (columnsCount === 1 || columnsCount === 2 || columnsCount === 3) {
+                    desktopColumnsCount = columnsCount;
+                    saveDesktopColumnsSettings();
+                } else {
+                    return;
+                }
+            }
+
+            normalizeActiveMobileRoom();
+            renderDesktopView();
+            renderMobileView();
+            renderSectionsOptionsList();
+            updateAllStationCards();
+        });
+
+        sectionsOptionsList?.addEventListener('dragstart', (e) => {
+            const target = e.target as HTMLElement;
+            const roomCard = target.closest('[data-layout-room-id]') as HTMLElement | null;
+            if (!roomCard) return;
+            draggedRoomId = roomCard.dataset.layoutRoomId || null;
+            roomCard.classList.add('dragging');
+            if (e.dataTransfer && draggedRoomId) {
+                e.dataTransfer.setData('text/plain', draggedRoomId);
+                e.dataTransfer.effectAllowed = 'move';
+            }
+        });
+
+        sectionsOptionsList?.addEventListener('dragend', () => {
+            draggedRoomId = null;
+            sectionsOptionsList.querySelectorAll('.layout-edit-room.dragging').forEach((el) => {
+                el.classList.remove('dragging');
+            });
+        });
+
+        sectionsOptionsList?.addEventListener('dragover', (e) => {
+            if (!isLayoutEditMode) return;
+            const target = e.target as HTMLElement;
+            const dropZone = target.closest('[data-layout-column], [data-layout-room-id]') as HTMLElement | null;
+            if (!dropZone) return;
+            e.preventDefault();
+        });
+
+        sectionsOptionsList?.addEventListener('drop', (e) => {
+            if (!isLayoutEditMode) return;
+            const target = e.target as HTMLElement;
+            const dropTarget = target.closest('[data-layout-column], [data-layout-room-id]') as HTMLElement | null;
+            if (!dropTarget) return;
+
+            const roomIdFromTransfer = e.dataTransfer?.getData('text/plain') || '';
+            const roomId = draggedRoomId || roomIdFromTransfer;
+            if (!roomId) return;
+
+            const columnEl = dropTarget.closest('[data-layout-column]') as HTMLElement | null;
+            const columnIndex = Number(columnEl?.dataset.layoutColumn);
+            if (Number.isNaN(columnIndex)) return;
+
+            const beforeRoomEl = dropTarget.closest('[data-layout-room-id]') as HTMLElement | null;
+            const beforeRoomId = beforeRoomEl?.dataset.layoutRoomId;
+
+            e.preventDefault();
+            moveRoomInLayout(
+                desktopColumnsCount,
+                roomId,
+                columnIndex,
+                beforeRoomId && beforeRoomId !== roomId ? beforeRoomId : undefined
+            );
+        });
     };
 
     /**
@@ -1458,6 +2193,12 @@ export const Stations: StationsAPI = (() => {
      */
     const handleClick = (e: MouseEvent): void => {
         const target = e.target as HTMLElement;
+
+        const roomChip = target.closest('[data-mobile-room-chip]') as HTMLElement;
+        if (roomChip) {
+            setActiveMobileRoom(roomChip.dataset.mobileRoomChip || '');
+            return;
+        }
 
         // Mobile room tile toggle
         const roomTile = target.closest('[data-mobile-room-tab]') as HTMLElement;
@@ -1505,19 +2246,27 @@ export const Stations: StationsAPI = (() => {
                     }
                 }
                 break;
+            case 'reserve-therapy-slot':
+                if (station.status === 'FREE' && treatmentId) {
+                    const treatment = room.treatments.find(t => t.id === treatmentId);
+                    if (treatment && isTherapyMassageTreatment(treatment.id)) {
+                        addToQueue(station, treatment.id, treatment.duration);
+                    }
+                }
+                break;
             case 'cancel':
             case 'release':
                 releaseStation(station);
                 break;
             case 'add-to-queue':
                 // Simple rooms: add directly with default treatment
-                if (station.status !== 'FREE') {
+                if (station.status !== 'FREE' || isAwaitingTherapyStartStation(station)) {
                     addToQueue(station, station.id, room.defaultDuration);
                 }
                 break;
             case 'show-queue-treatments':
                 // Multi rooms: show treatment tiles for queue selection
-                if (station.status !== 'FREE') {
+                if (station.status !== 'FREE' || isAwaitingTherapyStartStation(station)) {
                     showQueueTreatmentPicker(room, station);
                 }
                 break;
@@ -1564,7 +2313,7 @@ export const Stations: StationsAPI = (() => {
      * Set active mobile room tile/panel
      */
     const setActiveMobileRoom = (roomId: string): void => {
-        if (!roomId) return;
+        if (!roomId || !isRoomVisible(roomId)) return;
         activeMobileRoomId = activeMobileRoomId === roomId ? null : roomId;
 
         document.querySelectorAll('.mobile-room-tile').forEach(tile => {

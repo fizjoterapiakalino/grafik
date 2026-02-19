@@ -27,6 +27,22 @@
             <button id="toggleSoundBtn" class="sound-toggle-btn" title="Włącz/Wyłącz dźwięk">
                 <i class="fas fa-volume-up"></i>
             </button>
+            <button id="openSectionsOptionsBtn" class="sound-toggle-btn sections-options-btn" title="Opcje sekcji">
+                <i class="fas fa-sliders-h"></i>
+            </button>
+        </div>
+    </div>
+    <div id="stationsAttentionBar" class="stations-attention-bar" aria-live="polite"></div>
+
+    <div id="stationsSectionsModal" class="stations-sections-modal" aria-hidden="true">
+        <div class="stations-sections-modal-content">
+            <div class="stations-sections-modal-header">
+                <h3>Widoczne sekcje</h3>
+                <button id="closeSectionsOptionsBtn" class="stations-sections-modal-close" aria-label="Zamknij">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="stations-sections-modal-body" id="sectionsOptionsList"></div>
         </div>
     </div>
 
