@@ -24,6 +24,7 @@ import './login.js';
 import './appointments.js';
 import './appointments-pdf.js';
 import { ColorPreferences } from './color-preferences.js';
+import { MobileZen } from './mobile-zen.js';
 import { registerSW } from 'virtual:pwa-register';
 
 // PWA Install Prompt Logic
@@ -68,6 +69,7 @@ window.addEventListener('appinstalled', () => {
 
 document.addEventListener('DOMContentLoaded', () => {
     ColorPreferences.init(); // Apply saved color preferences
+    MobileZen.init(); // Apply saved mobile zen mode
     ConnectionMonitor.init(); // Monitor Firebase connection status
     Router.init();
     BackupScheduler.init();

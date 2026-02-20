@@ -114,6 +114,10 @@
     background: linear-gradient(135deg, #f472b6, #3b82f6, #a855f7);
 }
 
+.card-header-icon.blue {
+    background: linear-gradient(135deg, var(--color-secondary-500), var(--color-secondary-700));
+}
+
 .card-header-text {
     display: flex;
     align-items: center;
@@ -675,6 +679,17 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing-md);
+}
+
+.settings-hint {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--color-gray-600);
+    line-height: 1.45;
+}
+
+.zen-toggle-item {
+    margin-top: 2px;
 }
 
 /* Backup Section */

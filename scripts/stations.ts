@@ -1,5 +1,5 @@
 // scripts/stations.ts - PhysioResource Tracker Module
-import { db as dbRaw, auth as authRaw } from './firebase-config.js';
+import { db as dbRaw, auth as authRaw, FieldValue } from './firebase-config.js';
 import { EmployeeManager } from './employee-manager.js';
 
 // Type for Firebase db wrapper (compatible with existing codebase)
@@ -257,6 +257,48 @@ export const Stations: StationsAPI = (() => {
     let pendingQueueStation: Station | null = null;
     let pendingQueueRoom: Room | null = null;
     let activeMobileRoomId: string | null = null;
+    let serverTimeOffsetMs = 0;
+    let hasServerTimeOffset = false;
+
+    /**
+     * Convert Firestore timestamp-like value to epoch ms.
+     */
+    const toEpochMs = (value: unknown): number | null => {
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            return value;
+        }
+
+        if (typeof value === 'object' && value !== null) {
+            const maybeToMillis = (value as { toMillis?: () => number }).toMillis;
+            if (typeof maybeToMillis === 'function') {
+                const ms = maybeToMillis.call(value);
+                return Number.isFinite(ms) ? ms : null;
+            }
+
+            const seconds = (value as { seconds?: number }).seconds;
+            const nanoseconds = (value as { nanoseconds?: number }).nanoseconds ?? 0;
+            if (typeof seconds === 'number' && Number.isFinite(seconds)) {
+                return Math.round(seconds * 1000 + nanoseconds / 1_000_000);
+            }
+        }
+
+        return null;
+    };
+
+    /**
+     * Return current time corrected by server offset when available.
+     */
+    const getNowMs = (): number => Date.now() + (hasServerTimeOffset ? serverTimeOffsetMs : 0);
+
+    /**
+     * Update local server offset based on Firestore metadata field.
+     */
+    const updateServerOffset = (data: Record<string, unknown>): void => {
+        const updatedAtMs = toEpochMs(data._lastUpdated);
+        if (updatedAtMs === null) return;
+        serverTimeOffsetMs = updatedAtMs - Date.now();
+        hasServerTimeOffset = true;
+    };
 
     /**
      * Initialize module
@@ -413,6 +455,7 @@ export const Stations: StationsAPI = (() => {
             (snapshot: any) => {
                 if (snapshot.exists) {
                     const data = snapshot.data();
+                    updateServerOffset(data);
                     const previousStates = new Map(stationStates);
 
                     stationStates.clear();
@@ -430,6 +473,10 @@ export const Stations: StationsAPI = (() => {
                     syncLocalState();
 
                     // Update UI
+                    updateAllStationCards();
+                } else {
+                    stationStates.clear();
+                    syncLocalState();
                     updateAllStationCards();
                 }
             },
@@ -583,7 +630,7 @@ export const Stations: StationsAPI = (() => {
             const docRef = db.collection('stations').doc('state');
 
             const stateData: any = {
-                _lastUpdated: Date.now(),
+                _lastUpdated: FieldValue.serverTimestamp(),
             };
 
             if (station.status === 'OCCUPIED' || station.status === 'FINISHED') {
@@ -621,7 +668,7 @@ export const Stations: StationsAPI = (() => {
 
         station.status = 'OCCUPIED';
         station.treatmentId = station.id; // Use station ID as treatment ID for simple rooms
-        station.startTime = Date.now();
+        station.startTime = getNowMs();
         station.duration = room.defaultDuration;
         station.employeeId = empId;
 
@@ -655,7 +702,7 @@ export const Stations: StationsAPI = (() => {
 
         station.status = 'OCCUPIED';
         station.treatmentId = normalizeTreatmentId(treatment.id);
-        station.startTime = Date.now();
+        station.startTime = getNowMs();
         station.duration = treatment.duration;
         station.employeeId = empId;
 
@@ -732,7 +779,7 @@ export const Stations: StationsAPI = (() => {
             employeeId: empId,
             treatmentId: normalizedTreatmentId,
             duration: normalizedDuration,
-            addedAt: Date.now()
+            addedAt: getNowMs()
         });
         station.queue.sort((a, b) => a.addedAt - b.addedAt);
 
@@ -802,7 +849,7 @@ export const Stations: StationsAPI = (() => {
         station.status = 'OCCUPIED';
         station.employeeId = next.employeeId;
         station.treatmentId = normalizeTreatmentId(next.treatmentId);
-        station.startTime = Date.now();
+        station.startTime = getNowMs();
         station.duration = isTherapyMassageTreatment(next.treatmentId) ? 20 : next.duration;
 
         await saveStationState(station);
@@ -886,7 +933,7 @@ export const Stations: StationsAPI = (() => {
         if (!station.startTime || !station.duration) return 0;
 
         const endTime = station.startTime + (station.duration * 60 * 1000);
-        const remaining = Math.max(0, endTime - Date.now());
+        const remaining = Math.max(0, endTime - getNowMs());
 
         return Math.ceil(remaining / 1000);
     };
@@ -914,7 +961,7 @@ export const Stations: StationsAPI = (() => {
      * Format queue ETA as clock time (HH:MM)
      */
     const formatQueueEta = (waitSeconds: number): string => {
-        const startAt = new Date(Date.now() + Math.max(0, waitSeconds) * 1000);
+        const startAt = new Date(getNowMs() + Math.max(0, waitSeconds) * 1000);
         const hours = startAt.getHours().toString().padStart(2, '0');
         const minutes = startAt.getMinutes().toString().padStart(2, '0');
         return `${hours}:${minutes}`;
@@ -1269,24 +1316,6 @@ export const Stations: StationsAPI = (() => {
         }
     };
 
-    /**
-     * Count station statuses for a set of rooms (mobile summary).
-     */
-    const countStationsByStatus = (scopeRooms: Room[]): { free: number; occupied: number; finished: number } => {
-        let free = 0;
-        let occupied = 0;
-        let finished = 0;
-
-        scopeRooms.forEach((room) => {
-            room.stations.forEach((station) => {
-                if (station.status === 'FREE') free += 1;
-                if (station.status === 'OCCUPIED') occupied += 1;
-                if (station.status === 'FINISHED') finished += 1;
-            });
-        });
-
-        return { free, occupied, finished };
-    };
 
     /**
      * Update operational attention bar (what needs action now).
@@ -1626,15 +1655,6 @@ export const Stations: StationsAPI = (() => {
         }
 
         const activeId = activeMobileRoomId;
-        const totals = countStationsByStatus(visibleRooms);
-        const chipsHtml = visibleRooms.map((room) => {
-            const isActive = room.id === activeId;
-            return `
-                <button class="mobile-room-chip ${isActive ? 'active' : ''}" data-mobile-room-chip="${room.id}">
-                    ${room.name}
-                </button>
-            `;
-        }).join('');
 
         const tilesHtml = visibleRooms.map(room => {
             const isActive = room.id === activeId;
@@ -1664,14 +1684,6 @@ export const Stations: StationsAPI = (() => {
         }).join('');
 
         container.innerHTML = `
-            <div class="mobile-sticky-toolbar">
-                <div class="mobile-sticky-stats">
-                    <span class="mobile-sticky-pill free">Wolne ${totals.free}</span>
-                    <span class="mobile-sticky-pill occupied">Zajęte ${totals.occupied}</span>
-                    <span class="mobile-sticky-pill finished">Gotowe ${totals.finished}</span>
-                </div>
-                <div class="mobile-room-chips">${chipsHtml}</div>
-            </div>
             <div class="mobile-room-tiles">${tilesHtml}</div>
         `;
     };

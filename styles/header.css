@@ -368,6 +368,50 @@
         transform: scale(1.1);
         background: var(--color-primary-500);
     }
+
+    body.mobile-zen-mode .app-header {
+        height: 52px;
+        padding: 0 10px;
+        border-bottom-width: 1px;
+        transition: transform var(--transition-normal), opacity var(--transition-normal);
+    }
+
+    body.mobile-zen-mode .banner-logo,
+    body.mobile-zen-mode .date-time-text,
+    body.mobile-zen-mode .search-container,
+    body.mobile-zen-mode #btnIso,
+    body.mobile-zen-mode #undoButton,
+    body.mobile-zen-mode #printChangesTable,
+    body.mobile-zen-mode #printLeavesNavbarBtn,
+    body.mobile-zen-mode .schedule-action-buttons {
+        display: none !important;
+    }
+
+    body.mobile-zen-mode .banner-title {
+        font-size: 0.95rem;
+        letter-spacing: 0.04em;
+        text-transform: none;
+    }
+
+    body.mobile-zen-mode .header-right-menu {
+        margin-left: auto;
+    }
+
+    body.mobile-zen-mode .nav-panel {
+        top: 52px;
+        height: calc(100vh - 52px);
+    }
+
+    body.mobile-zen-mode.mobile-zen-header-hidden .app-header {
+        transform: translateY(-100%);
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    body.mobile-zen-mode.mobile-zen-header-hidden .nav-panel {
+        top: 0;
+        height: 100vh;
+    }
 }
 
 @media (min-width: 769px) {

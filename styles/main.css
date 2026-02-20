@@ -478,4 +478,36 @@ h3,
         box-sizing: border-box;
         overflow: hidden;
     }
+
+    body.mobile-zen-mode {
+        --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.08);
+        --shadow-md: 0 2px 8px rgb(15 23 42 / 0.1);
+        --shadow-lg: 0 6px 12px rgb(15 23 42 / 0.12);
+        --shadow-xl: 0 10px 20px rgb(15 23 42 / 0.14);
+    }
+
+    body.mobile-zen-mode .container {
+        padding: 0 12px 12px;
+    }
+
+    body.mobile-zen-mode .seasonal-overlay {
+        display: none !important;
+    }
+
+    body.mobile-zen-mode #toast-container {
+        bottom: 16px;
+    }
+
+    body.mobile-zen-mode .toast {
+        backdrop-filter: none;
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    body.mobile-zen-mode > .hamburger-menu {
+        bottom: 14px;
+        right: 14px;
+        width: 48px;
+        height: 48px;
+        box-shadow: 0 6px 14px rgba(15, 118, 110, 0.35);
+    }
 }

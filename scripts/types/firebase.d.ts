@@ -124,6 +124,7 @@ export interface FirebaseAuthWrapper {
  */
 export interface FieldValueHelper {
     delete(): unknown;
+    serverTimestamp(): unknown;
 }
 
 // Deklaracje modułu

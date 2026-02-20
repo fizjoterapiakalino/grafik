@@ -4,6 +4,7 @@ import { db as dbRaw, auth as authRaw, FieldValue } from './firebase-config.js';
 import { EmployeeManager } from './employee-manager.js';
 import { BackupService } from './backup-service.js';
 import { ColorPreferences } from './color-preferences.js';
+import { MobileZen } from './mobile-zen.js';
 import type { FirestoreDbWrapper, FirebaseAuthWrapper } from './types/firebase';
 import type { Employee, ShiftGroup } from './types';
 
@@ -49,6 +50,7 @@ export const Options: OptionsAPI = (() => {
     let lastBackupDateSpan: HTMLElement | null;
     let pwaInstallCard: HTMLElement | null;
     let installAppBtn: HTMLElement | null;
+    let mobileZenModeToggle: HTMLInputElement | null;
 
     const displayLastBackupDate = async (): Promise<void> => {
         try {
@@ -532,6 +534,7 @@ export const Options: OptionsAPI = (() => {
         lastBackupDateSpan = document.getElementById('lastBackupDate');
         pwaInstallCard = document.getElementById('pwaInstallCard');
         installAppBtn = document.getElementById('installAppBtn');
+        mobileZenModeToggle = document.getElementById('mobileZenModeToggle') as HTMLInputElement | null;
 
         resetDetailsPanel();
         showLoading(true);
@@ -557,6 +560,10 @@ export const Options: OptionsAPI = (() => {
         installAppBtn?.addEventListener('click', () => {
             (window as any).installPWA?.();
         });
+        if (mobileZenModeToggle) {
+            mobileZenModeToggle.checked = MobileZen.isEnabled();
+            mobileZenModeToggle.addEventListener('change', handleMobileZenToggle);
+        }
 
         // Listen for PWA installability
         window.addEventListener('pwa-installable', updatePWAUI);
@@ -678,6 +685,11 @@ export const Options: OptionsAPI = (() => {
         }
     };
 
+    const handleMobileZenToggle = (): void => {
+        if (!mobileZenModeToggle) return;
+        MobileZen.setEnabled(mobileZenModeToggle.checked, true);
+    };
+
     /**
      * Aktualizuje preview koloru
      */
@@ -697,6 +709,7 @@ export const Options: OptionsAPI = (() => {
         clearUidBtn?.removeEventListener('click', handleClearUid);
         createBackupBtn?.removeEventListener('click', createBackup);
         restoreBackupBtn?.removeEventListener('click', handleRestoreBackup);
+        mobileZenModeToggle?.removeEventListener('change', handleMobileZenToggle);
         window.removeEventListener('pwa-installable', updatePWAUI);
         window.removeEventListener('pwa-installed', updatePWAUI);
         debugLog('Options module destroyed');
