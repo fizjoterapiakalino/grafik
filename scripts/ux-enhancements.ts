@@ -289,11 +289,31 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
     };
 
     /**
+     * Inicjalizuje wyróżnik środowiska deweloperskiego (lokalnego)
+     */
+    const initDevEnvironmentBadge = (): void => {
+        const hostname = window.location.hostname;
+        const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.');
+
+        if (isLocal) {
+            const badge = document.createElement('div');
+            badge.className = 'dev-env-badge';
+            badge.innerHTML = 'Wersja Lokalna (DEV)';
+            badge.title = 'Uruchomiono na: ' + hostname;
+            document.body.appendChild(badge);
+
+            document.title = '[DEV] ' + document.title;
+            debugLog('UXEnhancements: Wyróżnik DEV dodany');
+        }
+    };
+
+    /**
      * Inicjalizacja wszystkich ulepszeń
      */
     const init = (): void => {
         initKeyboardShortcuts();
         initPageTransitions();
+        initDevEnvironmentBadge();
         debugLog('UXEnhancements: Moduł zainicjowany');
     };
 

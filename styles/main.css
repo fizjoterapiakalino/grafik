@@ -301,6 +301,36 @@ h3,
     color: var(--color-gray-800);
 }
 
+/* --- Wyróżnik środowiska DEV --- */
+.dev-env-badge {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    background: repeating-linear-gradient(45deg, #f59e0b, #f59e0b 10px, #d97706 10px, #d97706 20px);
+    color: white;
+    padding: 2px 12px;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    z-index: 10001;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-top: none;
+}
+
+.dev-env-badge::before,
+.dev-env-badge::after {
+    content: '⚠️';
+    font-size: 12px;
+}
+
 .login-content {
     display: flex;
     align-items: flex-start;
@@ -503,7 +533,7 @@ h3,
         border-color: rgba(255, 255, 255, 0.08);
     }
 
-    body.mobile-zen-mode > .hamburger-menu {
+    body.mobile-zen-mode>.hamburger-menu {
         bottom: 14px;
         right: 14px;
         width: 48px;
