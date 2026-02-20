@@ -25,6 +25,7 @@ import {
     writeBatch,
     runTransaction,
     deleteField,
+    serverTimestamp,
     enableIndexedDbPersistence,
     CACHE_SIZE_UNLIMITED,
     initializeFirestore,
@@ -49,6 +50,18 @@ const prodFirebaseConfig = {
     messagingSenderId: '__FIREBASE_MESSAGING_SENDER_ID__',
     appId: '__FIREBASE_APP_ID__',
     measurementId: '__FIREBASE_MEASUREMENT_ID__',
+};
+
+// Testowa Baza Danych (dla localhost / development)
+const testFirebaseConfig = {
+    apiKey: 'AIzaSyDNY67dtYOw5z8rDqs_7rfSixsMDDukQEw',
+    authDomain: 'grafikkalinowa.firebaseapp.com',
+    databaseURL: 'https://grafikkalinowa-default-rtdb.europe-west1.firebasedatabase.app',
+    projectId: 'grafikkalinowa',
+    storageBucket: 'grafikkalinowa.firebasestorage.app',
+    messagingSenderId: '531819524737',
+    appId: '1:531819524737:web:bb3f279ef99419095e1380',
+    measurementId: 'G-5X744M8VG5',
 };
 
 // Automatyczne wykrywanie środowiska
@@ -271,6 +284,7 @@ export const auth = {
  */
 export const FieldValue = {
     delete: () => deleteField(),
+    serverTimestamp: () => serverTimestamp(),
     // Dodaj inne metody w razie potrzeby (arrayUnion, arrayRemove, increment, serverTimestamp)
 };
 
@@ -291,6 +305,7 @@ export {
     writeBatch,
     runTransaction,
     deleteField,
+    serverTimestamp,
 };
 
 export { signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword };
