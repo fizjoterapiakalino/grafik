@@ -257,47 +257,32 @@ export const Stations: StationsAPI = (() => {
     let pendingQueueStation: Station | null = null;
     let pendingQueueRoom: Room | null = null;
     let activeMobileRoomId: string | null = null;
-    let serverTimeOffsetMs = 0;
-    let hasServerTimeOffset = false;
+    let lastQueueMove: { stationId: string; employeeId: string; direction: 'up' | 'down'; at: number } | null = null;
+
+    interface StationNotificationState {
+        startTime: number;
+        warningSent: boolean;
+        finishedSent: boolean;
+    }
+    const notificationStates = new Map<string, StationNotificationState>();
 
     /**
-     * Convert Firestore timestamp-like value to epoch ms.
+     * Return current time.
      */
-    const toEpochMs = (value: unknown): number | null => {
-        if (typeof value === 'number' && Number.isFinite(value)) {
-            return value;
-        }
+    const getNowMs = (): number => Date.now();
 
-        if (typeof value === 'object' && value !== null) {
-            const maybeToMillis = (value as { toMillis?: () => number }).toMillis;
-            if (typeof maybeToMillis === 'function') {
-                const ms = maybeToMillis.call(value);
-                return Number.isFinite(ms) ? ms : null;
-            }
-
-            const seconds = (value as { seconds?: number }).seconds;
-            const nanoseconds = (value as { nanoseconds?: number }).nanoseconds ?? 0;
-            if (typeof seconds === 'number' && Number.isFinite(seconds)) {
-                return Math.round(seconds * 1000 + nanoseconds / 1_000_000);
-            }
-        }
-
-        return null;
+    const updateServerOffset = (_data: Record<string, unknown>): void => {
+        // Obsolete function, no longer needed as we use local Date.now() for accurate timers
     };
 
-    /**
-     * Return current time corrected by server offset when available.
-     */
-    const getNowMs = (): number => Date.now() + (hasServerTimeOffset ? serverTimeOffsetMs : 0);
-
-    /**
-     * Update local server offset based on Firestore metadata field.
-     */
-    const updateServerOffset = (data: Record<string, unknown>): void => {
-        const updatedAtMs = toEpochMs(data._lastUpdated);
-        if (updatedAtMs === null) return;
-        serverTimeOffsetMs = updatedAtMs - Date.now();
-        hasServerTimeOffset = true;
+    const markQueueMove = (stationId: string, employeeId: string, direction: 'up' | 'down'): void => {
+        const now = getNowMs();
+        lastQueueMove = { stationId, employeeId, direction, at: now };
+        window.setTimeout(() => {
+            if (lastQueueMove && lastQueueMove.at === now) {
+                lastQueueMove = null;
+            }
+        }, 900);
     };
 
     /**
@@ -442,6 +427,47 @@ export const Stations: StationsAPI = (() => {
             }
         } catch (e) {
             console.log('Could not play sound');
+        }
+    };
+
+    /**
+     * Request notification permission on user interaction
+     */
+    const requestNotificationPermissionOnInteraction = (): void => {
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission().catch(console.warn);
+        }
+    };
+
+    /**
+     * Send Push/Local Notification
+     */
+    const sendNotification = async (title: string, body: string, vibrate: number[]): Promise<void> => {
+        if (!soundEnabled) return;
+
+        if (navigator.vibrate) {
+            navigator.vibrate(vibrate);
+        }
+
+        if (!('Notification' in window)) return;
+
+        if (Notification.permission === 'granted') {
+            try {
+                const swRegistration = await navigator.serviceWorker?.getRegistration();
+                if (swRegistration && swRegistration.showNotification) {
+                    await swRegistration.showNotification(title, {
+                        body,
+                        vibrate,
+                        icon: 'logo.png',
+                        tag: `station-timer-${title}`,
+                        renotify: true
+                    } as any);
+                } else {
+                    new Notification(title, { body, vibrate, icon: 'logo.png' } as any);
+                }
+            } catch (e) {
+                console.error('Notification error:', e);
+            }
         }
     };
 
@@ -608,8 +634,8 @@ export const Stations: StationsAPI = (() => {
                             ...entry,
                             treatmentId: normalizeTreatmentId(entry.treatmentId) || entry.treatmentId,
                             duration: isTherapyMassageTreatment(entry.treatmentId) ? 20 : entry.duration,
-                        }))
-                        .sort((a, b) => a.addedAt - b.addedAt);
+                            addedAt: typeof entry.addedAt === 'number' ? entry.addedAt : getNowMs(),
+                        }));
                 } else {
                     station.status = 'FREE';
                     station.treatmentId = undefined;
@@ -660,6 +686,7 @@ export const Stations: StationsAPI = (() => {
      * Start treatment on a station (for simple rooms)
      */
     const startSimpleTreatment = async (room: Room, station: Station): Promise<void> => {
+        requestNotificationPermissionOnInteraction();
         const empId = await getActiveEmployeeId();
         if (!empId) {
             window.showToast?.('Nie wybrano pracownika', 2000);
@@ -682,6 +709,7 @@ export const Stations: StationsAPI = (() => {
      * Start treatment on a station (for multi-treatment rooms)
      */
     const startMultiTreatment = async (_room: Room, station: Station, treatment: Treatment): Promise<void> => {
+        requestNotificationPermissionOnInteraction();
         const isTherapyMassage = isTherapyMassageTreatment(treatment.id);
         const empId = await getActiveEmployeeId({
             forcePicker: isTherapyMassage,
@@ -781,7 +809,6 @@ export const Stations: StationsAPI = (() => {
             duration: normalizedDuration,
             addedAt: getNowMs()
         });
-        station.queue.sort((a, b) => a.addedAt - b.addedAt);
 
         await saveStationState(station);
         window.showToast?.('Dodano do kolejki', 2000);
@@ -995,8 +1022,24 @@ export const Stations: StationsAPI = (() => {
             for (const station of room.stations) {
                 if (station.status === 'OCCUPIED') {
                     const remaining = getRemainingTime(station);
+                    const threshold = isTherapyMassageTreatment(station.treatmentId) ? 300 : 60;
+
+                    let notifState = notificationStates.get(station.id);
+                    if (!notifState || notifState.startTime !== station.startTime) {
+                        notifState = { startTime: station.startTime!, warningSent: false, finishedSent: false };
+                        notificationStates.set(station.id, notifState);
+                    }
+
+                    if (remaining > 0 && remaining <= threshold && !notifState.warningSent) {
+                        notifState.warningSent = true;
+                        sendNotification(`OstrzeÅ¼enie: ${station.name}`, `ZbliÅ¼a siÄ™ koniec. PozostaÅ‚o: ${formatTime(remaining)}`, [200, 100, 200]);
+                    }
 
                     if (remaining <= 0) {
+                        if (!notifState.finishedSent) {
+                            notifState.finishedSent = true;
+                            sendNotification(`Koniec: ${station.name}`, `Czas zabiegu upÅ‚ynÄ…Å‚ (00:00)`, [1000]);
+                        }
                         const nextInQueue = station.queue?.[0];
                         const isNextTherapy = nextInQueue && isTherapyMassageTreatment(nextInQueue.treatmentId);
 
@@ -1809,27 +1852,53 @@ export const Stations: StationsAPI = (() => {
             const queueEta = formatQueueEta(getQueueWaitSeconds(station, index));
             const isOwn = q.employeeId === currentEmployeeId;
             const canRemove = isCurrentUserAdmin || isOwn;
+            const isRecentlyMoved = Boolean(
+                lastQueueMove &&
+                lastQueueMove.stationId === station.id &&
+                lastQueueMove.employeeId === q.employeeId &&
+                (getNowMs() - lastQueueMove.at) <= 1000
+            );
+            const moveAnimClass = isRecentlyMoved
+                ? (lastQueueMove!.direction === 'up' ? ' queue-item-moved-up' : ' queue-item-moved-down')
+                : '';
+
+            const canMoveUp = canRemove && index > 0;
+            const canMoveDown = canRemove && index < (station.queue?.length || 0) - 1;
 
             return `
-                <div class="queue-item ${isOwn ? 'own' : ''}">
+                <div class="queue-item ${isOwn ? 'own' : ''}${moveAnimClass}">
                     <span class="queue-index">${index + 1}.</span>
                     <span class="queue-emp">${empName}</span>
                     <span class="queue-treat">${treatmentName}</span>
+                    <div class="queue-item-actions">
+                        ${canMoveUp ? `
+                            <button class="btn-move-queue" data-action="move-queue-up" 
+                                    data-station="${station.id}" data-room="${room.id}" data-employee="${q.employeeId}" title="PrzesuÅ„ w gÃ³rÄ™">
+                                <i class="fas fa-arrow-up"></i>
+                            </button>
+                        ` : ''}
+                        ${canMoveDown ? `
+                            <button class="btn-move-queue" data-action="move-queue-down" 
+                                    data-station="${station.id}" data-room="${room.id}" data-employee="${q.employeeId}" title="PrzesuÅ„ w dÃ³Å‚">
+                                <i class="fas fa-arrow-down"></i>
+                            </button>
+                        ` : ''}
+                        ${canRemove ? `
+                            <button class="btn-remove-queue" data-action="remove-from-queue" 
+                                    data-station="${station.id}" data-room="${room.id}" data-employee="${q.employeeId}">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        ` : ''}
+                    </div>
                     <span class="queue-eta" data-queue-index="${index}">${queueEta}</span>
-                    ${canRemove ? `
-                        <button class="btn-remove-queue" data-action="remove-from-queue" 
-                                data-station="${station.id}" data-room="${room.id}" data-employee="${q.employeeId}">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    ` : ''}
                 </div>
             `;
         }).join('');
 
-        const addButtonHtml = (station.status === 'OCCUPIED' && station.queue.length < 5) ? (
+        const addButtonHtml = (station.status !== 'FREE' && station.queue.length < 5) ? (
             room.type === 'simple'
-                ? `<button class="btn-add-queue mini" data-action="add-to-queue" data-station="${station.id}" data-room="${room.id}"><i class="fas fa-plus"></i></button>`
-                : `<button class="btn-add-queue mini" data-action="show-queue-treatments" data-station="${station.id}" data-room="${room.id}"><i class="fas fa-plus"></i></button>`
+                ? `<button class="btn-add-queue queue-tail" data-action="add-to-queue" data-station="${station.id}" data-room="${room.id}"><i class="fas fa-plus"></i> Zakolejkuj siÄ™</button>`
+                : `<button class="btn-add-queue queue-tail" data-action="show-queue-treatments" data-station="${station.id}" data-room="${room.id}"><i class="fas fa-plus"></i> Zakolejkuj siÄ™</button>`
         ) : '';
 
         const nextEntry = station.queue[0];
@@ -2062,6 +2131,44 @@ export const Stations: StationsAPI = (() => {
     };
 
     /**
+     * Force refresh station data from Firebase on demand.
+     */
+    const refreshStationsData = async (): Promise<void> => {
+        const refreshBtn = document.getElementById('refreshStationsBtn');
+        refreshBtn?.classList.add('is-refreshing');
+        window.showToast?.('OdÅ›wieÅ¼anie...', 900);
+
+        try {
+            const snapshot = await db.collection('stations').doc('state').get();
+            stationStates.clear();
+
+            if (snapshot.exists) {
+                const data = snapshot.data() || {};
+                updateServerOffset(data);
+
+                for (const [stationId, state] of Object.entries(data)) {
+                    if (stationId !== '_lastUpdated') {
+                        stationStates.set(stationId, state as StationState);
+                    }
+                }
+            }
+
+            syncLocalState();
+            normalizeActiveMobileRoom();
+            renderDesktopView();
+            renderMobileView();
+            renderSectionsOptionsList();
+            updateAllStationCards();
+            window.showToast?.('OdÅ›wieÅ¼ono', 1200);
+        } catch (error) {
+            console.error('Manual refresh failed:', error);
+            window.showToast?.('BÅ‚Ä…d odÅ›wieÅ¼ania', 2200);
+        } finally {
+            refreshBtn?.classList.remove('is-refreshing');
+        }
+    };
+
+    /**
      * Setup event listeners
      */
     const setupEventListeners = (): void => {
@@ -2070,6 +2177,11 @@ export const Stations: StationsAPI = (() => {
         // Sound toggle
         const soundBtn = document.getElementById('toggleSoundBtn');
         soundBtn?.addEventListener('click', toggleSound);
+
+        const refreshBtn = document.getElementById('refreshStationsBtn');
+        refreshBtn?.addEventListener('click', () => {
+            void refreshStationsData();
+        });
 
         const openOptionsBtn = document.getElementById('openSectionsOptionsBtn');
         openOptionsBtn?.addEventListener('click', openSectionsOptionsModal);
@@ -2303,6 +2415,44 @@ export const Stations: StationsAPI = (() => {
             case 'start-queue':
                 processQueue(station, true);
                 break;
+            case 'move-queue-up':
+                if (employeeId && station.queue) {
+                    if (!isCurrentUserAdmin && employeeId !== currentEmployeeId) {
+                        window.showToast?.('Mo¿esz przesuwaæ tylko w³asn¹ pozycjê', 2200);
+                        return;
+                    }
+                    const index = station.queue.findIndex(q => q.employeeId === employeeId);
+                    if (index > 0) {
+                        const temp = station.queue[index];
+                        station.queue[index] = station.queue[index - 1];
+                        station.queue[index - 1] = temp;
+                        markQueueMove(station.id, employeeId, 'up');
+                        saveStationState(station).then(() => {
+                            window.showToast?.('Kolejnoœæ zmieniona', 1000);
+                            updateAllStationCards();
+                        });
+                    }
+                }
+                break;
+            case 'move-queue-down':
+                if (employeeId && station.queue) {
+                    if (!isCurrentUserAdmin && employeeId !== currentEmployeeId) {
+                        window.showToast?.('Mo¿esz przesuwaæ tylko w³asn¹ pozycjê', 2200);
+                        return;
+                    }
+                    const index = station.queue.findIndex(q => q.employeeId === employeeId);
+                    if (index > -1 && index < station.queue.length - 1) {
+                        const temp = station.queue[index];
+                        station.queue[index] = station.queue[index + 1];
+                        station.queue[index + 1] = temp;
+                        markQueueMove(station.id, employeeId, 'down');
+                        saveStationState(station).then(() => {
+                            window.showToast?.('Kolejnoœæ zmieniona', 1000);
+                            updateAllStationCards();
+                        });
+                    }
+                }
+                break;
         }
     };
 
@@ -2348,6 +2498,7 @@ export const Stations: StationsAPI = (() => {
      * Toggle sound
      */
     const toggleSound = (): void => {
+        requestNotificationPermissionOnInteraction();
         soundEnabled = !soundEnabled;
         localStorage.setItem('stationsSoundEnabled', String(soundEnabled));
         updateSoundButton();

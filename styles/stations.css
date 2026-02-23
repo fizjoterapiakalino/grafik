@@ -210,6 +210,20 @@
     background: var(--color-primary-600);
 }
 
+.refresh-btn.is-refreshing i {
+    animation: stations-refresh-spin 0.8s linear infinite;
+}
+
+@keyframes stations-refresh-spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .sound-toggle-btn.muted {
     background: var(--color-gray-400);
 }
@@ -1293,9 +1307,23 @@
     border: 1px solid transparent;
 }
 
+.queue-item.queue-item-moved-up {
+    animation: queue-item-move-up 360ms ease-out;
+}
+
+.queue-item.queue-item-moved-down {
+    animation: queue-item-move-down 360ms ease-out;
+}
+
 .queue-item.own {
     background: var(--color-primary-50);
     border-color: var(--color-primary-200);
+}
+
+.queue-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
 /* Queue Next Action Styles */
@@ -1395,6 +1423,34 @@
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.01em;
+    min-width: 46px;
+    display: inline-flex;
+    justify-content: center;
+    margin-left: auto;
+}
+
+@keyframes queue-item-move-up {
+    0% {
+        transform: translateY(4px);
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.25);
+    }
+
+    100% {
+        transform: translateY(0);
+        box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+    }
+}
+
+@keyframes queue-item-move-down {
+    0% {
+        transform: translateY(-4px);
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.25);
+    }
+
+    100% {
+        transform: translateY(0);
+        box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+    }
 }
 
 /* Action Buttons */
@@ -1420,10 +1476,29 @@
     transform: translateY(-1px);
 }
 
+.btn-add-queue.queue-tail {
+    margin-top: 4px;
+}
+
 .btn-add-queue.mini {
     width: 24px;
     height: 24px;
     margin: 0 auto;
+}
+
+.btn-move-queue {
+    border: none;
+    background: transparent;
+    color: var(--color-gray-500);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: all 0.15s ease;
+}
+
+.btn-move-queue:hover {
+    color: var(--color-primary-700);
+    background: var(--color-primary-100);
 }
 
 .btn-remove-queue {
