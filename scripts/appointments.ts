@@ -44,6 +44,11 @@ interface AppointmentsAPI {
 
 export const Appointments: AppointmentsAPI = (() => {
     const SAVE_DEBOUNCE_MS = 450;
+    const APPOINTMENTS_FEATURES = {
+        treatmentBell: false,
+        dateUnderPatientName: false,
+        patientInfoModal: false
+    } as const;
 
     let unsubscribe: (() => void) | null = null;
     let appointmentData: AppointmentData = {};
@@ -281,7 +286,7 @@ export const Appointments: AppointmentsAPI = (() => {
                         <div class="editable-cell-container" draggable="true">
                             <span class="cell-text" contenteditable="true"></span>
                             <i class="fas fa-trash-alt appointment-delete-icon" style="display:none" title="Usuń pacjenta"></i>
-                            <i class="fas fa-info-circle appointment-info-icon" style="display:none" title="Szczegóły pacjenta"></i>
+                            <!-- <i class="fas fa-info-circle appointment-info-icon" style="display:none" title="Szczegóły pacjenta"></i> -->
                             <span class="cell-info-indicator"></span>
                         </div>
                     </td>
@@ -312,7 +317,6 @@ export const Appointments: AppointmentsAPI = (() => {
 
     const updateUIContent = (): void => {
         const targets = document.querySelectorAll('.cell-target');
-        const todayStr = new Date().toISOString().split('T')[0];
 
         targets.forEach(target => {
             const htmlTarget = target as HTMLElement;
@@ -322,7 +326,7 @@ export const Appointments: AppointmentsAPI = (() => {
             const cellData = appointmentData[time]?.[station];
             const textEl = htmlTarget.querySelector('.cell-text') as HTMLElement;
             const deleteIcon = htmlTarget.querySelector('.appointment-delete-icon') as HTMLElement;
-            const infoIcon = htmlTarget.querySelector('.appointment-info-icon') as HTMLElement;
+            // const infoIcon = htmlTarget.querySelector('.appointment-info-icon') as HTMLElement;
             const infoEl = htmlTarget.querySelector('.cell-info-indicator') as HTMLElement;
 
             if (textEl !== document.activeElement) {
@@ -331,18 +335,30 @@ export const Appointments: AppointmentsAPI = (() => {
 
             if (cellData && cellData.patientName) {
                 deleteIcon.style.display = 'block';
-                infoIcon.style.display = 'block';
-                if (cellData.endDate) {
-                    const isFinished = cellData.endDate <= todayStr;
-                    infoEl.innerText = `Koniec: ${cellData.endDate}`;
-                    infoEl.className = `cell-info-indicator ${isFinished ? 'treatment-end-marker' : ''}`;
+                // infoIcon.style.display = 'block';
+                if (APPOINTMENTS_FEATURES.dateUnderPatientName) {
+                    if (cellData.endDate) {
+                        infoEl.innerText = `Koniec: ${cellData.endDate}`;
+                        if (APPOINTMENTS_FEATURES.treatmentBell) {
+                            const todayStr = new Date().toISOString().split('T')[0];
+                            const isFinished = cellData.endDate <= todayStr;
+                            infoEl.className = `cell-info-indicator ${isFinished ? 'treatment-end-marker' : ''}`;
+                        } else {
+                            infoEl.className = 'cell-info-indicator';
+                        }
+                    } else {
+                        infoEl.innerText = '';
+                        infoEl.className = 'cell-info-indicator';
+                    }
                 } else {
                     infoEl.innerText = '';
+                    infoEl.className = 'cell-info-indicator';
                 }
             } else {
                 deleteIcon.style.display = 'none';
-                infoIcon.style.display = 'none';
+                // infoIcon.style.display = 'none';
                 infoEl.innerText = '';
+                infoEl.className = 'cell-info-indicator';
             }
         });
 
@@ -350,6 +366,8 @@ export const Appointments: AppointmentsAPI = (() => {
     };
 
     const openModal = (time: string, station: StationKey): void => {
+        if (!APPOINTMENTS_FEATURES.patientInfoModal) return;
+
         currentEditingCell = { time, station };
         const cellData = appointmentData[time]?.[station] || { patientName: '' };
 
@@ -383,6 +401,9 @@ export const Appointments: AppointmentsAPI = (() => {
 
         modal.style.display = 'flex';
     };
+
+    // Keeps the modal implementation available for quick re-enable without triggering TS6133.
+    void openModal;
 
     const closeModal = (): void => {
         const modal = document.getElementById('appointmentPatientInfoModal');
@@ -429,6 +450,8 @@ export const Appointments: AppointmentsAPI = (() => {
     };
 
     const saveModalData = async (): Promise<void> => {
+        if (!APPOINTMENTS_FEATURES.patientInfoModal) return;
+
         if (!currentEditingCell) return;
 
         const { time, station } = currentEditingCell;
@@ -558,6 +581,7 @@ export const Appointments: AppointmentsAPI = (() => {
             void flushCellSave(time, station);
         }, { signal });
 
+        /* Czasowo wyłączone otwieranie modalu prawym przyciskiem
         body.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             const target = (e.target as HTMLElement).closest('.cell-target') as HTMLElement | null;
@@ -567,6 +591,7 @@ export const Appointments: AppointmentsAPI = (() => {
             const station = target.dataset.station as StationKey;
             openModal(time, station);
         }, { signal });
+        */
 
         body.addEventListener('click', (e) => {
             const deleteIcon = (e.target as HTMLElement).closest('.appointment-delete-icon');
@@ -610,6 +635,7 @@ export const Appointments: AppointmentsAPI = (() => {
                 return;
             }
 
+            /* Czasowo wyłączone otwieranie modalu ikoną info
             const infoIcon = (e.target as HTMLElement).closest('.appointment-info-icon');
             if (!infoIcon) return;
 
@@ -619,6 +645,7 @@ export const Appointments: AppointmentsAPI = (() => {
             const time = target.dataset.time || '';
             const station = target.dataset.station as StationKey;
             openModal(time, station);
+            */
         }, { signal });
 
         body.addEventListener('dragstart', (e) => {
@@ -732,13 +759,15 @@ export const Appointments: AppointmentsAPI = (() => {
         const clearBtn = document.getElementById('clearAppointmentsBtn');
         const filterSelect = document.getElementById('appointmentsFilter') as HTMLSelectElement | null;
 
-        if (saveBtn) saveBtn.addEventListener('click', () => { void saveModalData(); }, { signal });
-        if (closeBtn) closeBtn.addEventListener('click', closeModal, { signal });
+        if (APPOINTMENTS_FEATURES.patientInfoModal) {
+            if (saveBtn) saveBtn.addEventListener('click', () => { void saveModalData(); }, { signal });
+            if (closeBtn) closeBtn.addEventListener('click', closeModal, { signal });
 
-        if (modal) {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) closeModal();
-            }, { signal });
+            if (modal) {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) closeModal();
+                }, { signal });
+            }
         }
 
         if (printBtn) {

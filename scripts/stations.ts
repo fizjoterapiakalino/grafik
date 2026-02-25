@@ -12,8 +12,25 @@ interface DbWrapper {
                 callback: (snapshot: { exists: boolean; data(): Record<string, unknown> | undefined }) => void,
                 errorCallback?: (error: Error) => void
             ): () => void;
+            _ref?: unknown;
         };
     };
+    runTransaction?<T>(
+        updateFunction: (transaction: {
+            get(
+                docRef: {
+                    _ref?: unknown;
+                }
+            ): Promise<{ exists: boolean; data(): Record<string, unknown> | undefined }>;
+            set(
+                docRef: {
+                    _ref?: unknown;
+                },
+                data: Record<string, unknown>,
+                options?: { merge?: boolean }
+            ): void;
+        }) => Promise<T> | T
+    ): Promise<T>;
 }
 
 const db = dbRaw as unknown as DbWrapper;
@@ -87,9 +104,15 @@ interface StationState {
     status: StationStatus;
     treatmentId?: string;
     startTime?: number;
+    startTimeServer?: unknown;
     duration?: number;
     employeeId?: string;
     queue?: QueueEntry[];
+}
+
+interface StationsDocData extends Record<string, unknown> {
+    _lastUpdated?: unknown;
+    _revision?: number;
 }
 
 /**
@@ -265,14 +288,29 @@ export const Stations: StationsAPI = (() => {
         finishedSent: boolean;
     }
     const notificationStates = new Map<string, StationNotificationState>();
+    const timerTransitionsInFlight = new Set<string>();
+    const STATIONS_DOC_ID = 'state';
+    let lastKnownRevision = 0;
 
     /**
      * Return current time.
      */
     const getNowMs = (): number => Date.now();
 
-    const updateServerOffset = (_data: Record<string, unknown>): void => {
-        // Obsolete function, no longer needed as we use local Date.now() for accurate timers
+    const parseFirestoreMillis = (value: unknown): number | null => {
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        if (!value || typeof value !== 'object') return null;
+        const maybeTimestamp = value as { toMillis?: () => number };
+        if (typeof maybeTimestamp.toMillis !== 'function') return null;
+        const millis = maybeTimestamp.toMillis();
+        return Number.isFinite(millis) ? millis : null;
+    };
+
+    const updateServerOffset = (data: Record<string, unknown>): void => {
+        const docData = data as StationsDocData;
+        if (typeof docData._revision === 'number' && Number.isFinite(docData._revision)) {
+            lastKnownRevision = Math.max(lastKnownRevision, Math.floor(docData._revision));
+        }
     };
 
     const markQueueMove = (stationId: string, employeeId: string, direction: 'up' | 'down'): void => {
@@ -475,21 +513,20 @@ export const Stations: StationsAPI = (() => {
      * Subscribe to Firebase real-time updates
      */
     const subscribeToUpdates = (): void => {
-        const docRef = db.collection('stations').doc('state');
+        const docRef = db.collection('stations').doc(STATIONS_DOC_ID);
 
         unsubscribe = docRef.onSnapshot(
             (snapshot: any) => {
                 if (snapshot.exists) {
-                    const data = snapshot.data();
+                    const data = (snapshot.data() || {}) as StationsDocData;
                     updateServerOffset(data);
                     const previousStates = new Map(stationStates);
 
                     stationStates.clear();
 
                     for (const [stationId, state] of Object.entries(data)) {
-                        if (stationId !== '_lastUpdated') {
-                            stationStates.set(stationId, state as StationState);
-                        }
+                        if (stationId.startsWith('_')) continue;
+                        stationStates.set(stationId, normalizeStationState(state));
                     }
 
                     // Check for newly finished stations
@@ -619,23 +656,170 @@ export const Stations: StationsAPI = (() => {
     /**
      * Sync local state with Firebase data
      */
+    const normalizeQueueEntries = (queue: unknown): QueueEntry[] => {
+        if (!Array.isArray(queue)) return [];
+
+        return queue
+            .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object')
+            .map((entry) => {
+                const treatmentIdRaw = typeof entry.treatmentId === 'string' ? entry.treatmentId : '';
+                const normalizedTreatmentId = normalizeTreatmentId(treatmentIdRaw) || treatmentIdRaw;
+                const durationRaw = typeof entry.duration === 'number' ? entry.duration : 0;
+                const normalizedDuration = isTherapyMassageTreatment(normalizedTreatmentId) ? 20 : durationRaw;
+
+                return {
+                    employeeId: typeof entry.employeeId === 'string' ? entry.employeeId : '',
+                    treatmentId: normalizedTreatmentId,
+                    duration: normalizedDuration,
+                    addedAt: typeof entry.addedAt === 'number' ? entry.addedAt : getNowMs(),
+                };
+            })
+            .filter(entry => !!entry.employeeId && !!entry.treatmentId && entry.duration > 0);
+    };
+
+    const normalizeStationState = (raw: unknown): StationState => {
+        if (!raw || typeof raw !== 'object') {
+            return { status: 'FREE', queue: [] };
+        }
+
+        const source = raw as Record<string, unknown>;
+        const queue = normalizeQueueEntries(source.queue);
+        const statusRaw = source.status;
+        const status: StationStatus =
+            statusRaw === 'OCCUPIED' || statusRaw === 'FINISHED' ? statusRaw : 'FREE';
+
+        const treatmentIdRaw = typeof source.treatmentId === 'string' ? source.treatmentId : undefined;
+        const treatmentId = normalizeTreatmentId(treatmentIdRaw);
+        const durationRaw = typeof source.duration === 'number' ? source.duration : undefined;
+        const serverStartTime = parseFirestoreMillis(source.startTimeServer);
+        const startTimeFallback =
+            typeof source.startTime === 'number' ? source.startTime : parseFirestoreMillis(source.startTime);
+        const resolvedStartTime = serverStartTime ?? startTimeFallback ?? undefined;
+
+        if (status !== 'OCCUPIED' && status !== 'FINISHED') {
+            return {
+                status: 'FREE',
+                queue
+            };
+        }
+
+        return {
+            status,
+            treatmentId,
+            startTime: resolvedStartTime,
+            startTimeServer: source.startTimeServer,
+            duration: treatmentId && isTherapyMassageTreatment(treatmentId) ? 20 : durationRaw,
+            employeeId: typeof source.employeeId === 'string' ? source.employeeId : undefined,
+            queue
+        };
+    };
+
+    const serializeStationState = (state: StationState): Record<string, unknown> => {
+        const queue = normalizeQueueEntries(state.queue);
+        if (state.status === 'OCCUPIED' || state.status === 'FINISHED') {
+            return {
+                status: state.status,
+                treatmentId: normalizeTreatmentId(state.treatmentId),
+                startTime: state.startTime,
+                ...(state.startTimeServer !== undefined ? { startTimeServer: state.startTimeServer } : {}),
+                duration: state.treatmentId && isTherapyMassageTreatment(state.treatmentId) ? 20 : state.duration,
+                employeeId: state.employeeId,
+                queue,
+            };
+        }
+
+        return {
+            status: 'FREE',
+            queue,
+        };
+    };
+
+    const applyStationStateToModel = (stationId: string, state: StationState): void => {
+        for (const room of rooms) {
+            const station = room.stations.find(s => s.id === stationId);
+            if (!station) continue;
+
+            station.status = state.status;
+            station.treatmentId = normalizeTreatmentId(state.treatmentId);
+            station.startTime = state.startTime;
+            station.duration = state.treatmentId && isTherapyMassageTreatment(state.treatmentId) ? 20 : state.duration;
+            station.employeeId = state.employeeId;
+            station.queue = normalizeQueueEntries(state.queue);
+            return;
+        }
+    };
+
+    const mutateStationState = async <T = void>(
+        stationId: string,
+        mutate: (current: StationState) => { next: StationState; result?: T } | null
+    ): Promise<{ applied: boolean; next: StationState | null; result?: T }> => {
+        const docRef = db.collection('stations').doc(STATIONS_DOC_ID);
+
+        if (typeof db.runTransaction !== 'function') {
+            const snapshot = await docRef.get();
+            const rawData = (snapshot.data?.() || {}) as StationsDocData;
+            const current = normalizeStationState(rawData[stationId]);
+            const mutation = mutate(current);
+            if (!mutation) {
+                return { applied: false, next: current };
+            }
+
+            const nextRevision = (typeof rawData._revision === 'number' ? rawData._revision : lastKnownRevision) + 1;
+            const payload: Record<string, unknown> = {
+                _lastUpdated: FieldValue.serverTimestamp(),
+                _revision: nextRevision,
+                [stationId]: serializeStationState(mutation.next)
+            };
+
+            await docRef.set(payload, { merge: true });
+            lastKnownRevision = nextRevision;
+            updateServerOffset({ _lastUpdated: Date.now(), _revision: nextRevision });
+            return { applied: true, next: mutation.next, result: mutation.result };
+        }
+
+        let applied = false;
+        let nextState: StationState | null = null;
+        let mutationResult: T | undefined;
+
+        await db.runTransaction(async (tx) => {
+            const snapshot = await tx.get(docRef);
+            const rawData = (snapshot.data?.() || {}) as StationsDocData;
+            const current = normalizeStationState(rawData[stationId]);
+            const mutation = mutate(current);
+            if (!mutation) {
+                nextState = current;
+                return;
+            }
+
+            const nextRevision = (typeof rawData._revision === 'number' ? rawData._revision : lastKnownRevision) + 1;
+            const payload: Record<string, unknown> = {
+                _lastUpdated: FieldValue.serverTimestamp(),
+                _revision: nextRevision,
+                [stationId]: serializeStationState(mutation.next)
+            };
+
+            tx.set(docRef, payload, { merge: true });
+            applied = true;
+            nextState = mutation.next;
+            mutationResult = mutation.result;
+            lastKnownRevision = nextRevision;
+        });
+
+        return { applied, next: nextState, result: mutationResult };
+    };
+
     const syncLocalState = (): void => {
         for (const room of rooms) {
             for (const station of room.stations) {
                 const state = stationStates.get(station.id);
                 if (state) {
-                    station.status = state.status;
-                    station.treatmentId = normalizeTreatmentId(state.treatmentId);
-                    station.startTime = state.startTime;
-                    station.duration = isTherapyMassageTreatment(state.treatmentId) ? 20 : state.duration;
-                    station.employeeId = state.employeeId;
-                    station.queue = [...(state.queue || [])]
-                        .map(entry => ({
-                            ...entry,
-                            treatmentId: normalizeTreatmentId(entry.treatmentId) || entry.treatmentId,
-                            duration: isTherapyMassageTreatment(entry.treatmentId) ? 20 : entry.duration,
-                            addedAt: typeof entry.addedAt === 'number' ? entry.addedAt : getNowMs(),
-                        }));
+                    const normalized = normalizeStationState(state);
+                    station.status = normalized.status;
+                    station.treatmentId = normalized.treatmentId;
+                    station.startTime = normalized.startTime;
+                    station.duration = normalized.duration;
+                    station.employeeId = normalized.employeeId;
+                    station.queue = normalized.queue || [];
                 } else {
                     station.status = 'FREE';
                     station.treatmentId = undefined;
@@ -649,40 +833,6 @@ export const Stations: StationsAPI = (() => {
     };
 
     /**
-     * Save station state to Firebase
-     */
-    const saveStationState = async (station: Station): Promise<void> => {
-        try {
-            const docRef = db.collection('stations').doc('state');
-
-            const stateData: any = {
-                _lastUpdated: FieldValue.serverTimestamp(),
-            };
-
-            if (station.status === 'OCCUPIED' || station.status === 'FINISHED') {
-                stateData[station.id] = {
-                    status: station.status,
-                    treatmentId: station.treatmentId,
-                    startTime: station.startTime,
-                    duration: station.duration,
-                    employeeId: station.employeeId,
-                    queue: station.queue || [],
-                };
-            } else {
-                stateData[station.id] = {
-                    status: 'FREE',
-                    queue: station.queue || [],
-                };
-            }
-
-            await docRef.set(stateData, { merge: true });
-        } catch (error) {
-            console.error('Error saving station state:', error);
-            window.showToast?.('Błąd zapisu', 3000);
-        }
-    };
-
-    /**
      * Start treatment on a station (for simple rooms)
      */
     const startSimpleTreatment = async (room: Room, station: Station): Promise<void> => {
@@ -692,15 +842,28 @@ export const Stations: StationsAPI = (() => {
             window.showToast?.('Nie wybrano pracownika', 2000);
             return;
         }
+        const startedAt = getNowMs();
+        const mutation = await mutateStationState(station.id, (current) => {
+            if (current.status !== 'FREE') return null;
+            return {
+                next: {
+                    status: 'OCCUPIED',
+                    treatmentId: station.id,
+                    startTime: startedAt,
+                    startTimeServer: FieldValue.serverTimestamp(),
+                    duration: room.defaultDuration,
+                    employeeId: empId,
+                    queue: current.queue || [],
+                }
+            };
+        });
 
-        station.status = 'OCCUPIED';
-        station.treatmentId = station.id; // Use station ID as treatment ID for simple rooms
-        station.startTime = getNowMs();
-        station.duration = room.defaultDuration;
-        station.employeeId = empId;
+        if (!mutation.applied || !mutation.next) {
+            window.showToast?.('Stanowisko jest już zajęte', 2000);
+            return;
+        }
 
-        await saveStationState(station);
-
+        applyStationStateToModel(station.id, mutation.next);
         window.showToast?.(`${station.name} - ${room.defaultDuration} min`, 2000);
         updateAllStationCards();
     };
@@ -728,14 +891,28 @@ export const Stations: StationsAPI = (() => {
             return;
         }
 
-        station.status = 'OCCUPIED';
-        station.treatmentId = normalizeTreatmentId(treatment.id);
-        station.startTime = getNowMs();
-        station.duration = treatment.duration;
-        station.employeeId = empId;
+        const startedAt = getNowMs();
+        const mutation = await mutateStationState(station.id, (current) => {
+            if (current.status !== 'FREE') return null;
+            return {
+                next: {
+                    status: 'OCCUPIED',
+                    treatmentId: normalizeTreatmentId(treatment.id),
+                    startTime: startedAt,
+                    startTimeServer: FieldValue.serverTimestamp(),
+                    duration: treatment.duration,
+                    employeeId: empId,
+                    queue: current.queue || [],
+                }
+            };
+        });
 
-        await saveStationState(station);
+        if (!mutation.applied || !mutation.next) {
+            window.showToast?.('Stanowisko jest już zajęte', 2000);
+            return;
+        }
 
+        applyStationStateToModel(station.id, mutation.next);
         window.showToast?.(`${treatment.name} - ${treatment.duration} min`, 2000);
         updateAllStationCards();
     };
@@ -749,21 +926,53 @@ export const Stations: StationsAPI = (() => {
             window.showToast?.('Nie masz uprawnień do zwolnienia tego stanowiska', 3000);
             return;
         }
+        const now = getNowMs();
+        const mutation = await mutateStationState<{ startedNext: boolean; nextEmployeeId?: string }>(station.id, (current) => {
+            if (current.status !== 'OCCUPIED' && current.status !== 'FINISHED') return null;
+            if (!isCurrentUserAdmin && current.employeeId && current.employeeId !== currentEmployeeId) return null;
 
-        const nextInQueue = station.queue?.[0];
-        const isNextTherapy = nextInQueue && isTherapyMassageTreatment(nextInQueue.treatmentId);
+            const queue = normalizeQueueEntries(current.queue);
+            const nextInQueue = queue[0];
+            const isNextTherapy = nextInQueue && isTherapyMassageTreatment(nextInQueue.treatmentId);
 
-        station.status = 'FREE';
-        station.treatmentId = undefined;
-        station.startTime = undefined;
-        station.duration = undefined;
-        station.employeeId = undefined;
+            if (nextInQueue && !isNextTherapy) {
+                const [, ...remainingQueue] = queue;
+                return {
+                    next: {
+                        status: 'OCCUPIED',
+                        treatmentId: normalizeTreatmentId(nextInQueue.treatmentId),
+                        startTime: now,
+                        startTimeServer: FieldValue.serverTimestamp(),
+                        duration: isTherapyMassageTreatment(nextInQueue.treatmentId) ? 20 : nextInQueue.duration,
+                        employeeId: nextInQueue.employeeId,
+                        queue: remainingQueue,
+                    },
+                    result: {
+                        startedNext: true,
+                        nextEmployeeId: nextInQueue.employeeId,
+                    }
+                };
+            }
 
-        // If next in queue is Therapy/Massage — do NOT auto-start, require manual 'Rozpocznij'
-        if (nextInQueue && !isNextTherapy) {
-            await processQueue(station);
+            return {
+                next: {
+                    status: 'FREE',
+                    queue,
+                },
+                result: {
+                    startedNext: false
+                }
+            };
+        });
+
+        if (!mutation.next) return;
+        applyStationStateToModel(station.id, mutation.next);
+
+        if (mutation.result?.startedNext && mutation.result.nextEmployeeId) {
+            const empName = EmployeeManager.getNameById(mutation.result.nextEmployeeId);
+            window.showToast?.(`Następny: ${empName}`, 3000);
+            playNotificationSound();
         } else {
-            await saveStationState(station);
             window.showToast?.('Stanowisko zwolnione', 1500);
         }
 
@@ -786,31 +995,38 @@ export const Stations: StationsAPI = (() => {
         }
         const normalizedDuration = isTherapyMassageTreatment(normalizedTreatmentId) ? 20 : duration;
 
-        // Initialize queue if not exists
-        if (!station.queue) {
-            station.queue = [];
-        }
+        const mutation = await mutateStationState(station.id, (current) => {
+            const queue = normalizeQueueEntries(current.queue);
+            if (queue.length >= 5) return null;
+            if (queue.some(q => q.employeeId === empId)) return null;
 
-        // Limit queue size
-        if (station.queue.length >= 5) {
-            window.showToast?.('Kolejka jest pełna (max 5)', 2500);
-            return;
-        }
-
-        // Check if employee already in queue for this station
-        if (station.queue.some(q => q.employeeId === empId)) {
-            window.showToast?.('Jesteś już w kolejce', 2000);
-            return;
-        }
-
-        station.queue.push({
-            employeeId: empId,
-            treatmentId: normalizedTreatmentId,
-            duration: normalizedDuration,
-            addedAt: getNowMs()
+            return {
+                next: {
+                    ...current,
+                    queue: [
+                        ...queue,
+                        {
+                            employeeId: empId,
+                            treatmentId: normalizedTreatmentId,
+                            duration: normalizedDuration,
+                            addedAt: getNowMs()
+                        }
+                    ]
+                }
+            };
         });
 
-        await saveStationState(station);
+        if (!mutation.applied || !mutation.next) {
+            const queue = normalizeQueueEntries(station.queue);
+            if (queue.length >= 5) {
+                window.showToast?.('Kolejka jest pełna (max 5)', 2500);
+            } else {
+                window.showToast?.('Jesteś już w kolejce', 2000);
+            }
+            return;
+        }
+
+        applyStationStateToModel(station.id, mutation.next);
         window.showToast?.('Dodano do kolejki', 2000);
         updateAllStationCards();
     };
@@ -824,10 +1040,21 @@ export const Stations: StationsAPI = (() => {
             return;
         }
 
-        if (!station.queue) return;
+        const mutation = await mutateStationState(station.id, (current) => {
+            const queue = normalizeQueueEntries(current.queue);
+            const exists = queue.some(q => q.employeeId === employeeId);
+            if (!exists) return null;
+            return {
+                next: {
+                    ...current,
+                    queue: queue.filter(q => q.employeeId !== employeeId)
+                }
+            };
+        });
 
-        station.queue = station.queue.filter(q => q.employeeId !== employeeId);
-        await saveStationState(station);
+        if (!mutation.applied || !mutation.next) return;
+
+        applyStationStateToModel(station.id, mutation.next);
         window.showToast?.('Usunięto z kolejki', 1500);
         updateAllStationCards();
     };
@@ -837,9 +1064,6 @@ export const Stations: StationsAPI = (() => {
      */
     const processQueue = async (station: Station, isManual = false): Promise<void> => {
         if (!station.queue || station.queue.length === 0) return;
-
-        const next = station.queue[0];
-        if (!next) return;
 
         // Robust permission check - use fresh data if possible
         const user = auth.currentUser;
@@ -851,37 +1075,53 @@ export const Stations: StationsAPI = (() => {
         console.log('--- Queue Process Check ---');
         console.log('Action Type:', isManual ? 'MANUAL (User Clicked)' : 'AUTO (System/Release)');
         console.log('Current User:', { uid: currentUid, empId: effectiveEmpId, isAdmin });
-        console.log('Queued Item:', { nextEmpId: next.employeeId, treatmentId: next.treatmentId });
+        const mutation = await mutateStationState<{ startedEmployeeId: string }>(station.id, (current) => {
+            const queue = normalizeQueueEntries(current.queue);
+            const next = queue[0];
+            if (!next) return null;
 
-        // If it's a manual start (button clicked), verify permissions
-        if (isManual) {
-            if (!currentUid || !effectiveEmpId) {
-                console.warn('BLOCK: User not identified as employee');
-                window.showToast?.('Błąd: Nie rozpoznano pracownika. Zaloguj się ponownie.', 4000);
-                return;
+            console.log('Queued Item:', { nextEmpId: next.employeeId, treatmentId: next.treatmentId });
+
+            if (isManual) {
+                if (!currentUid || !effectiveEmpId) {
+                    console.warn('BLOCK: User not identified as employee');
+                    return null;
+                }
+
+                if (!isAdmin && next.employeeId !== effectiveEmpId) {
+                    console.warn('BLOCK: User is not admin and does not own this queue entry');
+                    return null;
+                }
+
+                console.log('Permission granted for manual start');
             }
 
-            if (!isAdmin && next.employeeId !== effectiveEmpId) {
-                console.warn('BLOCK: User is not admin and does not own this queue entry');
+            const [, ...remainingQueue] = queue;
+            return {
+                next: {
+                    status: 'OCCUPIED',
+                    employeeId: next.employeeId,
+                    treatmentId: normalizeTreatmentId(next.treatmentId),
+                    startTime: getNowMs(),
+                    startTimeServer: FieldValue.serverTimestamp(),
+                    duration: isTherapyMassageTreatment(next.treatmentId) ? 20 : next.duration,
+                    queue: remainingQueue,
+                },
+                result: {
+                    startedEmployeeId: next.employeeId
+                }
+            };
+        });
+
+        if (!mutation.applied || !mutation.next || !mutation.result?.startedEmployeeId) {
+            if (isManual) {
                 window.showToast?.('Możesz rozpocząć tylko własny zabieg', 3000);
-                return;
             }
-
-            console.log('Permission granted for manual start');
+            return;
         }
 
-        // Proceed and remove from queue
-        station.queue.shift();
-
-        station.status = 'OCCUPIED';
-        station.employeeId = next.employeeId;
-        station.treatmentId = normalizeTreatmentId(next.treatmentId);
-        station.startTime = getNowMs();
-        station.duration = isTherapyMassageTreatment(next.treatmentId) ? 20 : next.duration;
-
-        await saveStationState(station);
-
-        const empName = EmployeeManager.getNameById(next.employeeId);
+        applyStationStateToModel(station.id, mutation.next);
+        const empName = EmployeeManager.getNameById(mutation.result.startedEmployeeId);
         window.showToast?.(`Następny: ${empName}`, 3000);
         playNotificationSound();
     };
@@ -1040,26 +1280,56 @@ export const Stations: StationsAPI = (() => {
                             notifState.finishedSent = true;
                             sendNotification(`Koniec: ${station.name}`, `Czas zabiegu upłynął (00:00)`, [1000]);
                         }
-                        const nextInQueue = station.queue?.[0];
-                        const isNextTherapy = nextInQueue && isTherapyMassageTreatment(nextInQueue.treatmentId);
+                        if (!station.startTime || !station.duration) {
+                            // Invalid local timer data; wait for next snapshot instead of persisting potentially stale state.
+                            continue;
+                        }
 
-                        if (nextInQueue && !isNextTherapy) {
-                            // Normal queue: set FINISHED so user clicks to release and auto-processes queue
-                            station.status = 'FINISHED';
-                        } else if (isNextTherapy) {
-                            // Therapy/Massage next: go straight to FREE so 'Rozpocznij' button appears
-                            station.status = 'FREE';
-                            station.treatmentId = undefined;
-                            station.startTime = undefined;
-                            station.duration = undefined;
-                            station.employeeId = undefined;
-                        } else {
-                            // No queue: normal FINISHED
-                            station.status = 'FINISHED';
+                        if (!timerTransitionsInFlight.has(station.id)) {
+                            timerTransitionsInFlight.add(station.id);
+                            const expectedStartTime = station.startTime;
+
+                            void mutateStationState(station.id, (current) => {
+                                if (current.status !== 'OCCUPIED') return null;
+                                if (!current.startTime || !current.duration) return null;
+                                if (current.startTime !== expectedStartTime) return null;
+
+                                const nextInQueue = normalizeQueueEntries(current.queue)[0];
+                                const isNextTherapy = nextInQueue && isTherapyMassageTreatment(nextInQueue.treatmentId);
+
+                                if (isNextTherapy) {
+                                    return {
+                                        next: {
+                                            status: 'FREE',
+                                            queue: normalizeQueueEntries(current.queue),
+                                        }
+                                    };
+                                }
+
+                                return {
+                                    next: {
+                                        ...current,
+                                        status: 'FINISHED',
+                                        queue: normalizeQueueEntries(current.queue),
+                                    }
+                                };
+                            })
+                                .then((result) => {
+                                    if (result.applied && result.next) {
+                                        applyStationStateToModel(station.id, result.next);
+                                        playNotificationSound();
+                                        updateAllStationCards();
+                                    }
+                                })
+                                .catch((error) => {
+                                    console.error('Timer transition failed:', error);
+                                })
+                                .finally(() => {
+                                    timerTransitionsInFlight.delete(station.id);
+                                });
                         }
 
                         hasFinishedTransition = true;
-                        saveStationState(station);
                     }
 
                     updateTimerDisplay(station.id, remaining, station.treatmentId);
@@ -1070,7 +1340,6 @@ export const Stations: StationsAPI = (() => {
         }
 
         if (hasFinishedTransition) {
-            playNotificationSound();
             updateAllStationCards();
         }
     };
@@ -2139,17 +2408,16 @@ export const Stations: StationsAPI = (() => {
         window.showToast?.('Odświeżanie...', 900);
 
         try {
-            const snapshot = await db.collection('stations').doc('state').get();
+            const snapshot = await db.collection('stations').doc(STATIONS_DOC_ID).get();
             stationStates.clear();
 
             if (snapshot.exists) {
-                const data = snapshot.data() || {};
+                const data = (snapshot.data() || {}) as StationsDocData;
                 updateServerOffset(data);
 
                 for (const [stationId, state] of Object.entries(data)) {
-                    if (stationId !== '_lastUpdated') {
-                        stationStates.set(stationId, state as StationState);
-                    }
+                    if (stationId.startsWith('_')) continue;
+                    stationStates.set(stationId, normalizeStationState(state));
                 }
             }
 
@@ -2418,39 +2686,59 @@ export const Stations: StationsAPI = (() => {
             case 'move-queue-up':
                 if (employeeId && station.queue) {
                     if (!isCurrentUserAdmin && employeeId !== currentEmployeeId) {
-                        window.showToast?.('Mo�esz przesuwa� tylko w�asn� pozycj�', 2200);
+                        window.showToast?.('Możesz przesuwać tylko własną pozycję', 2200);
                         return;
                     }
-                    const index = station.queue.findIndex(q => q.employeeId === employeeId);
-                    if (index > 0) {
-                        const temp = station.queue[index];
-                        station.queue[index] = station.queue[index - 1];
-                        station.queue[index - 1] = temp;
+                    void mutateStationState(station.id, (current) => {
+                        const queue = normalizeQueueEntries(current.queue);
+                        const index = queue.findIndex(q => q.employeeId === employeeId);
+                        if (index <= 0) return null;
+                        const reordered = [...queue];
+                        const temp = reordered[index];
+                        reordered[index] = reordered[index - 1];
+                        reordered[index - 1] = temp;
+                        return {
+                            next: {
+                                ...current,
+                                queue: reordered
+                            }
+                        };
+                    }).then((result) => {
+                        if (!result.applied || !result.next) return;
+                        applyStationStateToModel(station.id, result.next);
                         markQueueMove(station.id, employeeId, 'up');
-                        saveStationState(station).then(() => {
-                            window.showToast?.('Kolejno�� zmieniona', 1000);
-                            updateAllStationCards();
-                        });
-                    }
+                        window.showToast?.('Kolejność zmieniona', 1000);
+                        updateAllStationCards();
+                    });
                 }
                 break;
             case 'move-queue-down':
                 if (employeeId && station.queue) {
                     if (!isCurrentUserAdmin && employeeId !== currentEmployeeId) {
-                        window.showToast?.('Mo�esz przesuwa� tylko w�asn� pozycj�', 2200);
+                        window.showToast?.('Możesz przesuwać tylko własną pozycję', 2200);
                         return;
                     }
-                    const index = station.queue.findIndex(q => q.employeeId === employeeId);
-                    if (index > -1 && index < station.queue.length - 1) {
-                        const temp = station.queue[index];
-                        station.queue[index] = station.queue[index + 1];
-                        station.queue[index + 1] = temp;
+                    void mutateStationState(station.id, (current) => {
+                        const queue = normalizeQueueEntries(current.queue);
+                        const index = queue.findIndex(q => q.employeeId === employeeId);
+                        if (index < 0 || index >= queue.length - 1) return null;
+                        const reordered = [...queue];
+                        const temp = reordered[index];
+                        reordered[index] = reordered[index + 1];
+                        reordered[index + 1] = temp;
+                        return {
+                            next: {
+                                ...current,
+                                queue: reordered
+                            }
+                        };
+                    }).then((result) => {
+                        if (!result.applied || !result.next) return;
+                        applyStationStateToModel(station.id, result.next);
                         markQueueMove(station.id, employeeId, 'down');
-                        saveStationState(station).then(() => {
-                            window.showToast?.('Kolejno�� zmieniona', 1000);
-                            updateAllStationCards();
-                        });
-                    }
+                        window.showToast?.('Kolejność zmieniona', 1000);
+                        updateAllStationCards();
+                    });
                 }
                 break;
         }
