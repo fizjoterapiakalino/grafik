@@ -292,6 +292,21 @@ export const Stations: StationsAPI = (() => {
     const STATIONS_DOC_ID = 'state';
     let lastKnownRevision = 0;
 
+    // Event listener cleanup via AbortController
+    let eventAbortController: AbortController | null = null;
+
+    // Pending employee picker resolve (for cleanup on destroy)
+    let pendingPickerResolve: ((value: string | null) => void) | null = null;
+
+    // Page visibility state
+    let isPageVisible = true;
+
+    // DOM element cache for timer display (avoids querySelectorAll every second)
+    const timerDomCache = new Map<string, { cards: Element[]; dirty: boolean }>();
+
+    // Deduplication for updateAllStationCards
+    let updateAllScheduled = false;
+
     /**
      * Return current time.
      */
@@ -407,13 +422,40 @@ export const Stations: StationsAPI = (() => {
             timerInterval = null;
         }
 
-        // Remove event listener
-        document.removeEventListener('click', handleClick);
+        // Remove all event listeners via AbortController
+        if (eventAbortController) {
+            eventAbortController.abort();
+            eventAbortController = null;
+        }
+
+        // Remove visibilitychange handler
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+
+        // Close AudioContext to free resources
+        try {
+            const audioContext = (window as any).stationsAudioContext;
+            if (audioContext && typeof audioContext.close === 'function') {
+                audioContext.close();
+            }
+            (window as any).stationsAudioContext = null;
+        } catch (_) { /* ignore */ }
+
+        // Resolve pending employee picker Promise to prevent leak
+        if (pendingPickerResolve) {
+            pendingPickerResolve(null);
+            pendingPickerResolve = null;
+        }
 
         // Remove employee picker modal if exists
         document.getElementById('employeePickerModal')?.remove();
 
+        // Clear all maps and sets
         stationStates.clear();
+        notificationStates.clear();
+        timerTransitionsInFlight.clear();
+        timerDomCache.clear();
+        updateAllScheduled = false;
+
         rooms = [];
         roomVisibility.clear();
         currentUserUid = null;
@@ -424,6 +466,7 @@ export const Stations: StationsAPI = (() => {
         pendingQueueStation = null;
         pendingQueueRoom = null;
         activeMobileRoomId = null;
+        isPageVisible = true;
         closeSectionsOptionsModal();
     };
 
@@ -536,11 +579,11 @@ export const Stations: StationsAPI = (() => {
                     syncLocalState();
 
                     // Update UI
-                    updateAllStationCards();
+                    scheduleUpdateAllStationCards();
                 } else {
                     stationStates.clear();
                     syncLocalState();
-                    updateAllStationCards();
+                    scheduleUpdateAllStationCards();
                 }
             },
             (error: any) => {
@@ -601,7 +644,15 @@ export const Stations: StationsAPI = (() => {
      * Show modal for admin to pick an employee
      */
     const showEmployeePickerModal = (title = 'Wybierz pracownika'): Promise<string | null> => {
+        // Resolve any existing pending picker to prevent leaked Promises
+        if (pendingPickerResolve) {
+            pendingPickerResolve(null);
+            pendingPickerResolve = null;
+        }
+
         return new Promise((resolve) => {
+            pendingPickerResolve = resolve;
+
             // Remove existing modal if any
             document.getElementById('employeePickerModal')?.remove();
 
@@ -634,18 +685,22 @@ export const Stations: StationsAPI = (() => {
             `;
             document.body.appendChild(modal);
 
+            const finishWith = (value: string | null) => {
+                modal.remove();
+                pendingPickerResolve = null;
+                resolve(value);
+            };
+
             // Handle clicks
             const handleModalClick = (e: MouseEvent) => {
                 const target = e.target as HTMLElement;
                 const btn = target.closest('[data-emp-id]') as HTMLElement;
                 if (btn) {
-                    modal.remove();
-                    resolve(btn.dataset.empId || null);
+                    finishWith(btn.dataset.empId || null);
                     return;
                 }
                 if (target.closest('.emp-picker-close') || target === modal) {
-                    modal.remove();
-                    resolve(null);
+                    finishWith(null);
                 }
             };
 
@@ -865,7 +920,7 @@ export const Stations: StationsAPI = (() => {
 
         applyStationStateToModel(station.id, mutation.next);
         window.showToast?.(`${station.name} - ${room.defaultDuration} min`, 2000);
-        updateAllStationCards();
+        scheduleUpdateAllStationCards();
     };
 
     /**
@@ -914,7 +969,7 @@ export const Stations: StationsAPI = (() => {
 
         applyStationStateToModel(station.id, mutation.next);
         window.showToast?.(`${treatment.name} - ${treatment.duration} min`, 2000);
-        updateAllStationCards();
+        scheduleUpdateAllStationCards();
     };
 
     /**
@@ -1028,7 +1083,7 @@ export const Stations: StationsAPI = (() => {
 
         applyStationStateToModel(station.id, mutation.next);
         window.showToast?.('Dodano do kolejki', 2000);
-        updateAllStationCards();
+        scheduleUpdateAllStationCards();
     };
 
     /**
@@ -1056,7 +1111,7 @@ export const Stations: StationsAPI = (() => {
 
         applyStationStateToModel(station.id, mutation.next);
         window.showToast?.('Usunięto z kolejki', 1500);
-        updateAllStationCards();
+        scheduleUpdateAllStationCards();
     };
 
     /**
@@ -1244,10 +1299,23 @@ export const Stations: StationsAPI = (() => {
     };
 
     /**
+     * Handle page visibility changes — pause timers when hidden to save CPU/battery
+     */
+    const handleVisibilityChange = (): void => {
+        isPageVisible = !document.hidden;
+        if (isPageVisible) {
+            // Immediately update timers when page becomes visible again
+            updateTimers();
+        }
+    };
+
+    /**
      * Start timer interval
      */
     const startTimerInterval = (): void => {
+        document.addEventListener('visibilitychange', handleVisibilityChange);
         timerInterval = window.setInterval(() => {
+            if (!isPageVisible) return; // Skip timer work when tab is hidden
             updateTimers();
         }, 1000);
     };
@@ -1281,7 +1349,6 @@ export const Stations: StationsAPI = (() => {
                             sendNotification(`Koniec: ${station.name}`, `Czas zabiegu upłynął (00:00)`, [1000]);
                         }
                         if (!station.startTime || !station.duration) {
-                            // Invalid local timer data; wait for next snapshot instead of persisting potentially stale state.
                             continue;
                         }
 
@@ -1318,7 +1385,7 @@ export const Stations: StationsAPI = (() => {
                                     if (result.applied && result.next) {
                                         applyStationStateToModel(station.id, result.next);
                                         playNotificationSound();
-                                        updateAllStationCards();
+                                        scheduleUpdateAllStationCards();
                                     }
                                 })
                                 .catch((error) => {
@@ -1333,6 +1400,9 @@ export const Stations: StationsAPI = (() => {
                     }
 
                     updateTimerDisplay(station.id, remaining, station.treatmentId);
+                } else if (station.status === 'FREE') {
+                    // Prune notification state when station returns to FREE
+                    notificationStates.delete(station.id);
                 }
 
                 updateQueueEtaDisplay(station);
@@ -1340,7 +1410,30 @@ export const Stations: StationsAPI = (() => {
         }
 
         if (hasFinishedTransition) {
-            updateAllStationCards();
+            scheduleUpdateAllStationCards();
+        }
+    };
+
+    /**
+     * Get cached DOM elements for a station (avoids querySelectorAll on every tick)
+     */
+    const getCachedStationCards = (stationId: string): Element[] => {
+        const cached = timerDomCache.get(stationId);
+        if (cached && !cached.dirty) return cached.cards;
+        const cards = Array.from(document.querySelectorAll(`[data-station-id="${stationId}"]`));
+        timerDomCache.set(stationId, { cards, dirty: false });
+        return cards;
+    };
+
+    /**
+     * Invalidate DOM cache for a station (call after DOM rebuild)
+     */
+    const invalidateTimerDomCache = (stationId?: string): void => {
+        if (stationId) {
+            const cached = timerDomCache.get(stationId);
+            if (cached) cached.dirty = true;
+        } else {
+            timerDomCache.forEach(entry => { entry.dirty = true; });
         }
     };
 
@@ -1348,25 +1441,25 @@ export const Stations: StationsAPI = (() => {
      * Update timer display for a specific station
      */
     const updateTimerDisplay = (stationId: string, seconds: number, treatmentId?: string): void => {
-        const stationCards = document.querySelectorAll(`[data-station-id="${stationId}"]`);
+        const stationCards = getCachedStationCards(stationId);
 
         // Threshold: 5 minutes (300s) for Therapy/Massage, 1 minute (60s) for others
         const threshold = isTherapyMassageTreatment(treatmentId) ? 300 : 60;
+        const timeText = formatTime(seconds);
+        const isEnding = seconds > 0 && seconds <= threshold;
 
-        stationCards.forEach(card => {
-            // Update timer text
+        for (const card of stationCards) {
             const timerEl = card.querySelector('.station-timer');
-            if (timerEl) {
-                timerEl.textContent = formatTime(seconds);
+            if (timerEl && timerEl.textContent !== timeText) {
+                timerEl.textContent = timeText;
             }
 
-            // Add/remove ending warning class
-            if (seconds > 0 && seconds <= threshold) {
+            if (isEnding) {
                 card.classList.add('ending');
             } else {
                 card.classList.remove('ending');
             }
-        });
+        }
     };
 
     /**
@@ -1375,16 +1468,19 @@ export const Stations: StationsAPI = (() => {
     const updateQueueEtaDisplay = (station: Station): void => {
         if (!station.queue || station.queue.length === 0) return;
 
-        const stationCards = document.querySelectorAll(`[data-station-id="${station.id}"]`);
-        stationCards.forEach(card => {
+        const stationCards = getCachedStationCards(station.id);
+        for (const card of stationCards) {
             const etaElements = card.querySelectorAll<HTMLElement>('.queue-eta[data-queue-index]');
             etaElements.forEach(etaEl => {
                 const index = Number(etaEl.dataset.queueIndex);
                 if (Number.isNaN(index)) return;
                 const waitSeconds = getQueueWaitSeconds(station, index);
-                etaEl.textContent = formatQueueEta(waitSeconds);
+                const etaText = formatQueueEta(waitSeconds);
+                if (etaEl.textContent !== etaText) {
+                    etaEl.textContent = etaText;
+                }
             });
-        });
+        }
     };
 
     /**
@@ -1951,6 +2047,7 @@ export const Stations: StationsAPI = (() => {
                 `).join('')}
             </div>
         `).join('');
+        invalidateTimerDomCache();
     };
 
     /**
@@ -1998,6 +2095,7 @@ export const Stations: StationsAPI = (() => {
         container.innerHTML = `
             <div class="mobile-room-tiles">${tilesHtml}</div>
         `;
+        invalidateTimerDomCache();
     };
 
     /**
@@ -2353,6 +2451,19 @@ export const Stations: StationsAPI = (() => {
     };
 
     /**
+     * Deduplicated version of updateAllStationCards — coalesces multiple calls
+     * within the same microtask into a single DOM update.
+     */
+    const scheduleUpdateAllStationCards = (): void => {
+        if (updateAllScheduled) return;
+        updateAllScheduled = true;
+        queueMicrotask(() => {
+            updateAllScheduled = false;
+            updateAllStationCards();
+        });
+    };
+
+    /**
      * Update all station cards
      */
     const updateAllStationCards = (): void => {
@@ -2362,19 +2473,23 @@ export const Stations: StationsAPI = (() => {
             }
 
             // Update room stats
+            const statsText = `${countFreeStations(room)}/${room.stations.length}`;
             const statsEl = document.querySelector(`[data-room-stats="${room.id}"]`);
-            if (statsEl) {
-                statsEl.textContent = `${countFreeStations(room)}/${room.stations.length}`;
+            if (statsEl && statsEl.textContent !== statsText) {
+                statsEl.textContent = statsText;
             }
             const mobileStatsEl = document.querySelector(`[data-room-mobile-stats="${room.id}"]`);
-            if (mobileStatsEl) {
-                mobileStatsEl.textContent = `${countFreeStations(room)}/${room.stations.length}`;
+            if (mobileStatsEl && mobileStatsEl.textContent !== statsText) {
+                mobileStatsEl.textContent = statsText;
             }
 
             // Update status dots
             const statusDotsEl = document.querySelector(`[data-room-status="${room.id}"]`);
             if (statusDotsEl) {
-                statusDotsEl.innerHTML = renderStatusDots(room);
+                const newDotsHtml = renderStatusDots(room);
+                if (statusDotsEl.innerHTML !== newDotsHtml) {
+                    statusDotsEl.innerHTML = newDotsHtml;
+                }
             }
         }
 
@@ -2389,12 +2504,16 @@ export const Stations: StationsAPI = (() => {
         const newCardHtml = renderStationCard(room, station);
 
         cards.forEach(card => {
+            // Skip DOM replace if the content is identical
+            if (card.outerHTML === newCardHtml) return;
+
             const temp = document.createElement('div');
             temp.innerHTML = newCardHtml;
             const newCard = temp.firstElementChild as HTMLElement;
 
             if (newCard) {
                 card.replaceWith(newCard);
+                invalidateTimerDomCache(station.id);
             }
         });
     };
@@ -2437,32 +2556,37 @@ export const Stations: StationsAPI = (() => {
     };
 
     /**
-     * Setup event listeners
+     * Setup event listeners (using AbortController for clean teardown)
      */
     const setupEventListeners = (): void => {
-        document.addEventListener('click', handleClick);
+        // Abort any previous controller (safety)
+        if (eventAbortController) eventAbortController.abort();
+        eventAbortController = new AbortController();
+        const signal = eventAbortController.signal;
+
+        document.addEventListener('click', handleClick, { signal });
 
         // Sound toggle
         const soundBtn = document.getElementById('toggleSoundBtn');
-        soundBtn?.addEventListener('click', toggleSound);
+        soundBtn?.addEventListener('click', toggleSound, { signal });
 
         const refreshBtn = document.getElementById('refreshStationsBtn');
         refreshBtn?.addEventListener('click', () => {
             void refreshStationsData();
-        });
+        }, { signal });
 
         const openOptionsBtn = document.getElementById('openSectionsOptionsBtn');
-        openOptionsBtn?.addEventListener('click', openSectionsOptionsModal);
+        openOptionsBtn?.addEventListener('click', openSectionsOptionsModal, { signal });
 
         const closeOptionsBtn = document.getElementById('closeSectionsOptionsBtn');
-        closeOptionsBtn?.addEventListener('click', closeSectionsOptionsModal);
+        closeOptionsBtn?.addEventListener('click', closeSectionsOptionsModal, { signal });
 
         const sectionsModal = document.getElementById('stationsSectionsModal');
         sectionsModal?.addEventListener('click', (e) => {
             if (e.target === sectionsModal) {
                 closeSectionsOptionsModal();
             }
-        });
+        }, { signal });
 
         const sectionsOptionsList = document.getElementById('sectionsOptionsList');
         sectionsOptionsList?.addEventListener('click', (e) => {
@@ -2496,7 +2620,7 @@ export const Stations: StationsAPI = (() => {
             if (action === 'reset') {
                 resetSettingsToDefaults();
             }
-        });
+        }, { signal });
 
         sectionsOptionsList?.addEventListener('change', (e) => {
             const target = e.target as HTMLInputElement | null;
@@ -2524,7 +2648,7 @@ export const Stations: StationsAPI = (() => {
             renderMobileView();
             renderSectionsOptionsList();
             updateAllStationCards();
-        });
+        }, { signal });
 
         sectionsOptionsList?.addEventListener('dragstart', (e) => {
             const target = e.target as HTMLElement;
@@ -2536,14 +2660,14 @@ export const Stations: StationsAPI = (() => {
                 e.dataTransfer.setData('text/plain', draggedRoomId);
                 e.dataTransfer.effectAllowed = 'move';
             }
-        });
+        }, { signal });
 
         sectionsOptionsList?.addEventListener('dragend', () => {
             draggedRoomId = null;
             sectionsOptionsList.querySelectorAll('.layout-edit-room.dragging').forEach((el) => {
                 el.classList.remove('dragging');
             });
-        });
+        }, { signal });
 
         sectionsOptionsList?.addEventListener('dragover', (e) => {
             if (!isLayoutEditMode) return;
@@ -2551,7 +2675,7 @@ export const Stations: StationsAPI = (() => {
             const dropZone = target.closest('[data-layout-column], [data-layout-room-id]') as HTMLElement | null;
             if (!dropZone) return;
             e.preventDefault();
-        });
+        }, { signal });
 
         sectionsOptionsList?.addEventListener('drop', (e) => {
             if (!isLayoutEditMode) return;
@@ -2577,7 +2701,7 @@ export const Stations: StationsAPI = (() => {
                 columnIndex,
                 beforeRoomId && beforeRoomId !== roomId ? beforeRoomId : undefined
             );
-        });
+        }, { signal });
     };
 
     /**
@@ -2673,7 +2797,7 @@ export const Stations: StationsAPI = (() => {
                 // Close the picker
                 pendingQueueStation = null;
                 pendingQueueRoom = null;
-                updateAllStationCards();
+                scheduleUpdateAllStationCards();
                 break;
             case 'remove-from-queue':
                 if (employeeId) {
@@ -2708,7 +2832,7 @@ export const Stations: StationsAPI = (() => {
                         applyStationStateToModel(station.id, result.next);
                         markQueueMove(station.id, employeeId, 'up');
                         window.showToast?.('Kolejność zmieniona', 1000);
-                        updateAllStationCards();
+                        scheduleUpdateAllStationCards();
                     });
                 }
                 break;
@@ -2737,7 +2861,7 @@ export const Stations: StationsAPI = (() => {
                         applyStationStateToModel(station.id, result.next);
                         markQueueMove(station.id, employeeId, 'down');
                         window.showToast?.('Kolejność zmieniona', 1000);
-                        updateAllStationCards();
+                        scheduleUpdateAllStationCards();
                     });
                 }
                 break;
@@ -2756,7 +2880,7 @@ export const Stations: StationsAPI = (() => {
             pendingQueueStation = station;
             pendingQueueRoom = room;
         }
-        updateAllStationCards();
+        scheduleUpdateAllStationCards();
     };
 
     /**
