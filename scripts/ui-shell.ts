@@ -69,26 +69,26 @@ export const UIShell: UIShellAPI = (() => {
         if (bannerTitleLink) {
             bannerTitleLink.style.cursor = 'pointer';
             bannerTitleLink.addEventListener('click', () => {
-                window.location.hash = 'schedule';
+                globalThis.location.hash = 'schedule';
             });
         }
 
         const btnIso = document.getElementById('btnIso');
         if (btnIso) {
             btnIso.addEventListener('click', () => {
-                window.location.hash = 'scrapped-pdfs';
+                globalThis.location.hash = 'scrapped-pdfs';
             });
         }
 
-        window.addEventListener('iso-updates-available', () => {
-            const badge = document.querySelector('#btnIso .notification-badge') as HTMLElement | null;
+        globalThis.addEventListener('iso-updates-available', () => {
+            const badge = document.querySelector<HTMLElement>('#btnIso .notification-badge');
             if (badge) {
                 badge.style.display = 'block';
             }
         });
 
-        window.addEventListener('iso-updates-cleared', () => {
-            const badge = document.querySelector('#btnIso .notification-badge') as HTMLElement | null;
+        globalThis.addEventListener('iso-updates-cleared', () => {
+            const badge = document.querySelector<HTMLElement>('#btnIso .notification-badge');
             if (badge) {
                 badge.style.display = 'none';
             }
@@ -123,7 +123,7 @@ export const UIShell: UIShellAPI = (() => {
 
         if (!pageContent) {
             console.error('Fatal error: #page-content element not found.');
-            return Promise.reject('Page content container not found');
+            throw new Error('Page content container not found');
         }
 
         // Remove old page-specific CSS
@@ -134,7 +134,7 @@ export const UIShell: UIShellAPI = (() => {
 
         try {
             // Load new CSS if it exists
-            const cssPath = `styles/${pageName}.css?v=${Date.now()}`;
+            const cssPath = `styles/${pageName}.css`;
             const cssResponse = await fetch(cssPath);
             if (cssResponse.ok) {
                 const newStylesheet = document.createElement('link');
@@ -145,7 +145,7 @@ export const UIShell: UIShellAPI = (() => {
             }
 
             // Load new HTML with cache buster
-            const response = await fetch(`pages/${pageName}.html?v=${Date.now()}`);
+            const response = await fetch(`pages/${pageName}.html`);
             if (!response.ok) {
                 throw new Error(`Could not load page: ${pageName}`);
             }
@@ -168,42 +168,46 @@ export const UIShell: UIShellAPI = (() => {
         } catch (error) {
             console.error(`Failed to load page content for ${pageName}:`, error);
             pageContent.innerHTML = `<div class="error-page"><h1>Wystąpił błąd</h1><p>Nie można załadować strony. Spróbuj ponownie później.</p></div>`;
-            return Promise.reject(error);
+            throw error;
+        }
+    };
+
+    const setBannerState = (text: string, isUserView: boolean) => {
+        const appHeader = document.getElementById('appHeader');
+        const bannerTitle = document.querySelector('.banner-title');
+        
+        if (appHeader) {
+            if (isUserView) {
+                appHeader.classList.add('user-view');
+            } else {
+                appHeader.classList.remove('user-view');
+            }
+        }
+        if (bannerTitle) {
+            bannerTitle.textContent = text;
+        }
+    };
+
+    const setLogoutButtonVisible = (visible: boolean) => {
+        const logoutBtnContainer = document.getElementById('logoutBtnContainer');
+        if (logoutBtnContainer) {
+            logoutBtnContainer.style.display = visible ? 'block' : 'none';
         }
     };
 
     const updateUserState = (user: FirebaseUser | null): void => {
-        const appHeader = document.getElementById('appHeader');
-        const bannerTitle = document.querySelector('.banner-title');
-        const logoutBtnContainer = document.getElementById('logoutBtnContainer');
-
-        if (!appHeader) return;
-
         if (user) {
             const employee = EmployeeManager.getEmployeeByUid(user.uid);
             if (employee) {
-                appHeader.classList.add('user-view');
-                if (bannerTitle) {
-                    bannerTitle.textContent = `Grafik Kalinowa - ${EmployeeManager.getNameById(employee.id)}`;
-                }
+                setBannerState(`Grafik Kalinowa - ${EmployeeManager.getNameById(employee.id)}`, true);
             } else {
-                appHeader.classList.remove('user-view');
-                if (bannerTitle) {
-                    bannerTitle.textContent = 'Grafik Kalinowa';
-                }
+                setBannerState('Grafik Kalinowa', false);
             }
-            if (logoutBtnContainer) {
-                logoutBtnContainer.style.display = 'block';
-            }
-            Shared.updateUserInfo(employee ? employee.name || null : 'Admin');
+            setLogoutButtonVisible(true);
+            Shared.updateUserInfo(employee?.name || 'Admin');
         } else {
-            appHeader.classList.remove('user-view');
-            if (bannerTitle) {
-                bannerTitle.textContent = 'Grafik Kalinowa';
-            }
-            if (logoutBtnContainer) {
-                logoutBtnContainer.style.display = 'none';
-            }
+            setBannerState('Grafik Kalinowa', false);
+            setLogoutButtonVisible(false);
             Shared.updateUserInfo('Gość');
         }
     };
@@ -238,4 +242,4 @@ declare global {
     }
 }
 
-window.UIShell = UIShell;
+(globalThis as unknown as Window).UIShell = UIShell;

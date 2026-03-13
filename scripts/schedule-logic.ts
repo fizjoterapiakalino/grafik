@@ -85,9 +85,99 @@ interface ScheduleLogicAPI {
  * Moduł logiki harmonogramu
  */
 export const ScheduleLogic: ScheduleLogicAPI = (() => {
-    const getCellDisplayData = (cellData: CellData | null | undefined): CellDisplayData => {
+    const getSplitCellDisplayData = (cellData: CellData, today: Date, todayStr: string): CellDisplayData => {
         const result: CellDisplayData = {
             text: '',
+            classes: ['split-cell'],
+            styles: { backgroundColor: AppConfig.schedule.contentCellColor },
+            isSplit: true,
+            parts: [],
+            isBreak: false,
+        };
+
+        const createPartData = (
+            content: string | undefined,
+            isMassage: boolean | undefined,
+            isPnf: boolean | undefined,
+            isEveryOtherDay: boolean | undefined,
+            isHydrotherapy: boolean | undefined
+        ): PartData => {
+            const part: PartData = {
+                text: capitalizeFirstLetter(content || ''),
+                classes: [],
+                isMassage: !!isMassage,
+                isPnf: !!isPnf,
+                isEveryOtherDay: !!isEveryOtherDay,
+                isHydrotherapy: !!isHydrotherapy,
+            };
+
+            if (isMassage) part.classes.push('massage-text');
+            if (isPnf) part.classes.push('pnf-text');
+            if (isEveryOtherDay) part.classes.push('every-other-day-text');
+            if (isHydrotherapy) {
+                part.classes.push('hydrotherapy-text', 'hydrotherapy-cell-bg');
+            }
+
+            return part;
+        };
+
+        result.parts.push(
+            createPartData(
+                cellData.content1,
+                cellData.isMassage1,
+                cellData.isPnf1,
+                cellData.isEveryOtherDay1,
+                cellData.isHydrotherapy1
+            ),
+            createPartData(
+                cellData.content2,
+                cellData.isMassage2,
+                cellData.isPnf2,
+                cellData.isEveryOtherDay2,
+                cellData.isHydrotherapy2
+            )
+        );
+
+        // Part 1
+        let endDate1: string | null = cellData.treatmentData1?.endDate
+            ? cellData.treatmentData1.endDate.toString().trim()
+            : null;
+        if (!endDate1 && cellData.treatmentData1?.startDate && cellData.content1) {
+            endDate1 = calculateEndDate(cellData.treatmentData1.startDate, cellData.treatmentData1.extensionDays || 0);
+        }
+        if (endDate1 && result.parts[0].text.trim() !== '') {
+            result.parts[0].treatmentEndDate = endDate1;
+            const endDateObj = new Date(endDate1 + 'T00:00:00');
+            const diffTime = endDateObj.getTime() - today.getTime();
+            result.parts[0].daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (endDate1 <= todayStr) {
+                result.parts[0].classes.push('treatment-end-marker');
+            }
+        }
+
+        // Part 2
+        let endDate2: string | null = cellData.treatmentData2?.endDate
+            ? cellData.treatmentData2.endDate.toString().trim()
+            : null;
+        if (!endDate2 && cellData.treatmentData2?.startDate && cellData.content2) {
+            endDate2 = calculateEndDate(cellData.treatmentData2.startDate, cellData.treatmentData2.extensionDays || 0);
+        }
+        if (endDate2 && result.parts[1].text.trim() !== '') {
+            result.parts[1].treatmentEndDate = endDate2;
+            const endDateObj = new Date(endDate2 + 'T00:00:00');
+            const diffTime = endDateObj.getTime() - today.getTime();
+            result.parts[1].daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (endDate2 <= todayStr) {
+                result.parts[1].classes.push('treatment-end-marker');
+            }
+        }
+
+        return result;
+    };
+
+    const getNormalCellDisplayData = (cellData: CellData, today: Date, todayStr: string): CellDisplayData => {
+        const result: CellDisplayData = {
+            text: capitalizeFirstLetter(cellData.content || ''),
             classes: [],
             styles: {},
             isSplit: false,
@@ -95,128 +185,18 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
             isBreak: false,
         };
 
-        if (!cellData) return result;
-
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
-        // Handle Break
-        if (cellData.isBreak) {
-            result.text = AppConfig.schedule.breakText;
-            result.classes.push('break-cell');
-            result.isBreak = true;
-            return result;
-        }
-
-        // Handle Split Cell
-        if (cellData.isSplit) {
-            result.isSplit = true;
-            result.styles.backgroundColor = AppConfig.schedule.contentCellColor;
-            result.classes.push('split-cell');
-
-            const createPartData = (
-                content: string | undefined,
-                isMassage: boolean | undefined,
-                isPnf: boolean | undefined,
-                isEveryOtherDay: boolean | undefined,
-                isHydrotherapy: boolean | undefined
-            ): PartData => {
-                const part: PartData = {
-                    text: capitalizeFirstLetter(content || ''),
-                    classes: [],
-                    isMassage: !!isMassage,
-                    isPnf: !!isPnf,
-                    isEveryOtherDay: !!isEveryOtherDay,
-                    isHydrotherapy: !!isHydrotherapy,
-                };
-
-                if (isMassage) part.classes.push('massage-text');
-                if (isPnf) part.classes.push('pnf-text');
-                if (isEveryOtherDay) part.classes.push('every-other-day-text');
-                if (isHydrotherapy) {
-                    part.classes.push('hydrotherapy-text');
-                    part.classes.push('hydrotherapy-cell-bg'); // Helper class for partial split bg if needed
-                }
-
-                return part;
-            };
-
-            result.parts.push(
-                createPartData(
-                    cellData.content1,
-                    cellData.isMassage1,
-                    cellData.isPnf1,
-                    cellData.isEveryOtherDay1,
-                    cellData.isHydrotherapy1
-                )
-            );
-
-            result.parts.push(
-                createPartData(
-                    cellData.content2,
-                    cellData.isMassage2,
-                    cellData.isPnf2,
-                    cellData.isEveryOtherDay2,
-                    cellData.isHydrotherapy2
-                )
-            );
-
-            // Part 1
-            let endDate1: string | null = cellData.treatmentData1?.endDate
-                ? cellData.treatmentData1.endDate.toString().trim()
-                : null;
-            if (!endDate1 && cellData.treatmentData1?.startDate && cellData.content1) {
-                endDate1 = calculateEndDate(cellData.treatmentData1.startDate, cellData.treatmentData1.extensionDays || 0);
-            }
-            if (endDate1 && result.parts[0].text.trim() !== '') {
-                result.parts[0].treatmentEndDate = endDate1;
-                const endDateObj = new Date(endDate1 + 'T00:00:00');
-                const diffTime = endDateObj.getTime() - today.getTime();
-                result.parts[0].daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                if (endDate1 <= todayStr) {
-                    result.parts[0].classes.push('treatment-end-marker');
-                }
-            }
-
-            // Part 2
-            let endDate2: string | null = cellData.treatmentData2?.endDate
-                ? cellData.treatmentData2.endDate.toString().trim()
-                : null;
-            if (!endDate2 && cellData.treatmentData2?.startDate && cellData.content2) {
-                endDate2 = calculateEndDate(cellData.treatmentData2.startDate, cellData.treatmentData2.extensionDays || 0);
-            }
-            if (endDate2 && result.parts[1].text.trim() !== '') {
-                result.parts[1].treatmentEndDate = endDate2;
-                const endDateObj = new Date(endDate2 + 'T00:00:00');
-                const diffTime = endDateObj.getTime() - today.getTime();
-                result.parts[1].daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                if (endDate2 <= todayStr) {
-                    result.parts[1].classes.push('treatment-end-marker');
-                }
-            }
-
-            return result;
-        }
-
-        // Handle Normal Cell
-        result.text = capitalizeFirstLetter(cellData.content || '');
-
         if (cellData.isMassage) result.classes.push('massage-text');
         if (cellData.isPnf) result.classes.push('pnf-text');
         if (cellData.isEveryOtherDay) result.classes.push('every-other-day-text');
 
         if (cellData.isHydrotherapy) {
-            result.text = 'Hydro.'; // Enforce text for full cell
+            result.text = 'Hydro.';
             result.classes.push('hydrotherapy-cell');
-            result.styles.backgroundColor = 'var(--bg-hydrotherapy)'; // Direct style application
+            result.styles.backgroundColor = 'var(--bg-hydrotherapy)';
+        } else if (result.text.trim() !== '') {
+            result.styles.backgroundColor = AppConfig.schedule.contentCellColor;
         } else {
-            // Apply default or content color only if NOT hydrotherapy
-            if (result.text.trim() !== '') {
-                result.styles.backgroundColor = AppConfig.schedule.contentCellColor;
-            } else {
-                result.styles.backgroundColor = AppConfig.schedule.defaultCellColor;
-            }
+            result.styles.backgroundColor = AppConfig.schedule.defaultCellColor;
         }
 
         let endDateStr: string | null = cellData.treatmentEndDate
@@ -240,6 +220,40 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
         return result;
     };
 
+    const getCellDisplayData = (cellData: CellData | null | undefined): CellDisplayData => {
+        if (!cellData) {
+            return {
+                text: '',
+                classes: [],
+                styles: {},
+                isSplit: false,
+                parts: [],
+                isBreak: false,
+            };
+        }
+
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        if (cellData.isBreak) {
+            return {
+                text: AppConfig.schedule.breakText,
+                classes: ['break-cell'],
+                styles: {},
+                isSplit: false,
+                parts: [],
+                isBreak: true,
+            };
+        }
+
+        if (cellData.isSplit) {
+            return getSplitCellDisplayData(cellData, today, todayStr);
+        }
+
+        return getNormalCellDisplayData(cellData, today, todayStr);
+    };
+
     const calculatePatientCount = (scheduleCells: ScheduleCells | null | undefined): number => {
         let count = 0;
         if (!scheduleCells) return 0;
@@ -250,10 +264,10 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
                 if (cell.isBreak || cell.isHydrotherapy) return;
 
                 if (cell.isSplit) {
-                    if (cell.content1 && cell.content1.trim()) count++;
-                    if (cell.content2 && cell.content2.trim()) count++;
-                } else {
-                    if (cell.content && cell.content.trim()) count++;
+                    if (cell.content1?.trim()) count++;
+                    if (cell.content2?.trim()) count++;
+                } else if (cell.content?.trim()) {
+                    count++;
                 }
             });
         });
@@ -265,7 +279,7 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
         const endDate = new Date(startDate + 'T12:00:00Z');
 
         endDate.setUTCDate(endDate.getUTCDate() - 1);
-        const totalDays = 15 + parseInt(String(extensionDays || 0), 10);
+        const totalDays = 15 + Number.parseInt(String(extensionDays || 0), 10);
         let daysAdded = 0;
         while (daysAdded < totalDays) {
             endDate.setUTCDate(endDate.getUTCDate() + 1);

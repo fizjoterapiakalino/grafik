@@ -25,9 +25,7 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
      * Pokazuje feedback dla skrótu klawiszowego
      */
     const showShortcutFeedback = (message: string): void => {
-        if (typeof window.showToast === 'function') {
-            window.showToast(message, 1500);
-        }
+        (globalThis as any).showToast?.(message, 1500);
     };
 
     /**
@@ -133,16 +131,7 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
     /**
      * Aktualizuje pozycję paska postępu i wszystkie informacje
      */
-    const updateDayProgress = (): void => {
-        const progressFill = document.querySelector<HTMLElement>('.day-progress-fill');
-        const progressMarker = document.querySelector<HTMLElement>('.day-progress-marker');
-        const progressTime = document.querySelector<HTMLElement>('.day-progress-time');
-        const progressElapsed = document.querySelector<HTMLElement>('.day-progress-elapsed');
-        const progressRemaining = document.querySelector<HTMLElement>('.day-progress-remaining');
-
-        if (!progressFill || !progressMarker || !progressTime) return;
-
-        const now = new Date();
+    const calculateProgressData = (now: Date) => {
         const currentHour = now.getHours();
         const currentMinute = now.getMinutes();
 
@@ -153,10 +142,7 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
 
         // Oblicz postęp
         const minutesSinceStart = (currentHour - startHour) * 60 + currentMinute;
-        let progress = (minutesSinceStart / totalMinutes) * 100;
-
-        // Ogranicz do 0-100%
-        progress = Math.max(0, Math.min(100, progress));
+        const progress = Math.max(0, Math.min(100, (minutesSinceStart / totalMinutes) * 100));
 
         // Oblicz pozostały czas
         const minutesRemaining = totalMinutes - minutesSinceStart;
@@ -167,63 +153,80 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
         const hoursElapsed = Math.floor(Math.max(0, minutesSinceStart) / 60);
         const minsElapsed = Math.max(0, minutesSinceStart) % 60;
 
-        // Aktualizuj UI
-        progressFill.style.width = `${progress}%`;
-        progressMarker.style.left = `${progress}%`;
-        progressTime.textContent = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
+        return {
+            currentHour,
+            currentMinute,
+            startHour,
+            endHour,
+            progress,
+            hoursRemaining,
+            minsRemaining,
+            hoursElapsed,
+            minsElapsed,
+        };
+    };
 
-        // Tooltip na wskaźniku
+    const updateProgressMarkers = (data: any, elements: any) => {
+        const { progressMarker, progressElapsed, progressRemaining } = elements;
+        const { currentHour, startHour, endHour, hoursRemaining, minsRemaining, hoursElapsed, minsElapsed } = data;
+
         if (currentHour >= startHour && currentHour < endHour) {
-            progressMarker.setAttribute(
-                'title',
-                `Do końca zmiany: ${hoursRemaining}h ${minsRemaining}min\nMinęło: ${hoursElapsed}h ${minsElapsed}min`
-            );
-        } else if (currentHour < startHour) {
+            progressMarker.setAttribute('title', `Do końca zmiany: ${hoursRemaining}h ${minsRemaining}min\nMinęło: ${hoursElapsed}h ${minsElapsed}min`);
+            if (progressElapsed) progressElapsed.innerHTML = `<small>Minęło: ${hoursElapsed}h ${minsElapsed}min</small>`;
+            if (progressRemaining) progressRemaining.innerHTML = `<small>Pozostało: <strong>${hoursRemaining}h ${minsRemaining}min</strong></small>`;
+        } else {
+            updateOutsideHoursMarkers(data, elements);
+        }
+    };
+
+    const updateOutsideHoursMarkers = (data: any, elements: any) => {
+        const { progressMarker, progressElapsed, progressRemaining } = elements;
+        const { currentHour, currentMinute, startHour } = data;
+
+        if (currentHour < startHour) {
             const minsToStart = (startHour - currentHour) * 60 - currentMinute;
             const hToStart = Math.floor(minsToStart / 60);
             const mToStart = minsToStart % 60;
             progressMarker.setAttribute('title', `Do rozpoczęcia: ${hToStart}h ${mToStart}min`);
+            if (progressElapsed) progressElapsed.innerHTML = `<small>Przed rozpoczęciem</small>`;
+            if (progressRemaining) progressRemaining.innerHTML = `<small>Start za: ${hToStart}h ${mToStart}min</small>`;
         } else {
             progressMarker.setAttribute('title', 'Zmiana zakończona');
+            if (progressElapsed) progressElapsed.innerHTML = `<small>Zmiana zakończona</small>`;
+            if (progressRemaining) progressRemaining.innerHTML = `<small>Do jutra 7:00</small>`;
         }
+    };
 
-        // Minięty czas
-        if (progressElapsed) {
-            if (currentHour >= startHour && currentHour < endHour) {
-                progressElapsed.innerHTML = `<small>Minęło: ${hoursElapsed}h ${minsElapsed}min</small>`;
-            } else if (currentHour < startHour) {
-                progressElapsed.innerHTML = `<small>Przed rozpoczęciem</small>`;
-            } else {
-                progressElapsed.innerHTML = `<small>Zmiana zakończona</small>`;
-            }
-        }
+    const updateProgressUI = (data: any, elements: any) => {
+        const { progressFill, progressMarker, progressTime } = elements;
+        const { currentHour, currentMinute, startHour, endHour, progress } = data;
 
-        // Pozostały czas
-        if (progressRemaining) {
-            if (currentHour >= startHour && currentHour < endHour) {
-                progressRemaining.innerHTML = `<small>Pozostało: <strong>${hoursRemaining}h ${minsRemaining}min</strong></small>`;
-            } else if (currentHour < startHour) {
-                const minsToStart = (startHour - currentHour) * 60 - currentMinute;
-                const hToStart = Math.floor(minsToStart / 60);
-                const mToStart = minsToStart % 60;
-                progressRemaining.innerHTML = `<small>Start za: ${hToStart}h ${mToStart}min</small>`;
-            } else {
-                progressRemaining.innerHTML = `<small>Do jutra 7:00</small>`;
-            }
-        }
+        progressFill.style.width = `${progress}%`;
+        progressMarker.style.left = `${progress}%`;
+        progressTime.textContent = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
 
-        // Pokaż/ukryj w zależności od czasu
+        updateProgressMarkers(data, elements);
+
         const progressBar = document.getElementById('dayProgressBar');
         if (progressBar) {
-            if (currentHour < startHour || currentHour >= endHour) {
-                progressBar.classList.add('outside-hours');
-            } else {
-                progressBar.classList.remove('outside-hours');
-            }
+            progressBar.classList.toggle('outside-hours', currentHour < startHour || currentHour >= endHour);
         }
+    };
 
-        // Podświetl aktualny wiersz w tabeli
-        highlightCurrentTimeRow(currentHour, currentMinute);
+    const updateDayProgress = (): void => {
+        const elements = {
+            progressFill: document.querySelector<HTMLElement>('.day-progress-fill'),
+            progressMarker: document.querySelector<HTMLElement>('.day-progress-marker'),
+            progressTime: document.querySelector<HTMLElement>('.day-progress-time'),
+            progressElapsed: document.querySelector<HTMLElement>('.day-progress-elapsed'),
+            progressRemaining: document.querySelector<HTMLElement>('.day-progress-remaining'),
+        };
+
+        if (!elements.progressFill || !elements.progressMarker || !elements.progressTime) return;
+
+        const data = calculateProgressData(new Date());
+        updateProgressUI(data, elements);
+        highlightCurrentTimeRow(data.currentHour, data.currentMinute);
     };
 
     /**
@@ -239,11 +242,11 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
         const timeSlots = document.querySelectorAll<HTMLTableRowElement>('.schedule-table tbody tr');
         timeSlots.forEach((row) => {
             const timeCell = row.querySelector<HTMLTableCellElement>('td:first-child');
-            if (timeCell && timeCell.textContent) {
+            if (timeCell?.textContent) {
                 const cellTime = timeCell.textContent.trim();
                 const [cellHourStr, cellMinuteStr] = cellTime.split(':');
-                const cellHour = parseInt(cellHourStr, 10);
-                const cellMinute = parseInt(cellMinuteStr, 10);
+                const cellHour = Number.parseInt(cellHourStr, 10);
+                const cellMinute = Number.parseInt(cellMinuteStr, 10);
 
                 // Podświetl jeśli aktualny czas mieści się w tym slocie (30-minutowe sloty)
                 if (cellHour === hour && minute >= cellMinute && minute < cellMinute + 30) {
@@ -265,20 +268,10 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
 
         // Obserwuj zmiany w kontenerze strony
         const observer = new MutationObserver((mutations: MutationRecord[]) => {
-            mutations.forEach((mutation) => {
-                if (mutation.type === 'childList' && mutation.addedNodes.length > 0 && pageContent) {
-                    // Dodaj animację wejścia
-                    pageContent.classList.add('page-enter');
-                    requestAnimationFrame(() => {
-                        pageContent.classList.add('page-enter-active');
-                    });
-
-                    // Usuń klasy po animacji
-                    setTimeout(() => {
-                        pageContent.classList.remove('page-enter', 'page-enter-active');
-                    }, 300);
-                }
-            });
+            const hasNewNodes = mutations.some(m => m.type === 'childList' && m.addedNodes.length > 0);
+            if (hasNewNodes && pageContent) {
+                handlePageEnter(pageContent);
+            }
         });
 
         if (pageContent) {
@@ -288,11 +281,23 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
         debugLog('UXEnhancements: Animacje przejść zainicjowane');
     };
 
+    const handlePageEnter = (pageContent: HTMLElement): void => {
+        pageContent.classList.add('page-enter');
+        requestAnimationFrame(() => {
+            pageContent.classList.add('page-enter-active');
+        });
+
+        // Usuń klasy po animacji
+        setTimeout(() => {
+            pageContent.classList.remove('page-enter', 'page-enter-active');
+        }, 300);
+    };
+
     /**
      * Inicjalizuje wyróżnik środowiska deweloperskiego (lokalnego)
      */
     const initDevEnvironmentBadge = (): void => {
-        const hostname = window.location.hostname;
+        const hostname = globalThis.location.hostname;
         const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.');
 
         if (isLocal) {
@@ -350,6 +355,6 @@ declare global {
     }
 }
 
-if (typeof window !== 'undefined') {
-    window.UXEnhancements = UXEnhancements;
+if (globalThis.window !== undefined) {
+    (globalThis as any).UXEnhancements = UXEnhancements;
 }

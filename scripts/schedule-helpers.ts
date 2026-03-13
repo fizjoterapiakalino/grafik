@@ -139,10 +139,10 @@ export const copyFullCellState = (source: CellState, target: CellState): void =>
     target.additionalInfo = safeCopy(source.additionalInfo) as string | null | undefined;
 
     if (source.treatmentData1) {
-        target.treatmentData1 = JSON.parse(JSON.stringify(source.treatmentData1));
+        target.treatmentData1 = structuredClone(source.treatmentData1);
     }
     if (source.treatmentData2) {
-        target.treatmentData2 = JSON.parse(JSON.stringify(source.treatmentData2));
+        target.treatmentData2 = structuredClone(source.treatmentData2);
     }
 };
 
@@ -249,8 +249,8 @@ const updateSplitCellPart = (
         return;
     }
 
-    if (isDifferentPatient) {
-        // Nowy pacjent w tej części - resetuj dane leczenia
+    if (isDifferentPatient || (newContent !== '' && !treatmentData?.startDate)) {
+        // Nowy pacjent lub pierwszy wpis - resetuj/ustaw dane leczenia
         treatmentData = {
             startDate: getTodayDate(),
             extensionDays: 0,
@@ -260,14 +260,6 @@ const updateSplitCellPart = (
     } else if (treatmentData?.startDate) {
         // Ten sam pacjent - przelicz tylko datę końcową
         treatmentData.endDate = ScheduleLogic.calculateEndDate(treatmentData.startDate, treatmentData.extensionDays ?? undefined);
-    } else if (newContent !== '') {
-        // Pierwszy wpis - ustaw nowe dane
-        treatmentData = {
-            startDate: getTodayDate(),
-            extensionDays: 0,
-            endDate: ScheduleLogic.calculateEndDate(getTodayDate(), 0),
-        };
-        cellState[treatmentKey] = treatmentData;
     }
 };
 

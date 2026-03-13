@@ -153,7 +153,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         workloadValue.textContent = `${workloadFilled}/${workloadTotal} (${workloadPercentage}%)`;
 
         // Koloruj procent w zależności od obciążenia
-        const pct = parseInt(workloadPercentage);
+        const pct = Number.parseInt(workloadPercentage, 10);
         if (pct > 100) {
             workloadValue.style.color = '#8b5cf6'; // fioletowy - ponad normę
         } else if (pct >= 80) {
@@ -300,7 +300,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         _clearOverlayColumnWidths();
         _clearOverlayColumnLocks();
 
-        if (window.innerWidth <= 768) return;
+        if (globalThis.innerWidth <= 768) return;
 
         Object.entries(_employeeStationOverlays).forEach(([employeeId, overlay]) => {
             const headerCell = headerRow.querySelector<HTMLTableCellElement>(`th.employee-header[data-employee-index="${employeeId}"]`);
@@ -523,10 +523,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
 
         // Jeśli pracownik jest w obu zmianach lub w żadnej - zwróć null (pełny zakres)
         if (inMorningShift && inAfternoonShift) return null;
-        if (inMorningShift) return 'first';
-        if (inAfternoonShift) return 'second';
-
-        return null;
+        return inMorningShift ? 'first' : (inAfternoonShift ? 'second' : null);
     };
 
     /**
@@ -618,15 +615,15 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         // Załaduj dane o urlopach i harmonogramie zmian w tle
         Promise.all([_loadLeavesData(), _loadChangesData()]).then(() => {
             // Po załadowaniu danych, odśwież tabelę żeby wyświetlić badge'y i workload
-            renderTable();
+            render();
         });
 
-        let lastWidth = window.innerWidth;
+        let lastWidth = globalThis.innerWidth;
 
-        window.addEventListener('resize', () => {
-            if (window.innerWidth !== lastWidth) {
-                lastWidth = window.innerWidth;
-                renderTable();
+        globalThis.addEventListener('resize', () => {
+            if (globalThis.innerWidth !== lastWidth) {
+                lastWidth = globalThis.innerWidth;
+                render();
             }
         });
     };
@@ -913,14 +910,9 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         }
     };
 
-    const renderTable = (): void => {
-        const mainTable = document.getElementById('mainScheduleTable') as HTMLTableElement | null;
-        if (!mainTable || !_appState) return;
-
-        const isMobile = window.innerWidth <= 768;
-
+    const _getEmployeeIndices = (): { indices: string[], isSingleUser: boolean } => {
         let employeeIndices: string[] = [];
-        let isSingleUserView = false;
+        let isSingleUser = false;
 
         const currentUser = auth.currentUser;
         if (currentUser) {
@@ -928,25 +920,118 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                 const allEmployees = EmployeeManager.getAll();
                 employeeIndices = Object.keys(allEmployees)
                     .filter((id) => !allEmployees[id].isHidden)
-                    .sort((a, b) => parseInt(a) - parseInt(b));
-                isSingleUserView = false;
+                    .sort((a, b) => Number.parseInt(a, 10) - Number.parseInt(b, 10));
+                isSingleUser = false;
             } else {
                 const employee = EmployeeManager.getEmployeeByUid(currentUser.uid);
                 if (employee) {
                     employeeIndices.push(employee.id);
-                    isSingleUserView = true;
+                    isSingleUser = true;
                 }
             }
         } else {
             const allEmployees = EmployeeManager.getAll();
             employeeIndices = Object.keys(allEmployees)
                 .filter((id) => !allEmployees[id].isHidden)
-                .sort((a, b) => parseInt(a) - parseInt(b));
-            isSingleUserView = false;
+                .sort((a, b) => Number.parseInt(a, 10) - Number.parseInt(b, 10));
+            isSingleUser = false;
         }
+        return { indices: employeeIndices, isSingleUser };
+    };
+
+    const _renderHeader = (headerRow: HTMLTableRowElement, indices: string[]): void => {
+        headerRow.innerHTML = '';
+        const thTime = document.createElement('th');
+        thTime.textContent = 'Godz.';
+        headerRow.appendChild(thTime);
+
+        for (const i of indices) {
+            const th = document.createElement('th');
+            const employeeData = EmployeeManager.getById(i);
+            const displayName = employeeData?.displayName || employeeData?.name || `Pracownik ${Number.parseInt(i, 10) + 1}`;
+            const fullName = EmployeeManager.getFullNameById(i);
+            const employeeNumber = (employeeData as { employeeNumber?: string })?.employeeNumber || '';
+
+            th.dataset.employeeIndex = i;
+            th.setAttribute('tabindex', '0');
+            th.classList.add('employee-header');
+
+            const span = document.createElement('span');
+            span.textContent = capitalizeFirstLetter(displayName);
+
+            const isOnLeave = _isEmployeeOnLeaveToday(displayName);
+            if (isOnLeave) {
+                span.classList.add('on-leave');
+                th.classList.add('employee-on-leave');
+            }
+
+            th.appendChild(span);
+
+            const shiftFromChanges = _getEmployeeShiftFromChanges(i);
+            const workloadData = _calculateEmployeeWorkload(i, shiftFromChanges);
+            const workloadBar = document.createElement('div');
+            workloadBar.className = 'workload-bar';
+
+            const workloadFill = document.createElement('div');
+            workloadFill.className = 'workload-fill';
+            workloadFill.style.width = `${Math.min(workloadData.percentage, 100)}%`;
+
+            if (workloadData.percentage > 100) {
+                workloadFill.classList.add('overload');
+            } else if (workloadData.percentage >= 80) {
+                workloadFill.classList.add('high');
+            } else if (workloadData.percentage >= 50) {
+                workloadFill.classList.add('medium');
+            } else {
+                workloadFill.classList.add('low');
+            }
+
+            workloadBar.appendChild(workloadFill);
+            th.appendChild(workloadBar);
+
+            th.dataset.fullName = fullName;
+            th.dataset.employeeNumber = employeeNumber;
+            th.dataset.workloadFilled = String(workloadData.filled);
+            th.dataset.workloadTotal = String(workloadData.total);
+            th.dataset.workloadPercentage = String(workloadData.percentage);
+            headerRow.appendChild(th);
+
+            th.addEventListener('mouseover', _showEmployeeTooltip);
+            th.addEventListener('mouseout', _hideEmployeeTooltip);
+        }
+    };
+
+    const _renderBody = (tbody: HTMLTableSectionElement, indices: string[]): void => {
+        tbody.innerHTML = '';
+        for (let hour = AppConfig.schedule.startHour; hour <= AppConfig.schedule.endHour; hour++) {
+            for (let minute = 0; minute < 60; minute += 30) {
+                if (hour === AppConfig.schedule.endHour && minute === 30) continue;
+                const tr = tbody.insertRow();
+                const timeString = `${hour}:${minute.toString().padStart(2, '0')}`;
+                tr.insertCell().textContent = timeString;
+
+                for (const i of indices) {
+                    const cell = tr.insertCell();
+                    const cellData = _appState!.scheduleCells[timeString]?.[i] || {};
+                    applyCellDataToDom(cell, cellData);
+                    cell.dataset.time = timeString;
+                    cell.dataset.employeeIndex = i;
+                    cell.setAttribute('draggable', 'true');
+                    cell.setAttribute('tabindex', '0');
+                }
+            }
+        }
+    };
+
+    const render = (): void => {
+        const mainTable = document.getElementById('mainScheduleTable') as HTMLTableElement | null;
+        if (!mainTable || !_appState) return;
+
+        const isMobile = globalThis.innerWidth <= 768;
+        const { indices, isSingleUser } = _getEmployeeIndices();
 
         if (isMobile) {
-            renderMobileView(employeeIndices);
+            renderMobileView(indices);
             return;
         }
 
@@ -962,97 +1047,11 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             return;
         }
 
-        tableHeaderRow.innerHTML = '';
-        const thTime = document.createElement('th');
-        thTime.textContent = 'Godz.';
-        tableHeaderRow.appendChild(thTime);
-
-        tbody.innerHTML = '';
-
-        mainTable.classList.toggle('single-user-view', isSingleUserView);
-
-        for (const i of employeeIndices) {
-            const th = document.createElement('th');
-            const employeeData = EmployeeManager.getById(i);
-            const displayName = employeeData?.displayName || employeeData?.name || `Pracownik ${parseInt(i) + 1}`;
-            const fullName = EmployeeManager.getFullNameById(i);
-            const employeeNumber = (employeeData as { employeeNumber?: string })?.employeeNumber || '';
-
-            th.setAttribute('data-employee-index', i);
-            th.setAttribute('tabindex', '0');
-            th.classList.add('employee-header');
-
-            const span = document.createElement('span');
-            span.textContent = capitalizeFirstLetter(displayName);
-
-            // Sprawdź czy pracownik ma urlop dzisiaj i dodaj odpowiednią klasę
-            const isOnLeave = _isEmployeeOnLeaveToday(displayName);
-            if (isOnLeave) {
-                span.classList.add('on-leave');
-                th.classList.add('employee-on-leave');
-            }
-
-            th.appendChild(span);
-
-            // Oblicz obciążenie pracownika (zajęte sloty / wszystkie sloty)
-            // Określ zmianę na podstawie przypisania w harmonogramie zmian (Changes)
-            // Kolumny 1-4 = ranna zmiana (7:00-14:30), Kolumny 5-7 = popołudniowa (10:30-17:00)
-            const shiftFromChanges = _getEmployeeShiftFromChanges(i);
-            const workloadData = _calculateEmployeeWorkload(i, shiftFromChanges);
-            const workloadBar = document.createElement('div');
-            workloadBar.className = 'workload-bar';
-
-            const workloadFill = document.createElement('div');
-            workloadFill.className = 'workload-fill';
-            // Ogranicz szerokość do 100%, ale pozwól na wyświetlanie wartości > 100%
-            workloadFill.style.width = `${Math.min(workloadData.percentage, 100)}%`;
-
-            // Ustaw kolor w zależności od obciążenia
-            if (workloadData.percentage > 100) {
-                workloadFill.classList.add('overload'); // ponad normę
-            } else if (workloadData.percentage >= 80) {
-                workloadFill.classList.add('high');
-            } else if (workloadData.percentage >= 50) {
-                workloadFill.classList.add('medium');
-            } else {
-                workloadFill.classList.add('low');
-            }
-
-            workloadBar.appendChild(workloadFill);
-            th.appendChild(workloadBar);
-
-            th.dataset.fullName = fullName;
-            th.dataset.employeeNumber = employeeNumber;
-            // Zapisz dane workload do dataset dla tooltipa
-            th.dataset.workloadFilled = String(workloadData.filled);
-            th.dataset.workloadTotal = String(workloadData.total);
-            th.dataset.workloadPercentage = String(workloadData.percentage);
-            tableHeaderRow.appendChild(th);
-
-            th.addEventListener('mouseover', _showEmployeeTooltip);
-            th.addEventListener('mouseout', _hideEmployeeTooltip);
-        }
-
+        mainTable.classList.toggle('single-user-view', isSingleUser);
+        _renderHeader(tableHeaderRow, indices);
+        _renderBody(tbody, indices);
         _renderEmployeeStationOverlays();
-
-        for (let hour = AppConfig.schedule.startHour; hour <= AppConfig.schedule.endHour; hour++) {
-            for (let minute = 0; minute < 60; minute += 30) {
-                if (hour === AppConfig.schedule.endHour && minute === 30) continue;
-                const tr = tbody.insertRow();
-                const timeString = `${hour}:${minute.toString().padStart(2, '0')}`;
-                tr.insertCell().textContent = timeString;
-
-                for (const i of employeeIndices) {
-                    const cell = tr.insertCell();
-                    const cellData = _appState!.scheduleCells[timeString]?.[i] || {};
-                    applyCellDataToDom(cell, cellData);
-                    cell.setAttribute('data-time', timeString);
-                    cell.setAttribute('data-employee-index', i);
-                    cell.setAttribute('draggable', 'true');
-                    cell.setAttribute('tabindex', '0');
-                }
-            }
-        }
+        
         refreshAllRowHeights();
 
         if (_currentTimeInterval) {
@@ -1062,8 +1061,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         _currentTimeInterval = setInterval(() => {
             const now = new Date();
             const hours = now.getHours();
-            const minutes = now.getMinutes();
-            const roundedMinutes = minutes < 30 ? '00' : '30';
+            const roundedMinutes = now.getMinutes() < 30 ? '00' : '30';
             const currentTimeString = `${hours}:${roundedMinutes}`;
 
             document.querySelectorAll('#mainScheduleTable tbody tr.current-time-row').forEach((row) => {
@@ -1108,7 +1106,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
 
     return {
         initialize,
-        render: renderTable,
+        render,
         getElementText,
         updatePatientCount,
         destroy,
@@ -1122,4 +1120,4 @@ declare global {
     }
 }
 
-window.ScheduleUI = ScheduleUI;
+(globalThis as any).ScheduleUI = ScheduleUI;

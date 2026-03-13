@@ -48,6 +48,8 @@ export const BackupScheduler: BackupSchedulerAPI = (() => {
     };
 
     const init = (): void => {
+        if (intervalId) return;
+
         // Sprawdź co 60 sekund
         intervalId = setInterval(checkAndRunBackup, 60000);
         debugLog('BackupScheduler: Zainicjowano sprawdzanie harmonogramu kopii zapasowej.');

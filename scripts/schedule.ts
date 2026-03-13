@@ -1,7 +1,6 @@
 // scripts/schedule.ts
-import { debugLog } from './common.js';
+import { debugLog, AppConfig, capitalizeFirstLetter, hideLoadingOverlay } from './common.js';
 import { auth as authRaw } from './firebase-config.js';
-import { AppConfig, capitalizeFirstLetter, hideLoadingOverlay } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
 import { ScheduleUI } from './schedule-ui.js';
 import { ScheduleEvents } from './schedule-events.js';
@@ -61,11 +60,10 @@ export const Schedule: ScheduleAPI = (() => {
     const mainController = {
         processExitEditMode(element: HTMLElement, newText: string): void {
             element.setAttribute('contenteditable', 'false');
-            const parentCell = element.closest('[data-time]') as HTMLElement | null;
+            const parentCell = element.closest<HTMLElement>('[data-time]');
             if (!parentCell) return;
 
-            const employeeIndex = (parentCell as HTMLElement & { dataset: { employeeIndex?: string } }).dataset.employeeIndex || '';
-            const time = (parentCell as HTMLElement & { dataset: { time?: string } }).dataset.time || '';
+            const { employeeIndex = '', time = '' } = parentCell.dataset;
             const duplicate = this.findDuplicateEntry(newText, time, employeeIndex);
             const targetPart = getTargetPart(element);
 
@@ -91,10 +89,7 @@ export const Schedule: ScheduleAPI = (() => {
                 } else {
                     ScheduleData.updateCellState(time, employeeIndex, (cellState) => {
                         updateCellContent(cellState, newText, targetPart, element, parentCell);
-
-                        if (!isMove) {
-                            initTreatmentData(cellState);
-                        }
+                        if (!isMove) initTreatmentData(cellState);
                     });
                 }
             };
@@ -116,7 +111,7 @@ export const Schedule: ScheduleAPI = (() => {
             const newText = capitalizeFirstLetter((element.textContent || '').trim());
 
             if (newText.length > 35) {
-                window.showToast('Wprowadzony tekst jest za długi (maks. 35 znaków).', 3000);
+                (globalThis as any).showToast?.('Wprowadzony tekst jest za długi (maks. 35 znaków).', 3000);
                 element.setAttribute('contenteditable', 'false');
                 ScheduleUI.render();
                 return;
@@ -174,7 +169,7 @@ export const Schedule: ScheduleAPI = (() => {
             }
             element.focus();
             const range = document.createRange();
-            const sel = window.getSelection();
+            const sel = globalThis.getSelection();
             range.selectNodeContents(element);
             range.collapse(false);
             sel?.removeAllRanges();
@@ -187,11 +182,10 @@ export const Schedule: ScheduleAPI = (() => {
             const appState = ScheduleData.getAppState();
 
             for (const time in appState.scheduleCells) {
-                for (const employeeIndex in appState.scheduleCells[time]) {
-                    if (time === currentTime && employeeIndex === currentEmployeeIndex) {
-                        continue;
-                    }
-                    const cellData = appState.scheduleCells[time][employeeIndex] as CellState;
+                const dayCells = appState.scheduleCells[time];
+                for (const employeeIndex in dayCells) {
+                    if (time === currentTime && employeeIndex === currentEmployeeIndex) continue;
+                    const cellData = dayCells[employeeIndex];
                     if (
                         cellData.content?.toLowerCase() === lowerCaseText ||
                         cellData.content1?.toLowerCase() === lowerCaseText ||
@@ -228,26 +222,26 @@ export const Schedule: ScheduleAPI = (() => {
             }
             return {
                 content: ScheduleUI.getElementText(cell),
-                isMassage: (cell as HTMLElement).dataset.isMassage === 'true',
-                isPnf: (cell as HTMLElement).dataset.isPnf === 'true',
-                isHydrotherapy: (cell as HTMLElement).dataset.isHydrotherapy === 'true',
+                isMassage: cell.dataset.isMassage === 'true',
+                isPnf: cell.dataset.isPnf === 'true',
+                isHydrotherapy: cell.dataset.isHydrotherapy === 'true',
             };
         },
 
         openPatientInfoModal(element: HTMLElement): void {
-            const parentCell = element.closest('td') as HTMLTableCellElement | null;
+            const parentCell = element.closest('td');
             if (!parentCell) return;
-            const time = parentCell.dataset.time || '';
-            const employeeIndex = parentCell.dataset.employeeIndex || '';
-            const realCellState = ScheduleData.getCellState(time, employeeIndex) || {} as CellState;
+            const { time = '', employeeIndex = '' } = parentCell.dataset;
+            const realCellState = ScheduleData.getCellState(time, employeeIndex) || ({} as CellState);
 
             let cellState: CellState = realCellState;
             let partIndex: number | null = null;
 
             if (realCellState.isSplit) {
+                const wrapper = element.closest('.split-cell-wrapper');
                 if (element.tagName === 'DIV' && element.parentElement?.classList.contains('split-cell-wrapper')) {
                     partIndex = element === element.parentElement.children[0] ? 1 : 2;
-                } else if (element.closest('.split-cell-wrapper')) {
+                } else if (wrapper) {
                     const div = element.closest('.split-cell-wrapper > div');
                     if (div && div.parentElement) {
                         partIndex = div === div.parentElement.children[0] ? 1 : 2;
@@ -283,12 +277,12 @@ export const Schedule: ScheduleAPI = (() => {
                         state[`isEveryOtherDay${partIndex}`] = safeCopy(tempState.isEveryOtherDay);
                         state[`isHydrotherapy${partIndex}`] = safeCopy(tempState.isHydrotherapy);
 
-                        if (!state[`treatmentData${partIndex}`]) state[`treatmentData${partIndex}`] = {};
-                        const treatmentData = state[`treatmentData${partIndex}`] as TreatmentData;
-                        treatmentData.startDate = safeCopy(tempState.treatmentStartDate);
-                        treatmentData.extensionDays = safeCopy(tempState.treatmentExtensionDays);
-                        treatmentData.endDate = safeCopy(tempState.treatmentEndDate);
-                        treatmentData.additionalInfo = safeCopy(tempState.additionalInfo);
+                        const targetTD = (state[`treatmentData${partIndex}`] || {}) as TreatmentData;
+                        targetTD.startDate = safeCopy(tempState.treatmentStartDate);
+                        targetTD.extensionDays = safeCopy(tempState.treatmentExtensionDays);
+                        targetTD.endDate = safeCopy(tempState.treatmentEndDate);
+                        targetTD.additionalInfo = safeCopy(tempState.additionalInfo);
+                        state[`treatmentData${partIndex}`] = targetTD;
                     });
                 } else {
                     updateCellState(parentCell, updateFn);
@@ -297,8 +291,7 @@ export const Schedule: ScheduleAPI = (() => {
         },
 
         showHistoryModal(cell: HTMLElement): void {
-            const time = (cell as HTMLElement).dataset.time || '';
-            const employeeIndex = (cell as HTMLElement).dataset.employeeIndex || '';
+            const { time = '', employeeIndex = '' } = cell.dataset;
             const cellState = ScheduleData.getCellState(time, employeeIndex);
 
             ScheduleModals.showHistoryModal(cell, (cellState || {}) as any, (updateFn) => {
@@ -318,17 +311,16 @@ export const Schedule: ScheduleAPI = (() => {
                 } else {
                     state[dataAttribute] = !state[dataAttribute];
                 }
-                window.showToast('Zmieniono styl');
+                (globalThis as any).showToast?.('Zmieniono styl');
             });
         },
 
         mergeSplitCell(cell: HTMLElement): void {
-            const time = (cell as HTMLElement).dataset.time || '';
-            const employeeIndex = (cell as HTMLElement).dataset.employeeIndex || '';
+            const { time = '', employeeIndex = '' } = cell.dataset;
             const cellState = ScheduleData.getCellState(time, employeeIndex);
 
             if (!cellState || !cellState.isSplit) {
-                window.showToast('Ta komórka nie jest podzielona.', 3000);
+                (globalThis as any).showToast?.('Ta komórka nie jest podzielona.', 3000);
                 return;
             }
 
@@ -336,7 +328,7 @@ export const Schedule: ScheduleAPI = (() => {
             const content2 = (cellState.content2 as string) || '';
 
             if (content1.trim() !== '' && content2.trim() !== '') {
-                window.showToast('Jedna z części komórki musi być pusta, aby je scalić.', 3000);
+                (globalThis as any).showToast?.('Jedna z części komórki musi być pusta, aby je scalić.', 3000);
                 return;
             }
 
@@ -371,7 +363,7 @@ export const Schedule: ScheduleAPI = (() => {
                 state.treatmentData2 = null;
 
                 state.content = mergedContent;
-                window.showToast('Scalono komórkę.');
+                (globalThis as any).showToast?.('Scalono komórkę.');
             });
         },
 
@@ -393,7 +385,7 @@ export const Schedule: ScheduleAPI = (() => {
                         state[key] = null;
                     }
                 }
-                window.showToast('Wyczyszczono komórkę');
+                (globalThis as any).showToast?.('Wyczyszczono komórkę');
             };
             updateCellState(cell, clearContent);
         },
@@ -446,7 +438,7 @@ export const Schedule: ScheduleAPI = (() => {
             });
         } catch (error) {
             console.error('Błąd inicjalizacji strony harmonogramu:', error);
-            window.showToast('Wystąpił krytyczny błąd inicjalizacji. Odśwież stronę.', 5000);
+            (globalThis as any).showToast?.('Wystąpił krytyczny błąd inicjalizacji. Odśwież stronę.', 5000);
         } finally {
             if (loadingOverlay) hideLoadingOverlay(loadingOverlay);
             UXEnhancements.initScheduleEnhancements();

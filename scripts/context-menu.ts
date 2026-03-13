@@ -45,7 +45,7 @@ export const initializeContextMenu = (
     let currentTarget: HTMLElement | null = null;
 
     const handleContextMenu = (event: MouseEvent): void => {
-        const target = (event.target as HTMLElement).closest(targetSelector) as HTMLElement | null;
+        const target = (event.target as HTMLElement).closest(targetSelector) as HTMLElement;
         if (target) {
             event.preventDefault();
             contextMenu.contextEvent = event;
@@ -72,7 +72,7 @@ export const initializeContextMenu = (
             contextMenu.classList.add('visible');
 
             const { clientX: mouseX, clientY: mouseY } = event;
-            const { innerWidth: windowWidth, innerHeight: windowHeight } = window;
+            const { innerWidth: windowWidth, innerHeight: windowHeight } = globalThis;
             const menuWidth = contextMenu.offsetWidth;
             const menuHeight = contextMenu.offsetHeight;
 
@@ -127,13 +127,13 @@ export const initializeContextMenu = (
     const LONG_PRESS_DURATION = 500;
 
     const handleTouchStart = (event: TouchEvent): void => {
-        const target = (event.target as HTMLElement).closest(targetSelector) as HTMLElement | null;
+        const target = (event.target as HTMLElement).closest(targetSelector) as HTMLElement;
         if (target) {
             longPressTimer = setTimeout(() => {
                 const contextMenuEvent = new MouseEvent('contextmenu', {
                     bubbles: true,
                     cancelable: true,
-                    view: window,
+                    view: globalThis as any,
                     clientX: event.touches[0].clientX,
                     clientY: event.touches[0].clientY,
                 });
@@ -142,21 +142,16 @@ export const initializeContextMenu = (
         }
     };
 
-    const handleTouchEnd = (): void => {
+    const clearLongPress = (): void => {
         if (longPressTimer) {
             clearTimeout(longPressTimer);
-        }
-    };
-
-    const handleTouchMove = (): void => {
-        if (longPressTimer) {
-            clearTimeout(longPressTimer);
+            longPressTimer = null;
         }
     };
 
     document.addEventListener('touchstart', handleTouchStart, { passive: true });
-    document.addEventListener('touchend', handleTouchEnd);
-    document.addEventListener('touchmove', handleTouchMove);
+    document.addEventListener('touchend', clearLongPress);
+    document.addEventListener('touchmove', clearLongPress);
 
     contextMenuInstances[menuId] = {
         handleContextMenu,
@@ -184,12 +179,5 @@ export const destroyContextMenu = (menuId: string): void => {
 };
 
 // Backward compatibility
-declare global {
-    interface Window {
-        initializeContextMenu: typeof initializeContextMenu;
-        destroyContextMenu: typeof destroyContextMenu;
-    }
-}
-
-window.initializeContextMenu = initializeContextMenu;
-window.destroyContextMenu = destroyContextMenu;
+(globalThis as any).initializeContextMenu = initializeContextMenu;
+(globalThis as any).destroyContextMenu = destroyContextMenu;

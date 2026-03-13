@@ -29,225 +29,224 @@ interface SharedAPI {
  * Moduł współdzielonych funkcji UI
  */
 export const Shared: SharedAPI = (() => {
-    const initialize = (): void => {
+    let isInitialized = false;
+    let dateTimeIntervalId: ReturnType<typeof setInterval> | null = null;
+
+    const updateDateTimeHeader = (): void => {
         const dateTimeText = document.getElementById('dateTimeText');
+        if (!dateTimeText) return;
+        const now = new Date();
+        const options: Intl.DateTimeFormatOptions = {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        };
+        dateTimeText.textContent = now.toLocaleDateString('pl-PL', options);
+    };
+
+    (globalThis as any).showToast = (message: string, duration: number = 3000): void => {
+        let toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toast-container';
+            document.body.appendChild(toastContainer);
+        }
+
+        const toast = document.createElement('div');
+        toast.className = 'toast show';
+        toast.textContent = message;
+        toastContainer.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 500);
+        }, duration);
+    };
+
+    const toggleNavPanel = (navPanel: HTMLElement, hamburger: HTMLElement): void => {
+        navPanel.classList.toggle('visible');
+        hamburger.classList.toggle('active');
+    };
+
+    const closeNavPanel = (navPanel: HTMLElement, hamburger: HTMLElement): void => {
+        navPanel.classList.remove('visible');
+        hamburger.classList.remove('active');
+    };
+
+    const createLogoutMenu = (): HTMLElement => {
+        const logoutUl = document.createElement('ul');
+        logoutUl.className = 'logout-nav-list';
+        const logoutLi = document.createElement('li');
+        logoutLi.id = 'logoutBtnContainer';
+        logoutLi.style.display = 'none';
+        const logoutA = document.createElement('a');
+        logoutA.href = '#';
+        logoutA.id = 'logoutBtn';
+        logoutA.innerHTML = '<i class="fas fa-sign-out-alt"></i> <span>Wyloguj</span>';
+        logoutLi.appendChild(logoutA);
+        logoutUl.appendChild(logoutLi);
+        return logoutUl;
+    };
+
+    const generateHamburgerMenu = (): void => {
         const appHeader = document.getElementById('appHeader');
+        if (!appHeader) return;
 
-        const updateDateTimeHeader = (): void => {
-            if (!dateTimeText) return;
-            const now = new Date();
-            const options: Intl.DateTimeFormatOptions = {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-            };
-            dateTimeText.textContent = now.toLocaleDateString('pl-PL', options);
-        };
+        let headerRightMenu = appHeader.querySelector('.header-right-menu');
+        if (!headerRightMenu) {
+            headerRightMenu = document.createElement('div');
+            headerRightMenu.className = 'header-right-menu';
+            appHeader.appendChild(headerRightMenu);
+        }
 
-        const generateHamburgerMenu = (): void => {
-            if (!appHeader) return;
+        const navLinks: NavLink[] = [
+            { href: '#schedule', text: 'Grafik', icon: 'fas fa-calendar-alt' },
+            { href: '#appointments', text: 'Planowanie', icon: 'fas fa-clock' },
+            { href: '#stations', text: 'Stanowiska', icon: 'fas fa-clinic-medical' },
+            { href: '#leaves', text: 'Urlopy', icon: 'fas fa-plane-departure' },
+            { href: '#changes', text: 'Harmonogram zmian', icon: 'fas fa-exchange-alt' },
+            { href: '#statistics', text: 'Statystyki', icon: 'fas fa-chart-bar' },
+            { href: '#scrapped-pdfs', text: 'ISO', icon: 'fas fa-file-pdf', id: 'navLinkIso' },
+            { href: '#options', text: 'Opcje', icon: 'fas fa-cogs' },
+        ];
 
-            let headerRightMenu = appHeader.querySelector('.header-right-menu');
-            if (!headerRightMenu) {
-                headerRightMenu = document.createElement('div');
-                headerRightMenu.className = 'header-right-menu';
-                appHeader.appendChild(headerRightMenu);
+        const hamburger = document.createElement('div');
+        hamburger.className = 'hamburger-menu';
+        hamburger.innerHTML = '<i class="fas fa-bars"></i>';
+
+        const navPanel = document.createElement('div');
+        navPanel.className = 'nav-panel';
+
+        const userInfoDiv = document.createElement('div');
+        userInfoDiv.className = 'user-info';
+        userInfoDiv.id = 'navPanelUserInfo';
+        userInfoDiv.textContent = 'Zalogowano jako: Gość';
+        navPanel.appendChild(userInfoDiv);
+
+        const ul = document.createElement('ul');
+        ul.className = 'main-nav-list';
+        navLinks.forEach((link) => {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.href = link.href;
+
+            const icon = document.createElement('i');
+            icon.className = link.icon;
+            a.appendChild(icon);
+
+            const textSpan = document.createElement('span');
+            textSpan.textContent = ' ' + link.text;
+            a.appendChild(textSpan);
+
+            li.appendChild(a);
+            ul.appendChild(li);
+
+            if (link.id) {
+                a.id = link.id;
             }
 
-            const navLinks: NavLink[] = [
-                { href: '#schedule', text: 'Grafik', icon: 'fas fa-calendar-alt' },
-                { href: '#appointments', text: 'Planowanie', icon: 'fas fa-clock' },
-                { href: '#stations', text: 'Stanowiska', icon: 'fas fa-clinic-medical' },
-                { href: '#leaves', text: 'Urlopy', icon: 'fas fa-plane-departure' },
-                { href: '#changes', text: 'Harmonogram zmian', icon: 'fas fa-exchange-alt' },
-                { href: '#statistics', text: 'Statystyki', icon: 'fas fa-chart-bar' },
-                { href: '#scrapped-pdfs', text: 'ISO', icon: 'fas fa-file-pdf', id: 'navLinkIso' },
-                { href: '#options', text: 'Opcje', icon: 'fas fa-cogs' },
-            ];
+            a.addEventListener('click', () => closeNavPanel(navPanel, hamburger));
+        });
+        navPanel.appendChild(ul);
 
-            const hamburger = document.createElement('div');
-            hamburger.className = 'hamburger-menu';
-            hamburger.innerHTML = '<i class="fas fa-bars"></i>';
+        const logoutUl = createLogoutMenu();
+        navPanel.appendChild(logoutUl);
 
-            const navPanel = document.createElement('div');
-            navPanel.className = 'nav-panel';
+        const footerInfo = document.createElement('div');
+        footerInfo.className = 'footer-info';
+        footerInfo.innerHTML = '<p>&copy; 2025 Fizjoterapia Kalinowa. Wszelkie prawa zastrzeżone.</p>';
+        navPanel.appendChild(footerInfo);
 
-            const userInfoDiv = document.createElement('div');
-            userInfoDiv.className = 'user-info';
-            userInfoDiv.id = 'navPanelUserInfo';
-            userInfoDiv.textContent = 'Zalogowano jako: Gość';
-            navPanel.appendChild(userInfoDiv);
+        if (headerRightMenu) {
+            headerRightMenu.appendChild(hamburger);
+        }
 
-            const ul = document.createElement('ul');
-            ul.className = 'main-nav-list';
-            navLinks.forEach((link) => {
-                const li = document.createElement('li');
-                const a = document.createElement('a');
-                a.href = link.href;
+        const mobileHamburger = hamburger.cloneNode(true) as HTMLElement;
+        mobileHamburger.addEventListener('click', (e: MouseEvent) => {
+            e.stopPropagation();
+            toggleNavPanel(navPanel, mobileHamburger);
+        });
 
-                const icon = document.createElement('i');
-                icon.className = link.icon;
-                a.appendChild(icon);
+        document.body.appendChild(mobileHamburger);
+        document.body.appendChild(navPanel);
 
-                const textSpan = document.createElement('span');
-                textSpan.textContent = ' ' + link.text;
-                a.appendChild(textSpan);
+        const updateActiveLink = (): void => {
+            const currentHash = globalThis.location.hash || '#schedule';
+            navPanel.querySelectorAll('a').forEach((a) => {
+                a.classList.toggle('active', a.getAttribute('href') === currentHash);
+            });
+        };
 
-                li.appendChild(a);
-                ul.appendChild(li);
+        hamburger.addEventListener('click', (e: MouseEvent) => {
+            e.stopPropagation();
+            toggleNavPanel(navPanel, hamburger);
+        });
 
-                if (link.id) {
-                    a.id = link.id;
+        document.addEventListener('click', (e: MouseEvent) => {
+            const target = e.target as Node;
+            const isVisible = navPanel.classList.contains('visible');
+            if (isVisible && !navPanel.contains(target) && !hamburger.contains(target)) {
+                closeNavPanel(navPanel, hamburger);
+            }
+        });
+
+        globalThis.addEventListener('hashchange', updateActiveLink);
+        updateActiveLink();
+    };
+
+    const setupGlobalEventListeners = (): void => {
+        const searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
+        const clearSearchButton = document.getElementById('clearSearchButton');
+
+        if (searchInput) {
+            const debouncedSearch = debounce((searchTerm: string) => {
+                document.dispatchEvent(new CustomEvent('app:search', { detail: { searchTerm } }));
+            }, 250);
+
+            searchInput.addEventListener('input', (e: Event) => {
+                const target = e.target as HTMLInputElement;
+                const searchTerm = target.value.trim();
+
+                if (clearSearchButton) {
+                    clearSearchButton.style.display = searchTerm ? 'block' : 'none';
                 }
 
-                a.addEventListener('click', () => {
-                    navPanel.classList.remove('visible');
-                    hamburger.classList.remove('active');
-                });
+                debouncedSearch(searchTerm);
             });
-            navPanel.appendChild(ul);
+        }
 
-            // Add logout button
-            const logoutUl = document.createElement('ul');
-            logoutUl.className = 'logout-nav-list';
-            const logoutLi = document.createElement('li');
-            logoutLi.id = 'logoutBtnContainer';
-            logoutLi.style.display = 'none';
-            const logoutA = document.createElement('a');
-            logoutA.href = '#';
-            logoutA.id = 'logoutBtn';
-            logoutA.innerHTML = '<i class="fas fa-sign-out-alt"></i> <span>Wyloguj</span>';
-            logoutLi.appendChild(logoutA);
-            logoutUl.appendChild(logoutLi);
-            navPanel.appendChild(logoutUl);
-
-            const footerInfo = document.createElement('div');
-            footerInfo.className = 'footer-info';
-            footerInfo.innerHTML = '<p>&copy; 2025 Fizjoterapia Kalinowa. Wszelkie prawa zastrzeżone.</p>';
-            navPanel.appendChild(footerInfo);
-
-            if (headerRightMenu) {
-                headerRightMenu.appendChild(hamburger);
-            }
-
-            // Mobile floating hamburger (cloned to have separate event listener or just same logic)
-            const mobileHamburger = hamburger.cloneNode(true) as HTMLElement;
-            mobileHamburger.addEventListener('click', (e: MouseEvent) => {
-                e.stopPropagation();
-                navPanel.classList.toggle('visible');
-                mobileHamburger.classList.toggle('active');
-            });
-
-            document.body.appendChild(mobileHamburger);
-            document.body.appendChild(navPanel);
-
-            const updateActiveLink = (): void => {
-                const currentHash = window.location.hash || '#schedule';
-                navPanel.querySelectorAll('a').forEach((a) => {
-                    if (a.getAttribute('href') === currentHash) {
-                        a.classList.add('active');
-                    } else {
-                        a.classList.remove('active');
-                    }
-                });
-            };
-
-            hamburger.addEventListener('click', (e: MouseEvent) => {
-                e.stopPropagation();
-                navPanel.classList.toggle('visible');
-                hamburger.classList.toggle('active');
-            });
-
-            document.addEventListener('click', (e: MouseEvent) => {
-                const target = e.target as Node;
-                if (
-                    navPanel.classList.contains('visible') &&
-                    !navPanel.contains(target) &&
-                    !hamburger.contains(target)
-                ) {
-                    navPanel.classList.remove('visible');
-                    hamburger.classList.remove('active');
+        if (clearSearchButton) {
+            clearSearchButton.addEventListener('click', () => {
+                if (searchInput) {
+                    searchInput.value = '';
+                    searchInput.focus();
                 }
+                document.dispatchEvent(new CustomEvent('app:search', { detail: { searchTerm: '' } }));
+                clearSearchButton.style.display = 'none';
             });
+        }
+    };
 
-            window.addEventListener('hashchange', updateActiveLink);
-            updateActiveLink();
-        };
-
-        window.showToast = (message: string, duration: number = 3000): void => {
-            let toastContainer = document.getElementById('toast-container');
-            if (!toastContainer) {
-                toastContainer = document.createElement('div');
-                toastContainer.id = 'toast-container';
-                document.body.appendChild(toastContainer);
-            }
-
-            const toast = document.createElement('div');
-            toast.className = 'toast show';
-            toast.textContent = message;
-            toastContainer.appendChild(toast);
-
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => {
-                    if (toast.parentNode === toastContainer) {
-                        toastContainer!.removeChild(toast);
-                    }
-                }, 500);
-            }, duration);
-        };
-
-        const setupGlobalEventListeners = (): void => {
-            const searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
-            const clearSearchButton = document.getElementById('clearSearchButton');
-
-            if (searchInput) {
-                // Debounced search - czeka 250ms po ostatnim naciśnięciu klawisza
-                const debouncedSearch = debounce((searchTerm: string) => {
-                    document.dispatchEvent(new CustomEvent('app:search', { detail: { searchTerm } }));
-                }, 250);
-
-                searchInput.addEventListener('input', (e: Event) => {
-                    const target = e.target as HTMLInputElement;
-                    const searchTerm = target.value.trim();
-
-                    // Natychmiastowa aktualizacja UI (przycisk czyszczenia)
-                    if (clearSearchButton) {
-                        clearSearchButton.style.display = searchTerm ? 'block' : 'none';
-                    }
-
-                    // Opóźnione wyszukiwanie
-                    debouncedSearch(searchTerm);
-                });
-            }
-
-            if (clearSearchButton) {
-                clearSearchButton.addEventListener('click', () => {
-                    if (searchInput) {
-                        searchInput.value = '';
-                        searchInput.focus();
-                    }
-                    // Czyszczenie nie wymaga debounce - wykonaj natychmiast
-                    document.dispatchEvent(new CustomEvent('app:search', { detail: { searchTerm: '' } }));
-                    clearSearchButton.style.display = 'none';
-                });
-            }
-        };
+    const initialize = (): void => {
+        if (isInitialized) return;
+        isInitialized = true;
 
         generateHamburgerMenu();
-        setInterval(updateDateTimeHeader, 1000);
+        if (dateTimeIntervalId) {
+            clearInterval(dateTimeIntervalId);
+        }
+        dateTimeIntervalId = setInterval(updateDateTimeHeader, 1000);
         updateDateTimeHeader();
         setupGlobalEventListeners();
 
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => {
-                // Use window.firebase for backward compatibility
-                const firebase = (window as unknown as { firebase?: { auth(): { signOut(): Promise<void> } } }).firebase;
+                const firebase = (globalThis as unknown as { firebase?: { auth(): { signOut(): Promise<void> } } }).firebase;
                 if (firebase) {
                     firebase.auth().signOut().then(() => {
                         const currentNavPanel = document.querySelector('.nav-panel');
@@ -330,5 +329,5 @@ declare global {
     }
 }
 
-window.Shared = Shared;
-window.setSaveStatus = setSaveStatus;
+(globalThis as any).Shared = Shared;
+(globalThis as any).setSaveStatus = setSaveStatus;

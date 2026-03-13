@@ -1,1 +1,26 @@
-{}
+{
+    "sonarlint.connectedMode.project": {
+        "connectionId": "fizjoterapiakalino",
+        "projectKey": "fizjoterapiakalino_grafik"
+    },
+    "sonarlint.rules": {
+        "typescript:S1117": {
+            "level": "on"
+        },
+        "typescript:S3776": {
+            "level": "on"
+        },
+        "typescript:S1479": {
+            "level": "on"
+        },
+        "javascript:S3776": {
+            "level": "on"
+        }
+    },
+    "sonarlint.analyzerProperties": {
+        "sonar.javascript.environments": "browser",
+        "sonar.typescript.tsconfigPath": "tsconfig.json"
+    },
+    "sonarlint.ls.autoUpdate": true,
+    "sonarlint.focusOnNewCode": false
+}

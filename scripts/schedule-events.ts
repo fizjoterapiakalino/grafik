@@ -1,6 +1,5 @@
 // scripts/schedule-events.ts
-import { debugLog } from './common.js';
-import { AppConfig } from './common.js';
+import { debugLog, AppConfig } from './common.js';
 import { initializeContextMenu, destroyContextMenu } from './context-menu.js';
 import { safeCopy } from './utils.js';
 import { ScheduleDragDrop } from './schedule-drag-drop.js';
@@ -51,51 +50,49 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
     let copiedCellState: CellState | null = null;
 
     const _handleMainTableClick = (event: MouseEvent): void => {
-        const target = (event.target as HTMLElement).closest('td.editable-cell, div[tabindex="0"]') as HTMLElement | null;
+        const target = (event.target as HTMLElement).closest<HTMLElement>('td.editable-cell, div[tabindex="0"]');
+        const isTouchDevice = globalThis.matchMedia('(pointer: coarse)').matches;
 
-        const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
-
-        if (target) {
-            if (isTouchDevice && activeCell === target) {
-                if (target.getAttribute('contenteditable') !== 'true') {
-                    event.stopPropagation();
-                    _dependencies.enterEditMode(target);
-                    return;
-                }
-            }
-
-            if (activeCell === target && target.getAttribute('contenteditable') === 'true') {
-                return;
-            }
-
-            if (activeCell && activeCell.getAttribute('contenteditable') === 'true') {
-                const activeTd = activeCell.closest('td') as HTMLTableCellElement | null;
-                const targetTd = target.closest('td') as HTMLTableCellElement | null;
-                const isSameLogical =
-                    activeTd && targetTd &&
-                    activeTd.dataset.time === targetTd.dataset.time &&
-                    activeTd.dataset.employeeIndex === targetTd.dataset.employeeIndex;
-
-                if (isSameLogical) {
-                    setActiveCell(target);
-                    _dependencies.enterEditMode(target);
-                    return;
-                }
-
-                _dependencies.exitEditMode(activeCell);
-            }
-
-            setActiveCell(target);
-        } else {
-            if (activeCell && activeCell.getAttribute('contenteditable') === 'true') {
+        if (!target) {
+            if (activeCell?.getAttribute('contenteditable') === 'true') {
                 _dependencies.exitEditMode(activeCell);
             }
             setActiveCell(null);
+            return;
         }
+
+        if (isTouchDevice && activeCell === target && target.getAttribute('contenteditable') !== 'true') {
+            event.stopPropagation();
+            _dependencies.enterEditMode(target);
+            return;
+        }
+
+        if (activeCell === target && target.getAttribute('contenteditable') === 'true') {
+            return;
+        }
+
+        if (activeCell?.getAttribute('contenteditable') === 'true') {
+            const activeTd = activeCell.closest('td');
+            const targetTd = target.closest('td');
+            const isSameLogical =
+                activeTd && targetTd &&
+                activeTd.dataset.time === targetTd.dataset.time &&
+                activeTd.dataset.employeeIndex === targetTd.dataset.employeeIndex;
+
+            if (isSameLogical) {
+                setActiveCell(target);
+                _dependencies.enterEditMode(target);
+                return;
+            }
+
+            _dependencies.exitEditMode(activeCell);
+        }
+
+        setActiveCell(target);
     };
 
     const _handleMainTableDblClick = (event: MouseEvent): void => {
-        const target = (event.target as HTMLElement).closest('td.editable-cell, div[tabindex="0"], .card-body.editable-cell') as HTMLElement | null;
+        const target = (event.target as HTMLElement).closest<HTMLElement>('td.editable-cell, div[tabindex="0"], .card-body.editable-cell');
         if (target) _dependencies.enterEditMode(target);
     };
 
@@ -105,7 +102,7 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
         }
 
         if (!(event.target as HTMLElement).closest('.active-cell') && !(event.target as HTMLElement).closest('#contextMenu')) {
-            if (activeCell && activeCell.getAttribute('contenteditable') === 'true') {
+            if (activeCell?.getAttribute('contenteditable') === 'true') {
                 _dependencies.exitEditMode(activeCell);
             }
             setActiveCell(null);
@@ -154,24 +151,58 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
         }
     };
 
-    const setActiveCell = (cell: HTMLElement | null): void => {
-        if (activeCell) {
-            activeCell.classList.remove('active-cell');
-            if (activeCell.tagName === 'DIV' && activeCell.parentElement?.classList.contains('active-cell')) {
-                activeCell.parentElement.classList.remove('active-cell');
-            }
-            if (activeCell.getAttribute('contenteditable') === 'true') {
-                _dependencies.exitEditMode(activeCell);
-            }
-            clearDuplicateHighlights();
+    const _clearActiveCellState = (): void => {
+        if (!activeCell) return;
+        activeCell.classList.remove('active-cell');
+        if (activeCell.tagName === 'DIV' && activeCell.parentElement?.classList.contains('active-cell')) {
+            activeCell.parentElement.classList.remove('active-cell');
+        }
+        if (activeCell.getAttribute('contenteditable') === 'true') {
+            _dependencies.exitEditMode(activeCell);
+        }
+        clearDuplicateHighlights();
+    };
+
+    const _updateActionButtonsState = (isEnabled: boolean, cell: HTMLElement | null): void => {
+        document.querySelectorAll<HTMLButtonElement>('.schedule-action-buttons .action-icon-btn').forEach((btn) => {
+            btn.classList.toggle('active', isEnabled);
+            btn.disabled = !isEnabled;
+        });
+
+        if (!cell || !isEnabled) return;
+
+        const patientInfoBtn = document.getElementById('btnPatientInfo') as HTMLButtonElement | null;
+        if (patientInfoBtn) {
+            const hasInfo = !cell.classList.contains('break-cell') &&
+                          !cell.classList.contains('hydrotherapy-cell') &&
+                          _dependencies.ui.getElementText(cell).trim() !== '';
+            patientInfoBtn.classList.toggle('active', hasInfo);
+            patientInfoBtn.disabled = !hasInfo;
         }
 
-        activeCell = cell;
+        const addBreakBtn = document.getElementById('btnAddBreak') as HTMLButtonElement | null;
+        if (addBreakBtn) {
+            const isBreak = cell.classList.contains('break-cell');
+            addBreakBtn.classList.add('active');
+            addBreakBtn.disabled = false;
+            addBreakBtn.classList.toggle('btn-danger', isBreak);
+            addBreakBtn.title = isBreak ? 'Usuń przerwę' : 'Dodaj przerwę';
+        }
 
-        document.querySelectorAll<HTMLButtonElement>('.schedule-action-buttons .action-icon-btn').forEach((btn) => {
-            btn.classList.remove('active');
-            btn.disabled = true;
-        });
+        const hydroBtn = document.getElementById('btnHydrotherapy') as HTMLButtonElement | null;
+        if (hydroBtn) {
+            const isHydro = cell.classList.contains('hydrotherapy-cell') || cell.dataset.isHydrotherapy === 'true';
+            hydroBtn.classList.add('active');
+            hydroBtn.classList.toggle('btn-hydro-active', isHydro);
+            hydroBtn.title = isHydro ? 'Usuń Hydro.' : 'Dodano Hydro.';
+            hydroBtn.disabled = cell.classList.contains('break-cell');
+        }
+    };
+
+    const setActiveCell = (cell: HTMLElement | null): void => {
+        _clearActiveCellState();
+        activeCell = cell;
+        _updateActionButtonsState(!!activeCell, activeCell);
 
         if (activeCell) {
             activeCell.classList.add('active-cell');
@@ -180,112 +211,93 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
             }
             activeCell.focus();
             highlightDuplicates(_dependencies.ui.getElementText(activeCell));
-
-            document.querySelectorAll<HTMLButtonElement>('.schedule-action-buttons .action-icon-btn').forEach((btn) => {
-                btn.classList.add('active');
-                btn.disabled = false;
-            });
-
-            const patientInfoBtn = document.getElementById('btnPatientInfo') as HTMLButtonElement | null;
-            if (patientInfoBtn) {
-                const hasPatientInfo =
-                    !activeCell.classList.contains('break-cell') &&
-                    !activeCell.classList.contains('hydrotherapy-cell') &&
-                    _dependencies.ui.getElementText(activeCell).trim() !== '';
-                patientInfoBtn.classList.toggle('active', hasPatientInfo);
-                patientInfoBtn.disabled = !hasPatientInfo;
-            }
-
-            const addBreakBtn = document.getElementById('btnAddBreak') as HTMLButtonElement | null;
-            if (addBreakBtn) {
-                const isBreak = activeCell.classList.contains('break-cell');
-                addBreakBtn.classList.toggle('active', true);
-                addBreakBtn.disabled = false;
-
-                if (isBreak) {
-                    addBreakBtn.classList.add('btn-danger');
-                    addBreakBtn.title = 'Usuń przerwę';
-                } else {
-                    addBreakBtn.classList.remove('btn-danger');
-                    addBreakBtn.title = 'Dodaj przerwę';
-                }
-            }
-
-            const hydrotherapyBtn = document.getElementById('btnHydrotherapy') as HTMLButtonElement | null;
-            if (hydrotherapyBtn) {
-                const isHydrotherapy = activeCell.classList.contains('hydrotherapy-cell') || activeCell.dataset.isHydrotherapy === 'true';
-                hydrotherapyBtn.classList.toggle('active', true);
-                if (isHydrotherapy) {
-                    hydrotherapyBtn.classList.add('btn-hydro-active');
-                    hydrotherapyBtn.title = 'Usuń Hydro.';
-                } else {
-                    hydrotherapyBtn.classList.remove('btn-hydro-active');
-                    hydrotherapyBtn.title = 'Dodaj Hydro.';
-                }
-                hydrotherapyBtn.disabled = activeCell.classList.contains('break-cell');
-            }
         }
     };
 
     const _handleArrowNavigation = (key: string, currentCell: HTMLElement): void => {
-        let nextElement: HTMLElement | null = null;
-        const currentParentTd = currentCell.closest('td, th') as HTMLTableCellElement | null;
-        const currentRow = currentParentTd?.closest('tr') as HTMLTableRowElement | null;
+        const currentParentTd = currentCell.closest<HTMLTableCellElement>('td, th');
+        const currentRow = currentParentTd?.closest('tr');
         if (!currentParentTd || !currentRow) return;
 
         const currentIndexInRow = Array.from(currentRow.cells).indexOf(currentParentTd);
+        let nextElement: HTMLElement | null = null;
 
-        switch (key) {
-            case 'ArrowRight':
-                if (currentCell.tagName === 'DIV' && currentCell.nextElementSibling) {
-                    nextElement = currentCell.nextElementSibling as HTMLElement;
-                } else {
-                    const nextCell = currentRow.cells[currentIndexInRow + 1];
-                    if (nextCell) nextElement = nextCell.querySelector('div') || nextCell;
-                }
-                break;
-            case 'ArrowLeft':
-                if (currentCell.tagName === 'DIV' && currentCell.previousElementSibling) {
-                    nextElement = currentCell.previousElementSibling as HTMLElement;
-                } else {
-                    const prevCell = currentRow.cells[currentIndexInRow - 1];
-                    if (prevCell && prevCell.matches('.editable-cell, .editable-header')) {
-                        nextElement = Array.from(prevCell.querySelectorAll<HTMLElement>('div')).pop() || prevCell;
-                    }
-                }
-                break;
-            case 'ArrowDown': {
-                const nextRow = currentRow.nextElementSibling as HTMLTableRowElement | null;
-                if (nextRow) {
-                    const nextCell = nextRow.cells[currentIndexInRow];
-                    if (nextCell) nextElement = nextCell.querySelector('div') || nextCell;
-                }
-                break;
+        if (key === 'ArrowRight') {
+            if (currentCell.tagName === 'DIV' && currentCell.nextElementSibling) {
+                nextElement = currentCell.nextElementSibling as HTMLElement;
+            } else {
+                const nextCell = currentRow.cells[currentIndexInRow + 1];
+                nextElement = nextCell?.querySelector<HTMLElement>('div[tabindex="0"]') || nextCell || null;
             }
-            case 'ArrowUp': {
-                const prevRow = currentRow.previousElementSibling as HTMLTableRowElement | null;
-                if (prevRow) {
-                    const prevCell = prevRow.cells[currentIndexInRow];
-                    if (prevCell) nextElement = prevCell.querySelector('div') || prevCell;
+        } else if (key === 'ArrowLeft') {
+            if (currentCell.tagName === 'DIV' && currentCell.previousElementSibling) {
+                nextElement = currentCell.previousElementSibling as HTMLElement;
+            } else {
+                const prevCell = currentRow.cells[currentIndexInRow - 1];
+                if (prevCell?.matches('.editable-cell, .editable-header')) {
+                    nextElement = Array.from(prevCell.querySelectorAll<HTMLElement>('div[tabindex="0"]')).pop() || prevCell;
                 }
-                break;
             }
+        } else if (key === 'ArrowDown') {
+            const nextRow = currentRow.nextElementSibling as HTMLTableRowElement | null;
+            const nextCell = nextRow?.cells[currentIndexInRow];
+            nextElement = nextCell?.querySelector<HTMLElement>('div[tabindex="0"]') || nextCell || null;
+        } else if (key === 'ArrowUp') {
+            const prevRow = currentRow.previousElementSibling as HTMLTableRowElement | null;
+            const prevCell = prevRow?.cells[currentIndexInRow];
+            nextElement = prevCell?.querySelector<HTMLElement>('div[tabindex="0"]') || prevCell || null;
         }
 
-        if (nextElement) {
-            setActiveCell(nextElement);
+        if (nextElement) setActiveCell(nextElement);
+    };
+
+    const _handleClipboardEvents = (event: KeyboardEvent): boolean => {
+        if (!(event.ctrlKey || event.metaKey)) return false;
+
+        if (event.key === 'c') {
+            if (activeCell && !activeCell.classList.contains('break-cell')) {
+                const parentCell = activeCell.closest<HTMLTableCellElement>('td[data-time][data-employee-index]');
+                const time = parentCell?.dataset.time || '';
+                const employeeIndex = parentCell?.dataset.employeeIndex || '';
+                const currentState = _dependencies.appState.scheduleCells[time]?.[employeeIndex];
+
+                if (currentState && Object.keys(currentState).length > 0) {
+                    copiedCellState = structuredClone(currentState);
+                    (globalThis as any).showToast('Skopiowano komórkę');
+                } else {
+                    (globalThis as any).showToast('Brak danych do skopiowania', 2000);
+                }
+            } else if (!activeCell) {
+                (globalThis as any).showToast('Wybierz komórkę, aby skopiować.', 2000);
+            }
+            return true;
         }
+
+        if (event.key === 'v') {
+            event.preventDefault();
+            if (!activeCell) {
+                (globalThis as any).showToast('Wybierz komórkę, aby wkleić.', 2000);
+            } else if (!copiedCellState) {
+                (globalThis as any).showToast('Brak skopiowanej komórki.', 2000);
+            } else {
+                _dependencies.updateCellState(activeCell, (state) => {
+                    Object.assign(state, structuredClone(copiedCellState));
+                    (globalThis as any).showToast('Wklejono komórkę');
+                });
+            }
+            return true;
+        }
+
+        return false;
     };
 
     const _handleKeyDown = (event: KeyboardEvent): void => {
-        // Check if focus is on input or textarea - don't intercept keys
         const focusedElement = document.activeElement as HTMLElement;
         const isInInputField = focusedElement?.tagName === 'INPUT' ||
             focusedElement?.tagName === 'TEXTAREA' ||
             focusedElement?.closest('.search-container');
 
         if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
-            // Allow undo even when in input, but prevent default
             if (!isInInputField) {
                 event.preventDefault();
                 _dependencies.undoLastAction();
@@ -293,70 +305,26 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
             return;
         }
 
-        // If in input field, don't intercept any other keys
-        if (isInInputField) {
-            return;
-        }
+        if (isInInputField) return;
 
         if ((event.ctrlKey || event.metaKey) && event.key === 'p') {
             event.preventDefault();
             if (activeCell) {
                 if (_dependencies.ui.getElementText(activeCell).trim() !== '') {
-                    window.showToast('Nie można dodać przerwy do zajętej komórki. Najpierw wyczyść komórkę.', 3000);
+                    (globalThis as any).showToast('Nie można dodać przerwy do zajętej komórki. Najpierw wyczyść komórkę.', 3000);
                     return;
                 }
                 _dependencies.updateCellState(activeCell, (state) => {
                     state.isBreak = true;
-                    window.showToast('Dodano przerwę');
+                    (globalThis as any).showToast('Dodano przerwę');
                 });
             } else {
-                window.showToast('Wybierz komórkę, aby dodać przerwę.', 3000);
+                (globalThis as any).showToast('Wybierz komórkę, aby dodać przerwę.', 3000);
             }
             return;
         }
 
-        // Ctrl+C - Kopiuj zaznaczoną komórkę
-        if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
-            if (activeCell && !activeCell.classList.contains('break-cell')) {
-                const parentCell = activeCell.closest('td[data-time][data-employee-index]') as HTMLTableCellElement | null;
-                if (parentCell) {
-                    const time = parentCell.dataset.time || '';
-                    const employeeIndex = parentCell.dataset.employeeIndex || '';
-                    const currentState = _dependencies.appState.scheduleCells[time]?.[employeeIndex];
-
-                    if (currentState && Object.keys(currentState).length > 0) {
-                        // Głęboka kopia stanu komórki
-                        copiedCellState = JSON.parse(JSON.stringify(currentState));
-                        window.showToast('Skopiowano komórkę');
-                    } else {
-                        window.showToast('Brak danych do skopiowania', 2000);
-                    }
-                }
-            } else if (!activeCell) {
-                window.showToast('Wybierz komórkę, aby skopiować.', 2000);
-            }
-            return;
-        }
-
-        // Ctrl+V - Wklej do zaznaczonej komórki
-        if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
-            event.preventDefault();
-            if (!activeCell) {
-                window.showToast('Wybierz komórkę, aby wkleić.', 2000);
-                return;
-            }
-            if (!copiedCellState) {
-                window.showToast('Brak skopiowanej komórki.', 2000);
-                return;
-            }
-
-            _dependencies.updateCellState(activeCell, (state) => {
-                // Kopiuj wszystkie właściwości ze skopiowanego stanu
-                Object.assign(state, JSON.parse(JSON.stringify(copiedCellState)));
-                window.showToast('Wklejono komórkę');
-            });
-            return;
-        }
+        if (_handleClipboardEvents(event)) return;
 
         const target = document.activeElement as HTMLElement;
         const isEditing = target?.getAttribute('contenteditable') === 'true';
@@ -366,13 +334,11 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
             if (event.key === 'Enter') {
                 event.preventDefault();
                 _dependencies.exitEditMode(target);
-                const parentCell = target.closest('td') as HTMLTableCellElement | null;
-                if (parentCell) {
-                    const nextRow = parentCell.closest('tr')?.nextElementSibling as HTMLTableRowElement | null;
-                    if (nextRow) {
-                        const nextCell = nextRow.cells[parentCell.cellIndex];
-                        setActiveCell(nextCell);
-                    }
+                const parentCell = target.closest('td');
+                const nextRow = parentCell?.closest('tr')?.nextElementSibling as HTMLTableRowElement | null;
+                if (nextRow && parentCell) {
+                    const nextCell = nextRow.cells[parentCell.cellIndex];
+                    setActiveCell(nextCell);
                 }
             }
             return;
@@ -382,11 +348,10 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
 
         if (event.key === 'Delete' || event.key === 'Backspace') {
             event.preventDefault();
-            const cellToClear = activeCell.closest('td.editable-cell') as HTMLTableCellElement | null;
+            const cellToClear = activeCell.closest<HTMLTableCellElement>('td.editable-cell');
             if (cellToClear) {
                 _dependencies.clearCell(cellToClear);
-                const time = cellToClear.dataset.time;
-                const employeeIndex = cellToClear.dataset.employeeIndex;
+                const { time, employeeIndex } = cellToClear.dataset;
                 const newCell = document.querySelector<HTMLTableCellElement>(
                     `td[data-time="${time}"][data-employee-index="${employeeIndex}"]`
                 );
@@ -419,16 +384,132 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
         }
     };
 
+    const _setupActionButtons = (): void => {
+        const buttons: Record<string, () => void> = {
+            btnPatientInfo: () => {
+                const text = activeCell ? _dependencies.ui.getElementText(activeCell).trim() : '';
+                if (activeCell && !activeCell.classList.contains('break-cell') && text !== '') {
+                    _dependencies.openPatientInfoModal(activeCell);
+                } else {
+                    (globalThis as any).showToast('Wybierz komórkę z pacjentem, aby wyświetlić informacje.', 3000);
+                }
+            },
+            btnSplitCell: () => {
+                if (!activeCell) {
+                    (globalThis as any).showToast('Wybierz komórkę do podzielenia.', 3000);
+                    return;
+                }
+                _dependencies.updateCellState(activeCell, (state) => {
+                    Object.assign(state, {
+                        content1: state.content || '',
+                        content2: '',
+                        treatmentData1: {
+                            startDate: state.treatmentStartDate,
+                            extensionDays: state.treatmentExtensionDays,
+                            endDate: state.treatmentEndDate,
+                            additionalInfo: state.additionalInfo,
+                        },
+                        isSplit: true
+                    });
+                    if (state.isMassage) { state.isMassage1 = true; delete state.isMassage; }
+                    if (state.isPnf) { state.isPnf1 = true; delete state.isPnf; }
+                    if (state.isEveryOtherDay) { state.isEveryOtherDay1 = true; delete state.isEveryOtherDay; }
+                    delete state.content;
+                    delete state.treatmentStartDate;
+                    delete state.treatmentExtensionDays;
+                    delete state.treatmentEndDate;
+                    delete state.additionalInfo;
+                    (globalThis as any).showToast('Podzielono komórkę');
+                });
+            },
+            btnMergeCells: () => {
+                if (activeCell) _dependencies.mergeSplitCell(activeCell);
+                else (globalThis as any).showToast('Wybierz podzieloną komórkę do scalenia.', 3000);
+            },
+            btnAddBreak: () => {
+                if (!activeCell) {
+                    (globalThis as any).showToast('Wybierz komórkę, aby zarządzać przerwą.', 3000);
+                    return;
+                }
+                _dependencies.updateCellState(activeCell, (state) => {
+                    const isBreak = activeCell!.classList.contains('break-cell');
+                    if (isBreak) {
+                        state.isBreak = false;
+                        (globalThis as any).showToast('Usunięto przerwę');
+                    } else if (_dependencies.ui.getElementText(activeCell!).trim() !== '') {
+                        (globalThis as any).showToast('Nie można dodać przerwy do zajętej komórki. Najpierw wyczyść komórkę.', 3000);
+                    } else {
+                        state.isBreak = true;
+                        (globalThis as any).showToast('Dodano przerwę');
+                    }
+                });
+            },
+            btnHydrotherapy: () => {
+                if (!activeCell) {
+                    (globalThis as any).showToast('Wybierz komórkę, aby dodać Hydroterapię.', 3000);
+                    return;
+                }
+                if (activeCell.classList.contains('split-cell')) {
+                    (globalThis as any).showToast('Najpierw scal komórkę, aby dodać Hydro.', 3000);
+                    return;
+                }
+                if (activeCell.classList.contains('break-cell')) {
+                    (globalThis as any).showToast('Najpierw usuń przerwę.', 3000);
+                    return;
+                }
+                _dependencies.updateCellState(activeCell, (state) => {
+                    const isCurrentlyHydro = !!state.isHydrotherapy;
+                    Object.assign(state, {
+                        isHydrotherapy: !isCurrentlyHydro,
+                        content: isCurrentlyHydro ? '' : 'Hydro.',
+                        isMassage: false,
+                        isPnf: false,
+                        isEveryOtherDay: false
+                    });
+                    (globalThis as any).showToast(isCurrentlyHydro ? 'Usunięto Hydro.' : 'Dodano Hydro.');
+                });
+            },
+            btnMassage: () => activeCell ? _dependencies.toggleSpecialStyle(activeCell, 'isMassage') : (globalThis as any).showToast('Wybierz komórkę, aby oznaczyć jako Masaż.', 3000),
+            btnPnf: () => activeCell ? _dependencies.toggleSpecialStyle(activeCell, 'isPnf') : (globalThis as any).showToast('Wybierz komórkę, aby oznaczyć jako PNF.', 3000),
+            btnEveryOtherDay: () => activeCell ? _dependencies.toggleSpecialStyle(activeCell, 'isEveryOtherDay') : (globalThis as any).showToast('Wybierz komórkę, aby oznaczyć jako Co 2 Dni.', 3000),
+            btnClearCell: () => activeCell ? _dependencies.clearCell(activeCell) : (globalThis as any).showToast('Wybierz komórkę do wyczyszczenia.', 3000),
+        };
+
+        Object.entries(buttons).forEach(([id, handler]) => {
+            document.getElementById(id)?.addEventListener('click', handler);
+        });
+
+        document.querySelectorAll('.compact-legend .legend-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const type = (item as HTMLElement).dataset.type;
+                if (!type) return;
+
+                const selector = type === 'break' ? '.break-cell' : `[data-is-${type}="true"]`;
+                const cells = document.querySelectorAll(selector);
+
+                if (cells.length === 0) {
+                    (globalThis as any).showToast(`Brak komórek typu: ${item.textContent?.trim()}`, 2000);
+                    return;
+                }
+
+                cells.forEach(cell => {
+                    cell.classList.add('legend-highlight');
+                    setTimeout(() => cell.classList.remove('legend-highlight'), 3000);
+                });
+                (globalThis as any).showToast(`Podświetlono ${cells.length} komórek: ${item.textContent?.trim()}`);
+            });
+        });
+    };
+
     const initialize = (deps: Dependencies): void => {
         _dependencies = deps;
         mainTable = document.getElementById('mainScheduleTable') as HTMLTableElement | null;
 
         if (!mainTable) {
-            console.error('ScheduleEvents.initialize: mainScheduleTable not found. Aborting initialization.');
+            console.error('ScheduleEvents.initialize: mainScheduleTable not found.');
             return;
         }
 
-        // Inicjalizacja modułu Drag & Drop
         ScheduleDragDrop.initialize({
             appState: deps.appState,
             getCurrentTableStateForCell: deps.getCurrentTableStateForCell,
@@ -444,8 +525,6 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
             mainTable.addEventListener('dragleave', ScheduleDragDrop.handleDragLeave as EventListener);
             mainTable.addEventListener('drop', ScheduleDragDrop.handleDrop as EventListener);
             mainTable.addEventListener('dragend', ScheduleDragDrop.handleDragEnd);
-        } else {
-            console.error('ScheduleEvents.initialize: app-root not found.');
         }
 
         document.addEventListener('keydown', _handleKeyDown);
@@ -469,12 +548,12 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 id: 'contextAddBreak',
                 action: (cell: HTMLElement) => {
                     if (_dependencies.ui.getElementText(cell).trim() !== '') {
-                        window.showToast('Nie można dodać przerwy do zajętej komórki. Najpierw wyczyść komórkę.', 3000);
+                        (globalThis as any).showToast('Nie można dodać przerwy do zajętej komórki. Najpierw wyczyść komórkę.', 3000);
                         return;
                     }
                     _dependencies.updateCellState(cell, (state) => {
                         state.isBreak = true;
-                        window.showToast('Dodano przerwę');
+                        (globalThis as any).showToast('Dodano przerwę');
                     });
                 },
                 condition: (cell: HTMLElement) => !cell.classList.contains('break-cell'),
@@ -484,12 +563,8 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 condition: (cell: HTMLElement) => !cell.classList.contains('break-cell') && !cell.classList.contains('split-cell'),
                 action: (cell: HTMLElement) => {
                     _dependencies.updateCellState(cell, (state) => {
-                        state.content = 'Hydro.';
-                        state.isHydrotherapy = true;
-                        state.isMassage = false;
-                        state.isPnf = false;
-                        state.isEveryOtherDay = false;
-                        window.showToast('Dodano Hydro.');
+                        Object.assign(state, { content: 'Hydro.', isHydrotherapy: true, isMassage: false, isPnf: false, isEveryOtherDay: false });
+                        (globalThis as any).showToast('Dodano Hydro.');
                     });
                 }
             },
@@ -499,7 +574,7 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 action: (cell: HTMLElement) => {
                     _dependencies.updateCellState(cell, (state) => {
                         state.isBreak = false;
-                        window.showToast('Usunięto przerwę');
+                        (globalThis as any).showToast('Usunięto przerwę');
                     });
                 },
                 condition: (cell: HTMLElement) => cell.classList.contains('break-cell'),
@@ -508,7 +583,7 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 id: 'contextShowHistory',
                 condition: (cell: HTMLElement): boolean => {
                     const cellState = _dependencies.appState.scheduleCells[cell.dataset.time || '']?.[cell.dataset.employeeIndex || ''];
-                    return !!(cellState && cellState.history && cellState.history.length > 0);
+                    return !!cellState?.history?.length;
                 },
                 action: (cell: HTMLElement) => _dependencies.showHistoryModal(cell),
             },
@@ -517,37 +592,26 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 id: 'contextSplitCell',
                 action: (cell: HTMLElement) =>
                     _dependencies.updateCellState(cell, (state) => {
-                        state.content1 = safeCopy(state.content || '') as string;
-                        state.content2 = '';
-                        state.content = null;
-
-                        if (state.isMassage) {
-                            state.isMassage1 = true;
-                            state.isMassage = null;
-                        }
-                        if (state.isPnf) {
-                            state.isPnf1 = true;
-                            state.isPnf = null;
-                        }
-                        if (state.isEveryOtherDay) {
-                            state.isEveryOtherDay1 = true;
-                            state.isEveryOtherDay = null;
-                        }
-
-                        state.treatmentData1 = {
-                            startDate: safeCopy(state.treatmentStartDate),
-                            extensionDays: safeCopy(state.treatmentExtensionDays),
-                            endDate: safeCopy(state.treatmentEndDate),
-                            additionalInfo: safeCopy(state.additionalInfo),
-                        };
-
-                        state.treatmentStartDate = null;
-                        state.treatmentExtensionDays = null;
-                        state.treatmentEndDate = null;
-                        state.additionalInfo = null;
-
-                        state.isSplit = true;
-                        window.showToast('Podzielono komórkę');
+                        Object.assign(state, {
+                            content1: safeCopy(state.content || '') as string,
+                            content2: '',
+                            content: null,
+                            treatmentData1: {
+                                startDate: safeCopy(state.treatmentStartDate),
+                                extensionDays: safeCopy(state.treatmentExtensionDays),
+                                endDate: safeCopy(state.treatmentEndDate),
+                                additionalInfo: safeCopy(state.additionalInfo),
+                            },
+                            treatmentStartDate: null,
+                            treatmentExtensionDays: null,
+                            treatmentEndDate: null,
+                            additionalInfo: null,
+                            isSplit: true
+                        });
+                        if (state.isMassage) { state.isMassage1 = true; state.isMassage = null; }
+                        if (state.isPnf) { state.isPnf1 = true; state.isPnf = null; }
+                        if (state.isEveryOtherDay) { state.isEveryOtherDay1 = true; state.isEveryOtherDay = null; }
+                        (globalThis as any).showToast('Podzielono komórkę');
                     }),
                 condition: (cell: HTMLElement) => !cell.classList.contains('split-cell') && !cell.classList.contains('break-cell'),
             },
@@ -558,9 +622,7 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                     if (!cell.classList.contains('split-cell')) return false;
                     const parts = cell.querySelectorAll('.split-cell-wrapper > div');
                     if (parts.length < 2) return true;
-                    const text1 = _dependencies.ui.getElementText(parts[0] as HTMLElement).trim();
-                    const text2 = _dependencies.ui.getElementText(parts[1] as HTMLElement).trim();
-                    return text1 === '' || text2 === '';
+                    return !_dependencies.ui.getElementText(parts[0] as HTMLElement).trim() || !_dependencies.ui.getElementText(parts[1] as HTMLElement).trim();
                 },
                 action: (cell: HTMLElement) => _dependencies.mergeSplitCell(cell),
             },
@@ -571,190 +633,17 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 id: 'contextClearFormatting',
                 action: (cell: HTMLElement) => {
                     _dependencies.updateCellState(cell, (state) => {
-                        state.isMassage = false;
-                        state.isPnf = false;
-                        state.isEveryOtherDay = false;
+                        Object.assign(state, { isMassage: false, isPnf: false, isEveryOtherDay: false });
                         if (state.isSplit) {
-                            state.isMassage1 = false;
-                            state.isMassage2 = false;
-                            state.isPnf1 = false;
-                            state.isPnf2 = false;
-                            state.isEveryOtherDay1 = false;
-                            state.isEveryOtherDay2 = false;
+                            Object.assign(state, { isMassage1: false, isMassage2: false, isPnf1: false, isPnf2: false, isEveryOtherDay1: false, isEveryOtherDay2: false });
                         }
-                        window.showToast('Wyczyszczono formatowanie');
+                        (globalThis as any).showToast('Wyczyszczono formatowanie');
                     });
                 },
             },
         ];
         initializeContextMenu('contextMenu', '.editable-cell', contextMenuItems);
-
-        // Obsługa kliknięć dla przycisków akcji
-        document.getElementById('btnPatientInfo')?.addEventListener('click', () => {
-            if (activeCell && !activeCell.classList.contains('break-cell') && _dependencies.ui.getElementText(activeCell).trim() !== '') {
-                _dependencies.openPatientInfoModal(activeCell);
-            } else {
-                window.showToast('Wybierz komórkę z pacjentem, aby wyświetlić informacje.', 3000);
-            }
-        });
-
-        document.getElementById('btnSplitCell')?.addEventListener('click', () => {
-            if (activeCell) {
-                _dependencies.updateCellState(activeCell, (state) => {
-                    state.content1 = state.content || '';
-                    state.content2 = '';
-                    delete state.content;
-
-                    if (state.isMassage) {
-                        state.isMassage1 = true;
-                        delete state.isMassage;
-                    }
-                    if (state.isPnf) {
-                        state.isPnf1 = true;
-                        delete state.isPnf;
-                    }
-                    if (state.isEveryOtherDay) {
-                        state.isEveryOtherDay1 = true;
-                        delete state.isEveryOtherDay;
-                    }
-
-                    state.treatmentData1 = {
-                        startDate: state.treatmentStartDate,
-                        extensionDays: state.treatmentExtensionDays,
-                        endDate: state.treatmentEndDate,
-                        additionalInfo: state.additionalInfo,
-                    };
-
-                    delete state.treatmentStartDate;
-                    delete state.treatmentExtensionDays;
-                    delete state.treatmentEndDate;
-                    delete state.additionalInfo;
-
-                    state.isSplit = true;
-                    window.showToast('Podzielono komórkę');
-                });
-            } else {
-                window.showToast('Wybierz komórkę do podzielenia.', 3000);
-            }
-        });
-
-        document.getElementById('btnMergeCells')?.addEventListener('click', () => {
-            if (activeCell) {
-                _dependencies.mergeSplitCell(activeCell);
-            } else {
-                window.showToast('Wybierz podzieloną komórkę do scalenia.', 3000);
-            }
-        });
-
-        document.getElementById('btnAddBreak')?.addEventListener('click', () => {
-            if (activeCell) {
-                if (activeCell.classList.contains('break-cell')) {
-                    _dependencies.updateCellState(activeCell, (state) => {
-                        state.isBreak = false;
-                        window.showToast('Usunięto przerwę');
-                    });
-                } else {
-                    if (_dependencies.ui.getElementText(activeCell).trim() !== '') {
-                        window.showToast('Nie można dodać przerwy do zajętej komórki. Najpierw wyczyść komórkę.', 3000);
-                        return;
-                    }
-                    _dependencies.updateCellState(activeCell, (state) => {
-                        state.isBreak = true;
-                        window.showToast('Dodano przerwę');
-                    });
-                }
-            } else {
-                window.showToast('Wybierz komórkę, aby zarządzać przerwą.', 3000);
-            }
-        });
-
-        document.getElementById('btnHydrotherapy')?.addEventListener('click', () => {
-            if (activeCell) {
-                if (activeCell.classList.contains('split-cell')) {
-                    window.showToast('Najpierw scal komórkę, aby dodać Hydro.', 3000);
-                    return;
-                }
-                if (activeCell.classList.contains('break-cell')) {
-                    window.showToast('Najpierw usuń przerwę.', 3000);
-                    return;
-                }
-                _dependencies.updateCellState(activeCell, (state) => {
-                    const isCurrentlyHydro = state.isHydrotherapy === true;
-                    if (isCurrentlyHydro) {
-                        state.isHydrotherapy = false;
-                        state.content = '';
-                        window.showToast('Usunięto Hydro.');
-                    } else {
-                        state.content = 'Hydro.';
-                        state.isHydrotherapy = true;
-                        state.isMassage = false;
-                        state.isPnf = false;
-                        state.isEveryOtherDay = false;
-                        window.showToast('Dodano Hydro.');
-                    }
-                });
-            } else {
-                window.showToast('Wybierz komórkę, aby dodać Hydroterapię.', 3000);
-            }
-        });
-
-        document.getElementById('btnMassage')?.addEventListener('click', () => {
-            if (activeCell) {
-                _dependencies.toggleSpecialStyle(activeCell, 'isMassage');
-            } else {
-                window.showToast('Wybierz komórkę, aby oznaczyć jako Masaż.', 3000);
-            }
-        });
-
-        document.getElementById('btnPnf')?.addEventListener('click', () => {
-            if (activeCell) {
-                _dependencies.toggleSpecialStyle(activeCell, 'isPnf');
-            } else {
-                window.showToast('Wybierz komórkę, aby oznaczyć jako PNF.', 3000);
-            }
-        });
-
-        document.getElementById('btnEveryOtherDay')?.addEventListener('click', () => {
-            if (activeCell) {
-                _dependencies.toggleSpecialStyle(activeCell, 'isEveryOtherDay');
-            } else {
-                window.showToast('Wybierz komórkę, aby oznaczyć jako Co 2 Dni.', 3000);
-            }
-        });
-
-        document.getElementById('btnClearCell')?.addEventListener('click', () => {
-            if (activeCell) {
-                _dependencies.clearCell(activeCell);
-            } else {
-                window.showToast('Wybierz komórkę do wyczyszczenia.', 3000);
-            }
-        });
-
-        // Obsługa kliknięć w legendę dla podświetlania typu zabiegów
-        document.querySelectorAll('.compact-legend .legend-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const colorSpan = item.querySelector('.legend-dot');
-                if (!colorSpan) return;
-
-                const type = (item as HTMLElement).dataset.type;
-                if (!type) return;
-
-                const selector = type === 'break' ? '.break-cell' : `[data-is-${type}="true"]`;
-                const cells = document.querySelectorAll(selector);
-
-                if (cells.length === 0) {
-                    window.showToast(`Brak komórek typu: ${item.textContent?.trim()}`, 2000);
-                    return;
-                }
-
-                cells.forEach(cell => {
-                    cell.classList.add('legend-highlight');
-                    setTimeout(() => cell.classList.remove('legend-highlight'), 3000);
-                });
-
-                window.showToast(`Podświetlono ${cells.length} komórek: ${item.textContent?.trim()}`);
-            });
-        });
+        _setupActionButtons();
     };
 
     const destroy = (): void => {
@@ -794,4 +683,4 @@ declare global {
     }
 }
 
-window.ScheduleEvents = ScheduleEvents;
+(globalThis as any).ScheduleEvents = ScheduleEvents;

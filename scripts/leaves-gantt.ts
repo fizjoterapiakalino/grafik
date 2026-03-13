@@ -28,8 +28,8 @@ export const calculatePlannedVacationDays = (leaves: LeaveEntry[], year: number)
         const yearStart = new Date(Date.UTC(year, 0, 1));
         const yearEnd = new Date(Date.UTC(year, 11, 31));
 
-        const effectiveStart = start < yearStart ? yearStart : start;
-        const effectiveEnd = end > yearEnd ? yearEnd : end;
+        const effectiveStart = new Date(Math.max(start.getTime(), yearStart.getTime()));
+        const effectiveEnd = new Date(Math.min(end.getTime(), yearEnd.getTime()));
 
         if (effectiveStart > effectiveEnd) return;
 
@@ -345,8 +345,8 @@ const calculateLeaveBarPosition = (
     }
 
     // Clamp dates to year boundaries
-    const effectiveStart = startDate < yearStart ? yearStart : startDate;
-    const effectiveEnd = endDate > yearEnd ? yearEnd : endDate;
+    const effectiveStart = new Date(Math.max(startDate.getTime(), yearStart.getTime()));
+    const effectiveEnd = new Date(Math.min(endDate.getTime(), yearEnd.getTime()));
 
     const startMonth = effectiveStart.getMonth();
     const endMonth = effectiveEnd.getMonth();
@@ -422,12 +422,32 @@ const renderLeaveBars = (leaves: LeaveEntry[], year: number, employeeName: strin
                  data-start="${leave.startDate}"
                  data-end="${leave.endDate}"
                  title="${typeConfig.label}: ${leave.startDate} - ${leave.endDate} (${days} dni)">
-                ${!isInCollapsedMonth ? '<div class="resize-handle left" data-side="left"></div>' : ''}
+                ${isInCollapsedMonth ? '' : '<div class="resize-handle left" data-side="left"></div>'}
                 <span class="leave-bar-text">${text}</span>
-                ${!isInCollapsedMonth ? '<div class="resize-handle right" data-side="right"></div>' : ''}
+                ${isInCollapsedMonth ? '' : '<div class="resize-handle right" data-side="right"></div>'}
             </div>
         `;
     }).join('');
+};
+
+const renderExpandedMonthDays = (year: number, month: number): string => {
+    let html = '';
+    const daysInMonth = getDaysInMonth(year, month);
+    for (let day = 1; day <= daysInMonth; day++) {
+        const weekend = isWeekend(year, month, day) ? 'weekend' : '';
+        const today = isToday(year, month, day) ? 'today' : '';
+        const monthStart = day === 1 ? 'month-start' : '';
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        html += `<div class="gantt-day-cell ${weekend} ${today} ${monthStart}" data-date="${dateStr}"></div>`;
+    }
+    return html;
+};
+
+const renderCollapsedMonthWeeks = (year: number, month: number): string => {
+    const weeks = getWeeksForMonth(year, month);
+    return `<div class="gantt-collapsed-cell" data-month="${month}" style="flex: 1; min-width: ${COLLAPSED_MONTH_WIDTH}px;">
+        ${weeks.map(() => '<div class="gantt-week-tile-cell"></div>').join('')}
+    </div>`;
 };
 
 /**
@@ -435,32 +455,13 @@ const renderLeaveBars = (leaves: LeaveEntry[], year: number, employeeName: strin
  */
 const renderDayCells = (year: number): string => {
     let html = '';
-
     for (let month = 0; month < 12; month++) {
-        const isExpanded = expandedMonths.has(month);
-
-        if (isExpanded) {
-            // Expanded month - show all day cells
-            const daysInMonth = getDaysInMonth(year, month);
-
-            for (let day = 1; day <= daysInMonth; day++) {
-                const weekend = isWeekend(year, month, day) ? 'weekend' : '';
-                const today = isToday(year, month, day) ? 'today' : '';
-                const monthStart = day === 1 ? 'month-start' : '';
-
-                html += `<div class="gantt-day-cell ${weekend} ${today} ${monthStart}" 
-                             data-date="${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}">
-                         </div>`;
-            }
+        if (expandedMonths.has(month)) {
+            html += renderExpandedMonthDays(year, month);
         } else {
-            // Collapsed month - week tiles in the timeline row
-            const weeks = getWeeksForMonth(year, month);
-            html += `<div class="gantt-collapsed-cell" data-month="${month}" style="flex: 1; min-width: ${COLLAPSED_MONTH_WIDTH}px;">
-                ${weeks.map(() => '<div class="gantt-week-tile-cell"></div>').join('')}
-            </div>`;
+            html += renderCollapsedMonthWeeks(year, month);
         }
     }
-
     return html;
 };
 
@@ -580,8 +581,8 @@ const updateLeaveBarPositions = (timelineBody: HTMLElement, year: number): void 
         // Clamp to year boundaries
         const yearStart = new Date(year, 0, 1);
         const yearEnd = new Date(year, 11, 31);
-        const effectiveStart = startDate < yearStart ? yearStart : startDate;
-        const effectiveEnd = endDate > yearEnd ? yearEnd : endDate;
+        const effectiveStart = new Date(Math.max(startDate.getTime(), yearStart.getTime()));
+        const effectiveEnd = new Date(Math.min(endDate.getTime(), yearEnd.getTime()));
 
         const startMonth = effectiveStart.getMonth();
         const endMonth = effectiveEnd.getMonth();
@@ -627,19 +628,27 @@ const formatDateString = (date: Date): string => {
     return `${year}-${month}-${day}`;
 };
 
+let scrollSyncController: AbortController | null = null;
+
 /**
  * Sync vertical scroll between employees list and timeline body
  */
 const syncVerticalScroll = (employeesList: HTMLElement, scrollWrapper: HTMLElement): void => {
+    if (scrollSyncController) {
+        scrollSyncController.abort();
+    }
+    scrollSyncController = new AbortController();
+    const { signal } = scrollSyncController;
+
     // When timeline scrolls vertically, sync employee list
     scrollWrapper.addEventListener('scroll', () => {
         employeesList.scrollTop = scrollWrapper.scrollTop;
-    });
+    }, { signal });
 
     // When employee list scrolls, sync timeline
     employeesList.addEventListener('scroll', () => {
         scrollWrapper.scrollTop = employeesList.scrollTop;
-    });
+    }, { signal });
 };
 
 // Callback for re-rendering after month toggle
@@ -678,7 +687,7 @@ export const setupMonthToggle = (): void => {
         e.stopPropagation();
         const monthAttr = header.dataset.month;
         if (monthAttr !== undefined) {
-            const month = parseInt(monthAttr, 10);
+            const month = Number.parseInt(monthAttr, 10);
             toggleMonthExpansion(month);
 
             // Re-render the Gantt view
@@ -713,8 +722,8 @@ export const renderMobileView = (
         const employeeName = emp.displayName || emp.name || empId;
         const employeeLeaves = (leaves[employeeName] || [])
             .filter(leave => {
-                const startYear = parseInt(leave.startDate.split('-')[0]);
-                const endYear = parseInt(leave.endDate.split('-')[0]);
+                const startYear = Number.parseInt(leave.startDate.split('-')[0], 10);
+                const endYear = Number.parseInt(leave.endDate.split('-')[0], 10);
                 return startYear === year || endYear === year;
             });
 
@@ -882,7 +891,7 @@ const handleMouseMove = (e: MouseEvent): void => {
     const elemUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
     const dayCell = elemUnderMouse?.closest('.gantt-day-cell') as HTMLElement;
 
-    if (dayCell && dayCell.dataset.date) {
+    if (dayCell?.dataset.date) {
         dragState.endDate = dayCell.dataset.date;
     }
 
@@ -1267,6 +1276,26 @@ const handleResizeStart = (e: MouseEvent): void => {
     leaveBar.style.opacity = '0.7';
 };
 
+const getTargetCell = (relativeX: number, timelineRow: HTMLElement): HTMLElement | null => {
+    const dayCells = timelineRow.querySelectorAll('.gantt-day-cell');
+    if (dayCells.length === 0) return null;
+
+    let targetCell: HTMLElement | null = null;
+    for (const cell of dayCells) {
+        const htmlCell = cell as HTMLElement;
+        const cellLeft = htmlCell.offsetLeft;
+        const cellRight = cellLeft + htmlCell.offsetWidth;
+
+        if (relativeX >= cellLeft && relativeX < cellRight) {
+            targetCell = htmlCell;
+            break;
+        }
+    }
+
+    targetCell ??= (relativeX < 0 ? dayCells[0] : dayCells[dayCells.length - 1]) as HTMLElement;
+    return targetCell;
+};
+
 /**
  * Handle resize move
  */
@@ -1277,33 +1306,9 @@ const handleResizeMove = (e: MouseEvent): void => {
     const timelineRect = resizeState.timelineRow.getBoundingClientRect();
     const relativeX = e.clientX - timelineRect.left;
 
-    // Calculate which day cell index we're over based on X position
-    const dayCells = resizeState.timelineRow.querySelectorAll('.gantt-day-cell');
-    if (dayCells.length === 0) return;
+    const targetCell = getTargetCell(relativeX, resizeState.timelineRow);
 
-    // Find the cell at the current X position
-    let targetCell: HTMLElement | null = null;
-    for (let i = 0; i < dayCells.length; i++) {
-        const cell = dayCells[i] as HTMLElement;
-        const cellLeft = cell.offsetLeft;
-        const cellRight = cellLeft + cell.offsetWidth;
-
-        if (relativeX >= cellLeft && relativeX < cellRight) {
-            targetCell = cell;
-            break;
-        }
-    }
-
-    // If we're outside the cells, clamp to first or last cell
-    if (!targetCell) {
-        if (relativeX < 0) {
-            targetCell = dayCells[0] as HTMLElement;
-        } else {
-            targetCell = dayCells[dayCells.length - 1] as HTMLElement;
-        }
-    }
-
-    if (!targetCell || !targetCell.dataset.date) return;
+    if (!targetCell?.dataset.date) return;
 
     const targetDate = targetCell.dataset.date;
 

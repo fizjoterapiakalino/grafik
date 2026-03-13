@@ -57,54 +57,35 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
      */
     const handleDragStart = (event: DragEvent): void => {
         const target = event.target as HTMLElement;
-
-        // Sprawdź czy Alt jest wciśnięty (tryb kopiowania)
+        const dragPart = target.dataset.splitPart;
         isAltDrag = event.altKey;
 
-        // Sprawdź czy przeciągamy część podzielonej komórki
-        if (target.hasAttribute('data-split-part')) {
-            const parentCell = target.closest('td.editable-cell') as HTMLTableCellElement | null;
+        if (dragPart) {
+            const parentCell = target.closest<HTMLTableCellElement>('td.editable-cell');
             if (parentCell && !parentCell.classList.contains('break-cell') && !parentCell.classList.contains('hydrotherapy-cell') && event.dataTransfer) {
                 draggedCell = parentCell;
-                draggedSplitPart = parseInt(target.getAttribute('data-split-part')!, 10);
-                event.dataTransfer.setData(
-                    'application/json',
-                    JSON.stringify(Object.assign(
-                        {},
-                        _dependencies.getCurrentTableStateForCell(parentCell),
-                        { draggedPart: draggedSplitPart }
-                    ))
-                );
+                draggedSplitPart = Number.parseInt(dragPart, 10);
+                event.dataTransfer.setData('application/json', JSON.stringify({
+                    ...(_dependencies.getCurrentTableStateForCell(parentCell) as object),
+                    draggedPart: draggedSplitPart
+                }));
                 event.dataTransfer.effectAllowed = isAltDrag ? 'copy' : 'move';
                 target.classList.add('is-dragging');
-                if (isAltDrag) {
-                    target.classList.add('is-copying');
-                }
+                if (isAltDrag) target.classList.add('is-copying');
                 parentCell.classList.add('has-dragging-part');
-            } else {
-                event.preventDefault();
-            }
+            } else event.preventDefault();
             return;
         }
 
-        // Standardowe przeciąganie całej komórki
-        const cellTarget = target.closest('td.editable-cell') as HTMLTableCellElement | null;
-
+        const cellTarget = target.closest<HTMLTableCellElement>('td.editable-cell');
         if (cellTarget && !cellTarget.classList.contains('break-cell') && !cellTarget.classList.contains('hydrotherapy-cell') && event.dataTransfer) {
             draggedCell = cellTarget;
             draggedSplitPart = null;
-            event.dataTransfer.setData(
-                'application/json',
-                JSON.stringify(_dependencies.getCurrentTableStateForCell(cellTarget))
-            );
+            event.dataTransfer.setData('application/json', JSON.stringify(_dependencies.getCurrentTableStateForCell(cellTarget)));
             event.dataTransfer.effectAllowed = isAltDrag ? 'copy' : 'move';
             draggedCell.classList.add('is-dragging');
-            if (isAltDrag) {
-                draggedCell.classList.add('is-copying');
-            }
-        } else {
-            event.preventDefault();
-        }
+            if (isAltDrag) draggedCell.classList.add('is-copying');
+        } else event.preventDefault();
     };
 
     /**
@@ -113,7 +94,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
     const handleDragOver = (event: DragEvent): void => {
         event.preventDefault();
         const eventTarget = event.target as HTMLElement;
-        const dropTargetCell = eventTarget.closest('td.editable-cell') as HTMLTableCellElement | null;
+        const dropTargetCell = eventTarget.closest<HTMLTableCellElement>('td.editable-cell');
 
         // Usuń poprzednie podświetlenia
         document.querySelectorAll('.drag-over-target').forEach((el) => el.classList.remove('drag-over-target'));
@@ -122,7 +103,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
             event.dataTransfer.dropEffect = 'move';
 
             // Sprawdź czy przeciągamy nad częścią split komórki
-            if (eventTarget.hasAttribute('data-split-part') ||
+            if (eventTarget.dataset.splitPart ||
                 (eventTarget.tagName === 'DIV' && eventTarget.parentElement?.classList.contains('split-cell-wrapper'))) {
                 // Podświetl tylko część split
                 eventTarget.classList.add('drag-over-target');
@@ -147,8 +128,110 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
      * Opuszczenie obszaru przeciągania
      */
     const handleDragLeave = (event: DragEvent): void => {
-        const target = event.target as HTMLElement;
-        target.classList.remove('drag-over-target');
+        (event.target as HTMLElement).classList.remove('drag-over-target');
+    };
+
+    const _getSourceData = (cell: HTMLElement, part: number | null): any => {
+        const { time = '', employeeIndex = '' } = cell.dataset;
+        const state = _dependencies.appState.scheduleCells[time]?.[employeeIndex] || {};
+
+        if (part && state.isSplit) {
+            return {
+                content: (state as any)[`content${part}`],
+                isMassage: (state as any)[`isMassage${part}`],
+                isPnf: (state as any)[`isPnf${part}`],
+                isEveryOtherDay: (state as any)[`isEveryOtherDay${part}`],
+                treatmentData: (state as any)[`treatmentData${part}`] || {}
+            };
+        }
+
+        return {
+            content: state.content,
+            isMassage: state.isMassage,
+            isPnf: state.isPnf,
+            isEveryOtherDay: state.isEveryOtherDay,
+            treatmentData: {
+                startDate: state.treatmentStartDate,
+                extensionDays: state.treatmentExtensionDays,
+                endDate: state.treatmentEndDate,
+                additionalInfo: state.additionalInfo,
+            }
+        };
+    };
+
+    const _updateTargetStateFromSingle = (targetState: any, sourceData: any): void => {
+        for (const key of CONTENT_KEYS) delete (targetState as any)[key];
+        Object.assign(targetState, {
+            content: safeCopy(sourceData.content),
+            isMassage: safeBool(sourceData.isMassage),
+            isPnf: safeBool(sourceData.isPnf),
+            isEveryOtherDay: safeBool(sourceData.isEveryOtherDay),
+            treatmentStartDate: safeCopy(sourceData.treatmentData.startDate),
+            treatmentExtensionDays: safeCopy(sourceData.treatmentData.extensionDays),
+            treatmentEndDate: safeCopy(sourceData.treatmentData.endDate),
+            additionalInfo: safeCopy(sourceData.treatmentData.additionalInfo)
+        });
+    };
+
+    const _updateTargetState = (targetState: any, sourceData: any, targetPart: number | null, shouldAutoSplit: boolean): void => {
+        if (shouldAutoSplit) {
+            Object.assign(targetState, {
+                content1: safeCopy(targetState.content),
+                isMassage1: safeBool(targetState.isMassage),
+                isPnf1: safeBool(targetState.isPnf),
+                isEveryOtherDay1: safeBool(targetState.isEveryOtherDay),
+                treatmentData1: {
+                    startDate: safeCopy(targetState.treatmentStartDate),
+                    extensionDays: safeCopy(targetState.treatmentExtensionDays),
+                    endDate: safeCopy(targetState.treatmentEndDate),
+                    additionalInfo: safeCopy(targetState.additionalInfo),
+                },
+                content2: safeCopy(sourceData.content),
+                isMassage2: safeBool(sourceData.isMassage),
+                isPnf2: safeBool(sourceData.isPnf),
+                isEveryOtherDay2: safeBool(sourceData.isEveryOtherDay),
+                treatmentData2: safeCopy(sourceData.treatmentData),
+                isSplit: true,
+                content: null, isMassage: null, isPnf: null, isEveryOtherDay: null, treatmentStartDate: null, treatmentExtensionDays: null, treatmentEndDate: null, additionalInfo: null
+            });
+        } else if (targetPart && targetState.isSplit) {
+            const updates = {
+                [`content${targetPart}`]: safeCopy(sourceData.content),
+                [`isMassage${targetPart}`]: safeBool(sourceData.isMassage),
+                [`isPnf${targetPart}`]: safeBool(sourceData.isPnf),
+                [`isEveryOtherDay${targetPart}`]: safeBool(sourceData.isEveryOtherDay),
+                [`treatmentData${targetPart}`]: safeCopy(sourceData.treatmentData)
+            };
+            Object.assign(targetState, updates);
+        } else {
+            _updateTargetStateFromSingle(targetState, sourceData);
+        }
+    };
+
+    const _updateSourceState = (sourceState: any, sourcePart: number | null): void => {
+        if (sourcePart && sourceState.isSplit) {
+            const keys = [`content${sourcePart}`, `isMassage${sourcePart}`, `isPnf${sourcePart}`, `isEveryOtherDay${sourcePart}`, `treatmentData${sourcePart}`];
+            keys.forEach(k => sourceState[k] = null);
+
+            const otherPart = sourcePart === 1 ? 2 : 1;
+            const otherContent = sourceState[`content${otherPart}`] as string | undefined;
+
+            if (!otherContent?.trim()) {
+                Object.assign(sourceState, { isSplit: null, content1: null, content2: null, isMassage1: null, isMassage2: null, isPnf1: null, isPnf2: null, isEveryOtherDay1: null, isEveryOtherDay2: null, treatmentData1: null, treatmentData2: null });
+            } else {
+                sourceState.content = safeCopy(otherContent);
+                sourceState.isMassage = safeBool(sourceState[`isMassage${otherPart}`] as boolean);
+                sourceState.isPnf = safeBool(sourceState[`isPnf${otherPart}`] as boolean);
+                sourceState.isEveryOtherDay = safeBool(sourceState[`isEveryOtherDay${otherPart}`] as boolean);
+                const otherTD = sourceState[`treatmentData${otherPart}`];
+                if (otherTD) {
+                    Object.assign(sourceState, { treatmentStartDate: safeCopy(otherTD.startDate), treatmentExtensionDays: safeCopy(otherTD.extensionDays), treatmentEndDate: safeCopy(otherTD.endDate), additionalInfo: safeCopy(otherTD.additionalInfo) });
+                }
+                Object.assign(sourceState, { isSplit: null, content1: null, content2: null, isMassage1: null, isMassage2: null, isPnf1: null, isPnf2: null, isEveryOtherDay1: null, isEveryOtherDay2: null, treatmentData1: null, treatmentData2: null });
+            }
+        } else {
+            for (const key of CONTENT_KEYS) sourceState[key] = null;
+        }
     };
 
     /**
@@ -156,274 +239,63 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
      */
     const handleDrop = (event: DragEvent): void => {
         event.preventDefault();
-        const dropTargetCell = (event.target as HTMLElement).closest('td.editable-cell') as HTMLTableCellElement | null;
-
-        // Usuń podświetlenia
+        const dropTargetCell = (event.target as HTMLElement).closest<HTMLTableCellElement>('td.editable-cell');
         document.querySelectorAll('.drag-over-target').forEach((el) => el.classList.remove('drag-over-target'));
 
-        if (dropTargetCell && !dropTargetCell.classList.contains('break-cell') && !dropTargetCell.classList.contains('hydrotherapy-cell') && draggedCell && draggedCell !== dropTargetCell) {
-            const sourceTime = draggedCell.dataset.time!;
-            const sourceIndex = draggedCell.dataset.employeeIndex!;
-            const targetTime = dropTargetCell.dataset.time!;
-            const targetIndex = dropTargetCell.dataset.employeeIndex!;
+        if (!dropTargetCell || dropTargetCell.classList.contains('break-cell') || dropTargetCell.classList.contains('hydrotherapy-cell') || !draggedCell || draggedCell === dropTargetCell) return;
 
-            // Sprawdź czy upuszczono na część podzielonej komórki
-            let targetPart: number | null = null;
-            const eventTarget = event.target as HTMLElement;
+        const { time: sourceTime = '', employeeIndex: sourceIndex = '' } = draggedCell.dataset;
+        const { time: targetTime = '', employeeIndex: targetIndex = '' } = dropTargetCell.dataset;
 
-            // Sprawdź czy kliknięto bezpośrednio na div z data-split-part
-            if (eventTarget.hasAttribute('data-split-part')) {
-                targetPart = parseInt(eventTarget.getAttribute('data-split-part')!, 10);
-            } else {
-                // Sprawdź czy kliknięto na element wewnątrz split-cell-wrapper (np. span)
-                const splitDiv = eventTarget.closest('.split-cell-wrapper > div') as HTMLElement | null;
-                if (splitDiv && splitDiv.hasAttribute('data-split-part')) {
-                    targetPart = parseInt(splitDiv.getAttribute('data-split-part')!, 10);
-                } else if (splitDiv) {
-                    // Fallback - określ część na podstawie pozycji w wrapper
-                    const wrapper = splitDiv.parentElement;
-                    if (wrapper) {
-                        targetPart = splitDiv === wrapper.children[0] ? 1 : 2;
-                    }
-                }
-            }
+        const eventTarget = event.target as HTMLElement;
+        const splitDiv = eventTarget.closest<HTMLElement>('.split-cell-wrapper > div');
+        let targetPart: number | null = null;
+        if (eventTarget.dataset.splitPart) targetPart = Number.parseInt(eventTarget.dataset.splitPart, 10);
+        else if (splitDiv?.dataset.splitPart) targetPart = Number.parseInt(splitDiv.dataset.splitPart, 10);
 
-            const sourceCellState = _dependencies.appState.scheduleCells[sourceTime]?.[sourceIndex] || {};
-            const targetCellState = _dependencies.appState.scheduleCells[targetTime]?.[targetIndex] || {};
-            const sourcePart = draggedSplitPart; // Która część jest przeciągana (null = cała komórka)
+        const sourceCellState = _dependencies.appState.scheduleCells[sourceTime]?.[sourceIndex] || {};
+        const targetCellState = _dependencies.appState.scheduleCells[targetTime]?.[targetIndex] || {};
 
-            // === WARUNEK 2: Blokada przenoszenia całej komórki na podzieloną bez wybrania części ===
-            if (!sourcePart && targetCellState.isSplit && !targetPart) {
-                // Próba upuszczenia całej komórki na podzieloną bez wskazania części
-                window.showToast?.('Wybierz konkretną część podzielonej komórki', 3000);
+        if (!draggedSplitPart && targetCellState.isSplit && !targetPart) {
+            (globalThis as any).showToast?.('Wybierz konkretną część podzielonej komórki', 3000);
+            return;
+        }
+
+        if (targetPart && targetCellState.isSplit) {
+            const content = targetCellState[`content${targetPart}`] as string | undefined;
+            if (content?.trim()) {
+                (globalThis as any).showToast?.('Ta część komórki jest już zajęta', 3000);
                 return;
             }
-
-            // === WARUNEK 2b: Blokada nadpisywania części podzielonej komórki która już ma zawartość ===
-            if (targetPart && targetCellState.isSplit) {
-                const targetPartContent = targetCellState[`content${targetPart}`];
-                const targetPartHasContent = targetPartContent && String(targetPartContent).trim() !== '';
-                if (targetPartHasContent) {
-                    window.showToast?.('Ta część komórki jest już zajęta', 3000);
-                    return;
-                }
-            }
-
-            // Wyciągnij dane ze źródła (z uwzględnieniem części split)
-            let contentToMove: string | null | undefined;
-            let isMassageToMove: boolean | null | undefined;
-            let isPnfToMove: boolean | null | undefined;
-            let isEveryOtherDayToMove: boolean | null | undefined;
-            let treatmentDataToMove: {
-                startDate?: string | null;
-                extensionDays?: number | null;
-                endDate?: string | null;
-                additionalInfo?: string | null;
-            };
-
-            if (sourcePart && sourceCellState.isSplit) {
-                // Źródło: część podzielonej komórki
-                contentToMove = sourceCellState[`content${sourcePart}`] as string | null | undefined;
-                isMassageToMove = sourceCellState[`isMassage${sourcePart}`] as boolean | null | undefined;
-                isPnfToMove = sourceCellState[`isPnf${sourcePart}`] as boolean | null | undefined;
-                isEveryOtherDayToMove = sourceCellState[`isEveryOtherDay${sourcePart}`] as boolean | null | undefined;
-                const srcTreatment = sourceCellState[`treatmentData${sourcePart}`] as { startDate?: string | null; extensionDays?: number | null; endDate?: string | null; additionalInfo?: string | null } | null | undefined;
-                treatmentDataToMove = srcTreatment || {};
-            } else {
-                // Źródło: cała komórka (normalna lub podzielona - przenosimy wszystko)
-                contentToMove = sourceCellState.content;
-                isMassageToMove = sourceCellState.isMassage;
-                isPnfToMove = sourceCellState.isPnf;
-                isEveryOtherDayToMove = sourceCellState.isEveryOtherDay;
-                treatmentDataToMove = {
-                    startDate: sourceCellState.treatmentStartDate,
-                    extensionDays: sourceCellState.treatmentExtensionDays,
-                    endDate: sourceCellState.treatmentEndDate,
-                    additionalInfo: sourceCellState.additionalInfo,
-                };
-            }
-
-            // Sprawdź czy jest co przenosić
-            if (!contentToMove || contentToMove.trim() === '') {
-                // Jeśli przeciągamy całą split komórkę, sprawdź obie części
-                if (!sourcePart && sourceCellState.isSplit) {
-                    const hasContent1 = sourceCellState.content1 && String(sourceCellState.content1).trim() !== '';
-                    const hasContent2 = sourceCellState.content2 && String(sourceCellState.content2).trim() !== '';
-                    if (!hasContent1 && !hasContent2) {
-                        return;
-                    }
-                } else {
-                    return;
-                }
-            }
-
-            // === WARUNEK 1: Sprawdź czy cel ma już zawartość - automatyczny podział ===
-            const targetHasContent = targetCellState.isSplit
-                ? (targetCellState.content1 && String(targetCellState.content1).trim() !== '') ||
-                (targetCellState.content2 && String(targetCellState.content2).trim() !== '')
-                : (targetCellState.content && String(targetCellState.content).trim() !== '');
-
-            // Jeśli cel ma zawartość i nie jest podzielony i nie wskazano konkretnej części
-            const shouldAutoSplit = !targetCellState.isSplit && targetHasContent && !targetPart;
-
-            const updates = [
-                {
-                    time: targetTime,
-                    employeeIndex: targetIndex,
-                    updateFn: (targetState: CellState) => {
-                        if (shouldAutoSplit) {
-                            // === AUTOMATYCZNY PODZIAŁ: cel ma zawartość, więc dzielimy ===
-                            // Przenieś istniejącą zawartość do części 1
-                            targetState.content1 = safeCopy(targetState.content);
-                            targetState.isMassage1 = safeBool(targetState.isMassage);
-                            targetState.isPnf1 = safeBool(targetState.isPnf);
-                            targetState.isEveryOtherDay1 = safeBool(targetState.isEveryOtherDay);
-                            targetState.treatmentData1 = {
-                                startDate: safeCopy(targetState.treatmentStartDate),
-                                extensionDays: safeCopy(targetState.treatmentExtensionDays),
-                                endDate: safeCopy(targetState.treatmentEndDate),
-                                additionalInfo: safeCopy(targetState.additionalInfo),
-                            };
-
-                            // Przenieś nową zawartość do części 2
-                            targetState.content2 = safeCopy(contentToMove);
-                            targetState.isMassage2 = safeBool(isMassageToMove);
-                            targetState.isPnf2 = safeBool(isPnfToMove);
-                            targetState.isEveryOtherDay2 = safeBool(isEveryOtherDayToMove);
-                            targetState.treatmentData2 = {
-                                startDate: safeCopy(treatmentDataToMove.startDate),
-                                extensionDays: safeCopy(treatmentDataToMove.extensionDays),
-                                endDate: safeCopy(treatmentDataToMove.endDate),
-                                additionalInfo: safeCopy(treatmentDataToMove.additionalInfo),
-                            };
-
-                            // Oznacz jako podzieloną i wyczyść pola zwykłej komórki
-                            targetState.isSplit = true;
-                            targetState.content = null;
-                            targetState.isMassage = null;
-                            targetState.isPnf = null;
-                            targetState.isEveryOtherDay = null;
-                            targetState.treatmentStartDate = null;
-                            targetState.treatmentExtensionDays = null;
-                            targetState.treatmentEndDate = null;
-                            targetState.additionalInfo = null;
-                        } else if (targetPart && targetCellState.isSplit) {
-                            // Cel: część podzielonej komórki
-                            targetState[`content${targetPart}`] = safeCopy(contentToMove);
-                            targetState[`isMassage${targetPart}`] = safeBool(isMassageToMove);
-                            targetState[`isPnf${targetPart}`] = safeBool(isPnfToMove);
-                            targetState[`isEveryOtherDay${targetPart}`] = safeBool(isEveryOtherDayToMove);
-                            targetState[`treatmentData${targetPart}`] = {
-                                startDate: safeCopy(treatmentDataToMove.startDate),
-                                extensionDays: safeCopy(treatmentDataToMove.extensionDays),
-                                endDate: safeCopy(treatmentDataToMove.endDate),
-                                additionalInfo: safeCopy(treatmentDataToMove.additionalInfo),
-                            };
-                        } else {
-                            // Cel: zwykła komórka (pusta lub bez wskazania części)
-                            for (const key of CONTENT_KEYS) {
-                                delete (targetState as Record<string, unknown>)[key];
-                            }
-                            targetState.content = safeCopy(contentToMove);
-                            targetState.isMassage = safeBool(isMassageToMove);
-                            targetState.isPnf = safeBool(isPnfToMove);
-                            targetState.isEveryOtherDay = safeBool(isEveryOtherDayToMove);
-                            targetState.treatmentStartDate = safeCopy(treatmentDataToMove.startDate);
-                            targetState.treatmentExtensionDays = safeCopy(treatmentDataToMove.extensionDays);
-                            targetState.treatmentEndDate = safeCopy(treatmentDataToMove.endDate);
-                            targetState.additionalInfo = safeCopy(treatmentDataToMove.additionalInfo);
-                        }
-                    },
-                },
-            ];
-
-            // Dodaj aktualizację źródła tylko jeśli NIE kopiujemy (Alt nie wciśnięty)
-            if (!isAltDrag) {
-                updates.push({
-                    time: sourceTime,
-                    employeeIndex: sourceIndex,
-                    updateFn: (sourceState: CellState) => {
-                        if (sourcePart && sourceState.isSplit) {
-                            // Wyczyść tylko wybraną część podzielonej komórki
-                            sourceState[`content${sourcePart}`] = null;
-                            sourceState[`isMassage${sourcePart}`] = null;
-                            sourceState[`isPnf${sourcePart}`] = null;
-                            sourceState[`isEveryOtherDay${sourcePart}`] = null;
-                            sourceState[`treatmentData${sourcePart}`] = null;
-
-                            // === WARUNEK 3: Automatyczne scalenie jeśli obie części puste ===
-                            const otherPart = sourcePart === 1 ? 2 : 1;
-                            const otherContent = sourceState[`content${otherPart}`];
-                            const otherHasContent = otherContent && String(otherContent).trim() !== '';
-
-                            if (!otherHasContent) {
-                                // Obie części puste - scal komórkę (usuń podział)
-                                sourceState.isSplit = null;
-                                sourceState.content1 = null;
-                                sourceState.content2 = null;
-                                sourceState.isMassage1 = null;
-                                sourceState.isMassage2 = null;
-                                sourceState.isPnf1 = null;
-                                sourceState.isPnf2 = null;
-                                sourceState.isEveryOtherDay1 = null;
-                                sourceState.isEveryOtherDay2 = null;
-                                sourceState.treatmentData1 = null;
-                                sourceState.treatmentData2 = null;
-                            } else {
-                                // Druga część ma zawartość - przenieś ją do głównej i scal
-                                const otherMassage = sourceState[`isMassage${otherPart}`];
-                                const otherPnf = sourceState[`isPnf${otherPart}`];
-                                const otherEveryOtherDay = sourceState[`isEveryOtherDay${otherPart}`];
-                                const otherTreatmentData = sourceState[`treatmentData${otherPart}`] as { startDate?: string | null; extensionDays?: number | null; endDate?: string | null; additionalInfo?: string | null } | null | undefined;
-
-                                // Przenieś zawartość do głównych pól
-                                sourceState.content = safeCopy(otherContent);
-                                sourceState.isMassage = safeBool(otherMassage);
-                                sourceState.isPnf = safeBool(otherPnf);
-                                sourceState.isEveryOtherDay = safeBool(otherEveryOtherDay);
-                                if (otherTreatmentData) {
-                                    sourceState.treatmentStartDate = safeCopy(otherTreatmentData.startDate);
-                                    sourceState.treatmentExtensionDays = safeCopy(otherTreatmentData.extensionDays);
-                                    sourceState.treatmentEndDate = safeCopy(otherTreatmentData.endDate);
-                                    sourceState.additionalInfo = safeCopy(otherTreatmentData.additionalInfo);
-                                }
-
-                                // Wyczyść pola split
-                                sourceState.isSplit = null;
-                                sourceState.content1 = null;
-                                sourceState.content2 = null;
-                                sourceState.isMassage1 = null;
-                                sourceState.isMassage2 = null;
-                                sourceState.isPnf1 = null;
-                                sourceState.isPnf2 = null;
-                                sourceState.isEveryOtherDay1 = null;
-                                sourceState.isEveryOtherDay2 = null;
-                                sourceState.treatmentData1 = null;
-                                sourceState.treatmentData2 = null;
-                            }
-                        } else {
-                            // Wyczyść całą źródłową komórkę
-                            for (const key of CONTENT_KEYS) {
-                                sourceState[key] = null;
-                            }
-                        }
-                    },
-                });
-            }
-
-            _dependencies.updateMultipleCells(updates);
-
-            // Dodaj animację drop na komórce docelowej
-            dropTargetCell.classList.add('just-dropped');
-            setTimeout(() => {
-                dropTargetCell.classList.remove('just-dropped');
-            }, 300);
-
-            // Pokaż toast przy kopiowaniu
-            if (isAltDrag) {
-                window.showToast?.('Skopiowano pacjenta', 1500);
-            }
         }
+
+        const sourceData = _getSourceData(draggedCell, draggedSplitPart);
+        const sourceContent = sourceData.content as string | undefined;
+        if (!sourceContent?.trim()) {
+            const s1 = sourceCellState.content1 as string | undefined;
+            const s2 = sourceCellState.content2 as string | undefined;
+            if (!draggedSplitPart && sourceCellState.isSplit && (s1?.trim() || s2?.trim())) { /* continue */ }
+            else return;
+        }
+
+        const t1 = targetCellState.content1 as string | undefined;
+        const t2 = targetCellState.content2 as string | undefined;
+        const tc = targetCellState.content as string | undefined;
+        const targetHasContent = !!(targetCellState.isSplit ? (t1?.trim() || t2?.trim()) : tc?.trim());
+        const shouldAutoSplit = !targetCellState.isSplit && targetHasContent && !targetPart;
+
+        const updates = [
+            { time: targetTime, employeeIndex: targetIndex, updateFn: (state: CellState) => _updateTargetState(state, sourceData, targetPart, shouldAutoSplit) }
+        ];
+
+        if (!isAltDrag) {
+            updates.push({ time: sourceTime, employeeIndex: sourceIndex, updateFn: (state: CellState) => _updateSourceState(state, draggedSplitPart) });
+        }
+
+        _dependencies.updateMultipleCells(updates);
+        dropTargetCell.classList.add('just-dropped');
+        setTimeout(() => dropTargetCell.classList.remove('just-dropped'), 300);
+        if (isAltDrag) (globalThis as any).showToast?.('Skopiowano pacjenta', 1500);
     };
 
     /**
@@ -479,4 +351,4 @@ declare global {
     }
 }
 
-window.ScheduleDragDrop = ScheduleDragDrop;
+(globalThis as any).ScheduleDragDrop = ScheduleDragDrop;

@@ -1,6 +1,5 @@
 // scripts/calendar-modal.ts
-import { debugLog } from './common.js';
-import { AppConfig, months, isHoliday } from './common.js';
+import { debugLog, AppConfig, months, isHoliday } from './common.js';
 import { toUTCDate, toDateString } from './utils.js';
 
 /**
@@ -206,9 +205,21 @@ export const CalendarModal: CalendarModalAPI = (() => {
         });
 
         dateToTypeMap.forEach((_, dateString) => {
-            const cell = document.querySelector(`#calendarModal .day-cell-calendar[data-date="${dateString}"]`) as HTMLElement | null;
-            if (cell) updateDayCellSelection(cell);
+            const cell = document.querySelector(`#calendarModal .day-cell-calendar[data-date="${dateString}"]`);
+            if (cell instanceof HTMLElement) updateDayCellSelection(cell);
         });
+    };
+
+    const getCellSelectionStatus = (dateString: string, isRangeActive: boolean, start: string | null, end: string | null) => {
+        let startStr = start;
+        let endStr = end;
+        if (startStr && endStr && startStr > endStr) [startStr, endStr] = [endStr, startStr];
+
+        const isInRange = isRangeActive && startStr && endStr && dateString >= startStr && dateString <= endStr;
+        const isSelected = singleSelectedDays.has(dateString);
+        const isApplied = dateToTypeMap.has(dateString);
+
+        return { isInRange, isSelected, isApplied, startStr, endStr };
     };
 
     const updateDayCellSelection = (dayCell: HTMLElement): void => {
@@ -221,13 +232,7 @@ export const CalendarModal: CalendarModalAPI = (() => {
         dayCell.style.backgroundColor = '';
         dayCell.style.color = '';
 
-        let startStr = selectionStartDate;
-        let endStr = hoverEndDate;
-        if (startStr && endStr && startStr > endStr) [startStr, endStr] = [endStr, startStr];
-
-        const isInRange = isRangeSelectionActive && startStr && endStr && dateString >= startStr && dateString <= endStr;
-        const isSelected = singleSelectedDays.has(dateString);
-        const isApplied = dateToTypeMap.has(dateString);
+        const { isInRange, isSelected, isApplied, startStr, endStr } = getCellSelectionStatus(dateString, isRangeSelectionActive, selectionStartDate, hoverEndDate);
 
         if (isSelected || isInRange || isApplied) {
             const leaveType = (isSelected || isInRange) ? (leaveTypeSelect?.value || 'vacation') : (dateToTypeMap.get(dateString) || 'vacation');
@@ -262,73 +267,88 @@ export const CalendarModal: CalendarModalAPI = (() => {
         updateSelectionPreview();
     };
 
+    const validateAndShowToast = (message: string): boolean => {
+        (globalThis as any).showToast(message, 3000);
+        return false;
+    };
+
+    const validateArt188 = (clickedDate: string): boolean => {
+        const selectedArt188Days = Array.from(singleSelectedDays).filter((date) => {
+            const type = dateToTypeMap.get(date);
+            return type === 'child_care_art_188' || !type;
+        });
+        if (selectedArt188Days.length >= 2 && !singleSelectedDays.has(clickedDate)) {
+            return validateAndShowToast('Wykorzystano maksymalną liczbę 2 dni opieki nad zdrowym dzieckiem.');
+        }
+        return true;
+    };
+
+    const validateVacationLimit = (clickedDate: string): boolean => {
+        const currentUsage = countVacationUsage();
+        const d = new Date(clickedDate + 'T00:00:00Z');
+        const day = d.getUTCDay();
+        const isWorkDay = day !== 0 && day !== 6 && !isHoliday(d);
+
+        if (isWorkDay && currentUsage >= currentVacationLimit) {
+            return validateAndShowToast(`Osiągnięto limit urlopu wypoczynkowego (${currentVacationLimit} dni).`);
+        }
+        return true;
+    };
+
+    const handleSingleSelection = (clickedDate: string): void => {
+        isRangeSelectionActive = false;
+        selectionStartDate = null;
+        if (singleSelectedDays.has(clickedDate)) {
+            singleSelectedDays.delete(clickedDate);
+        } else {
+            singleSelectedDays.add(clickedDate);
+        }
+    };
+
+    const handleRangeSelection = (clickedDate: string): void => {
+        let start = selectionStartDate!;
+        let end = clickedDate;
+        if (start > end) [start, end] = [end, start];
+        const startDate = toUTCDate(start);
+        const endDate = toUTCDate(end);
+
+        for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
+            singleSelectedDays.add(toDateString(d));
+        }
+        isRangeSelectionActive = false;
+        selectionStartDate = null;
+    };
+
     const handleDayClick = (event: Event): void => {
         const mouseEvent = event as MouseEvent;
-        const target = (mouseEvent.target as HTMLElement).closest('.day-cell-calendar') as HTMLElement | null;
-        if (!target || !target.dataset.date) return;
+        const target = (mouseEvent.target as HTMLElement)?.closest('.day-cell-calendar');
+        if (!(target instanceof HTMLElement) || !target.dataset.date) return;
+        
         const clickedDate = target.dataset.date;
         const currentType = leaveTypeSelect?.value || 'vacation';
 
-        // Validation for child care art 188
-        if (currentType === 'child_care_art_188') {
-            const selectedArt188Days = Array.from(singleSelectedDays).filter((date) => {
-                const type = dateToTypeMap.get(date);
-                return type === 'child_care_art_188' || !type;
-            });
-            const isAddingNewDay = !singleSelectedDays.has(clickedDate);
-            if (selectedArt188Days.length >= 2 && isAddingNewDay) {
-                window.showToast('Wykorzystano maksymalną liczbę 2 dni opieki nad zdrowym dzieckiem.', 3000);
-                return;
-            }
-        }
-
-        // Validation for vacation limit
+        if (currentType === 'child_care_art_188' && !validateArt188(clickedDate)) return;
         if (currentType === 'vacation' && !singleSelectedDays.has(clickedDate) && !mouseEvent.ctrlKey && !mouseEvent.metaKey) {
-            const currentUsage = countVacationUsage();
-            const d = new Date(clickedDate + 'T00:00:00Z');
-            const day = d.getUTCDay();
-            const isWorkDay = day !== 0 && day !== 6 && !isHoliday(d);
-
-            if (isWorkDay && currentUsage >= currentVacationLimit) {
-                window.showToast(`Osiągnięto limit urlopu wypoczynkowego (${currentVacationLimit} dni).`, 3000);
-                return;
-            }
+            if (!validateVacationLimit(clickedDate)) return;
         }
 
         if (mouseEvent.ctrlKey || mouseEvent.metaKey) {
-            isRangeSelectionActive = false;
-            selectionStartDate = null;
-            if (singleSelectedDays.has(clickedDate)) {
-                singleSelectedDays.delete(clickedDate);
-            } else {
-                singleSelectedDays.add(clickedDate);
-            }
+            handleSingleSelection(clickedDate);
+        } else if (isRangeSelectionActive) {
+            handleRangeSelection(clickedDate);
         } else {
-            if (!isRangeSelectionActive) {
-                isRangeSelectionActive = true;
-                selectionStartDate = clickedDate;
-            } else {
-                let start = selectionStartDate!;
-                let end = clickedDate;
-                if (start > end) [start, end] = [end, start];
-                const startDate = toUTCDate(start);
-                const endDate = toUTCDate(end);
-
-                for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
-                    singleSelectedDays.add(toDateString(d));
-                }
-                isRangeSelectionActive = false;
-                selectionStartDate = null;
-            }
+            isRangeSelectionActive = true;
+            selectionStartDate = clickedDate;
         }
+
         hoverEndDate = null;
         updateAllDayCells();
         updateSelectionPreview();
     };
 
     const handleDayMouseOver = (event: Event): void => {
-        const target = (event.target as HTMLElement).closest('.day-cell-calendar') as HTMLElement | null;
-        if (!target || !target.dataset.date || !isRangeSelectionActive) return;
+        const target = (event.target as HTMLElement)?.closest('.day-cell-calendar');
+        if (!(target instanceof HTMLElement) || !target.dataset.date || !isRangeSelectionActive) return;
         if (hoverEndDate !== target.dataset.date) {
             hoverEndDate = target.dataset.date;
             updateAllDayCells();
@@ -336,7 +356,7 @@ export const CalendarModal: CalendarModalAPI = (() => {
     };
 
     const updateSelectionPreview = (): void => {
-        const dates = Array.from(singleSelectedDays).sort();
+        const dates = Array.from(singleSelectedDays).sort((a, b) => a.localeCompare(b));
         if (startDatePreview) startDatePreview.textContent = dates.length > 0 ? dates[0] : '-';
         if (endDatePreview) endDatePreview.textContent = dates.length > 0 ? dates[dates.length - 1] : '-';
 
@@ -367,7 +387,7 @@ export const CalendarModal: CalendarModalAPI = (() => {
             });
         }
 
-        const sortedDays = Array.from(dateToTypeMap.keys()).sort();
+        const sortedDays = Array.from(dateToTypeMap.keys()).sort((a, b) => a.localeCompare(b));
         const newLeaves: LeaveResult[] = [];
 
         if (sortedDays.length > 0) {
@@ -526,4 +546,4 @@ declare global {
     }
 }
 
-window.CalendarModal = CalendarModal;
+(globalThis as any).CalendarModal = CalendarModal;

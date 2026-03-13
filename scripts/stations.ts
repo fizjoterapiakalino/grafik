@@ -240,7 +240,7 @@ export const Stations: StationsAPI = (() => {
     let stationStates: Map<string, StationState> = new Map();
     let unsubscribe: (() => void) | null = null;
     let unsubscribeAuth: (() => void) | null = null;
-    let timerInterval: number | null = null;
+    let timerInterval: any = null;
     let soundEnabled = true;
     let roomVisibility: Map<string, boolean> = new Map();
     let desktopColumnsCount: DesktopColumnsCount = 3;
@@ -285,6 +285,7 @@ export const Stations: StationsAPI = (() => {
         return null;
     };
 
+<<<<<<< Updated upstream
     /**
      * Return current time corrected by server offset when available.
      */
@@ -298,6 +299,16 @@ export const Stations: StationsAPI = (() => {
         if (updatedAtMs === null) return;
         serverTimeOffsetMs = updatedAtMs - Date.now();
         hasServerTimeOffset = true;
+=======
+    const markQueueMove = (stationId: string, employeeId: string, direction: 'up' | 'down'): void => {
+        const now = getNowMs();
+        lastQueueMove = { stationId, employeeId, direction, at: now };
+        globalThis.setTimeout(() => {
+            if (lastQueueMove?.at === now) {
+                lastQueueMove = null;
+            }
+        }, 900);
+>>>>>>> Stashed changes
     };
 
     /**
@@ -331,7 +342,7 @@ export const Stations: StationsAPI = (() => {
         });
 
         // Deep clone configuration
-        rooms = JSON.parse(JSON.stringify(ROOMS_CONFIG));
+        rooms = structuredClone(ROOMS_CONFIG);
         activeMobileRoomId = rooms[0]?.id ?? null;
         loadRoomVisibilitySettings();
         loadDesktopColumnsSettings();
@@ -384,8 +395,34 @@ export const Stations: StationsAPI = (() => {
             timerInterval = null;
         }
 
+<<<<<<< Updated upstream
         // Remove event listener
         document.removeEventListener('click', handleClick);
+=======
+        // Remove all event listeners via AbortController
+        if (eventAbortController) {
+            eventAbortController.abort();
+            eventAbortController = null;
+        }
+
+        // Remove visibilitychange handler
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+
+        // Close AudioContext to free resources
+        try {
+            const audioContext = (globalThis as any).stationsAudioContext;
+            if (audioContext && typeof audioContext.close === 'function') {
+                audioContext.close();
+            }
+            (globalThis as any).stationsAudioContext = null;
+        } catch (_) { /* ignore */ }
+
+        // Resolve pending employee picker Promise to prevent leak
+        if (pendingPickerResolve) {
+            pendingPickerResolve(null);
+            pendingPickerResolve = null;
+        }
+>>>>>>> Stashed changes
 
         // Remove employee picker modal if exists
         document.getElementById('employeePickerModal')?.remove();
@@ -409,8 +446,8 @@ export const Stations: StationsAPI = (() => {
      */
     const initAudio = (): void => {
         try {
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-            (window as any).stationsAudioContext = audioContext;
+            const audioContext = new (globalThis.AudioContext || (globalThis as any).webkitAudioContext)();
+            (globalThis as any).stationsAudioContext = audioContext;
         } catch (e) {
             console.log('Audio not supported');
         }
@@ -423,7 +460,7 @@ export const Stations: StationsAPI = (() => {
         if (!soundEnabled) return;
 
         try {
-            const audioContext = (window as any).stationsAudioContext;
+            const audioContext = (globalThis as any).stationsAudioContext;
             if (audioContext) {
                 const oscillator = audioContext.createOscillator();
                 const gainNode = audioContext.createGain();
@@ -446,6 +483,50 @@ export const Stations: StationsAPI = (() => {
     };
 
     /**
+<<<<<<< Updated upstream
+=======
+     * Request notification permission on user interaction
+     */
+    const requestNotificationPermissionOnInteraction = (): void => {
+        if ('Notification' in globalThis && Notification.permission === 'default') {
+            Notification.requestPermission().catch(console.warn);
+        }
+    };
+
+    /**
+     * Send Push/Local Notification
+     */
+    const sendNotification = async (title: string, body: string, vibrate: number[]): Promise<void> => {
+        if (!soundEnabled) return;
+
+        if (navigator.vibrate) {
+            navigator.vibrate(vibrate);
+        }
+
+        if (!('Notification' in globalThis)) return;
+
+        if (Notification.permission === 'granted') {
+            try {
+                const swRegistration = await navigator.serviceWorker?.getRegistration();
+                if (swRegistration && swRegistration.showNotification) {
+                    await swRegistration.showNotification(title, {
+                        body,
+                        vibrate,
+                        icon: 'logo.png',
+                        tag: `station-timer-${title}`,
+                        renotify: true
+                    } as any);
+                } else {
+                    new Notification(title, { body, vibrate, icon: 'logo.png' } as any);
+                }
+            } catch (e) {
+                console.error('Notification error:', e);
+            }
+        }
+    };
+
+    /**
+>>>>>>> Stashed changes
      * Subscribe to Firebase real-time updates
      */
     const subscribeToUpdates = (): void => {
@@ -498,7 +579,7 @@ export const Stations: StationsAPI = (() => {
                     const nextInQueue = state.queue?.[0];
                     if (nextInQueue) {
                         const nextName = EmployeeManager.getNameById(nextInQueue.employeeId);
-                        window.showToast?.(`Stanowisko gotowe. Następny: ${nextName}`, 3500);
+                        (globalThis as any).showToast?.(`Stanowisko gotowe. Następny: ${nextName}`, 3500);
                     }
                     break;
                 }
@@ -593,6 +674,161 @@ export const Stations: StationsAPI = (() => {
     /**
      * Sync local state with Firebase data
      */
+<<<<<<< Updated upstream
+=======
+    const normalizeQueueEntries = (queue: unknown): QueueEntry[] => {
+        if (!Array.isArray(queue)) return [];
+
+        return queue
+            .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object')
+            .map((entry) => {
+                const treatmentIdRaw = typeof entry.treatmentId === 'string' ? entry.treatmentId : '';
+                const normalizedTreatmentId = normalizeTreatmentId(treatmentIdRaw) || treatmentIdRaw;
+                const durationRaw = typeof entry.duration === 'number' ? entry.duration : 0;
+                const normalizedDuration = isTherapyMassageTreatment(normalizedTreatmentId) ? 20 : durationRaw;
+
+                return {
+                    employeeId: typeof entry.employeeId === 'string' ? entry.employeeId : '',
+                    treatmentId: normalizedTreatmentId,
+                    duration: normalizedDuration,
+                    addedAt: typeof entry.addedAt === 'number' ? entry.addedAt : getNowMs(),
+                };
+            })
+            .filter(entry => !!entry.employeeId && !!entry.treatmentId && entry.duration > 0);
+    };
+
+    const normalizeStationState = (raw: unknown): StationState => {
+        if (!raw || typeof raw !== 'object') {
+            return { status: 'FREE', queue: [] };
+        }
+
+        const source = raw as Record<string, unknown>;
+        const queue = normalizeQueueEntries(source.queue);
+        const statusRaw = source.status;
+        const status: StationStatus =
+            statusRaw === 'OCCUPIED' || statusRaw === 'FINISHED' ? statusRaw : 'FREE';
+
+        const treatmentIdRaw = typeof source.treatmentId === 'string' ? source.treatmentId : undefined;
+        const treatmentId = normalizeTreatmentId(treatmentIdRaw);
+        const durationRaw = typeof source.duration === 'number' ? source.duration : undefined;
+        const serverStartTime = parseFirestoreMillis(source.startTimeServer);
+        const startTimeFallback =
+            typeof source.startTime === 'number' ? source.startTime : parseFirestoreMillis(source.startTime);
+        const resolvedStartTime = serverStartTime ?? startTimeFallback ?? undefined;
+
+        if (status !== 'OCCUPIED' && status !== 'FINISHED') {
+            return {
+                status: 'FREE',
+                queue
+            };
+        }
+
+        return {
+            status,
+            treatmentId,
+            startTime: resolvedStartTime,
+            startTimeServer: source.startTimeServer,
+            duration: treatmentId && isTherapyMassageTreatment(treatmentId) ? 20 : durationRaw,
+            employeeId: typeof source.employeeId === 'string' ? source.employeeId : undefined,
+            queue
+        };
+    };
+
+    const serializeStationState = (state: StationState): Record<string, unknown> => {
+        const queue = normalizeQueueEntries(state.queue);
+        if (state.status === 'OCCUPIED' || state.status === 'FINISHED') {
+            return {
+                status: state.status,
+                treatmentId: normalizeTreatmentId(state.treatmentId),
+                startTime: state.startTime,
+                ...(state.startTimeServer !== undefined && { startTimeServer: state.startTimeServer }),
+                duration: state.treatmentId && isTherapyMassageTreatment(state.treatmentId) ? 20 : state.duration,
+                employeeId: state.employeeId,
+                queue,
+            };
+        }
+
+        return {
+            status: 'FREE',
+            queue,
+        };
+    };
+
+    const applyStationStateToModel = (stationId: string, state: StationState): void => {
+        for (const room of rooms) {
+            const station = room.stations.find(s => s.id === stationId);
+            if (!station) continue;
+
+            station.status = state.status;
+            station.treatmentId = normalizeTreatmentId(state.treatmentId);
+            station.startTime = state.startTime;
+            station.duration = state.treatmentId && isTherapyMassageTreatment(state.treatmentId) ? 20 : state.duration;
+            station.employeeId = state.employeeId;
+            station.queue = normalizeQueueEntries(state.queue);
+            return;
+        }
+    };
+
+    const mutateStationState = async <T = void>(
+        stationId: string,
+        mutate: (current: StationState) => { next: StationState; result?: T } | null
+    ): Promise<{ applied: boolean; next: StationState | null; result?: T }> => {
+        const docRef = db.collection('stations').doc(STATIONS_DOC_ID);
+
+        if (typeof db.runTransaction !== 'function') {
+            const snapshot = await docRef.get();
+            const rawData = (snapshot.data?.() || {}) as StationsDocData;
+            const current = normalizeStationState(rawData[stationId]);
+            const mutation = mutate(current);
+            if (!mutation) {
+                return { applied: false, next: current };
+            }
+
+            const nextRevision = (typeof rawData._revision === 'number' ? rawData._revision : lastKnownRevision) + 1;
+            const payload: Record<string, unknown> = {
+                _lastUpdated: FieldValue.serverTimestamp(),
+                _revision: nextRevision,
+                [stationId]: serializeStationState(mutation.next)
+            };
+
+            await docRef.set(payload, { merge: true });
+            lastKnownRevision = nextRevision;
+            updateServerOffset({ _lastUpdated: Date.now(), _revision: nextRevision });
+            return { applied: true, next: mutation.next, result: mutation.result };
+        }
+
+        let applied = false;
+        let nextState: StationState | null = null;
+        let mutationResult: T | undefined;
+
+        await db.runTransaction(async (tx) => {
+            const snapshot = await tx.get(docRef);
+            const rawData = (snapshot.data?.() || {}) as StationsDocData;
+            const current = normalizeStationState(rawData[stationId]);
+            const mutation = mutate(current);
+            if (!mutation) {
+                nextState = current;
+                return;
+            }
+
+            const nextRevision = (typeof rawData._revision === 'number' ? rawData._revision : lastKnownRevision) + 1;
+            const payload: Record<string, unknown> = {
+                _lastUpdated: FieldValue.serverTimestamp(),
+                _revision: nextRevision,
+                [stationId]: serializeStationState(mutation.next)
+            };
+
+            tx.set(docRef, payload, { merge: true });
+            applied = true;
+            nextState = mutation.next;
+            mutationResult = mutation.result;
+            lastKnownRevision = nextRevision;
+        });
+
+        return { applied, next: nextState, result: mutationResult };
+    };
+
+>>>>>>> Stashed changes
     const syncLocalState = (): void => {
         for (const room of rooms) {
             for (const station of room.stations) {
@@ -662,10 +898,11 @@ export const Stations: StationsAPI = (() => {
     const startSimpleTreatment = async (room: Room, station: Station): Promise<void> => {
         const empId = await getActiveEmployeeId();
         if (!empId) {
-            window.showToast?.('Nie wybrano pracownika', 2000);
+            (globalThis as any).showToast?.('Nie wybrano pracownika', 2000);
             return;
         }
 
+<<<<<<< Updated upstream
         station.status = 'OCCUPIED';
         station.treatmentId = station.id; // Use station ID as treatment ID for simple rooms
         station.startTime = getNowMs();
@@ -676,6 +913,16 @@ export const Stations: StationsAPI = (() => {
 
         window.showToast?.(`${station.name} - ${room.defaultDuration} min`, 2000);
         updateAllStationCards();
+=======
+        if (!mutation.applied || !mutation.next) {
+            (globalThis as any).showToast?.('Stanowisko jest już zajęte', 2000);
+            return;
+        }
+
+        applyStationStateToModel(station.id, mutation.next);
+        (globalThis as any).showToast?.(`${station.name} - ${room.defaultDuration} min`, 2000);
+        scheduleUpdateAllStationCards();
+>>>>>>> Stashed changes
     };
 
     /**
@@ -688,15 +935,15 @@ export const Stations: StationsAPI = (() => {
             pickerTitle: isTherapyMassage ? 'Wybierz terapeutę' : undefined,
         });
         if (!empId) {
-            window.showToast?.('Nie wybrano pracownika', 2000);
+            (globalThis as any).showToast?.('Nie wybrano pracownika', 2000);
             return;
         }
         if (!isTreatmentAvailable(_room, treatment)) {
-            window.showToast?.('Ten zabieg jest chwilowo niedostępny', 2200);
+            (globalThis as any).showToast?.('Ten zabieg jest chwilowo niedostępny', 2200);
             return;
         }
         if (isTherapyMassage && hasActiveTherapyMassage(empId, station.id)) {
-            window.showToast?.('Masz już aktywną Terapię/Masaż. Możesz tylko dodać się do kolejki.', 3000);
+            (globalThis as any).showToast?.('Masz już aktywną Terapię/Masaż. Możesz tylko dodać się do kolejki.', 3000);
             return;
         }
 
@@ -706,10 +953,21 @@ export const Stations: StationsAPI = (() => {
         station.duration = treatment.duration;
         station.employeeId = empId;
 
+<<<<<<< Updated upstream
         await saveStationState(station);
 
         window.showToast?.(`${treatment.name} - ${treatment.duration} min`, 2000);
         updateAllStationCards();
+=======
+        if (!mutation.applied || !mutation.next) {
+            (globalThis as any).showToast?.('Stanowisko jest już zajęte', 2000);
+            return;
+        }
+
+        applyStationStateToModel(station.id, mutation.next);
+        (globalThis as any).showToast?.(`${treatment.name} - ${treatment.duration} min`, 2000);
+        scheduleUpdateAllStationCards();
+>>>>>>> Stashed changes
     };
 
     /**
@@ -718,7 +976,7 @@ export const Stations: StationsAPI = (() => {
     const releaseStation = async (station: Station): Promise<void> => {
         // Check if user is allowed to release (owner or admin)
         if (!isCurrentUserAdmin && station.employeeId && station.employeeId !== currentEmployeeId) {
-            window.showToast?.('Nie masz uprawnień do zwolnienia tego stanowiska', 3000);
+            (globalThis as any).showToast?.('Nie masz uprawnień do zwolnienia tego stanowiska', 3000);
             return;
         }
 
@@ -731,12 +989,35 @@ export const Stations: StationsAPI = (() => {
         station.duration = undefined;
         station.employeeId = undefined;
 
+<<<<<<< Updated upstream
         // If next in queue is Therapy/Massage — do NOT auto-start, require manual 'Rozpocznij'
         if (nextInQueue && !isNextTherapy) {
             await processQueue(station);
         } else {
             await saveStationState(station);
             window.showToast?.('Stanowisko zwolnione', 1500);
+=======
+            return {
+                next: {
+                    status: 'FREE',
+                    queue,
+                },
+                result: {
+                    startedNext: false
+                }
+            };
+        });
+
+        if (!mutation.next) return;
+        applyStationStateToModel(station.id, mutation.next);
+
+        if (mutation.result?.startedNext && mutation.result.nextEmployeeId) {
+            const empName = EmployeeManager.getNameById(mutation.result.nextEmployeeId);
+            (globalThis as any).showToast?.(`Następny: ${empName}`, 3000);
+            playNotificationSound();
+        } else {
+            (globalThis as any).showToast?.('Stanowisko zwolnione', 1500);
+>>>>>>> Stashed changes
         }
 
         updateAllStationCards();
@@ -753,7 +1034,7 @@ export const Stations: StationsAPI = (() => {
             pickerTitle: isTherapyMassage ? 'Wybierz terapeutę' : undefined,
         });
         if (!empId) {
-            window.showToast?.('Nie wybrano pracownika', 2000);
+            (globalThis as any).showToast?.('Nie wybrano pracownika', 2000);
             return;
         }
         const normalizedDuration = isTherapyMassageTreatment(normalizedTreatmentId) ? 20 : duration;
@@ -763,6 +1044,7 @@ export const Stations: StationsAPI = (() => {
             station.queue = [];
         }
 
+<<<<<<< Updated upstream
         // Limit queue size
         if (station.queue.length >= 5) {
             window.showToast?.('Kolejka jest pełna (max 5)', 2500);
@@ -786,6 +1068,37 @@ export const Stations: StationsAPI = (() => {
         await saveStationState(station);
         window.showToast?.('Dodano do kolejki', 2000);
         updateAllStationCards();
+=======
+            return {
+                next: {
+                    ...current,
+                    queue: [
+                        ...queue,
+                        {
+                            employeeId: empId,
+                            treatmentId: normalizedTreatmentId,
+                            duration: normalizedDuration,
+                            addedAt: getNowMs()
+                        }
+                    ]
+                }
+            };
+        });
+
+        if (!mutation.applied || !mutation.next) {
+            const queue = normalizeQueueEntries(station.queue);
+            if (queue.length >= 5) {
+                (globalThis as any).showToast?.('Kolejka jest pełna (max 5)', 2500);
+            } else {
+                (globalThis as any).showToast?.('Jesteś już w kolejce', 2000);
+            }
+            return;
+        }
+
+        applyStationStateToModel(station.id, mutation.next);
+        (globalThis as any).showToast?.('Dodano do kolejki', 2000);
+        scheduleUpdateAllStationCards();
+>>>>>>> Stashed changes
     };
 
     /**
@@ -793,16 +1106,24 @@ export const Stations: StationsAPI = (() => {
      */
     const removeFromQueue = async (station: Station, employeeId: string): Promise<void> => {
         if (!isCurrentUserAdmin && employeeId !== currentEmployeeId) {
-            window.showToast?.('Brak uprawnień', 2000);
+            (globalThis as any).showToast?.('Brak uprawnień', 2000);
             return;
         }
 
         if (!station.queue) return;
 
+<<<<<<< Updated upstream
         station.queue = station.queue.filter(q => q.employeeId !== employeeId);
         await saveStationState(station);
         window.showToast?.('Usunięto z kolejki', 1500);
         updateAllStationCards();
+=======
+        if (!mutation.applied || !mutation.next) return;
+
+        applyStationStateToModel(station.id, mutation.next);
+        (globalThis as any).showToast?.('Usunięto z kolejki', 1500);
+        scheduleUpdateAllStationCards();
+>>>>>>> Stashed changes
     };
 
     /**
@@ -834,15 +1155,39 @@ export const Stations: StationsAPI = (() => {
                 return;
             }
 
+<<<<<<< Updated upstream
             if (!isAdmin && next.employeeId !== effectiveEmpId) {
                 console.warn('BLOCK: User is not admin and does not own this queue entry');
                 window.showToast?.('Możesz rozpocząć tylko własny zabieg', 3000);
                 return;
+=======
+            const [, ...remainingQueue] = queue;
+            return {
+                next: {
+                    status: 'OCCUPIED',
+                    employeeId: next.employeeId,
+                    treatmentId: normalizeTreatmentId(next.treatmentId),
+                    startTime: getNowMs(),
+                    startTimeServer: FieldValue.serverTimestamp(),
+                    duration: isTherapyMassageTreatment(next.treatmentId) ? 20 : next.duration,
+                    queue: remainingQueue,
+                },
+                result: {
+                    startedEmployeeId: next.employeeId
+                }
+            };
+        });
+
+        if (!mutation.applied || !mutation.next || !mutation.result?.startedEmployeeId) {
+            if (isManual) {
+                (globalThis as any).showToast?.('Możesz rozpocząć tylko własny zabieg', 3000);
+>>>>>>> Stashed changes
             }
 
             console.log('Permission granted for manual start');
         }
 
+<<<<<<< Updated upstream
         // Proceed and remove from queue
         station.queue.shift();
 
@@ -856,6 +1201,11 @@ export const Stations: StationsAPI = (() => {
 
         const empName = EmployeeManager.getNameById(next.employeeId);
         window.showToast?.(`Następny: ${empName}`, 3000);
+=======
+        applyStationStateToModel(station.id, mutation.next);
+        const empName = EmployeeManager.getNameById(mutation.result.startedEmployeeId);
+        (globalThis as any).showToast?.(`Następny: ${empName}`, 3000);
+>>>>>>> Stashed changes
         playNotificationSound();
     };
 
@@ -980,7 +1330,13 @@ export const Stations: StationsAPI = (() => {
      * Start timer interval
      */
     const startTimerInterval = (): void => {
+<<<<<<< Updated upstream
         timerInterval = window.setInterval(() => {
+=======
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        timerInterval = globalThis.setInterval(() => {
+            if (!isPageVisible) return; // Skip timer work when tab is hidden
+>>>>>>> Stashed changes
             updateTimers();
         }, 1000);
     };
@@ -2062,7 +2418,48 @@ export const Stations: StationsAPI = (() => {
     };
 
     /**
+<<<<<<< Updated upstream
      * Setup event listeners
+=======
+     * Force refresh station data from Firebase on demand.
+     */
+    const refreshStationsData = async (): Promise<void> => {
+        const refreshBtn = document.getElementById('refreshStationsBtn');
+        refreshBtn?.classList.add('is-refreshing');
+        (globalThis as any).showToast?.('Odświeżanie...', 900);
+
+        try {
+            const snapshot = await db.collection('stations').doc(STATIONS_DOC_ID).get();
+            stationStates.clear();
+
+            if (snapshot.exists) {
+                const data = (snapshot.data() || {}) as StationsDocData;
+                updateServerOffset(data);
+
+                for (const [stationId, state] of Object.entries(data)) {
+                    if (stationId.startsWith('_')) continue;
+                    stationStates.set(stationId, normalizeStationState(state));
+                }
+            }
+
+            syncLocalState();
+            normalizeActiveMobileRoom();
+            renderDesktopView();
+            renderMobileView();
+            renderSectionsOptionsList();
+            updateAllStationCards();
+            (globalThis as any).showToast?.('Odświeżono', 1200);
+        } catch (error) {
+            console.error('Manual refresh failed:', error);
+            (globalThis as any).showToast?.('Błąd odświeżania', 2200);
+        } finally {
+            refreshBtn?.classList.remove('is-refreshing');
+        }
+    };
+
+    /**
+     * Setup event listeners (using AbortController for clean teardown)
+>>>>>>> Stashed changes
      */
     const setupEventListeners = (): void => {
         document.addEventListener('click', handleClick);
@@ -2303,6 +2700,67 @@ export const Stations: StationsAPI = (() => {
             case 'start-queue':
                 processQueue(station, true);
                 break;
+<<<<<<< Updated upstream
+=======
+            case 'move-queue-up':
+                if (employeeId && station.queue) {
+                    if (!isCurrentUserAdmin && employeeId !== currentEmployeeId) {
+                        (globalThis as any).showToast?.('Możesz przesuwać tylko własną pozycję', 2200);
+                        return;
+                    }
+                    void mutateStationState(station.id, (current) => {
+                        const queue = normalizeQueueEntries(current.queue);
+                        const index = queue.findIndex(q => q.employeeId === employeeId);
+                        if (index <= 0) return null;
+                        const reordered = [...queue];
+                        const temp = reordered[index];
+                        reordered[index] = reordered[index - 1];
+                        reordered[index - 1] = temp;
+                        return {
+                            next: {
+                                ...current,
+                                queue: reordered
+                            }
+                        };
+                    }).then((result) => {
+                        if (!result.applied || !result.next) return;
+                        applyStationStateToModel(station.id, result.next);
+                        markQueueMove(station.id, employeeId, 'up');
+                        (globalThis as any).showToast?.('Kolejność zmieniona', 1000);
+                        scheduleUpdateAllStationCards();
+                    });
+                }
+                break;
+            case 'move-queue-down':
+                if (employeeId && station.queue) {
+                    if (!isCurrentUserAdmin && employeeId !== currentEmployeeId) {
+                        (globalThis as any).showToast?.('Możesz przesuwać tylko własną pozycję', 2200);
+                        return;
+                    }
+                    void mutateStationState(station.id, (current) => {
+                        const queue = normalizeQueueEntries(current.queue);
+                        const index = queue.findIndex(q => q.employeeId === employeeId);
+                        if (index < 0 || index >= queue.length - 1) return null;
+                        const reordered = [...queue];
+                        const temp = reordered[index];
+                        reordered[index] = reordered[index + 1];
+                        reordered[index + 1] = temp;
+                        return {
+                            next: {
+                                ...current,
+                                queue: reordered
+                            }
+                        };
+                    }).then((result) => {
+                        if (!result.applied || !result.next) return;
+                        applyStationStateToModel(station.id, result.next);
+                        markQueueMove(station.id, employeeId, 'down');
+                        (globalThis as any).showToast?.('Kolejność zmieniona', 1000);
+                        scheduleUpdateAllStationCards();
+                    });
+                }
+                break;
+>>>>>>> Stashed changes
         }
     };
 
@@ -2351,7 +2809,7 @@ export const Stations: StationsAPI = (() => {
         soundEnabled = !soundEnabled;
         localStorage.setItem('stationsSoundEnabled', String(soundEnabled));
         updateSoundButton();
-        window.showToast?.(soundEnabled ? 'Dźwięk włączony' : 'Dźwięk wyłączony', 1500);
+        (globalThis as any).showToast?.(soundEnabled ? 'Dźwięk włączony' : 'Dźwięk wyłączony', 1500);
     };
 
     /**
@@ -2383,4 +2841,4 @@ declare global {
     }
 }
 
-window.Stations = Stations;
+(globalThis as any).Stations = Stations;

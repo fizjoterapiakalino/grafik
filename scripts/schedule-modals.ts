@@ -121,7 +121,7 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
     ): void => {
         const patientName = ScheduleUI.getElementText(element);
         if (!patientName) {
-            window.showToast('Brak pacjenta w tej komórce.', 3000);
+            (globalThis as any).showToast('Brak pacjenta w tej komórce.', 3000);
             return;
         }
 
@@ -149,7 +149,7 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
         additionalInfoTextarea.value = currentAdditionalInfo;
 
         const updateEndDate = (): void => {
-            endDateInput.value = ScheduleLogic.calculateEndDate(startDateInput.value, parseInt(extensionDaysInput.value || '0', 10));
+            endDateInput.value = ScheduleLogic.calculateEndDate(startDateInput.value, Number.parseInt(extensionDaysInput.value || '0', 10));
         };
 
         updateEndDate();
@@ -169,7 +169,7 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
         saveModalBtn.onclick = (): void => {
             const newTreatmentData = {
                 startDate: startDateInput.value,
-                extensionDays: parseInt(extensionDaysInput.value, 10),
+                extensionDays: Number.parseInt(extensionDaysInput.value, 10),
                 endDate: endDateInput.value,
                 additionalInfo: additionalInfoTextarea.value,
             };
@@ -180,7 +180,7 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
                 state.treatmentEndDate = newTreatmentData.endDate;
                 state.additionalInfo = newTreatmentData.additionalInfo;
             });
-            window.showToast('Zapisano daty zabiegów i informacje o pacjencie.');
+            (globalThis as any).showToast('Zapisano daty zabiegów i informacje o pacjencie.');
             closeModal();
         };
 
@@ -207,7 +207,7 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
             return;
         }
 
-        if (!cellState || !cellState.history || cellState.history.length === 0) {
+        if (!cellState?.history || cellState.history.length === 0) {
             modalBody.innerHTML = '<p>Brak historii dla tej komórki.</p>';
         } else {
             modalBody.innerHTML = `
@@ -228,25 +228,27 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
             `;
         }
 
-        modalBody.querySelectorAll<HTMLButtonElement>('.revert-btn').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                const valueToRevert = btn.dataset.value || '';
-                updateCellStateCallback((state) => {
-                    if (valueToRevert.includes('/')) {
-                        const parts = valueToRevert.split('/', 2);
-                        state.isSplit = true;
-                        state.content1 = parts[0];
-                        state.content2 = parts[1];
-                        delete state.content;
-                    } else {
-                        delete state.isSplit;
-                        delete state.content1;
-                        delete state.content2;
-                        state.content = valueToRevert;
-                    }
-                });
-                modal.style.display = 'none';
+        const handleRevertClick = (btn: HTMLButtonElement) => {
+            const valueToRevert = btn.dataset.value || '';
+            updateCellStateCallback((state) => {
+                if (valueToRevert.includes('/')) {
+                    const parts = valueToRevert.split('/', 2);
+                    state.isSplit = true;
+                    state.content1 = parts[0];
+                    state.content2 = parts[1];
+                    delete state.content;
+                } else {
+                    delete state.isSplit;
+                    delete state.content1;
+                    delete state.content2;
+                    state.content = valueToRevert;
+                }
             });
+            modal.style.display = 'none';
+        };
+
+        modalBody.querySelectorAll<HTMLButtonElement>('.revert-btn').forEach((btn) => {
+            btn.addEventListener('click', () => handleRevertClick(btn));
         });
 
         const closeModal = (): void => {
@@ -266,7 +268,7 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
     };
 
     const openEmployeeSelectionModal = (): void => {
-        window.showToast('Funkcja wyboru pracownika nie jest jeszcze zaimplementowana.');
+        (globalThis as any).showToast('Funkcja wyboru pracownika nie jest jeszcze zaimplementowana.');
     };
 
     return {
@@ -285,4 +287,4 @@ declare global {
     }
 }
 
-window.ScheduleModals = ScheduleModals;
+(globalThis as any).ScheduleModals = ScheduleModals;

@@ -100,7 +100,7 @@ export const Router: RouterAPI = (() => {
 
     const init = (): void => {
         UIShell.render();
-        window.addEventListener('hashchange', navigate);
+        globalThis.addEventListener('hashchange', navigate);
 
         let isInitialAuthCheck = true;
         auth.onAuthStateChanged((user) => {
@@ -118,31 +118,41 @@ export const Router: RouterAPI = (() => {
         PdfService.initRealtimeUpdates();
     };
 
-    const navigate = async (): Promise<void> => {
-        if (isNavigating) {
-            return;
+    const cleanupActiveModule = (): void => {
+        if (activeModule && typeof activeModule.destroy === 'function') {
+            try {
+                activeModule.destroy();
+            } catch (err) {
+                console.error('Error destroying module:', err);
+            }
         }
+        activeModule = null;
+    };
+
+    const determineTargetPage = (pageName: string): string => {
+        if (currentUser) {
+            return pageName === 'login' || !pageName ? 'schedule' : pageName;
+        }
+        return 'login';
+    };
+
+    const updateHeaderVisibility = (isVisible: boolean): void => {
+        const appHeader = document.getElementById('appHeader');
+        if (appHeader) {
+            appHeader.style.display = isVisible ? 'flex' : 'none';
+        }
+    };
+
+    const navigate = async (): Promise<void> => {
+        if (isNavigating) return;
         isNavigating = true;
         UIShell.showLoading();
 
         try {
-            if (activeModule && typeof activeModule.destroy === 'function') {
-                try {
-                    activeModule.destroy();
-                } catch (err) {
-                    console.error('Error destroying module:', err);
-                }
-                activeModule = null;
-            }
+            cleanupActiveModule();
 
-            const pageName = window.location.hash.substring(1);
-            let targetPage: string;
-
-            if (currentUser) {
-                targetPage = pageName === 'login' || !pageName ? 'schedule' : pageName;
-            } else {
-                targetPage = 'login';
-            }
+            const pageName = globalThis.location.hash.substring(1);
+            const targetPage = determineTargetPage(pageName);
 
             if (pageName !== targetPage) {
                 history.replaceState(null, '', '#' + targetPage);
@@ -159,11 +169,7 @@ export const Router: RouterAPI = (() => {
             }
 
             UIShell.updateUserState(currentUser);
-            const appHeader = document.getElementById('appHeader');
-            if (appHeader) {
-                const displayStyle = currentUser ? 'flex' : 'none';
-                appHeader.style.display = displayStyle;
-            }
+            updateHeaderVisibility(!!currentUser);
 
             await UIShell.loadPage(route.page);
 

@@ -133,7 +133,7 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
                 return;
             }
 
-            allLinksData = documents.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+            allLinksData = [...documents].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
             container.style.display = 'none';
             if (tableContainer) {
@@ -141,7 +141,7 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
             }
 
             const searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
-            if (searchInput && searchInput.value.trim()) {
+            if (searchInput?.value.trim()) {
                 handleGlobalSearch(new CustomEvent('app:search', { detail: { searchTerm: searchInput.value.trim() } }));
             } else {
                 displayLinks(allLinksData);
@@ -180,9 +180,9 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
 
         const filteredLinks = allLinksData.filter(
             (link) =>
-                (link.title && link.title.toLowerCase().includes(searchTerm)) ||
-                (link.type && link.type.toLowerCase().includes(searchTerm)) ||
-                (link.date && link.date.toLowerCase().includes(searchTerm))
+                link.title?.toLowerCase().includes(searchTerm) ||
+                link.type?.toLowerCase().includes(searchTerm) ||
+                link.date?.toLowerCase().includes(searchTerm)
         );
 
         displayLinks(filteredLinks);
@@ -246,49 +246,46 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
         modal.style.display = 'flex';
     };
 
+    const handleKeydown = (e: KeyboardEvent): void => {
+        if (e.key === 'Escape') {
+            const modal = document.getElementById('pdfModal');
+            const loginModal = document.getElementById('isoLoginModal');
+            if (modal?.style.display === 'flex') {
+                closeModal();
+            }
+            if (loginModal?.style.display === 'flex') {
+                closeLoginModal();
+            }
+        }
+    };
+
     const initModal = (): void => {
         if (isModalInitialized) return;
 
         const modal = document.getElementById('pdfModal');
         const closeBtn = document.getElementById('pdfCloseBtn');
-        const loginModal = document.getElementById('isoLoginModal');
         const loginConfirmBtn = document.getElementById('isoLoginConfirmBtn');
         const loginCancelBtn = document.getElementById('isoLoginCancelBtn');
 
         if (!modal) return;
 
-        if (closeBtn) {
-            closeBtn.addEventListener('click', closeModal);
-        }
+        closeBtn?.addEventListener('click', closeModal);
 
         modal.addEventListener('click', (e: MouseEvent) => {
             if (e.target === modal) closeModal();
         });
 
-        if (loginConfirmBtn) {
-            loginConfirmBtn.addEventListener('click', () => {
-                isIsoAuthenticated = true;
-                closeLoginModal();
-                if (pendingUrl) {
-                    actualOpenPdf(pendingUrl, pendingTitle || '');
-                }
-            });
-        }
-
-        if (loginCancelBtn) {
-            loginCancelBtn.addEventListener('click', closeLoginModal);
-        }
-
-        document.addEventListener('keydown', (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                if (modal.style.display === 'flex') {
-                    closeModal();
-                }
-                if (loginModal && loginModal.style.display === 'flex') {
-                    closeLoginModal();
-                }
+        loginConfirmBtn?.addEventListener('click', () => {
+            isIsoAuthenticated = true;
+            closeLoginModal();
+            if (pendingUrl) {
+                actualOpenPdf(pendingUrl, pendingTitle || '');
             }
         });
+
+        loginCancelBtn?.addEventListener('click', closeLoginModal);
+
+        document.addEventListener('keydown', handleKeydown);
 
         isModalInitialized = true;
     };
@@ -303,6 +300,8 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
     const destroy = (): void => {
         allLinksData = [];
         document.removeEventListener('app:search', handleGlobalSearch as EventListener);
+        document.removeEventListener('keydown', handleKeydown);
+        isModalInitialized = false;
     };
 
     return {
@@ -320,4 +319,4 @@ declare global {
     }
 }
 
-window.ScrappedPdfs = ScrappedPdfs;
+(globalThis as unknown as Window).ScrappedPdfs = ScrappedPdfs;

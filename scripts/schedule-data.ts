@@ -58,9 +58,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
             return;
         }
 
-        if (!cellState.history) {
-            cellState.history = [];
-        }
+        cellState.history ??= [];
 
         const lastHistoryValue = cellState.history[0] ? cellState.history[0].oldValue : null;
         if (lastHistoryValue === oldContent) {
@@ -132,7 +130,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
             },
             (error) => {
                 console.error('Error listening to schedule changes:', error);
-                window.showToast('Błąd synchronizacji grafiku. Odśwież stronę.', 5000);
+                (globalThis as any).showToast('Błąd synchronizacji grafiku. Odśwież stronę.', 5000);
             }
         );
     };
@@ -144,7 +142,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
         }
 
         isSaving = true;
-        window.setSaveStatus('saving');
+        (globalThis as any).setSaveStatus('saving');
 
         try {
             if (AppConfig.debug) {
@@ -159,7 +157,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
             }
 
             await getScheduleDocRef().set(appState, { merge: true });
-            window.setSaveStatus('saved');
+            (globalThis as any).setSaveStatus('saved');
             isSaving = false;
 
             if (saveQueued) {
@@ -168,7 +166,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
             }
         } catch (error) {
             console.error('Error saving schedule to Firestore:', error);
-            window.setSaveStatus('error');
+            (globalThis as any).setSaveStatus('error');
             isSaving = false;
         }
     };
@@ -223,7 +221,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
         saveSchedule();
     };
 
-    const getCurrentTableState = (): ScheduleAppState => JSON.parse(JSON.stringify(appState));
+    const getCurrentTableState = (): ScheduleAppState => structuredClone(appState);
 
     const getCellState = (time: string, employeeIndex: string): CellState | undefined => {
         return appState.scheduleCells[time]?.[employeeIndex];
@@ -273,4 +271,4 @@ declare global {
     }
 }
 
-window.ScheduleData = ScheduleData;
+(globalThis as any).ScheduleData = ScheduleData;

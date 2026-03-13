@@ -1,4 +1,3 @@
-// scripts/changes.ts
 import { debugLog } from './common.js';
 import { db as dbRaw } from './firebase-config.js';
 import { AppConfig } from './common.js';
@@ -162,7 +161,7 @@ export const Changes: ChangesAPI = (() => {
                 return cellState?.assignedEmployees ? [...cellState.assignedEmployees] : [];
             });
 
-            window.showToast(`Skopiowano ${clipboard.length} komórek.`);
+            (globalThis as unknown as Window).showToast(`Skopiowano ${clipboard.length} komórek.`);
             return;
         }
 
@@ -174,10 +173,10 @@ export const Changes: ChangesAPI = (() => {
 
         if (cellState?.assignedEmployees) {
             clipboard = [[...cellState.assignedEmployees]];
-            window.showToast('Skopiowano.');
+            (globalThis as unknown as Window).showToast('Skopiowano.');
         } else {
             clipboard = [[]];
-            window.showToast('Skopiowano pustą komórkę.');
+            (globalThis as unknown as Window).showToast('Skopiowano pustą komórkę.');
         }
     };
 
@@ -231,11 +230,11 @@ export const Changes: ChangesAPI = (() => {
         renderChangesAndSave();
 
         if (clipboard.length === 1) {
-            window.showToast('Wklejono.');
+            (globalThis as unknown as Window).showToast('Wklejono.');
         } else if (pastedCount < clipboard.length) {
-            window.showToast(`Wklejono ${pastedCount}/${clipboard.length} komórek (brak miejsca dla pozostałych).`);
+            (globalThis as unknown as Window).showToast(`Wklejono ${pastedCount}/${clipboard.length} komórek (brak miejsca dla pozostałych).`);
         } else {
-            window.showToast(`Wklejono ${pastedCount} komórek.`);
+            (globalThis as unknown as Window).showToast(`Wklejono ${pastedCount} komórek.`);
         }
     };
 
@@ -244,7 +243,7 @@ export const Changes: ChangesAPI = (() => {
         updateCellState(cell, (state) => {
             state.assignedEmployees = [];
         });
-        window.showToast('Wyczyszczono.');
+        (globalThis as unknown as Window).showToast('Wyczyszczono.');
     };
 
     /**
@@ -262,7 +261,7 @@ export const Changes: ChangesAPI = (() => {
         });
 
         if (!hasData) {
-            window.showToast('Bieżący okres jest pusty - brak danych do skopiowania.', 2000);
+            (globalThis as unknown as Window).showToast('Bieżący okres jest pusty - brak danych do skopiowania.', 2000);
             return;
         }
 
@@ -275,7 +274,7 @@ export const Changes: ChangesAPI = (() => {
             }
         }
 
-        window.showToast('Skopiowano wiersz do schowka.', 2000);
+        (globalThis as unknown as Window).showToast('Skopiowano wiersz do schowka.', 2000);
 
         // Aktualizuj wizualny stan przycisków paste
         document.querySelectorAll('.paste-row-btn').forEach(btn => {
@@ -288,7 +287,7 @@ export const Changes: ChangesAPI = (() => {
      */
     const pasteRowFromClipboard = (row: HTMLTableRowElement): void => {
         if (!rowClipboard || Object.keys(rowClipboard).length === 0) {
-            window.showToast('Schowek jest pusty - najpierw skopiuj wiersz.', 2000);
+            (globalThis as unknown as Window).showToast('Schowek jest pusty - najpierw skopiuj wiersz.', 2000);
             return;
         }
 
@@ -310,7 +309,7 @@ export const Changes: ChangesAPI = (() => {
         }
 
         renderChangesAndSave();
-        window.showToast('Wklejono wiersz ze schowka.', 2000);
+        (globalThis as unknown as Window).showToast('Wklejono wiersz ze schowka.', 2000);
     };
 
     // =========================
@@ -350,7 +349,7 @@ export const Changes: ChangesAPI = (() => {
         });
 
         if (!hasData) {
-            window.showToast('Wiersz jest pusty - nie ma czego zapisać jako szablon.', 2000);
+            (globalThis as unknown as Window).showToast('Wiersz jest pusty - nie ma czego zapisać jako szablon.', 2000);
             return;
         }
 
@@ -374,7 +373,7 @@ export const Changes: ChangesAPI = (() => {
 
         const name = input.value.trim();
         if (!name) {
-            window.showToast('Podaj nazwę szablonu.', 2000);
+            (globalThis as unknown as Window).showToast('Podaj nazwę szablonu.', 2000);
             return;
         }
 
@@ -403,7 +402,7 @@ export const Changes: ChangesAPI = (() => {
         if (modal) modal.style.display = 'none';
         pendingTemplateRow = null;
 
-        window.showToast(`Zapisano szablon "${name}".`, 2000);
+        (globalThis as unknown as Window).showToast(`Zapisano szablon "${name}".`, 2000);
     };
 
     /** Otwiera modal aplikacji szablonu */
@@ -411,7 +410,7 @@ export const Changes: ChangesAPI = (() => {
         loadTemplates();
 
         if (templates.length === 0) {
-            window.showToast('Brak zapisanych szablonów. Najpierw zapisz szablon z istniejącego wiersza.', 3000);
+            (globalThis as unknown as Window).showToast('Brak zapisanych szablonów. Najpierw zapisz szablon z istniejącego wiersza.', 3000);
             return;
         }
 
@@ -465,7 +464,7 @@ export const Changes: ChangesAPI = (() => {
         const template = templates.find(t => t.id === selectedId);
 
         if (!template) {
-            window.showToast('Wybierz szablon.', 2000);
+            (globalThis as unknown as Window).showToast('Wybierz szablon.', 2000);
             return;
         }
 
@@ -491,7 +490,7 @@ export const Changes: ChangesAPI = (() => {
         if (modal) modal.style.display = 'none';
         pendingTemplateRow = null;
 
-        window.showToast(`Zastosowano szablon "${template.name}".`, 2000);
+        (globalThis as unknown as Window).showToast(`Zastosowano szablon "${template.name}".`, 2000);
     };
 
     /** Usuwa szablon */
@@ -503,7 +502,7 @@ export const Changes: ChangesAPI = (() => {
             templates = templates.filter(t => t.id !== templateId);
             saveTemplates();
             renderTemplateList();
-            window.showToast('Szablon usunięty.', 2000);
+            (globalThis as unknown as Window).showToast('Szablon usunięty.', 2000);
         }
     };
 
@@ -658,7 +657,7 @@ export const Changes: ChangesAPI = (() => {
         loadTemplates();
 
         if (templates.length === 0) {
-            window.showToast('Brak zapisanych szablonów. Najpierw zapisz szablon z istniejącego wiersza.', 3000);
+            (globalThis as unknown as Window).showToast('Brak zapisanych szablonów. Najpierw zapisz szablon z istniejącego wiersza.', 3000);
             return;
         }
 
@@ -753,7 +752,7 @@ export const Changes: ChangesAPI = (() => {
         const template = templates.find(t => t.id === selectedTemplateId);
 
         if (!template) {
-            window.showToast('Wybierz szablon.', 2000);
+            (globalThis as unknown as Window).showToast('Wybierz szablon.', 2000);
             return;
         }
 
@@ -761,7 +760,7 @@ export const Changes: ChangesAPI = (() => {
         const toValue = periodToSelect.value;
 
         if (!fromValue || !toValue) {
-            window.showToast('Wybierz zakres okresów.', 2000);
+            (globalThis as unknown as Window).showToast('Wybierz zakres okresów.', 2000);
             return;
         }
 
@@ -770,7 +769,7 @@ export const Changes: ChangesAPI = (() => {
         const toIndex = periods.findIndex(p => p.value === toValue);
 
         if (fromIndex === -1 || toIndex === -1 || fromIndex > toIndex) {
-            window.showToast('Nieprawidłowy zakres okresów.', 2000);
+            (globalThis as unknown as Window).showToast('Nieprawidłowy zakres okresów.', 2000);
             return;
         }
 
@@ -801,7 +800,7 @@ export const Changes: ChangesAPI = (() => {
 
         if (modal) modal.style.display = 'none';
 
-        window.showToast(`Zastosowano szablon "${template.name}" do ${appliedCount} ${appliedCount === 1 ? 'okresu' : appliedCount < 5 ? 'okresów' : 'okresów'}.`, 3000);
+        (globalThis as unknown as Window).showToast(`Zastosowano szablon "${template.name}" do ${appliedCount} ${appliedCount === 1 ? 'okresu' : 'okresów'}.`, 3000);
     };
 
     const generateTwoWeekPeriods = (year: number): Period[] => {
@@ -920,7 +919,7 @@ export const Changes: ChangesAPI = (() => {
             return docSnap.exists ? (docSnap.data() as Record<string, unknown>) || {} : {};
         } catch (error) {
             console.error('Błąd podczas ładowania danych o urlopach z Firestore:', error);
-            window.showToast('Wystąpił błąd podczas ładowania danych o urlopach. Spróbuj ponownie.', 5000);
+            (globalThis as unknown as Window).showToast('Wystąpił błąd podczas ładowania danych o urlopach. Spróbuj ponownie.', 5000);
             return {};
         }
     };
@@ -939,7 +938,7 @@ export const Changes: ChangesAPI = (() => {
             let leavesHtml = '';
             const employees = EmployeeManager.getAll();
 
-            for (const employeeId in employees) {
+            for (const employeeId of Object.keys(employees)) {
                 const employee = employees[employeeId];
                 if (employee.isHidden || employee.isScheduleOnly) continue;
 
@@ -1062,7 +1061,7 @@ export const Changes: ChangesAPI = (() => {
         if ((event.ctrlKey || event.metaKey) && event.key === 's') {
             event.preventDefault();
             saveChanges();
-            window.showToast('Zapisano zmiany.', 2000);
+            (globalThis as unknown as Window).showToast('Zapisano zmiany.', 2000);
             return;
         }
 
@@ -1085,7 +1084,7 @@ export const Changes: ChangesAPI = (() => {
         if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
             event.preventDefault();
             if (!clipboard) {
-                window.showToast('Brak skopiowanej komórki.', 2000);
+                (globalThis as unknown as Window).showToast('Brak skopiowanej komórki.', 2000);
                 return;
             }
 
@@ -1392,7 +1391,7 @@ export const Changes: ChangesAPI = (() => {
                     delete state.substitutes;
                 }
             });
-            window.showToast('Zapisano zmiany.');
+            (globalThis as unknown as Window).showToast('Zapisano zmiany.');
             closeModal();
         };
 
@@ -1415,7 +1414,7 @@ export const Changes: ChangesAPI = (() => {
      */
     const undoLastChange = (): void => {
         if (undoStack.length === 0) {
-            window.showToast('Brak zmian do cofnięcia.', 2000);
+            (globalThis as unknown as Window).showToast('Brak zmian do cofnięcia.', 2000);
             return;
         }
         const previousState = undoStack.pop();
@@ -1423,7 +1422,7 @@ export const Changes: ChangesAPI = (() => {
             appState.changesCells = JSON.parse(previousState);
             renderChangesContent();
             saveChanges();
-            window.showToast('Cofnięto zmianę.', 2000);
+            (globalThis as unknown as Window).showToast('Cofnięto zmianę.', 2000);
         }
     };
 
@@ -1471,10 +1470,10 @@ export const Changes: ChangesAPI = (() => {
             await db.collection(AppConfig.firestore.collections.schedules)
                 .doc(`changesSchedule_${currentYear}`)
                 .set(appState, { merge: true });
-            window.setSaveStatus('saved');
+            (globalThis as unknown as Window).setSaveStatus('saved');
         } catch (error) {
             console.error('Error saving changes to Firestore:', error);
-            window.setSaveStatus('error');
+            (globalThis as unknown as Window).setSaveStatus('error');
         }
     };
 
@@ -1502,7 +1501,7 @@ export const Changes: ChangesAPI = (() => {
         const employeesOnLeave: string[] = [];
         const employees = EmployeeManager.getAll();
 
-        for (const employeeId in employees) {
+        for (const employeeId of Object.keys(employees)) {
             const employee = employees[employeeId];
             if (employee.isHidden || employee.isScheduleOnly) continue;
 
@@ -1677,7 +1676,7 @@ export const Changes: ChangesAPI = (() => {
             pdfMake.createPdf(docDefinition).download(`grafik-zmian-${currentYear}.pdf`);
         } else {
             console.error('pdfMake is not defined');
-            window.showToast('Błąd: Biblioteka PDF nie została załadowana.', 3000);
+            (globalThis as unknown as Window).showToast('Błąd: Biblioteka PDF nie została załadowana.', 3000);
         }
     };
 
@@ -1770,7 +1769,7 @@ export const Changes: ChangesAPI = (() => {
                 }
             },
         ];
-        window.initializeContextMenu('changesContextMenu', '#changesTableBody td:not(.leaves-cell)', contextMenuItems);
+        (globalThis as unknown as Window).initializeContextMenu('changesContextMenu', '#changesTableBody td:not(.leaves-cell)', contextMenuItems);
     };
 
     /**
@@ -1836,8 +1835,8 @@ export const Changes: ChangesAPI = (() => {
         if (printButton) {
             printButton.removeEventListener('click', printChangesTableToPdf);
         }
-        if (window.destroyContextMenu) {
-            window.destroyContextMenu('changesContextMenu');
+        if ((globalThis as unknown as Window).destroyContextMenu) {
+            (globalThis as unknown as Window).destroyContextMenu('changesContextMenu');
         }
         setActiveCell(null);
         debugLog('Changes module destroyed');
@@ -1850,7 +1849,11 @@ export const Changes: ChangesAPI = (() => {
 declare global {
     interface Window {
         Changes: ChangesAPI;
+        showToast: (message: string, duration?: number) => void;
+        setSaveStatus: (status: 'saving' | 'saved' | 'error') => void;
+        initializeContextMenu: (id: string, selector: string, items: any[]) => void;
+        destroyContextMenu: (id: string) => void;
     }
 }
 
-window.Changes = Changes;
+(globalThis as unknown as Window).Changes = Changes;

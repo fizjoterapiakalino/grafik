@@ -1,4 +1,4 @@
-﻿// scripts/appointments-pdf.ts
+// scripts/appointments-pdf.ts
 import {
     PdfColors,
     PdfDefaultStyle,
@@ -119,4 +119,4 @@ function generateTimeSlots(): string[] {
     return slots;
 }
 
-(window as any).printAppointmentsToPdf = printAppointmentsToPdf;
+(globalThis as any).printAppointmentsToPdf = printAppointmentsToPdf;
