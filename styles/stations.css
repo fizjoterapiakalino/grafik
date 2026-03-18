@@ -1024,7 +1024,7 @@
     gap: 8px;
     box-shadow: var(--shadow-sm);
     cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: all 0.2s ease;
     text-align: left;
 }
 
@@ -1032,6 +1032,12 @@
     box-shadow: var(--shadow-md);
     transform: translateY(-1px);
     outline: 2px solid rgba(255, 255, 255, 0.65);
+    /* Aktywny panel ułożony kompaktowo jako jeden wiersz */
+    flex-direction: row;
+    min-height: 48px;
+    padding: 12px;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .mobile-room-tile-title {
@@ -1047,6 +1053,17 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+
+.mobile-room-tile.active .mobile-room-tile-meta {
+    width: auto;
+    gap: 8px;
+}
+
+.mobile-room-tile.active .mobile-room-count {
+    /* Mniejszy licznik przy poziomym ułożeniu */
+    font-size: 0.68rem;
+    padding: 2px 5px;
 }
 
 .mobile-room-status {
@@ -1236,7 +1253,7 @@
    ============================================ */
 
 .station-emp-name {
-    font-size: 0.75rem;
+    font-size: 1.5rem;
     font-weight: 600;
     color: var(--color-primary-700);
     background: rgba(255, 255, 255, 0.4);

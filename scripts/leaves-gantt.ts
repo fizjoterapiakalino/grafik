@@ -550,9 +550,9 @@ export const renderGanttView = (
         updateLeaveBarPositions(timelineBody, year);
     });
 
-    // Sync vertical scroll between employees list and timeline
+    // Setup scroll handling (vertical sync + horizontal wheel)
     if (scrollWrapper) {
-        syncVerticalScroll(employeesList, scrollWrapper);
+        setupGanttScrollHandling(employeesList, scrollWrapper);
     }
 };
 
@@ -628,18 +628,54 @@ const formatDateString = (date: Date): string => {
 };
 
 /**
- * Sync vertical scroll between employees list and timeline body
+ * Setup scroll handling: sync vertical scroll between employees list and timeline.
+ * Wheel scroll over the timeline scrolls HORIZONTALLY by default (Gantt is a horizontal chart).
+ * Vertical scroll is handled via the employee list on the left, or Ctrl+wheel.
+ * Trackpad two-finger horizontal swipe works natively via deltaX.
  */
-const syncVerticalScroll = (employeesList: HTMLElement, scrollWrapper: HTMLElement): void => {
-    // When timeline scrolls vertically, sync employee list
+const setupGanttScrollHandling = (employeesList: HTMLElement, scrollWrapper: HTMLElement): void => {
+    // Remove old listeners if re-rendering (clean slate approach via cloneNode trick on the attribute)
+    if (scrollWrapper.hasAttribute('data-scroll-setup')) {
+        // Already set up – skip to avoid double listeners
+        return;
+    }
+    scrollWrapper.setAttribute('data-scroll-setup', 'true');
+
+    // ── Vertical sync: timeline ↔ employee list ──────────────────────────────
+    let isSyncingFromWrapper = false;
+    let isSyncingFromList = false;
+
     scrollWrapper.addEventListener('scroll', () => {
+        if (isSyncingFromList) return;
+        isSyncingFromWrapper = true;
         employeesList.scrollTop = scrollWrapper.scrollTop;
+        isSyncingFromWrapper = false;
     });
 
-    // When employee list scrolls, sync timeline
     employeesList.addEventListener('scroll', () => {
+        if (isSyncingFromWrapper) return;
+        isSyncingFromList = true;
         scrollWrapper.scrollTop = employeesList.scrollTop;
+        isSyncingFromList = false;
     });
+
+    // ── Horizontal wheel scroll (default behaviour in Gantt) ─────────────────
+    // Regular mouse wheel → scroll LEFT/RIGHT (horizontal)
+    // Ctrl + wheel       → scroll UP/DOWN (vertical, e.g. zoom-like behaviour)
+    // Trackpad deltaX    → native horizontal scroll, no interception needed
+    scrollWrapper.addEventListener('wheel', (e: WheelEvent) => {
+        // Let native horizontal trackpad swipes pass through unmodified
+        if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+
+        // Ctrl+wheel: allow normal vertical scroll (browser default)
+        if (e.ctrlKey) return;
+
+        // All other cases: treat vertical wheel delta as horizontal scroll
+        if (e.deltaY !== 0) {
+            e.preventDefault();
+            scrollWrapper.scrollLeft += e.deltaY;
+        }
+    }, { passive: false });
 };
 
 // Callback for re-rendering after month toggle
@@ -769,17 +805,31 @@ export const setupMobileAccordion = (): void => {
 };
 
 /**
- * Scroll to today's position in the Gantt chart
+ * Scroll to today's position in the Gantt chart, centering it in the viewport.
+ * Uses actual DOM cell positions to handle collapsed/expanded months correctly.
  */
 export const scrollToToday = (): void => {
-    const today = new Date();
-    const dayOfYear = getDayOfYear(today);
-    const scrollPosition = (dayOfYear - 10) * DAY_WIDTH; // 10 days before today
-
     const scrollWrapper = document.getElementById('ganttScrollWrapper');
+    if (!scrollWrapper) return;
 
-    if (scrollWrapper) {
-        scrollWrapper.scrollLeft = Math.max(0, scrollPosition);
+    // Try to find the actual today cell in the DOM (most accurate approach)
+    const todayCell = scrollWrapper.querySelector('.gantt-day-cell.today') as HTMLElement | null;
+
+    if (todayCell) {
+        // Center today's cell: scrollLeft = cellLeft - (half of visible width) + (half of cell width)
+        const cellLeft = todayCell.offsetLeft;
+        const cellWidth = todayCell.offsetWidth;
+        const visibleWidth = scrollWrapper.clientWidth;
+        const centeredScroll = cellLeft - (visibleWidth / 2) + (cellWidth / 2);
+        scrollWrapper.scrollLeft = Math.max(0, centeredScroll);
+    } else {
+        // Fallback: estimate position from day-of-year (used before DOM is fully rendered)
+        const today = new Date();
+        const dayOfYear = getDayOfYear(today);
+        const visibleWidth = scrollWrapper.clientWidth;
+        const estimatedLeft = dayOfYear * DAY_WIDTH;
+        const centeredScroll = estimatedLeft - visibleWidth / 2;
+        scrollWrapper.scrollLeft = Math.max(0, centeredScroll);
     }
 };
 

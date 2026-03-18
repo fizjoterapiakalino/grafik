@@ -489,8 +489,8 @@ export const Leaves: LeavesAPI = (() => {
         // Setup all Gantt interactions (desktop only)
         setupGanttInteractions();
 
-        // Scroll to today's position
-        setTimeout(() => scrollToToday(), 100);
+        // Scroll to today's position, centered – wait for rAF + paint
+        setTimeout(() => scrollToToday(), 200);
     };
 
     /**

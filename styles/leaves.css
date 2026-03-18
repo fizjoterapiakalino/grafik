@@ -1574,24 +1574,34 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     overflow-y: auto;
     display: flex;
     flex-direction: column;
+    /* Zawsze pokazuj poziomy scrollbar – informuje użytkownika że można scrollować */
+    scrollbar-gutter: stable;
 }
 
+/* Poziomy scrollbar – większy i bardziej widoczny */
 .gantt-scroll-wrapper::-webkit-scrollbar {
-    height: 12px;
+    height: 14px;
     width: 8px;
 }
 
 .gantt-scroll-wrapper::-webkit-scrollbar-track {
-    background: var(--color-gray-100);
+    background: var(--color-gray-200);
+    border-radius: 0 0 var(--border-radius) 0;
 }
 
 .gantt-scroll-wrapper::-webkit-scrollbar-thumb {
     background: var(--color-gray-400);
-    border-radius: 6px;
+    border-radius: 7px;
+    border: 3px solid var(--color-gray-200);
 }
 
 .gantt-scroll-wrapper::-webkit-scrollbar-thumb:hover {
-    background: var(--color-gray-500);
+    background: var(--color-primary-600);
+    border-color: var(--color-gray-200);
+}
+
+.gantt-scroll-wrapper::-webkit-scrollbar-corner {
+    background: var(--color-gray-200);
 }
 
 /* Timeline header with months and days */
@@ -1665,7 +1675,9 @@ table.summary-table tbody tr td.editable-carried-over:focus {
 }
 
 .gantt-day-header.weekend {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.18);
+    color: rgba(255, 255, 255, 0.7);
+    font-style: italic;
 }
 
 .gantt-day-header.today {
@@ -1708,7 +1720,8 @@ table.summary-table tbody tr td.editable-carried-over:focus {
 }
 
 .gantt-day-cell.weekend {
-    background: var(--color-gray-100);
+    background: #dde3ea;
+    border-right-color: #c5cdd8;
 }
 
 .gantt-day-cell.month-start {
