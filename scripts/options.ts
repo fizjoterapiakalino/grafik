@@ -71,7 +71,7 @@ export const Options: OptionsAPI = (() => {
     };
 
     const createBackup = async (): Promise<void> => {
-        if (!confirm('Czy na pewno chcesz utworzyć nową kopię zapasową? Spowoduje to nadpisanie poprzedniej kopii.')) {
+        if (!globalThis.confirm('Czy na pewno chcesz utworzyć nową kopię zapasową? Spowoduje to nadpisanie poprzedniej kopii.')) {
             return;
         }
         showLoading(true);
@@ -89,11 +89,11 @@ export const Options: OptionsAPI = (() => {
         try {
             const date = await BackupService.getLastBackupDate();
             if (!date) {
-                window.showToast('Brak kopii zapasowej do przywrócenia.', 3000);
+                (globalThis as any).showToast('Brak kopii zapasowej do przywrócenia.', 3000);
                 return;
             }
         } catch {
-            window.showToast('Błąd sprawdzania kopii.', 3000);
+            (globalThis as any).showToast('Błąd sprawdzania kopii.', 3000);
             return;
         }
 
@@ -119,10 +119,10 @@ export const Options: OptionsAPI = (() => {
                 batch.set(leavesDocWrapper, backupData.leavesData || {});
                 await batch.commit();
 
-                window.showToast('Dane przywrócone pomyślnie! Odśwież stronę, aby zobaczyć zmiany.', 5000);
+                (globalThis as any).showToast('Dane przywrócone pomyślnie! Odśwież stronę, aby zobaczyć zmiany.', 5000);
             } catch (error) {
                 console.error('Błąd podczas przywracania danych:', error);
-                window.showToast('Wystąpił błąd podczas przywracania danych.', 5000);
+                (globalThis as any).showToast('Wystąpił błąd podczas przywracania danych.', 5000);
             } finally {
                 showLoading(false);
             }
@@ -152,12 +152,12 @@ export const Options: OptionsAPI = (() => {
             const allEmployees = EmployeeManager.getAll();
             const existingEmployee = Object.values(allEmployees).find((emp) => emp.uid === currentUser.uid);
             if (existingEmployee && (existingEmployee as Employee & { id?: number }).id !== selectedEmployeeIndex) {
-                window.showToast(`Ten użytkownik jest już przypisany do: ${existingEmployee.displayName}.`, 4000);
+                (globalThis as any).showToast(`Ten użytkownik jest już przypisany do: ${existingEmployee.displayName}.`, 4000);
                 return;
             }
             employeeUidInput.value = currentUser.uid;
         } else {
-            window.showToast('Nie jesteś zalogowany.', 3000);
+            (globalThis as any).showToast('Nie jesteś zalogowany.', 3000);
         }
     };
 
@@ -195,7 +195,7 @@ export const Options: OptionsAPI = (() => {
 
         const sortedEmployees = Object.entries(employees)
             .map(([index, data]) => ({
-                index: parseInt(index, 10),
+                index: Number.parseInt(index, 10),
                 firstName: data.firstName,
                 lastName: data.lastName,
                 displayName: data.displayName || data.name,
@@ -306,14 +306,14 @@ export const Options: OptionsAPI = (() => {
     };
 
     const handleAddEmployee = async (): Promise<void> => {
-        const displayName = prompt('Wpisz nazwę wyświetlaną nowego pracownika:');
+        const displayName = globalThis.prompt('Wpisz nazwę wyświetlaną nowego pracownika:');
         if (!displayName || displayName.trim() === '') {
-            window.showToast('Anulowano. Nazwa wyświetlana nie może być pusta.', 3000);
+            (globalThis as any).showToast('Anulowano. Nazwa wyświetlana nie może być pusta.', 3000);
             return;
         }
-        const entitlement = parseInt(prompt('Podaj wymiar urlopu (np. 26):', '26') || '', 10);
-        if (isNaN(entitlement)) {
-            window.showToast('Anulowano. Wymiar urlopu musi być liczbą.', 3000);
+        const entitlement = Number.parseInt(globalThis.prompt('Podaj wymiar urlopu (np. 26):', '26') || '', 10);
+        if (Number.isNaN(entitlement)) {
+            (globalThis as any).showToast('Anulowano. Wymiar urlopu musi być liczbą.', 3000);
             return;
         }
 
@@ -321,7 +321,7 @@ export const Options: OptionsAPI = (() => {
         try {
             const allEmployees = EmployeeManager.getAll();
             const highestIndex = Object.keys(allEmployees).reduce(
-                (max, index) => Math.max(max, parseInt(index, 10)),
+                (max, index) => Math.max(max, Number.parseInt(index, 10)),
                 -1
             );
             const newIndex = highestIndex + 1;
@@ -341,10 +341,10 @@ export const Options: OptionsAPI = (() => {
 
             await EmployeeManager.load();
             renderEmployeeList();
-            window.showToast('Pracownik dodany pomyślnie!', 2000);
+            (globalThis as any).showToast('Pracownik dodany pomyślnie!', 2000);
         } catch (error) {
             console.error('Błąd podczas dodawania pracownika:', error);
-            window.showToast('Wystąpił błąd podczas dodawania pracownika. Spróbuj ponownie.', 5000);
+            (globalThis as any).showToast('Wystąpił błąd podczas dodawania pracownika. Spróbuj ponownie.', 5000);
         } finally {
             showLoading(false);
         }
@@ -352,7 +352,7 @@ export const Options: OptionsAPI = (() => {
 
     const handleSaveEmployee = async (): Promise<void> => {
         if (selectedEmployeeIndex === null) {
-            window.showToast('Nie wybrano pracownika.', 3000);
+            (globalThis as any).showToast('Nie wybrano pracownika.', 3000);
             return;
         }
 
@@ -363,7 +363,7 @@ export const Options: OptionsAPI = (() => {
         const newLastName = employeeLastNameInput?.value.trim() || '';
         const newDisplayName = employeeDisplayNameInput?.value.trim() || '';
         const newEmployeeNumber = employeeNumberInput?.value.trim() || '';
-        const newEntitlement = parseInt(leaveEntitlementInput?.value || '0', 10);
+        const newEntitlement = Number.parseInt(leaveEntitlementInput?.value || '0', 10);
 
         const adminCheckbox = document.getElementById('employeeRoleAdmin') as HTMLInputElement | null;
         const isAdmin = adminCheckbox?.checked || false;
@@ -371,11 +371,11 @@ export const Options: OptionsAPI = (() => {
         const newUid = employeeUidInput?.value.trim() || '';
 
         if (newDisplayName === '') {
-            window.showToast('Nazwa wyświetlana nie może być pusta.', 3000);
+            (globalThis as any).showToast('Nazwa wyświetlana nie może być pusta.', 3000);
             return;
         }
-        if (isNaN(newEntitlement)) {
-            window.showToast('Wartości urlopu muszą być poprawnymi liczbami.', 3000);
+        if (Number.isNaN(newEntitlement)) {
+            (globalThis as any).showToast('Wartości urlopu muszą być poprawnymi liczbami.', 3000);
             return;
         }
 
@@ -419,10 +419,10 @@ export const Options: OptionsAPI = (() => {
                 const span = listItem.querySelector('span');
                 if (span) span.textContent = nameToDisplay;
             }
-            window.showToast('Dane pracownika zaktualizowane.', 2000);
+            (globalThis as any).showToast('Dane pracownika zaktualizowane.', 2000);
         } catch (error) {
             console.error('Błąd podczas zapisywania zmian pracownika:', error);
-            window.showToast('Wystąpił błąd podczas zapisu. Spróbuj ponownie.', 5000);
+            (globalThis as any).showToast('Wystąpił błąd podczas zapisu. Spróbuj ponownie.', 5000);
         } finally {
             showLoading(false);
         }
@@ -464,13 +464,13 @@ export const Options: OptionsAPI = (() => {
                     const scheduleData = scheduleDoc.data() as Record<string, unknown> | undefined;
                     const scheduleCells = scheduleData?.scheduleCells as Record<string, Record<string, unknown>> | undefined;
                     if (scheduleCells) {
-                        Object.keys(scheduleCells).forEach((time) => {
+                        for (const time of Object.keys(scheduleCells)) {
                             if (scheduleCells[time]?.[String(selectedEmployeeIndex)]) {
                                 transaction.update(scheduleDocWrapper, {
                                     [`scheduleCells.${time}.${selectedEmployeeIndex}`]: FieldValue.delete(),
                                 });
                             }
-                        });
+                        }
                     }
 
                     const leavesData = leavesDoc.data() as Record<string, unknown> | undefined;
@@ -482,10 +482,10 @@ export const Options: OptionsAPI = (() => {
                 await EmployeeManager.load();
                 renderEmployeeList();
                 resetDetailsPanel();
-                window.showToast('Pracownik usunięty pomyślnie.', 2000);
+                (globalThis as any).showToast('Pracownik usunięty pomyślnie.', 2000);
             } catch (error) {
                 console.error('Błąd podczas usuwania pracownika:', error);
-                window.showToast('Wystąpił błąd. Spróbuj ponownie.', 5000);
+                (globalThis as any).showToast('Wystąpił błąd. Spróbuj ponownie.', 5000);
             } finally {
                 showLoading(false);
             }
@@ -544,7 +544,7 @@ export const Options: OptionsAPI = (() => {
             await displayLastBackupDate();
         } catch (error) {
             console.error('Błąd inicjalizacji strony opcji:', error);
-            window.showToast('Wystąpił krytyczny błąd inicjalizacji. Odśwież stronę.', 5000);
+            (globalThis as any).showToast('Wystąpił krytyczny błąd inicjalizacji. Odśwież stronę.', 5000);
         } finally {
             showLoading(false);
         }
