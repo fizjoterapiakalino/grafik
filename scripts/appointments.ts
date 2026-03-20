@@ -1,4 +1,4 @@
-﻿// scripts/appointments.ts - Appointment Scheduler Module
+// scripts/appointments.ts - Appointment Scheduler Module
 import { db as dbRaw } from './firebase-config.js';
 import { capitalizeFirstLetter, isHoliday } from './common.js';
 
@@ -76,7 +76,7 @@ export const Appointments: AppointmentsAPI = (() => {
             listenersAbortController.abort();
             listenersAbortController = null;
         }
-        saveDebounceTimers.forEach(timer => window.clearTimeout(timer));
+        saveDebounceTimers.forEach(timer => globalThis.clearTimeout(timer));
         saveDebounceTimers.clear();
         pendingCellUpdates.clear();
     };
@@ -86,7 +86,7 @@ export const Appointments: AppointmentsAPI = (() => {
         const endDate = new Date(startDate + 'T12:00:00Z');
 
         endDate.setUTCDate(endDate.getUTCDate() - 1);
-        const totalDays = 15 + parseInt(String(extensionDays || 0), 10);
+        const totalDays = 15 + Number.parseInt(String(extensionDays || 0), 10);
         let daysAdded = 0;
         while (daysAdded < totalDays) {
             endDate.setUTCDate(endDate.getUTCDate() + 1);
@@ -118,7 +118,7 @@ export const Appointments: AppointmentsAPI = (() => {
 
     const getCellKey = (time: string, station: StationKey): string => `${time}__${station}`;
 
-    // const normalizePatientName = (name?: string): string => (name || '').trim().toLocaleLowerCase('pl-PL');
+
 
     const getCurrentFilterMode = (): FilterMode => {
         const filterEl = document.getElementById('appointmentsFilter') as HTMLSelectElement | null;
@@ -212,12 +212,12 @@ export const Appointments: AppointmentsAPI = (() => {
 
         const existingTimer = saveDebounceTimers.get(key);
         if (existingTimer) {
-            window.clearTimeout(existingTimer);
+            globalThis.clearTimeout(existingTimer);
         }
 
-        const timer = window.setTimeout(() => {
+        const timer = globalThis.setTimeout(() => {
             void flushCellSave(time, station);
-        }, SAVE_DEBOUNCE_MS);
+        }, SAVE_DEBOUNCE_MS) as unknown as number;
         saveDebounceTimers.set(key, timer);
     };
 
@@ -225,7 +225,7 @@ export const Appointments: AppointmentsAPI = (() => {
         const key = getCellKey(time, station);
         const existingTimer = saveDebounceTimers.get(key);
         if (existingTimer) {
-            window.clearTimeout(existingTimer);
+            globalThis.clearTimeout(existingTimer);
             saveDebounceTimers.delete(key);
         }
         pendingCellUpdates.delete(key);
@@ -260,7 +260,7 @@ export const Appointments: AppointmentsAPI = (() => {
         const key = getCellKey(time, station);
         const existingTimer = saveDebounceTimers.get(key);
         if (existingTimer) {
-            window.clearTimeout(existingTimer);
+            globalThis.clearTimeout(existingTimer);
             saveDebounceTimers.delete(key);
         }
 
@@ -309,10 +309,27 @@ export const Appointments: AppointmentsAPI = (() => {
                     updateUIContent();
                 }
             },
-            (error) => {
+            (error: Error) => {
                 console.error('Error subscribing to appointments:', error);
             }
         );
+    };
+    const clearCellInfo = (deleteIcon: HTMLElement, infoEl: HTMLElement): void => {
+        deleteIcon.style.display = 'none';
+        infoEl.innerText = '';
+        infoEl.className = 'cell-info-indicator';
+    };
+
+    const updateCellIndicator = (infoEl: HTMLElement, endDate: string): void => {
+        infoEl.innerText = `Koniec: ${endDate}`;
+        if (!APPOINTMENTS_FEATURES.treatmentBell) {
+            infoEl.className = 'cell-info-indicator';
+            return;
+        }
+        
+        const todayStr = new Date().toISOString().split('T')[0];
+        const isFinished = endDate <= todayStr;
+        infoEl.className = `cell-info-indicator ${isFinished ? 'treatment-end-marker' : ''}`;
     };
 
     const updateUIContent = (): void => {
@@ -326,39 +343,22 @@ export const Appointments: AppointmentsAPI = (() => {
             const cellData = appointmentData[time]?.[station];
             const textEl = htmlTarget.querySelector('.cell-text') as HTMLElement;
             const deleteIcon = htmlTarget.querySelector('.appointment-delete-icon') as HTMLElement;
-            // const infoIcon = htmlTarget.querySelector('.appointment-info-icon') as HTMLElement;
             const infoEl = htmlTarget.querySelector('.cell-info-indicator') as HTMLElement;
 
             if (textEl !== document.activeElement) {
                 textEl.innerText = cellData?.patientName || '';
             }
 
-            if (cellData && cellData.patientName) {
+            if (cellData?.patientName) {
                 deleteIcon.style.display = 'block';
-                // infoIcon.style.display = 'block';
-                if (APPOINTMENTS_FEATURES.dateUnderPatientName) {
-                    if (cellData.endDate) {
-                        infoEl.innerText = `Koniec: ${cellData.endDate}`;
-                        if (APPOINTMENTS_FEATURES.treatmentBell) {
-                            const todayStr = new Date().toISOString().split('T')[0];
-                            const isFinished = cellData.endDate <= todayStr;
-                            infoEl.className = `cell-info-indicator ${isFinished ? 'treatment-end-marker' : ''}`;
-                        } else {
-                            infoEl.className = 'cell-info-indicator';
-                        }
-                    } else {
-                        infoEl.innerText = '';
-                        infoEl.className = 'cell-info-indicator';
-                    }
+                if (APPOINTMENTS_FEATURES.dateUnderPatientName && cellData.endDate) {
+                    updateCellIndicator(infoEl, cellData.endDate);
                 } else {
                     infoEl.innerText = '';
                     infoEl.className = 'cell-info-indicator';
                 }
             } else {
-                deleteIcon.style.display = 'none';
-                // infoIcon.style.display = 'none';
-                infoEl.innerText = '';
-                infoEl.className = 'cell-info-indicator';
+                clearCellInfo(deleteIcon, infoEl);
             }
         });
 
@@ -391,7 +391,7 @@ export const Appointments: AppointmentsAPI = (() => {
         };
 
         const updateEndDateDisplay = (): void => {
-            endInput.value = calculateEndDate(startInput.value, parseInt(extInput.value || '0', 10));
+            endInput.value = calculateEndDate(startInput.value, Number.parseInt(extInput.value || '0', 10));
         };
 
         updateEndDateDisplay();
@@ -402,8 +402,8 @@ export const Appointments: AppointmentsAPI = (() => {
         modal.style.display = 'flex';
     };
 
-    // Keeps the modal implementation available for quick re-enable without triggering TS6133.
-    void openModal;
+    // Keeps the modal implementation available without triggering TS6133 or no-void.
+    (globalThis as any)._openModal = openModal;
 
     const closeModal = (): void => {
         const modal = document.getElementById('appointmentPatientInfoModal');
@@ -437,14 +437,14 @@ export const Appointments: AppointmentsAPI = (() => {
             }
             updateUIContent();
 
-            if (window.setSaveStatus) window.setSaveStatus('saving');
+            if ((globalThis as any).setSaveStatus) (globalThis as any).setSaveStatus('saving');
             await persistAllAppointments();
 
-            if (window.setSaveStatus) window.setSaveStatus('saved');
+            if ((globalThis as any).setSaveStatus) (globalThis as any).setSaveStatus('saved');
             return true;
         } catch (err) {
             console.error('Error saving appointment:', err);
-            if (window.setSaveStatus) window.setSaveStatus('error');
+            if ((globalThis as any).setSaveStatus) (globalThis as any).setSaveStatus('error');
             return false;
         }
     };
@@ -462,7 +462,7 @@ export const Appointments: AppointmentsAPI = (() => {
 
         const patientName = capitalizeFirstLetter(nameInput.value.trim());
         const startDate = startInput.value;
-        const extensionDays = parseInt(extInput.value || '0', 10);
+        const extensionDays = Number.parseInt(extInput.value || '0', 10);
         const additionalInfo = infoInput.value.trim();
         const endDate = calculateEndDate(startDate, extensionDays);
 
@@ -498,7 +498,7 @@ export const Appointments: AppointmentsAPI = (() => {
         const setCursorToEnd = (element: HTMLElement) => {
             if (!element.innerText) return;
             const range = document.createRange();
-            const selection = window.getSelection();
+            const selection = globalThis.getSelection();
             if (!selection) return;
 
             if (element.childNodes.length === 0) {
@@ -530,7 +530,7 @@ export const Appointments: AppointmentsAPI = (() => {
             const textEl = e.target as HTMLElement;
             if (!textEl.classList.contains('cell-text')) return;
 
-            const target = textEl.closest('.cell-target') as HTMLElement | null;
+            const target = textEl.closest<HTMLElement>('.cell-target');
             if (!target) return;
             const time = target.dataset.time || '';
             const station = target.dataset.station as StationKey;
@@ -553,7 +553,7 @@ export const Appointments: AppointmentsAPI = (() => {
             if (e.key !== 'Enter') return;
 
             e.preventDefault();
-            const target = textEl.closest('.cell-target') as HTMLElement | null;
+            const target = textEl.closest<HTMLElement>('.cell-target');
             if (!target) return;
 
             const time = target.dataset.time || '';
@@ -571,7 +571,7 @@ export const Appointments: AppointmentsAPI = (() => {
             const container = textEl.closest('.editable-cell-container') as HTMLElement | null;
             if (container?.classList.contains('is-dragging')) return;
 
-            const target = textEl.closest('.cell-target') as HTMLElement | null;
+            const target = textEl.closest<HTMLElement>('.cell-target');
             if (!target) return;
 
             const time = target.dataset.time || '';
@@ -593,66 +593,57 @@ export const Appointments: AppointmentsAPI = (() => {
         }, { signal });
         */
 
-        body.addEventListener('click', (e) => {
-            const deleteIcon = (e.target as HTMLElement).closest('.appointment-delete-icon');
-            if (deleteIcon) {
-                const target = deleteIcon.closest('.cell-target') as HTMLElement | null;
-                if (!target) return;
-
-                const time = target.dataset.time || '';
-                const station = target.dataset.station as StationKey;
-
-                pendingDeleteCell = { time, station };
-                const modal = document.getElementById('appointmentDeleteConfirmModal');
-                if (modal) {
-                    modal.classList.add('is-popover');
-                    const modalContent = modal.querySelector('.modal-content') as HTMLElement;
-
-                    // Position calculations
-                    const rect = deleteIcon.getBoundingClientRect();
-                    const popoverWidth = 220;
-                    const popoverHeight = 100; // estimated
-
-                    let top = rect.bottom + window.scrollY + 5;
-                    let left = rect.left + window.scrollX - (popoverWidth / 2) + (rect.width / 2);
-
-                    // Boundary checks
-                    if (left < 10) left = 10;
-                    if (left + popoverWidth > window.innerWidth - 10) {
-                        left = window.innerWidth - popoverWidth - 10;
-                    }
-                    if (top + popoverHeight > window.innerHeight + window.scrollY - 10) {
-                        top = rect.top + window.scrollY - popoverHeight - 5;
-                    }
-
-                    if (modalContent) {
-                        modalContent.style.top = `${top}px`;
-                        modalContent.style.left = `${left}px`;
-                    }
-
-                    modal.style.display = 'flex';
-                }
-                return;
-            }
-
-            /* Czasowo wyłączone otwieranie modalu ikoną info
-            const infoIcon = (e.target as HTMLElement).closest('.appointment-info-icon');
-            if (!infoIcon) return;
-
-            const target = infoIcon.closest('.cell-target') as HTMLElement | null;
+        const handleDeleteIconClick = (deleteIcon: Element): void => {
+            const target = deleteIcon.closest<HTMLElement>('.cell-target');
             if (!target) return;
 
             const time = target.dataset.time || '';
             const station = target.dataset.station as StationKey;
-            openModal(time, station);
-            */
+
+            pendingDeleteCell = { time, station };
+            const modal = document.getElementById('appointmentDeleteConfirmModal');
+            if (!modal) return;
+
+            modal.classList.add('is-popover');
+            const modalContent = modal.querySelector<HTMLElement>('.modal-content');
+
+            if (!modalContent) {
+                modal.style.display = 'flex';
+                return;
+            }
+
+            const rect = deleteIcon.getBoundingClientRect();
+            const popoverWidth = 220;
+            const popoverHeight = 100; // estimated
+
+            let top = rect.bottom + globalThis.scrollY + 5;
+            let left = rect.left + globalThis.scrollX - (popoverWidth / 2) + (rect.width / 2);
+
+            if (left < 10) left = 10;
+            if (left + popoverWidth > globalThis.innerWidth - 10) {
+                left = globalThis.innerWidth - popoverWidth - 10;
+            }
+            if (top + popoverHeight > globalThis.innerHeight + globalThis.scrollY - 10) {
+                top = rect.top + globalThis.scrollY - popoverHeight - 5;
+            }
+
+            modalContent.style.top = `${top}px`;
+            modalContent.style.left = `${left}px`;
+            modal.style.display = 'flex';
+        };
+
+        body.addEventListener('click', (e) => {
+            const deleteIcon = (e.target as HTMLElement).closest('.appointment-delete-icon');
+            if (deleteIcon) {
+                handleDeleteIconClick(deleteIcon);
+            }
         }, { signal });
 
         body.addEventListener('dragstart', (e) => {
-            const container = (e.target as HTMLElement).closest('.editable-cell-container') as HTMLElement | null;
+            const container = (e.target as HTMLElement).closest<HTMLElement>('.editable-cell-container');
             if (!container) return;
 
-            const target = container.closest('.cell-target') as HTMLElement | null;
+            const target = container.closest<HTMLElement>('.cell-target');
             if (!target) return;
 
             const time = target.dataset.time || '';
@@ -673,7 +664,7 @@ export const Appointments: AppointmentsAPI = (() => {
 
         body.addEventListener('dragover', (e) => {
             e.preventDefault();
-            const target = (e.target as HTMLElement).closest('.cell-target') as HTMLElement | null;
+            const target = (e.target as HTMLElement).closest<HTMLElement>('.cell-target');
             if (target && e.dataTransfer) {
                 e.dataTransfer.dropEffect = 'move';
                 target.classList.add('drag-over-target');
@@ -681,13 +672,13 @@ export const Appointments: AppointmentsAPI = (() => {
         }, { signal });
 
         body.addEventListener('dragleave', (e) => {
-            const target = (e.target as HTMLElement).closest('.cell-target') as HTMLElement | null;
+            const target = (e.target as HTMLElement).closest<HTMLElement>('.cell-target');
             if (target) target.classList.remove('drag-over-target');
         }, { signal });
 
         body.addEventListener('drop', async (e) => {
             e.preventDefault();
-            const dropTarget = (e.target as HTMLElement).closest('.cell-target') as HTMLElement | null;
+            const dropTarget = (e.target as HTMLElement).closest<HTMLElement>('.cell-target');
             if (!dropTarget || !draggedData) return;
 
             dropTarget.classList.remove('drag-over-target');
@@ -705,7 +696,7 @@ export const Appointments: AppointmentsAPI = (() => {
 
             const destinationData = appointmentData[targetTime]?.[targetStation];
             if (destinationData?.patientName) {
-                window.showToast?.('To pole jest już zajęte. Najpierw je wyczyść.', 2500);
+            if ((globalThis as any).showToast) (globalThis as any).showToast('To pole jest już zajęte. Najpierw je wyczyść.', 2500);
                 return;
             }
 
@@ -734,13 +725,13 @@ export const Appointments: AppointmentsAPI = (() => {
             updateUIContent();
 
             try {
-                if (window.setSaveStatus) window.setSaveStatus('saving');
+                if ((globalThis as any).setSaveStatus) (globalThis as any).setSaveStatus('saving');
                 await persistAllAppointments();
-                if (window.setSaveStatus) window.setSaveStatus('saved');
-                window.showToast?.(isCopying ? 'Skopiowano pacjenta' : 'Przeniesiono pacjenta');
+                if ((globalThis as any).setSaveStatus) (globalThis as any).setSaveStatus('saved');
+                if ((globalThis as any).showToast) (globalThis as any).showToast(isCopying ? 'Skopiowano pacjenta' : 'Przeniesiono pacjenta');
             } catch (error) {
                 console.error('Error moving appointment:', error);
-                if (window.setSaveStatus) window.setSaveStatus('error');
+                if ((globalThis as any).setSaveStatus) (globalThis as any).setSaveStatus('error');
             } finally {
                 isMoving = false; // Release lock
             }
@@ -772,10 +763,10 @@ export const Appointments: AppointmentsAPI = (() => {
 
         if (printBtn) {
             printBtn.addEventListener('click', () => {
-                if (typeof (window as any).printAppointmentsToPdf === 'function') {
-                    (window as any).printAppointmentsToPdf(appointmentData);
+                if (typeof (globalThis as any).printAppointmentsToPdf === 'function') {
+                    (globalThis as any).printAppointmentsToPdf(appointmentData);
                 } else {
-                    window.print();
+                    globalThis.print();
                 }
             }, { signal });
         }
@@ -785,15 +776,15 @@ export const Appointments: AppointmentsAPI = (() => {
                 if (!confirm('Czy na pewno chcesz wyczyścić wszystkie wpisy w tabeli?')) return;
 
                 try {
-                    if (window.setSaveStatus) window.setSaveStatus('saving');
+                    if ((globalThis as any).setSaveStatus) (globalThis as any).setSaveStatus('saving');
                     const docRef = db.collection('appointments').doc('current');
                     await docRef.set({});
                     appointmentData = {};
                     updateUIContent();
-                    if (window.setSaveStatus) window.setSaveStatus('saved');
+                    if ((globalThis as any).setSaveStatus) (globalThis as any).setSaveStatus('saved');
                 } catch (error) {
                     console.error('Error clearing appointments:', error);
-                    if (window.setSaveStatus) window.setSaveStatus('error');
+                    if ((globalThis as any).setSaveStatus) (globalThis as any).setSaveStatus('error');
                 }
             }, { signal });
         }
@@ -849,4 +840,4 @@ declare global {
     }
 }
 
-window.Appointments = Appointments;
+(globalThis as unknown as { Appointments: AppointmentsAPI }).Appointments = Appointments;

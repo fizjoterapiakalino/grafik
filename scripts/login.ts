@@ -37,7 +37,7 @@ export const Login: LoginAPI = (() => {
 
         try {
             await typedAuth.signInWithEmailAndPassword(email, password);
-            window.location.hash = '#schedule';
+            globalThis.location.hash = '#schedule';
         } catch (error) {
             console.error('Błąd logowania:', error);
             loginError.textContent = 'Nieprawidłowy e-mail lub hasło.';
@@ -71,4 +71,4 @@ declare global {
     }
 }
 
-window.Login = Login;
+(globalThis as unknown as { Login: LoginAPI }).Login = Login;
