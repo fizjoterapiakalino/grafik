@@ -1,0 +1,23 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "noEmit": false,
+        "outDir": "./tests/__build__",
+        "rootDir": ".",
+        "allowImportingTsExtensions": false
+    },
+    "include": [
+        "scripts/common.ts",
+        "scripts/data-validation.ts",
+        "scripts/employee-manager.ts",
+        "scripts/firebase-config.js",
+        "scripts/pdf-service.ts",
+        "scripts/schedule-helpers.ts",
+        "scripts/schedule-logic.ts",
+        "scripts/scrapped-pdfs.ts",
+        "scripts/shared.ts",
+        "scripts/utils.ts",
+        "scripts/types/**/*.ts",
+        "scripts/types/**/*.d.ts"
+    ]
+}

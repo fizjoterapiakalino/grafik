@@ -9,6 +9,7 @@ import {
     validateCellContent,
     validateTreatmentData,
     validateCellState,
+    validateScheduleState,
     sanitizeCellState,
     sanitizeTreatmentData,
     ALLOWED_CELL_KEYS,
@@ -275,6 +276,35 @@ describe('data-validation', () => {
         test('returns null for null/undefined input', () => {
             expect(sanitizeTreatmentData(null)).toBeNull();
             expect(sanitizeTreatmentData(undefined)).toBeNull();
+        });
+    });
+
+    describe('validateScheduleState', () => {
+        test('returns invalid for malformed schedule structure', () => {
+            const result = validateScheduleState({
+                invalidTime: {},
+                '08:00': null,
+            });
+
+            expect(result.valid).toBe(false);
+            expect(result.errors).toContain('Nieprawidłowy format czasu: invalidTime');
+            expect(result.errors).toContain('Nieprawidłowy slot czasowy dla 08:00');
+        });
+
+        test('returns nested cell validation errors with cell coordinates', () => {
+            const result = validateScheduleState({
+                '08:00': {
+                    0: {
+                        content: 'A'.repeat(51),
+                        isMassage: 'tak',
+                    },
+                },
+            });
+
+            expect(result.valid).toBe(false);
+            expect(result.errors.some((error) => error.includes('Komórka [08:00][0]'))).toBe(true);
+            expect(result.errors.some((error) => error.includes('50 znaków'))).toBe(true);
+            expect(result.errors.some((error) => error.includes('isMassage musi być wartością boolean lub null'))).toBe(true);
         });
     });
 

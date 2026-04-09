@@ -16,6 +16,7 @@ import {
     clearAllProperties,
     getTodayDate,
     initTreatmentData,
+    updateCellContent,
 } from '../scripts/schedule-helpers.js';
 
 // Mock schedule-logic.js
@@ -31,6 +32,10 @@ jest.mock('../scripts/schedule-logic.js', () => ({
 }));
 
 describe('schedule-helpers', () => {
+    afterEach(() => {
+        jest.useRealTimers();
+    });
+
     describe('getTargetPart', () => {
         test('returns null for non-split cell', () => {
             const element = document.createElement('td');
@@ -304,6 +309,44 @@ describe('schedule-helpers', () => {
             expect(target.content).toBe('OldPatient');
             expect(target.isMassage).toBe(true);
         });
+
+        test('moves split part into normal cell and clears split-only fields', () => {
+            const oldCellState = {
+                isSplit: true,
+                content1: 'Part One',
+                content2: 'Part Two',
+                isMassage1: true,
+                isPnf1: false,
+                isEveryOtherDay1: true,
+                treatmentData1: {
+                    startDate: '2024-02-01',
+                    extensionDays: 2,
+                    endDate: '2024-02-13',
+                    additionalInfo: 'From split',
+                },
+            };
+
+            const updateFn = createTargetUpdateFn(oldCellState, 1, null);
+            const target = {
+                isSplit: true,
+                content1: 'Old A',
+                content2: 'Old B',
+                treatmentData1: { startDate: '2024-01-01' },
+            };
+
+            updateFn(target);
+
+            expect(target.content).toBe('Part One');
+            expect(target.isSplit).toBe(false);
+            expect(target.isMassage).toBe(true);
+            expect(target.isEveryOtherDay).toBe(true);
+            expect(target.treatmentStartDate).toBe('2024-02-01');
+            expect(target.treatmentEndDate).toBe('2024-02-13');
+            expect(target.additionalInfo).toBe('From split');
+            expect(target.content1).toBeUndefined();
+            expect(target.content2).toBeUndefined();
+            expect(target.treatmentData1).toBeUndefined();
+        });
     });
 
     describe('initTreatmentData', () => {
@@ -342,6 +385,90 @@ describe('schedule-helpers', () => {
             initTreatmentData(cellState);
 
             expect(cellState.treatmentStartDate).toBeUndefined();
+        });
+    });
+
+    describe('updateCellContent', () => {
+        test('converts slash-separated input into split cell', () => {
+            const cellState = {};
+            const parentCell = document.createElement('td');
+            const element = document.createElement('div');
+
+            updateCellContent(cellState, 'Jan/Anna', null, element, parentCell);
+
+            expect(cellState.isSplit).toBe(true);
+            expect(cellState.content1).toBe('Jan');
+            expect(cellState.content2).toBe('Anna');
+        });
+
+        test('initializes treatment data for first split entry', () => {
+            jest.useFakeTimers().setSystemTime(new Date('2024-01-10T12:00:00Z'));
+
+            const parentCell = document.createElement('td');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'split-cell-wrapper';
+            const firstPart = document.createElement('div');
+            wrapper.appendChild(firstPart);
+            parentCell.appendChild(wrapper);
+
+            const cellState = { isSplit: true };
+
+            updateCellContent(cellState, 'Pacjent', 1, firstPart, parentCell);
+
+            expect(cellState.content1).toBe('Pacjent');
+            expect(cellState.treatmentData1).toEqual({
+                startDate: '2024-01-10',
+                extensionDays: 0,
+                endDate: '2024-01-20',
+            });
+        });
+
+        test('clears split part flags and treatment data when text is removed', () => {
+            const parentCell = document.createElement('td');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'split-cell-wrapper';
+            const firstPart = document.createElement('div');
+            wrapper.appendChild(firstPart);
+            parentCell.appendChild(wrapper);
+
+            const cellState = {
+                isSplit: true,
+                content1: 'Pacjent',
+                isMassage1: true,
+                isPnf1: true,
+                isEveryOtherDay1: true,
+                isHydrotherapy1: true,
+                treatmentData1: { startDate: '2024-01-10' },
+            };
+
+            updateCellContent(cellState, '', 1, firstPart, parentCell);
+
+            expect(cellState.content1).toBe('');
+            expect(cellState.isMassage1).toBeUndefined();
+            expect(cellState.isPnf1).toBeUndefined();
+            expect(cellState.isEveryOtherDay1).toBeUndefined();
+            expect(cellState.isHydrotherapy1).toBeUndefined();
+            expect(cellState.treatmentData1).toBeUndefined();
+        });
+
+        test('resets treatment data when normal cell gets a different patient', () => {
+            jest.useFakeTimers().setSystemTime(new Date('2024-01-10T12:00:00Z'));
+
+            const cellState = {
+                content: 'Stary Pacjent',
+                treatmentStartDate: '2024-01-01',
+                treatmentExtensionDays: 7,
+                treatmentEndDate: '2024-01-23',
+                additionalInfo: 'Legacy note',
+            };
+
+            updateCellContent(cellState, 'Nowy Pacjent', null, document.createElement('td'), document.createElement('td'));
+
+            expect(cellState.content).toBe('Nowy Pacjent');
+            expect(cellState.treatmentStartDate).toBe('2024-01-10');
+            expect(cellState.treatmentExtensionDays).toBe(0);
+            expect(cellState.treatmentEndDate).toBe('2024-01-20');
+            expect(cellState.additionalInfo).toBeNull();
         });
     });
 });

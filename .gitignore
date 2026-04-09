@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+tests/__build__/
 
 # Environment/Secrets
 firebase-config.js

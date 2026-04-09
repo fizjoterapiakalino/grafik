@@ -6,6 +6,10 @@ import { AppConfig } from '../scripts/common.js';
 // For now assuming common.js is safe to import.
 
 describe('ScheduleLogic', () => {
+    afterEach(() => {
+        jest.useRealTimers();
+    });
+
     describe('getCellDisplayData', () => {
         test('should handle break cell', () => {
             const cellData = { isBreak: true };
@@ -38,6 +42,30 @@ describe('ScheduleLogic', () => {
             expect(result.parts[0].classes).toContain('pnf-text');
             expect(result.parts[1].text).toBe('B');
         });
+
+        test('should force hydrotherapy display for full cell', () => {
+            const result = ScheduleLogic.getCellDisplayData({
+                content: 'Pacjent',
+                isHydrotherapy: true,
+            });
+
+            expect(result.text).toBe('Hydro.');
+            expect(result.classes).toContain('hydrotherapy-cell');
+            expect(result.styles.backgroundColor).toBe('var(--bg-hydrotherapy)');
+        });
+
+        test('should mark ended treatments for normal cell', () => {
+            jest.useFakeTimers().setSystemTime(new Date('2024-01-20T12:00:00Z'));
+
+            const result = ScheduleLogic.getCellDisplayData({
+                content: 'Pacjent',
+                treatmentEndDate: '2024-01-20',
+            });
+
+            expect(result.treatmentEndDate).toBe('2024-01-20');
+            expect(result.daysRemaining).toBe(0);
+            expect(result.classes).toContain('treatment-end-marker');
+        });
     });
 
     describe('calculatePatientCount', () => {
@@ -62,6 +90,23 @@ describe('ScheduleLogic', () => {
             };
             const count = ScheduleLogic.calculatePatientCount(scheduleCells);
             expect(count).toBe(0);
+        });
+
+        test('should ignore hydrotherapy cells', () => {
+            const scheduleCells = {
+                '08:00': {
+                    0: { content: 'Pacjent 1', isHydrotherapy: true },
+                    1: { content: 'Pacjent 2' },
+                },
+            };
+
+            expect(ScheduleLogic.calculatePatientCount(scheduleCells)).toBe(1);
+        });
+    });
+
+    describe('calculateEndDate', () => {
+        test('should skip weekends and holidays', () => {
+            expect(ScheduleLogic.calculateEndDate('2024-01-01', 0)).toBe('2024-01-22');
         });
     });
 });

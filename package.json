@@ -7,7 +7,7 @@
         "dev": "vite",
         "build": "tsc && vite build",
         "preview": "vite preview",
-        "test": "jest --env=jsdom",
+        "test": "tsc -p tsconfig.tests.json && jest --config jest.config.cjs",
         "lint": "eslint .",
         "format": "prettier --write .",
         "type-check": "tsc --noEmit"

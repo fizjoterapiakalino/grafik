@@ -267,10 +267,12 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
 
         if (loginConfirmBtn) {
             loginConfirmBtn.addEventListener('click', () => {
+                const urlToOpen = pendingUrl;
+                const titleToOpen = pendingTitle || '';
                 isIsoAuthenticated = true;
                 closeLoginModal();
-                if (pendingUrl) {
-                    actualOpenPdf(pendingUrl, pendingTitle || '');
+                if (urlToOpen) {
+                    actualOpenPdf(urlToOpen, titleToOpen);
                 }
             });
         }
@@ -302,6 +304,10 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
 
     const destroy = (): void => {
         allLinksData = [];
+        pendingUrl = null;
+        pendingTitle = null;
+        isIsoAuthenticated = false;
+        isModalInitialized = false;
         document.removeEventListener('app:search', handleGlobalSearch as EventListener);
     };
 
