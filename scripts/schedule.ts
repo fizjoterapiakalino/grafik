@@ -19,6 +19,7 @@ import {
 } from './schedule-helpers.js';
 import type { FirebaseAuthWrapper, FirebaseUser } from './types/firebase';
 import type { CellState, TreatmentData } from './types/index.js';
+import { Stations } from './stations.js';
 
 const auth = authRaw as unknown as FirebaseAuthWrapper;
 
@@ -42,6 +43,8 @@ interface ScheduleAPI {
 export const Schedule: ScheduleAPI = (() => {
     let loadingOverlay: HTMLElement | null = null;
     let undoButton: HTMLButtonElement | null = null;
+    let splitViewActive = false;
+    let splitViewHandler: (() => void) | null = null;
 
     const render = (): void => {
         ScheduleUI.render();
@@ -403,6 +406,58 @@ export const Schedule: ScheduleAPI = (() => {
         ScheduleData.undo();
     };
 
+    // ---- Split-View: embedded stations sidebar ----
+
+    const initSplitView = async (): Promise<void> => {
+        const wrapper = document.getElementById('splitViewWrapper');
+        const sidebar = document.getElementById('splitViewSidebar');
+        const btn = document.getElementById('btnSplitView');
+        if (!wrapper || !sidebar) return;
+
+        try {
+            const response = await fetch(`pages/stations.html?v=${Date.now()}`);
+            if (!response.ok) return;
+            const html = await response.text();
+            sidebar.innerHTML = html;
+            wrapper.classList.add('split-view-active');
+            if (btn) btn.classList.add('active');
+            Stations.init();
+            splitViewActive = true;
+        } catch (error) {
+            console.error('Failed to initialize split-view:', error);
+        }
+    };
+
+    const destroySplitView = (): void => {
+        if (!splitViewActive) return;
+
+        try {
+            Stations.destroy();
+        } catch (error) {
+            console.error('Error destroying stations in split-view:', error);
+        }
+
+        const wrapper = document.getElementById('splitViewWrapper');
+        const sidebar = document.getElementById('splitViewSidebar');
+        const btn = document.getElementById('btnSplitView');
+
+        if (wrapper) wrapper.classList.remove('split-view-active');
+        if (sidebar) sidebar.innerHTML = '';
+        if (btn) btn.classList.remove('active');
+
+        splitViewActive = false;
+    };
+
+    const toggleSplitView = async (): Promise<void> => {
+        if (splitViewActive) {
+            destroySplitView();
+            localStorage.setItem('splitViewEnabled', 'false');
+        } else {
+            await initSplitView();
+            localStorage.setItem('splitViewEnabled', 'true');
+        }
+    };
+
     const init = async (): Promise<void> => {
         loadingOverlay = document.getElementById('loadingOverlay');
         undoButton = document.getElementById('undoButton') as HTMLButtonElement | null;
@@ -451,9 +506,29 @@ export const Schedule: ScheduleAPI = (() => {
             if (loadingOverlay) hideLoadingOverlay(loadingOverlay);
             UXEnhancements.initScheduleEnhancements();
         }
+
+        // Setup split-view toggle button
+        const btnSplitView = document.getElementById('btnSplitView');
+        if (btnSplitView) {
+            splitViewHandler = () => { toggleSplitView(); };
+            btnSplitView.addEventListener('click', splitViewHandler);
+        }
+
+        // Auto-enable split-view if previously saved
+        if (localStorage.getItem('splitViewEnabled') === 'true') {
+            await initSplitView();
+        }
     };
 
     const destroy = (): void => {
+        // Clean up split-view
+        const btnSplitView = document.getElementById('btnSplitView');
+        if (btnSplitView && splitViewHandler) {
+            btnSplitView.removeEventListener('click', splitViewHandler);
+            splitViewHandler = null;
+        }
+        destroySplitView();
+
         if (undoButton) {
             undoButton.removeEventListener('click', handleUndoClick);
         }

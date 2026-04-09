@@ -47,6 +47,9 @@ export const UIShell: UIShellAPI = (() => {
                         </button>
                         <button id="btnClearCell" class="action-icon-btn danger" title="Wyczyść komórkę"><i class="fas fa-trash-alt"></i></button>
                     </div>
+                    <button id="btnSplitView" class="action-icon-btn header-action-btn" title="Panel stanowisk" style="display: none;">
+                        <span style="display: inline-block; width: 24px; height: 24px; background-color: white; -webkit-mask: url('icons/massage.png') no-repeat center / contain; mask: url('icons/massage.png') no-repeat center / contain; vertical-align: middle;"></span>
+                    </button>
                     <button id="btnIso" class="action-icon-btn active header-action-btn" title="Dokumenty ISO"><i class="fas fa-file-alt"></i><span class="notification-badge" style="display: none;"></span></button>
                     <div class="search-container">
                         <button id="searchToggleBtn" class="search-toggle-btn" title="Szukaj"><i class="fas fa-search"></i></button>
@@ -58,7 +61,10 @@ export const UIShell: UIShellAPI = (() => {
                     <button id="printLeavesNavbarBtn" class="action-icon-btn active" title="Drukuj Grafik Urlopów" style="display: none;"><i class="fas fa-file-pdf"></i></button>
                 </div>
             </div>
-            <main id="page-content" class="container"></main>
+            <div id="splitViewWrapper" class="split-view-wrapper">
+                <main id="page-content" class="container"></main>
+                <aside id="splitViewSidebar" class="split-view-sidebar"></aside>
+            </div>
         `;
 
         // Initialize shared components
@@ -164,6 +170,18 @@ export const UIShell: UIShellAPI = (() => {
             }
             if (printLeavesNavbarBtn) {
                 printLeavesNavbarBtn.style.display = pageName === 'leaves' ? 'inline-block' : 'none';
+            }
+
+            // Split-view: show toggle only on schedule page, cleanup sidebar otherwise
+            const btnSplitView = document.getElementById('btnSplitView');
+            if (btnSplitView) {
+                btnSplitView.style.display = pageName === 'schedule' ? 'inline-flex' : 'none';
+            }
+            if (pageName !== 'schedule') {
+                const splitWrapper = document.getElementById('splitViewWrapper');
+                const splitSidebar = document.getElementById('splitViewSidebar');
+                if (splitWrapper) splitWrapper.classList.remove('split-view-active');
+                if (splitSidebar) splitSidebar.innerHTML = '';
             }
         } catch (error) {
             console.error(`Failed to load page content for ${pageName}:`, error);

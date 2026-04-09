@@ -1392,15 +1392,427 @@ td.current-time-highlight {
 
 /* Badge wyświetlany przez ::after - inline z nazwą, bez zaburzania układu */
 .employee-header span.on-leave::after {
-    content: ' URLOP';
+    content: 'URLOP';
+    display: inline-block;
     background-color: #dc2626;
     color: white;
     font-size: 0.6em;
     font-weight: 700;
-    padding: 1px 4px;
-    border-radius: 2px;
+    padding: 2px 5px;
+    border-radius: 3px;
     margin-left: 4px;
+    margin-top: 2px;
     vertical-align: middle;
     text-transform: uppercase;
     letter-spacing: 0.3px;
+    line-height: 1;
+}
+
+/* ============================================
+   SPLIT-VIEW LAYOUT
+   Schedule + Stations sidebar
+   ============================================ */
+
+.split-view-wrapper {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.split-view-sidebar {
+    display: none;
+    width: 0;
+    overflow: hidden;
+}
+
+.split-view-wrapper.split-view-active .split-view-sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 335px;
+    min-width: 335px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-left: 2px solid var(--color-primary-600);
+    background: var(--color-gray-100);
+    -webkit-overflow-scrolling: touch;
+    animation: slideInSidebar 0.25s ease-out;
+}
+
+@keyframes slideInSidebar {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Split-view button animations and state */
+#btnSplitView {
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    animation: fadeInHeaderBtn 0.4s ease-out;
+}
+
+#btnSplitView:hover {
+    transform: scale(1.1);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+#btnSplitView:active {
+    transform: scale(0.95);
+}
+
+#btnSplitView span {
+    transition: transform 0.3s ease;
+}
+
+#btnSplitView:hover span {
+    transform: translateY(-1px);
+}
+
+#btnSplitView.active {
+    background: rgba(var(--color-primary-rgb), 0.3) !important;
+    border-color: var(--color-primary-400) !important;
+}
+
+#btnSplitView.active span {
+    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+}
+
+@keyframes fadeInHeaderBtn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Stations sidebar overrides ---- */
+
+/* Force mobile (accordion) view in sidebar regardless of screen width */
+.split-view-sidebar .stations-mobile-view {
+    display: flex !important;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Force hide desktop view in sidebar */
+.split-view-sidebar .stations-desktop-view {
+    display: none !important;
+}
+
+/* Compact container for sidebar */
+.split-view-sidebar .stations-container {
+    max-width: 100%;
+    padding: 0;
+}
+
+/* Compact header */
+.split-view-sidebar .stations-header {
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 10px;
+    margin-bottom: 4px;
+    border-radius: 0;
+    box-shadow: none;
+    border-bottom: 1px solid var(--color-gray-200);
+}
+
+.split-view-sidebar .stations-header-left {
+    text-align: center;
+    width: 100%;
+}
+
+.split-view-sidebar .stations-title {
+    font-size: 0.85rem;
+    justify-content: center;
+}
+
+.split-view-sidebar .stations-subtitle {
+    display: none;
+}
+
+.split-view-sidebar .stations-header-right {
+    width: 100%;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.split-view-sidebar .status-legend {
+    font-size: 0.6rem;
+    gap: 6px;
+    width: 100%;
+    justify-content: center;
+}
+
+.split-view-sidebar .legend-item {
+    color: var(--color-gray-900) !important;
+}
+
+.split-view-sidebar .sound-toggle-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 0.75rem;
+}
+
+/* Room tiles: single column in narrow sidebar */
+.split-view-sidebar .mobile-room-tiles {
+    grid-template-columns: 1fr;
+    padding: 0 6px 6px;
+    gap: 4px;
+}
+
+.split-view-sidebar .mobile-room-card.expanded {
+    grid-column: 1;
+}
+
+/* Compact room tiles */
+.split-view-sidebar .mobile-room-tile {
+    min-height: 52px;
+    padding: 8px 10px;
+    border-radius: 8px;
+}
+
+.split-view-sidebar .mobile-room-tile.active {
+    min-height: 40px;
+    padding: 8px 10px;
+}
+
+.split-view-sidebar .mobile-room-tile-title {
+    font-size: 0.75rem;
+}
+
+.split-view-sidebar .mobile-room-tile-title i {
+    font-size: 0.7rem;
+}
+
+.split-view-sidebar .mobile-room-count {
+    font-size: 0.65rem;
+}
+
+/* Compact room panels */
+.split-view-sidebar .mobile-room-panel {
+    margin-top: 4px;
+}
+
+.split-view-sidebar .room-accordion-content {
+    padding: 6px;
+    gap: 4px;
+}
+
+/* Compact station cards */
+.split-view-sidebar .station-card {
+    padding: 5px !important;
+}
+
+.split-view-sidebar .station-card.station-multi {
+    padding: 4px !important;
+}
+
+.split-view-sidebar .station-name {
+    font-size: 0.75rem;
+}
+
+.split-view-sidebar .station-duration {
+    font-size: 0.65rem;
+}
+
+.split-view-sidebar .station-timer {
+    font-size: 1.8rem;
+    font-weight: 800;
+    margin: 0;
+    min-width: 70px;
+}
+
+.split-view-sidebar .station-emp-name {
+    font-size: 0.85rem;
+    padding: 1px 4px;
+}
+
+.split-view-sidebar .station-cancel-btn {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    font-size: 0.7rem;
+}
+
+/* Compact treatment tiles */
+.split-view-sidebar .treatment-tiles {
+    gap: 3px;
+}
+
+.split-view-sidebar .treatment-tile {
+    min-width: 45px;
+    padding: 5px 6px;
+}
+
+.split-view-sidebar .treatment-tile-name {
+    font-size: 0.65rem;
+}
+
+.split-view-sidebar .treatment-tile-time {
+    font-size: 0.55rem;
+}
+
+.split-view-sidebar .therapy-queue-btn {
+    width: 28px;
+    min-width: 28px;
+}
+
+/* Compact queue section */
+.split-view-sidebar .station-queue-container {
+    margin-top: 4px;
+    padding-top: 4px;
+}
+
+.split-view-sidebar .queue-header {
+    font-size: 0.6rem;
+}
+
+.split-view-sidebar .queue-item {
+    font-size: 0.65rem;
+    padding: 2px 4px;
+}
+
+.split-view-sidebar .queue-next {
+    font-size: 0.65rem;
+    padding: 3px 5px;
+}
+
+.split-view-sidebar .btn-start-queue {
+    padding: 5px 8px;
+    font-size: 0.75rem;
+}
+
+.split-view-sidebar .btn-add-queue {
+    padding: 5px 8px;
+    font-size: 0.72rem;
+}
+
+.split-view-sidebar .station-occupied-header {
+    padding: 0 2px;
+    margin-bottom: 2px;
+}
+
+/* Compact attention bar */
+.split-view-sidebar .stations-attention-bar {
+    margin: 0 6px;
+    font-size: 0.7rem;
+}
+
+/* Sections modal adjustments for sidebar */
+.split-view-sidebar .stations-sections-modal-content {
+    max-width: 240px;
+}
+
+/* Awaiting start card compact */
+.split-view-sidebar .station-awaiting-content {
+    gap: 5px;
+    padding: 5px;
+}
+
+.split-view-sidebar .station-reserved-badge {
+    font-size: 0.6rem;
+    padding: 2px 6px;
+}
+
+.split-view-sidebar .queue-next-action {
+    padding: 6px;
+    margin: 2px 0 4px;
+}
+
+.split-view-sidebar .queue-next-info {
+    font-size: 0.75rem;
+}
+
+.split-view-sidebar .awaiting-actions-row {
+    gap: 4px;
+}
+
+.split-view-sidebar .btn-awaiting-queue {
+    padding: 5px 8px;
+    font-size: 0.72rem;
+}
+
+/* Employee picker modal inside sidebar */
+.split-view-sidebar .emp-picker-overlay {
+    position: fixed;
+    z-index: 2000;
+}
+
+/* Hide split-view on narrow screens (table needs space) */
+@media (max-width: 768px) {
+    #btnSplitView {
+        display: none !important;
+    }
+
+    .split-view-wrapper.split-view-active .split-view-sidebar {
+        display: none;
+        width: 0;
+        min-width: 0;
+    }
+}
+
+/* ============================================
+   TABLE ADAPTATION FOR SPLIT VIEW
+   Intelligent fit using fixed layout and wrapping
+   ============================================ */
+
+/* Wymuszamy domyślne chowanie overflow żeby zapobiec paskom */
+.split-view-wrapper.split-view-active .table-container {
+    overflow-x: hidden; 
+}
+
+/* Wymuszamy zamknięcie i rozłożenie w 100% szerokości */
+.split-view-wrapper.split-view-active .schedule-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.split-view-wrapper.split-view-active .schedule-table th,
+.split-view-wrapper.split-view-active .schedule-table td {
+    padding: 3px 2px;
+    font-size: 0.95rem; /* Było 0.92, możemy tu utrzymać bardziej czytelną wartość */
+    line-height: 1.15;
+    word-wrap: break-word; /* Ważne: zwijamy! */
+    white-space: normal;
+}
+
+/* Nagłówki łamią wiersze zamiast wypychać kolumny w prawo */
+.split-view-wrapper.split-view-active table.schedule-table thead tr th {
+    font-size: 0.72rem;
+    padding: 3px 1px;
+    white-space: normal;
+    word-break: break-word;
+}
+
+/* Sztywna kolumna czasu z boku */
+.split-view-wrapper.split-view-active .schedule-table tbody td:first-child,
+.split-view-wrapper.split-view-active .schedule-table thead th:first-child {
+    font-size: 0.70rem;
+    padding: 3px 1px;
+    width: 44px;
+    min-width: 44px;
+}
+
+/* Dostosowania komórek podzielonych PNF itp */
+.split-view-wrapper.split-view-active .split-cell-wrapper > div {
+    font-size: 0.85rem; 
+    padding: 2px 1px;
+    border-radius: 3px;
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+.split-view-wrapper.split-view-active .schedule-table td.break-cell {
+    font-size: 0.75rem;
+    padding: 2px;
+}
+
+.split-view-wrapper.split-view-active .split-cell-wrapper > div[data-treatment-end]::after,
+.split-view-wrapper.split-view-active td[data-treatment-end]::after {
+    transform: translateY(-50%) scale(0.9);
+    transform-origin: right top;
 }
