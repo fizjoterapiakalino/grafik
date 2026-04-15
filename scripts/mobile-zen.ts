@@ -1,5 +1,5 @@
 const STORAGE_KEY = 'fizjoterapia_mobile_zen_mode';
-const MOBILE_BREAKPOINT_QUERY = '(max-width: 768px)';
+const MOBILE_BREAKPOINT_QUERY = '(max-width: 1024px)';
 
 interface MobileZenState {
     enabled: boolean;

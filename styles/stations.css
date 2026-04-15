@@ -122,7 +122,7 @@
     text-align: center;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1025px) {
     .stations-attention-bar.active {
         display: flex;
         align-items: center;
@@ -539,7 +539,7 @@
 }
 
 /* Desktop/tablet: always show 3 side-by-side sections */
-@media (min-width: 768px) {
+@media (min-width: 1025px) {
     .stations-desktop-view {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, calc((100% - 12px) / 3)));
@@ -991,7 +991,7 @@
 }
 
 
-@media (min-width: 768px) {
+@media (min-width: 1025px) {
     .stations-mobile-view {
         display: none;
     }
@@ -1143,7 +1143,7 @@
 }
 
 /* Mobile adjustments */
-@media (max-width: 767px) {
+@media (max-width: 1024px) {
     .stations-header {
         padding: var(--spacing-xs) var(--spacing-sm);
     }
@@ -1674,7 +1674,7 @@
 }
 
 /* Responsive adjustments */
-@media (max-width: 767px) {
+@media (max-width: 1024px) {
     .queue-item {
         padding: 5px 8px;
         font-size: 0.8rem;

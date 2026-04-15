@@ -855,7 +855,7 @@ td.current-time-highlight {
 
 /* --- Style responsywne --- */
 /* --- Style responsywne --- */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
     .schedule-table {
         display: none;
         /* Hide table on mobile */
@@ -1743,7 +1743,7 @@ td.current-time-highlight {
 }
 
 /* Hide split-view on narrow screens (table needs space) */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
     #btnSplitView {
         display: none !important;
     }

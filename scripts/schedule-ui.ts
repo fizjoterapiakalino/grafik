@@ -300,7 +300,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         _clearOverlayColumnWidths();
         _clearOverlayColumnLocks();
 
-        if (window.innerWidth <= 768) return;
+        if (window.innerWidth <= 1024) return;
 
         Object.entries(_employeeStationOverlays).forEach(([employeeId, overlay]) => {
             const headerCell = headerRow.querySelector<HTMLTableCellElement>(`th.employee-header[data-employee-index="${employeeId}"]`);
@@ -917,7 +917,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         const mainTable = document.getElementById('mainScheduleTable') as HTMLTableElement | null;
         if (!mainTable || !_appState) return;
 
-        const isMobile = window.innerWidth <= 768;
+        const isMobile = window.innerWidth <= 1024;
 
         let employeeIndices: string[] = [];
         let isSingleUserView = false;
