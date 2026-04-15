@@ -1710,3 +1710,32 @@
         max-height: 92vh;
     }
 }
+
+/* ============================================
+   ZEN BUTTON – mobile only (≤1024px)
+   ============================================ */
+.stations-zen-btn {
+    display: none !important;
+}
+
+@media (max-width: 1024px) {
+    .stations-zen-btn {
+        display: flex !important;
+        background: var(--color-gray-500);
+        transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+    }
+
+    .stations-zen-btn:hover {
+        background: var(--color-gray-700);
+        transform: scale(1.06);
+    }
+
+    .stations-zen-btn.zen-active {
+        background: #0d9488;
+        box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.25);
+    }
+
+    .stations-zen-btn.zen-active:hover {
+        background: #0f766e;
+    }
+}

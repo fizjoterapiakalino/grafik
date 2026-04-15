@@ -11,6 +11,8 @@ interface MobileZenAPI {
     isEnabled(): boolean;
     isActive(): boolean;
     setEnabled(enabled: boolean, notify?: boolean): void;
+    toggle(notify?: boolean): void;
+    bindZenButton(btn: HTMLElement | null): void;
 }
 
 export const MobileZen: MobileZenAPI = (() => {
@@ -19,6 +21,7 @@ export const MobileZen: MobileZenAPI = (() => {
     let lastScrollTop = 0;
     let scrollContainer: HTMLElement | Window | null = null;
     let scrollListenerAttached = false;
+    let boundZenButton: HTMLElement | null = null;
     const SCROLL_HIDE_THRESHOLD = 12;
     const SCROLL_SHOW_TOP = 20;
     const SCROLL_HIDE_MIN_Y = 72;
@@ -112,6 +115,13 @@ export const MobileZen: MobileZenAPI = (() => {
             setHeaderHidden(false);
         }
         refreshScrollBinding();
+        if (boundZenButton) {
+            if (document.body.contains(boundZenButton)) {
+                syncZenButton(boundZenButton);
+            } else {
+                boundZenButton = null;
+            }
+        }
         dispatchState();
     };
 
@@ -144,12 +154,48 @@ export const MobileZen: MobileZenAPI = (() => {
         window.showToast?.('Tryb zen mobilny został wyłączony', 2500);
     };
 
+    /* ---- Zen button binding ---- */
+    const syncZenButton = (btn: HTMLElement): void => {
+        const on = enabled && isMobileViewport();
+        btn.classList.toggle('zen-active', on);
+        btn.setAttribute('aria-pressed', String(on));
+        const icon = btn.querySelector('i');
+        if (icon) {
+            icon.className = on ? 'fas fa-compress-alt' : 'fas fa-expand-alt';
+        }
+    };
+
+    const bindZenButton = (btn: HTMLElement | null): void => {
+        boundZenButton = btn;
+        if (!boundZenButton) return;
+        syncZenButton(boundZenButton);
+        boundZenButton.onclick = () => {
+            const next = !enabled;
+            // Apply zen-mode class first (setEnabled → applyStateToDom)
+            setEnabled(next, true);
+            // Then in the next frame set header hidden — ensures transition fires
+            requestAnimationFrame(() => {
+                if (isMobileViewport()) {
+                    setHeaderHidden(next);
+                    lastScrollTop = resolveScrollTop();
+                }
+                if (boundZenButton && document.body.contains(boundZenButton)) {
+                    syncZenButton(boundZenButton);
+                }
+            });
+        };
+    };
+
+    const toggle = (notify: boolean = true): void => setEnabled(!enabled, notify);
+
     const init = (): void => {
         if (initialized) return;
         initialized = true;
         enabled = loadFromStorage();
         window.setTimeout(refreshScrollBinding, 0);
-        window.addEventListener('hashchange', refreshScrollBinding);
+        window.addEventListener('hashchange', () => {
+            refreshScrollBinding();
+        });
         window.addEventListener('resize', handleViewportChange);
         window.addEventListener('orientationchange', handleViewportChange);
         applyStateToDom();
@@ -163,6 +209,8 @@ export const MobileZen: MobileZenAPI = (() => {
         isEnabled,
         isActive,
         setEnabled,
+        toggle,
+        bindZenButton,
     };
 })();
 

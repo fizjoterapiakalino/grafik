@@ -12,6 +12,8 @@
     top: 0;
     border-bottom: 2px solid var(--color-primary-700);
     box-shadow: var(--shadow-premium);
+    /* Always transition transform/opacity so zen slide-up animates */
+    transition: transform 0.28s ease, opacity 0.28s ease;
 }
 
 .app-header:hover {
@@ -337,7 +339,7 @@
 }
 
 /* Mobile Adjustments */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
     .app-header {
         padding: 0 16px;
     }
@@ -402,19 +404,20 @@
         height: calc(100vh - 52px);
     }
 
-    body.mobile-zen-mode.mobile-zen-header-hidden .app-header {
+    /* Zen: header slides up and out */
+    body.mobile-zen-header-hidden .app-header {
         transform: translateY(-100%);
         opacity: 0;
         pointer-events: none;
     }
 
-    body.mobile-zen-mode.mobile-zen-header-hidden .nav-panel {
+    body.mobile-zen-header-hidden .nav-panel {
         top: 0;
         height: 100vh;
     }
 }
 
-@media (min-width: 769px) {
+@media (min-width: 1025px) {
     body>.hamburger-menu {
         display: none !important;
         /* Hide floating on desktop */

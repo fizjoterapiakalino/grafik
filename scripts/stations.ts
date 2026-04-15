@@ -1,6 +1,7 @@
 // scripts/stations.ts - PhysioResource Tracker Module
 import { db as dbRaw, auth as authRaw, FieldValue } from './firebase-config.js';
 import { EmployeeManager } from './employee-manager.js';
+import { MobileZen } from './mobile-zen.js';
 
 // Type for Firebase db wrapper (compatible with existing codebase)
 interface DbWrapper {
@@ -386,6 +387,7 @@ export const Stations: StationsAPI = (() => {
         // Render views
         renderDesktopView();
         renderMobileView();
+        MobileZen.bindZenButton(document.getElementById('stationsZenBtn') as HTMLElement | null);
 
         // Setup listeners
         setupEventListeners();
