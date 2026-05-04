@@ -1689,6 +1689,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
 .gantt-timeline-body {
     flex: 1;
     min-width: max-content;
+    position: relative;
 }
 
 .gantt-timeline-row {
@@ -1730,6 +1731,26 @@ table.summary-table tbody tr td.editable-carried-over:focus {
 
 .gantt-day-cell.today {
     background: rgba(var(--color-secondary-rgb), 0.2);
+}
+
+/* ── Crosshair highlighting (column overlay + row on hover) ── */
+.gantt-crosshair-col-overlay {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: rgba(59, 130, 246, 0.09);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.gantt-day-header.gantt-crosshair-col {
+    background: rgba(255, 255, 255, 0.35) !important;
+    font-weight: 700;
+    text-shadow: 0 0 1px rgba(0, 0, 0, 0.3);
+}
+
+.gantt-employee-cell.gantt-crosshair-row {
+    background: rgba(59, 130, 246, 0.10);
 }
 
 /* Collapsed month cells - Week Tiles */

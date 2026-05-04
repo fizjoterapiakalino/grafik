@@ -98,11 +98,15 @@ export const Leaves: LeavesAPI = (() => {
         if (nameCell) {
             const row = nameCell.closest('tr');
             const firstMonthCell = row?.querySelector('.day-cell[data-month="0"]') as HTMLTableCellElement | null;
-            openCalendarForCell(firstMonthCell);
+            if (firstMonthCell) {
+                showLeaveTypePopup(firstMonthCell, mouseEvent.clientX, mouseEvent.clientY);
+            }
             return;
         }
         const targetCell = (mouseEvent.target as HTMLElement).closest('.day-cell') as HTMLTableCellElement | null;
-        openCalendarForCell(targetCell);
+        if (targetCell) {
+            showLeaveTypePopup(targetCell, mouseEvent.clientX, mouseEvent.clientY);
+        }
     };
 
     const _handleTableClick = (event: Event): void => {
@@ -360,7 +364,7 @@ export const Leaves: LeavesAPI = (() => {
         debugLog('Leaves module destroyed');
     };
 
-    const openCalendarForCell = async (cell: HTMLTableCellElement | null): Promise<void> => {
+    const openCalendarForCell = async (cell: HTMLTableCellElement | null, defaultLeaveType?: string): Promise<void> => {
         if (!cell) return;
         const tr = cell.closest('tr') as HTMLTableRowElement;
         const employeeName = tr.dataset.employee || '';
@@ -376,6 +380,7 @@ export const Leaves: LeavesAPI = (() => {
 
             const updatedLeaves = await CalendarModal.open(employeeName, existingLeaves, monthIndex, currentYear, {
                 totalLimit: totalLimit,
+                defaultLeaveType: defaultLeaveType,
             });
 
             appState.leaves = allLeaves;
@@ -389,6 +394,82 @@ export const Leaves: LeavesAPI = (() => {
                 window.showToast('Anulowano zmiany.', 2000);
             }
         }
+    };
+
+    /**
+     * Leave type configuration for popup (matches leaves-gantt.ts LEAVE_TYPES)
+     */
+    const LEAVE_TYPE_OPTIONS: Record<string, { label: string; color: string }> = {
+        vacation: { label: 'Wypoczynkowy', color: '#3498db' },
+        child_care_art_188: { label: 'Opieka nad zdrowym dzieckiem', color: '#f39c12' },
+        sick_child_care: { label: 'Opieka nad chorym dzieckiem', color: '#e74c3c' },
+        family_member_care: { label: 'Opieka nad chorym członkiem rodziny', color: '#9b59b6' },
+        schedule_pickup: { label: 'Wybicie za święto', color: '#1abc9c' },
+    };
+
+    /**
+     * Show leave type selection popup before opening the calendar modal
+     * Reuses the gantt-leave-popup styling from the Gantt view
+     */
+    const showLeaveTypePopup = (cell: HTMLTableCellElement, x: number, y: number): void => {
+        // Remove any existing popup
+        document.querySelectorAll('.gantt-leave-popup').forEach(el => el.remove());
+
+        const tr = cell.closest('tr') as HTMLTableRowElement;
+        const employeeName = tr?.dataset.employee || '';
+
+        const typeButtons = Object.entries(LEAVE_TYPE_OPTIONS).map(([type, config]) => `
+            <button class="gantt-popup-type-btn" data-type="${type}" style="background: ${config.color};">
+                ${config.label}
+            </button>
+        `).join('');
+
+        const popup = document.createElement('div');
+        popup.className = 'gantt-leave-popup';
+        popup.innerHTML = `
+            <div class="gantt-popup-header">
+                <strong>${employeeName}</strong>
+                <button class="gantt-popup-close">&times;</button>
+            </div>
+            <div class="gantt-popup-dates" style="font-size: 0.8rem; padding: 6px 12px;">
+                <i class="fas fa-calendar-alt"></i> Wybierz typ urlopu, aby otworzyć kalendarz
+            </div>
+            <div class="gantt-popup-types">
+                ${typeButtons}
+            </div>
+            <div class="gantt-popup-footer">
+                <button class="gantt-popup-cancel">Anuluj</button>
+            </div>
+        `;
+
+        popup.style.position = 'fixed';
+        popup.style.left = `${Math.min(x, window.innerWidth - 320)}px`;
+        popup.style.top = `${Math.min(y, window.innerHeight - 350)}px`;
+        popup.style.zIndex = '1000';
+
+        document.body.appendChild(popup);
+
+        // Close handlers
+        popup.querySelector('.gantt-popup-close')?.addEventListener('click', () => popup.remove());
+        popup.querySelector('.gantt-popup-cancel')?.addEventListener('click', () => popup.remove());
+
+        // Type selection → open calendar with pre-selected type
+        popup.querySelectorAll('.gantt-popup-type-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const leaveType = (btn as HTMLElement).dataset.type || 'vacation';
+                popup.remove();
+                openCalendarForCell(cell, leaveType);
+            });
+        });
+
+        // Close on outside click
+        const closeOnOutside = (e: MouseEvent) => {
+            if (!popup.contains(e.target as Node)) {
+                popup.remove();
+                document.removeEventListener('mousedown', closeOnOutside);
+            }
+        };
+        setTimeout(() => document.addEventListener('mousedown', closeOnOutside), 100);
     };
 
     const setupEventListeners = (): void => {
@@ -658,6 +739,7 @@ export const Leaves: LeavesAPI = (() => {
         careViewBtn?.classList.remove('active');
 
         if (ganttViewContainer) ganttViewContainer.style.display = 'none';
+        if (ganttMobileViewContainer) ganttMobileViewContainer.style.display = 'none';
         if (monthlyViewContainer) monthlyViewContainer.style.display = '';
         if (careViewContainer) careViewContainer.style.display = 'none';
         if (leavesFilterContainer) leavesFilterContainer.style.display = 'flex';
@@ -747,10 +829,13 @@ export const Leaves: LeavesAPI = (() => {
     };
 
     const showSummaryView = async (): Promise<void> => {
+        ganttViewBtn?.classList.remove('active');
         monthlyViewBtn?.classList.remove('active');
         summaryViewBtn?.classList.add('active');
         careViewBtn?.classList.remove('active');
 
+        if (ganttViewContainer) ganttViewContainer.style.display = 'none';
+        if (ganttMobileViewContainer) ganttMobileViewContainer.style.display = 'none';
         if (monthlyViewContainer) monthlyViewContainer.style.display = '';
         if (careViewContainer) careViewContainer.style.display = 'none';
         if (leavesFilterContainer) leavesFilterContainer.style.display = 'none';
@@ -762,10 +847,13 @@ export const Leaves: LeavesAPI = (() => {
     };
 
     const showCareView = async (): Promise<void> => {
+        ganttViewBtn?.classList.remove('active');
         monthlyViewBtn?.classList.remove('active');
         summaryViewBtn?.classList.remove('active');
         careViewBtn?.classList.add('active');
 
+        if (ganttViewContainer) ganttViewContainer.style.display = 'none';
+        if (ganttMobileViewContainer) ganttMobileViewContainer.style.display = 'none';
         if (monthlyViewContainer) monthlyViewContainer.style.display = 'none';
         if (careViewContainer) careViewContainer.style.display = 'block';
         if (leavesFilterContainer) leavesFilterContainer.style.display = 'none';

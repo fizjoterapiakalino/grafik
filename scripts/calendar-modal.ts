@@ -7,6 +7,7 @@ import { toUTCDate, toDateString } from './utils.js';
  */
 interface LeaveLimits {
     totalLimit?: number;
+    defaultLeaveType?: string;
 }
 
 /**
@@ -505,6 +506,12 @@ export const CalendarModal: CalendarModalAPI = (() => {
 
         resetSelection();
         loadEmployeeLeavesForModal(existingLeaves);
+
+        // Pre-select leave type if specified
+        if (limits.defaultLeaveType && leaveTypeSelect) {
+            leaveTypeSelect.value = limits.defaultLeaveType;
+        }
+
         updateLeaveTypeIndicator();
         if (modal) modal.style.display = 'flex';
 

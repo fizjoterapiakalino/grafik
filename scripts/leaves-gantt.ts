@@ -273,7 +273,8 @@ export const renderGanttHeader = (year: number): string => {
             for (let day = 1; day <= daysInMonth; day++) {
                 const weekend = isWeekend(year, month, day) ? 'weekend' : '';
                 const today = isToday(year, month, day) ? 'today' : '';
-                daysHtml += `<div class="gantt-day-header ${weekend} ${today}">${day}</div>`;
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                daysHtml += `<div class="gantt-day-header ${weekend} ${today}" data-date="${dateStr}">${day}</div>`;
             }
         } else {
             // Collapsed month - show full month name
@@ -554,6 +555,9 @@ export const renderGanttView = (
     if (scrollWrapper) {
         setupGanttScrollHandling(employeesList, scrollWrapper);
     }
+
+    // Setup crosshair highlighting (row + column on hover)
+    setupGanttCrosshair();
 };
 
 /**
@@ -1609,4 +1613,99 @@ const showEditPopup = (
     setTimeout(() => {
         document.addEventListener('mousedown', closeOnOutsideClick);
     }, 100);
+};
+
+// ============================================
+// CROSSHAIR HIGHLIGHTING
+// ============================================
+
+let lastCrosshairDate: string | null = null;
+let crosshairColOverlay: HTMLElement | null = null;
+let crosshairHdrEl: HTMLElement | null = null;
+let crosshairEmpEl: HTMLElement | null = null;
+
+/**
+ * Setup crosshair highlighting on the Gantt chart.
+ * Uses a single overlay element for the column stripe (O(1) repositioning)
+ * and caches the highlighted header/employee elements for instant clearing.
+ */
+const setupGanttCrosshair = (): void => {
+    const timelineBody = document.getElementById('ganttTimelineBody');
+    const employeesList = document.getElementById('ganttEmployeesList');
+    const headerContainer = document.getElementById('ganttTimelineHeader');
+
+    if (!timelineBody || !employeesList || !headerContainer) return;
+
+    // Reset state on re-render (DOM was replaced)
+    lastCrosshairDate = null;
+    crosshairHdrEl = null;
+    crosshairEmpEl = null;
+
+    // Create or reuse the column overlay element (survives re-renders via recreation)
+    crosshairColOverlay = timelineBody.querySelector('.gantt-crosshair-col-overlay') as HTMLElement | null;
+    if (!crosshairColOverlay) {
+        crosshairColOverlay = document.createElement('div');
+        crosshairColOverlay.className = 'gantt-crosshair-col-overlay';
+        timelineBody.appendChild(crosshairColOverlay);
+    }
+    crosshairColOverlay.style.display = 'none';
+
+    // Only bind event listeners once – they survive innerHTML changes via delegation
+    if (timelineBody.hasAttribute('data-crosshair-setup')) return;
+    timelineBody.setAttribute('data-crosshair-setup', 'true');
+
+    const clearHighlights = (): void => {
+        if (lastCrosshairDate === null) return;
+        if (crosshairColOverlay) crosshairColOverlay.style.display = 'none';
+        if (crosshairHdrEl) { crosshairHdrEl.classList.remove('gantt-crosshair-col'); crosshairHdrEl = null; }
+        if (crosshairEmpEl) { crosshairEmpEl.classList.remove('gantt-crosshair-row'); crosshairEmpEl = null; }
+        lastCrosshairDate = null;
+    };
+
+    timelineBody.addEventListener('mouseover', (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        const dayCell = target.closest('.gantt-day-cell') as HTMLElement | null;
+
+        if (!dayCell) {
+            clearHighlights();
+            return;
+        }
+
+        const date = dayCell.dataset.date;
+        if (!date || date === lastCrosshairDate) return;
+
+        // Clear previous highlights (O(1) – just hide overlay + remove 2 cached classes)
+        clearHighlights();
+        lastCrosshairDate = date;
+
+        // ── Column: position the overlay stripe at the hovered cell's X ──
+        if (crosshairColOverlay) {
+            crosshairColOverlay.style.left = `${dayCell.offsetLeft}px`;
+            crosshairColOverlay.style.width = `${dayCell.offsetWidth}px`;
+            crosshairColOverlay.style.display = '';
+        }
+
+        // ── Column header: highlight the single day number ──
+        const hdr = headerContainer.querySelector(`.gantt-day-header[data-date="${date}"]`) as HTMLElement | null;
+        if (hdr) {
+            hdr.classList.add('gantt-crosshair-col');
+            crosshairHdrEl = hdr;
+        }
+
+        // ── Row: highlight the employee name in the fixed column ──
+        const timelineRow = dayCell.closest('.gantt-timeline-row') as HTMLElement | null;
+        if (timelineRow) {
+            const empName = timelineRow.dataset.employee;
+            if (empName) {
+                const escapedName = empName.replace(/"/g, '\\"');
+                const empCell = employeesList.querySelector(`.gantt-employee-cell[data-employee="${escapedName}"]`) as HTMLElement | null;
+                if (empCell) {
+                    empCell.classList.add('gantt-crosshair-row');
+                    crosshairEmpEl = empCell;
+                }
+            }
+        }
+    });
+
+    timelineBody.addEventListener('mouseleave', clearHighlights);
 };
