@@ -714,7 +714,7 @@
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 12px;
     flex: 1;
 }
 
@@ -745,7 +745,7 @@
     line-height: 0.8;
     order: 2;
     letter-spacing: -0.04em;
-    margin-left: -8px;
+    margin-left: 4px;
     margin-right: 12px;
 }
 
@@ -757,25 +757,34 @@
 }
 
 .station-cancel-btn {
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
+    padding: 6px 14px;
+    height: 34px;
+    min-width: 75px;
     border: none;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.1);
-    color: var(--color-gray-600);
+    border-radius: 6px;
+    background: #fee2e2;
+    color: #991b1b;
+    font-size: 0.85rem;
+    font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.15s ease;
     order: 3;
-    margin-right: 6px;
+    margin-right: 4px;
+    border: 1px solid #fecaca;
 }
 
 .station-cancel-btn:hover {
-    background: var(--color-danger);
+    background: #ef4444;
     color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+}
+
+.station-cancel-btn:active {
+    transform: translateY(0);
 }
 
 /* ============================================
@@ -868,7 +877,7 @@
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: 12px;
     flex: 1;
 }
 

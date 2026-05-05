@@ -2318,7 +2318,7 @@ export const Stations: StationsAPI = (() => {
                         </div>
                         <span class="station-timer">${formatTime(remaining)}</span>
                         <button class="station-cancel-btn" data-action="cancel" data-station="${station.id}" data-room="${room.id}">
-                            <i class="fas fa-times"></i>
+                            Koniec
                         </button>
                     </div>
                     ${queueHtml}
@@ -2427,7 +2427,7 @@ export const Stations: StationsAPI = (() => {
                         </div>
                         <span class="station-timer">${formatTime(remaining)}</span>
                         <button class="station-cancel-btn" data-action="cancel" data-station="${station.id}" data-room="${room.id}">
-                            <i class="fas fa-times"></i>
+                            Koniec
                         </button>
                     </div>
                     ${queueHtml}
