@@ -271,6 +271,7 @@ export const Stations: StationsAPI = (() => {
     let roomLayoutSettings: RoomLayoutSettings = { 1: [], 2: [], 3: [] };
     let isLayoutEditMode = false;
     let draggedRoomId: string | null = null;
+    let focusedRoomIds: Set<string> | null = null;
 
     // User session state
     let currentUserUid: string | null = null;
@@ -339,11 +340,38 @@ export const Stations: StationsAPI = (() => {
         }, 900);
     };
 
+    const loadRuntimeViewSettings = (): void => {
+        const container = document.querySelector<HTMLElement>('.stations-container');
+        const roomFilter = container?.dataset.stationsRoomFilter || '';
+        const roomIds = roomFilter
+            .split(',')
+            .map(roomId => roomId.trim())
+            .filter(Boolean);
+
+        focusedRoomIds = roomIds.length > 0 ? new Set(roomIds) : null;
+    };
+
+    const isFocusedView = (): boolean => focusedRoomIds !== null;
+
+    const isRoomInRuntimeScope = (roomId: string): boolean => {
+        return !focusedRoomIds || focusedRoomIds.has(roomId);
+    };
+
+    const getScopedRooms = (): Room[] => {
+        return rooms.filter(room => isRoomInRuntimeScope(room.id));
+    };
+
+    const isStationInRuntimeScope = (stationId: string): boolean => {
+        if (!focusedRoomIds) return true;
+        return getScopedRooms().some(room => room.stations.some(station => station.id === stationId));
+    };
+
     /**
      * Initialize module
      */
     const init = (): void => {
         console.log('Stations module initializing...');
+        loadRuntimeViewSettings();
 
         // Setup auth state listener
         unsubscribeAuth = auth.onAuthStateChanged((user: any) => {
@@ -465,6 +493,7 @@ export const Stations: StationsAPI = (() => {
         roomLayoutSettings = { 1: [], 2: [], 3: [] };
         isLayoutEditMode = false;
         draggedRoomId = null;
+        focusedRoomIds = null;
         pendingQueueStation = null;
         pendingQueueRoom = null;
         activeMobileRoomId = null;
@@ -599,6 +628,7 @@ export const Stations: StationsAPI = (() => {
      */
     const checkForNewlyFinished = (previousStates: Map<string, StationState>): void => {
         for (const [stationId, state] of stationStates) {
+            if (!isStationInRuntimeScope(stationId)) continue;
             if (state.status === 'FINISHED') {
                 const prevState = previousStates.get(stationId);
                 if (!prevState || prevState.status !== 'FINISHED') {
@@ -1328,7 +1358,7 @@ export const Stations: StationsAPI = (() => {
     const updateTimers = (): void => {
         let hasFinishedTransition = false;
 
-        for (const room of rooms) {
+        for (const room of getScopedRooms()) {
             for (const station of room.stations) {
                 if (station.status === 'OCCUPIED') {
                     const remaining = getRemainingTime(station);
@@ -1546,12 +1576,18 @@ export const Stations: StationsAPI = (() => {
      */
     const loadRoomVisibilitySettings = (): void => {
         const defaults: RoomVisibilityMap = {};
-        for (const room of rooms) {
+        const settingsRooms = getScopedRooms();
+        for (const room of settingsRooms) {
             defaults[room.id] = true;
         }
 
-        if (rooms.length === 0) {
+        if (settingsRooms.length === 0) {
             roomVisibility = new Map();
+            return;
+        }
+
+        if (isFocusedView()) {
+            roomVisibility = new Map(Object.entries(defaults));
             return;
         }
 
@@ -1564,7 +1600,7 @@ export const Stations: StationsAPI = (() => {
         try {
             const parsed = JSON.parse(raw) as RoomVisibilityMap;
             const merged: RoomVisibilityMap = {};
-            for (const room of rooms) {
+            for (const room of settingsRooms) {
                 merged[room.id] = parsed[room.id] !== false;
             }
             roomVisibility = new Map(Object.entries(merged));
@@ -1585,6 +1621,11 @@ export const Stations: StationsAPI = (() => {
      * Load desktop columns count from localStorage for current user
      */
     const loadDesktopColumnsSettings = (): void => {
+        if (isFocusedView()) {
+            desktopColumnsCount = 1;
+            return;
+        }
+
         const raw = localStorage.getItem(getDesktopColumnsStorageKey());
         const value = Number(raw);
         if (value === 1 || value === 2 || value === 3) {
@@ -1606,7 +1647,7 @@ export const Stations: StationsAPI = (() => {
      */
     const createDefaultColumnsLayout = (columnsCount: DesktopColumnsCount): string[][] => {
         const columns: string[][] = Array.from({ length: columnsCount }, () => []);
-        rooms.forEach((room, index) => {
+        getScopedRooms().forEach((room, index) => {
             columns[index % columnsCount]?.push(room.id);
         });
         return columns;
@@ -1617,7 +1658,8 @@ export const Stations: StationsAPI = (() => {
      */
     const normalizeColumnsLayout = (columnsCount: DesktopColumnsCount, rawLayout?: unknown): string[][] => {
         const normalized = Array.from({ length: columnsCount }, () => [] as string[]);
-        const validRoomIds = new Set(rooms.map(room => room.id));
+        const scopedRooms = getScopedRooms();
+        const validRoomIds = new Set(scopedRooms.map(room => room.id));
         const seen = new Set<string>();
 
         if (Array.isArray(rawLayout)) {
@@ -1648,7 +1690,7 @@ export const Stations: StationsAPI = (() => {
             return target;
         };
 
-        for (const room of rooms) {
+        for (const room of scopedRooms) {
             if (seen.has(room.id)) continue;
             const target = pickTargetColumn();
             normalized[target]?.push(room.id);
@@ -1674,7 +1716,7 @@ export const Stations: StationsAPI = (() => {
         const parsedByColumns: Partial<Record<DesktopColumnsCount, unknown>> = {};
         const raw = localStorage.getItem(getRoomLayoutStorageKey());
 
-        if (raw) {
+        if (raw && !isFocusedView()) {
             try {
                 const parsed = JSON.parse(raw) as Record<string, unknown>;
                 parsedByColumns[1] = parsed?.['1'];
@@ -1708,6 +1750,8 @@ export const Stations: StationsAPI = (() => {
      * Check whether room should be visible
      */
     const isRoomVisible = (roomId: string): boolean => {
+        if (!isRoomInRuntimeScope(roomId)) return false;
+        if (isFocusedView()) return true;
         return roomVisibility.get(roomId) !== false;
     };
 
@@ -1734,8 +1778,8 @@ export const Stations: StationsAPI = (() => {
         const bar = document.getElementById('stationsAttentionBar');
         if (!bar) return;
 
-        const visibleRooms = rooms.filter(room => isRoomVisible(room.id));
-        const scopeRooms = visibleRooms.length > 0 ? visibleRooms : rooms;
+        const visibleRooms = getScopedRooms().filter(room => isRoomVisible(room.id));
+        const scopeRooms = visibleRooms.length > 0 ? visibleRooms : getScopedRooms();
         const allStations = scopeRooms.flatMap(room => room.stations);
 
         const occupiedNow = allStations.filter(station => station.status === 'OCCUPIED').length;
@@ -2009,7 +2053,7 @@ export const Stations: StationsAPI = (() => {
         if (!container) return;
 
         const roomById = new Map(rooms.map(room => [room.id, room] as const));
-        const visibleRoomIds = new Set(rooms.filter(room => isRoomVisible(room.id)).map(room => room.id));
+        const visibleRoomIds = new Set(getScopedRooms().filter(room => isRoomVisible(room.id)).map(room => room.id));
         const layoutColumns = getColumnsLayout(desktopColumnsCount);
         const desktopColumns: Room[][] = layoutColumns.map(column => column
             .filter(roomId => visibleRoomIds.has(roomId))
@@ -2024,7 +2068,8 @@ export const Stations: StationsAPI = (() => {
             return;
         }
 
-        container.style.gridTemplateColumns = `repeat(${desktopColumnsCount}, minmax(0, calc((100% - 12px) / 3)))`;
+        const totalGapWidth = Math.max(0, desktopColumnsCount - 1) * 6;
+        container.style.gridTemplateColumns = `repeat(${desktopColumnsCount}, minmax(0, calc((100% - ${totalGapWidth}px) / ${desktopColumnsCount})))`;
 
         container.innerHTML = desktopColumns
             .map((columnRooms) => `
@@ -2059,7 +2104,7 @@ export const Stations: StationsAPI = (() => {
         const container = document.getElementById('stationsMobileView');
         if (!container) return;
 
-        const visibleRooms = rooms.filter(room => isRoomVisible(room.id));
+        const visibleRooms = getScopedRooms().filter(room => isRoomVisible(room.id));
         if (visibleRooms.length === 0) {
             container.innerHTML = '<div class="stations-empty-state">Brak widocznych sekcji. Włącz je w opcjach.</div>';
             return;
@@ -2469,7 +2514,7 @@ export const Stations: StationsAPI = (() => {
      * Update all station cards
      */
     const updateAllStationCards = (): void => {
-        for (const room of rooms) {
+        for (const room of getScopedRooms()) {
             for (const station of room.stations) {
                 updateStationCard(room, station);
             }

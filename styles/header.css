@@ -423,3 +423,53 @@
         /* Hide floating on desktop */
     }
 }
+
+body.massage-access-shell .hamburger-menu,
+body.massage-access-shell .nav-panel {
+    display: none !important;
+}
+
+.massage-light-header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px;
+    background: var(--color-white);
+    border-bottom: 1px solid var(--color-gray-200);
+    box-shadow: var(--shadow-sm);
+}
+
+.massage-light-btn {
+    min-height: 42px;
+    border: 1px solid var(--color-gray-200);
+    border-radius: 8px;
+    background: var(--color-background-soft);
+    color: var(--color-gray-800);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 14px;
+    font: inherit;
+    font-weight: 800;
+}
+
+.massage-light-btn.active {
+    background: var(--color-primary-500);
+    border-color: var(--color-primary-600);
+    color: var(--color-white);
+}
+
+.massage-light-btn.danger {
+    color: var(--color-danger-dark);
+    border-color: var(--color-danger);
+    background: var(--color-danger-light);
+}
+
+body.massage-access-shell .container {
+    padding-top: 4px;
+}

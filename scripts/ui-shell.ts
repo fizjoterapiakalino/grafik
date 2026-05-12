@@ -1,6 +1,7 @@
 // scripts/ui-shell.ts
 import { Shared } from './shared.js';
 import { EmployeeManager } from './employee-manager.js';
+import { auth } from './firebase-config.js';
 import type { FirebaseUser } from './types/firebase';
 
 /**
@@ -61,6 +62,20 @@ export const UIShell: UIShellAPI = (() => {
                     <button id="printLeavesNavbarBtn" class="action-icon-btn active" title="Drukuj Grafik Urlopów" style="display: none;"><i class="fas fa-file-pdf"></i></button>
                 </div>
             </div>
+            <div id="massageLightHeader" class="massage-light-header" style="display: none;">
+                <button id="massageHomeBtn" class="massage-light-btn active" type="button">
+                    <i class="fas fa-hands"></i>
+                    <span>Masaż</span>
+                </button>
+                <button id="massageOptionsBtn" class="massage-light-btn" type="button">
+                    <i class="fas fa-cog"></i>
+                    <span>Opcje</span>
+                </button>
+                <button id="massageLogoutBtn" class="massage-light-btn danger" type="button">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Wyloguj</span>
+                </button>
+            </div>
             <div id="splitViewWrapper" class="split-view-wrapper">
                 <main id="page-content" class="container"></main>
                 <aside id="splitViewSidebar" class="split-view-sidebar"></aside>
@@ -85,6 +100,18 @@ export const UIShell: UIShellAPI = (() => {
                 window.location.hash = 'scrapped-pdfs';
             });
         }
+
+        document.getElementById('massageHomeBtn')?.addEventListener('click', () => {
+            window.location.hash = 'massage-stations';
+        });
+
+        document.getElementById('massageOptionsBtn')?.addEventListener('click', () => {
+            window.location.hash = 'options';
+        });
+
+        document.getElementById('massageLogoutBtn')?.addEventListener('click', () => {
+            void auth.signOut();
+        });
 
         window.addEventListener('iso-updates-available', () => {
             const badge = document.querySelector('#btnIso .notification-badge') as HTMLElement | null;
@@ -192,10 +219,35 @@ export const UIShell: UIShellAPI = (() => {
 
     const updateUserState = (user: FirebaseUser | null): void => {
         const appHeader = document.getElementById('appHeader');
+        const massageLightHeader = document.getElementById('massageLightHeader');
         const bannerTitle = document.querySelector('.banner-title');
         const logoutBtnContainer = document.getElementById('logoutBtnContainer');
 
         if (!appHeader) return;
+
+        const isMassageAccess = user ? EmployeeManager.isMassageAccessUser(user.uid) : false;
+        const isMassageView = window.location.hash === '#massage-stations';
+        const useMassageLightShell = Boolean(user && (isMassageAccess || isMassageView));
+        document.body.classList.toggle('massage-access-shell', useMassageLightShell);
+        Shared.setMassageStationsLinkVisible(isMassageAccess);
+
+        if (massageLightHeader) {
+            massageLightHeader.style.display = useMassageLightShell ? 'flex' : 'none';
+            massageLightHeader.querySelectorAll('.massage-light-btn').forEach((button) => {
+                const element = button as HTMLElement;
+                const isActive =
+                    (element.id === 'massageHomeBtn' && window.location.hash === '#massage-stations') ||
+                    (element.id === 'massageOptionsBtn' && window.location.hash === '#options');
+                element.classList.toggle('active', isActive);
+            });
+        }
+
+        if (user && useMassageLightShell) {
+            const employee = EmployeeManager.getEmployeeByUid(user.uid);
+            appHeader.style.display = 'none';
+            Shared.updateUserInfo(employee ? employee.name || employee.displayName || null : 'Masaż');
+            return;
+        }
 
         if (user) {
             const employee = EmployeeManager.getEmployeeByUid(user.uid);

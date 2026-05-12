@@ -81,6 +81,11 @@ export const Router: RouterAPI = (() => {
             init: () => Stations.init(),
             getModule: () => Stations,
         },
+        'massage-stations': {
+            page: 'massage-stations',
+            init: () => Stations.init(),
+            getModule: () => Stations,
+        },
         appointments: {
             page: 'appointments',
             init: () => Appointments.init(),
@@ -97,10 +102,14 @@ export const Router: RouterAPI = (() => {
     let currentUser: FirebaseUser | null = null;
     let isNavigating = false;
     let lastUserUid: string | null = null;
+    let pdfServicesStarted = false;
 
     const init = (): void => {
         UIShell.render();
         window.addEventListener('hashchange', navigate);
+        document.addEventListener('app:access-mode-updated', () => {
+            navigate();
+        });
 
         let isInitialAuthCheck = true;
         auth.onAuthStateChanged((user) => {
@@ -112,8 +121,11 @@ export const Router: RouterAPI = (() => {
                 isInitialAuthCheck = false;
             }
         });
+    };
 
-        // Initialize PDF Service
+    const ensurePdfServicesStarted = (): void => {
+        if (pdfServicesStarted) return;
+        pdfServicesStarted = true;
         PdfService.fetchAndCachePdfLinks();
         PdfService.initRealtimeUpdates();
     };
@@ -144,6 +156,16 @@ export const Router: RouterAPI = (() => {
                 targetPage = 'login';
             }
 
+            if (currentUser) {
+                await EmployeeManager.load();
+            }
+
+            const isMassageAccess = currentUser ? EmployeeManager.isMassageAccessUser(currentUser.uid) : false;
+            if (currentUser && isMassageAccess) {
+                const allowedMassagePages = new Set(['massage-stations', 'options']);
+                targetPage = allowedMassagePages.has(targetPage) ? targetPage : 'massage-stations';
+            }
+
             if (pageName !== targetPage) {
                 history.replaceState(null, '', '#' + targetPage);
             }
@@ -154,14 +176,15 @@ export const Router: RouterAPI = (() => {
                 return;
             }
 
-            if (currentUser) {
-                await EmployeeManager.load();
+            if (currentUser && !isMassageAccess) {
+                ensurePdfServicesStarted();
             }
 
             UIShell.updateUserState(currentUser);
             const appHeader = document.getElementById('appHeader');
             if (appHeader) {
-                const displayStyle = currentUser ? 'flex' : 'none';
+                const useMassageLightShell = Boolean(currentUser && (isMassageAccess || targetPage === 'massage-stations'));
+                const displayStyle = currentUser && !useMassageLightShell ? 'flex' : 'none';
                 appHeader.style.display = displayStyle;
             }
 

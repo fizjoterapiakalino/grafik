@@ -1,0 +1,42 @@
+<!-- pages/massage-stations.html - compact massage stations view -->
+<div class="stations-container massage-stations-page" data-stations-room-filter="sala21">
+    <div class="stations-header">
+        <div class="stations-header-left">
+            <h1 class="stations-title">
+                <i class="fas fa-hands"></i>
+                Masaż - Sala 21
+            </h1>
+            <p class="stations-subtitle">Dwa stanowiska do masażu</p>
+        </div>
+        <div class="stations-header-right">
+            <div class="status-legend">
+                <div class="legend-item">
+                    <span class="legend-dot free"></span>
+                    <span>Wolne</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-dot occupied"></span>
+                    <span>Zajęte</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-dot finished"></span>
+                    <span>Koniec</span>
+                </div>
+            </div>
+            <button id="toggleSoundBtn" class="sound-toggle-btn" title="Włącz/Wyłącz dźwięk" aria-label="Dźwięk">
+                <i class="fas fa-volume-up"></i>
+            </button>
+            <button id="refreshStationsBtn" class="sound-toggle-btn refresh-btn" title="Odśwież" aria-label="Odśwież">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+            <button id="stationsZenBtn" class="sound-toggle-btn stations-zen-btn" title="Tryb pełnego ekranu" aria-label="Tryb pełnego ekranu" aria-pressed="false">
+                <i class="fas fa-expand-alt"></i>
+            </button>
+        </div>
+    </div>
+
+    <div id="stationsAttentionBar" class="stations-attention-bar" aria-live="polite" style="display: none !important;"></div>
+
+    <div class="stations-mobile-view" id="stationsMobileView"></div>
+    <div class="stations-desktop-view" id="stationsDesktopView"></div>
+</div>

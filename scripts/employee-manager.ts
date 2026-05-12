@@ -28,6 +28,7 @@ interface EmployeeManagerAPI {
     compareEmployees(empA: Employee, empB: Employee): number;
     getEmployeeByUid(uid: string): EmployeeWithId | null;
     isUserAdmin(uid: string): boolean;
+    isMassageAccessUser(uid: string): boolean;
     updateEmployee(id: string, data: Partial<Employee>): Promise<void>;
 }
 
@@ -195,6 +196,15 @@ export const EmployeeManager: EmployeeManagerAPI = (() => {
             if (!uid) return false;
             const employee = this.getEmployeeByUid(uid);
             return employee?.role === 'admin';
+        },
+
+        /**
+         * Sprawdza, czy użytkownik ma ograniczony dostęp do strony masażu.
+         */
+        isMassageAccessUser: function (uid: string): boolean {
+            if (!uid) return false;
+            const employee = this.getEmployeeByUid(uid);
+            return employee?.accessMode === 'massage';
         },
 
         /**

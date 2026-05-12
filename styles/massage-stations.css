@@ -1,0 +1,216 @@
+/* Compact Sala 21 massage view */
+
+.massage-stations-page {
+    max-width: 980px;
+    padding: 4px;
+}
+
+.massage-stations-page .stations-header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin-bottom: 4px;
+    padding: 6px 8px;
+    gap: 6px;
+}
+
+.massage-stations-page .stations-title {
+    font-size: 1rem;
+    line-height: 1.15;
+}
+
+.massage-stations-page .stations-header-left {
+    min-width: 130px;
+}
+
+.massage-stations-page .stations-header-right {
+    gap: 6px;
+}
+
+.massage-stations-page .status-legend {
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.massage-stations-page .sound-toggle-btn {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+}
+
+.massage-stations-page .stations-desktop-view {
+    gap: 4px;
+}
+
+.massage-stations-page .stations-column {
+    gap: 4px;
+}
+
+.massage-stations-page .room-panel {
+    border-radius: 8px;
+    box-shadow: var(--shadow-sm);
+}
+
+.massage-stations-page .room-panel-header {
+    padding: 7px 10px;
+    background: linear-gradient(135deg, #be185d, #0f766e);
+}
+
+.massage-stations-page .room-panel-body,
+.massage-stations-page .room-accordion-content {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 6px;
+}
+
+.massage-stations-page .station-card.station-multi {
+    min-width: 0;
+    min-height: 112px;
+    padding: 8px;
+    border-radius: 8px;
+}
+
+.massage-stations-page .station-header {
+    margin-bottom: 6px;
+}
+
+.massage-stations-page .station-header .station-name,
+.massage-stations-page .station-info .station-name {
+    font-size: 0.9rem;
+    font-weight: 800;
+}
+
+.massage-stations-page .treatment-tiles {
+    gap: 6px;
+}
+
+.massage-stations-page .treatment-tile {
+    min-height: 54px;
+    padding: 8px 10px;
+    border-radius: 7px;
+}
+
+.massage-stations-page .therapy-queue-btn {
+    width: 46px;
+    min-width: 46px;
+    min-height: 54px;
+    border-radius: 7px;
+}
+
+.massage-stations-page .station-occupied-content,
+.massage-stations-page .station-timer-content {
+    gap: 8px;
+    padding: 2px;
+}
+
+.massage-stations-page .station-timer {
+    font-size: 5.3rem;
+    line-height: 0.95;
+    margin: 0;
+    min-width: 204px;
+    text-align: right;
+}
+
+.massage-stations-page .station-emp-name {
+    font-size: 2.5rem;
+    margin-left: 0;
+}
+
+.massage-stations-page .station-cancel-btn {
+    height: 42px;
+    min-width: 64px;
+    margin-right: 0;
+    padding: 6px 10px;
+}
+
+.massage-stations-page .station-queue-container {
+    max-height: 34vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.massage-stations-page .queue-item {
+    gap: 4px;
+    padding: 4px 5px;
+}
+
+.massage-stations-page .queue-emp {
+    min-width: 0;
+}
+
+.massage-stations-page .btn-add-queue,
+.massage-stations-page .btn-start-queue,
+.massage-stations-page .btn-awaiting-queue,
+.massage-stations-page .queue-picker-tile {
+    min-height: 42px;
+}
+
+@media (min-width: 700px) {
+    .massage-stations-page .stations-desktop-view {
+        display: grid;
+    }
+
+    .massage-stations-page .stations-mobile-view {
+        display: none;
+    }
+}
+
+@media (max-width: 699px) {
+    .massage-stations-page {
+        padding: 2px;
+    }
+
+    .massage-stations-page .stations-header {
+        align-items: stretch;
+    }
+
+    .massage-stations-page .status-legend {
+        width: 100%;
+        order: 2;
+        justify-content: space-between;
+        font-size: 0.68rem;
+    }
+
+    .massage-stations-page .mobile-room-tiles {
+        display: block;
+    }
+
+    .massage-stations-page .mobile-room-tile {
+        display: none;
+    }
+
+    .massage-stations-page .mobile-room-panel {
+        display: block;
+        margin-top: 0;
+    }
+
+    .massage-stations-page .room-accordion-content {
+        grid-template-columns: 1fr;
+    }
+
+    .massage-stations-page .station-timer {
+        font-size: 4.7rem;
+        min-width: 184px;
+    }
+}
+
+@media (max-width: 380px) {
+    .massage-stations-page .stations-header-right {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .massage-stations-page .station-occupied-content {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .massage-stations-page .station-timer {
+        text-align: left;
+    }
+
+    .massage-stations-page .station-cancel-btn {
+        width: 100%;
+    }
+}

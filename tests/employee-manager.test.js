@@ -33,6 +33,12 @@ describe('EmployeeManager', () => {
             carriedOverLeave: 1,
         },
         2: { displayName: 'Marek', role: 'user' }, // Legacy format
+        3: {
+            displayName: 'Masażysta',
+            role: 'user',
+            uid: 'massage789',
+            accessMode: 'massage',
+        },
     };
 
     const mockLoadResult = (employees = mockEmployees) => {
@@ -125,6 +131,13 @@ describe('EmployeeManager', () => {
         expect(EmployeeManager.isUserAdmin('admin456')).toBe(true);
         expect(EmployeeManager.isUserAdmin('user123')).toBe(false);
         expect(EmployeeManager.isUserAdmin('unknown')).toBe(false);
+    });
+
+    test('isMassageAccessUser() should return true only for massage access uid', async () => {
+        await EmployeeManager.load();
+        expect(EmployeeManager.isMassageAccessUser('massage789')).toBe(true);
+        expect(EmployeeManager.isMassageAccessUser('user123')).toBe(false);
+        expect(EmployeeManager.isMassageAccessUser('unknown')).toBe(false);
     });
 
     test('compareEmployees() should sort by composed display key', () => {

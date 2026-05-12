@@ -23,6 +23,7 @@ interface SharedAPI {
     initialize(): void;
     updateUserInfo(userName: string | null): void;
     setIsoLinkActive(isActive: boolean): void;
+    setMassageStationsLinkVisible(isVisible: boolean): void;
 }
 
 /**
@@ -62,6 +63,7 @@ export const Shared: SharedAPI = (() => {
                 { href: '#schedule', text: 'Grafik', icon: 'fas fa-calendar-alt' },
                 { href: '#appointments', text: 'Planowanie', icon: 'fas fa-clock' },
                 { href: '#stations', text: 'Stanowiska', icon: 'fas fa-clinic-medical' },
+                { href: '#massage-stations', text: 'Masaż', icon: 'fas fa-hands', id: 'navLinkMassageStations' },
                 { href: '#leaves', text: 'Urlopy', icon: 'fas fa-plane-departure' },
                 { href: '#changes', text: 'Harmonogram zmian', icon: 'fas fa-exchange-alt' },
                 { href: '#statistics', text: 'Statystyki', icon: 'fas fa-chart-bar' },
@@ -286,10 +288,21 @@ export const Shared: SharedAPI = (() => {
         }
     };
 
+    const setMassageStationsLinkVisible = (isVisible: boolean): void => {
+        const massageStationsLink = document.getElementById('navLinkMassageStations') as HTMLAnchorElement | null;
+        const listItem = massageStationsLink?.closest('li') as HTMLElement | null;
+        if (!massageStationsLink || !listItem) return;
+
+        listItem.style.display = isVisible ? '' : 'none';
+        massageStationsLink.tabIndex = isVisible ? 0 : -1;
+        massageStationsLink.setAttribute('aria-hidden', String(!isVisible));
+    };
+
     return {
         initialize,
         updateUserInfo,
         setIsoLinkActive,
+        setMassageStationsLinkVisible,
     };
 })();
 

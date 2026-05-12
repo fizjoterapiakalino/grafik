@@ -41,9 +41,13 @@ export const Options: OptionsAPI = (() => {
     let clearUidBtn: HTMLElement | null;
     let employeeIsHidden: HTMLInputElement | null;
     let employeeIsScheduleOnly: HTMLInputElement | null;
+    let employeeAccessMassage: HTMLInputElement | null;
     let employeeShiftGroup: HTMLSelectElement | null;
 
     let selectedEmployeeIndex: number | null = null;
+    let currentEmployeeId: string | null = null;
+    let currentUserIsMassageAccess = false;
+    let isApplyingEmployeeFormState = false;
 
     let createBackupBtn: HTMLElement | null;
     let restoreBackupBtn: HTMLElement | null;
@@ -51,6 +55,7 @@ export const Options: OptionsAPI = (() => {
     let pwaInstallCard: HTMLElement | null;
     let installAppBtn: HTMLElement | null;
     let mobileZenModeToggle: HTMLInputElement | null;
+    const MASSAGE_ACCESS_CONFIRMATION = 'PEŁNY DOSTĘP';
 
     const displayLastBackupDate = async (): Promise<void> => {
         try {
@@ -165,6 +170,51 @@ export const Options: OptionsAPI = (() => {
         if (employeeUidInput) employeeUidInput.value = '';
     };
 
+    const confirmMassageAccessDisable = (): boolean => {
+        const confirmation = globalThis.prompt(
+            `Wyłączenie trybu masażu przywróci dostęp do pełnego systemu. Wpisz "${MASSAGE_ACCESS_CONFIRMATION}", aby potwierdzić.`
+        );
+        return confirmation?.trim().toLocaleUpperCase('pl-PL') === MASSAGE_ACCESS_CONFIRMATION;
+    };
+
+    const handleMassageAccessToggle = (): void => {
+        if (isApplyingEmployeeFormState || !employeeAccessMassage) return;
+        if (employeeAccessMassage.checked || !currentUserIsMassageAccess) return;
+
+        if (!confirmMassageAccessDisable()) {
+            employeeAccessMassage.checked = true;
+            window.showToast?.('Tryb masażu pozostał włączony.', 2200);
+        }
+    };
+
+    const applyMassageAccessOptionsMode = (): void => {
+        if (!currentUserIsMassageAccess) return;
+
+        document.body.classList.add('massage-access-options');
+
+        const optionsPage = document.querySelector('.options-page');
+        optionsPage?.classList.add('massage-access-options-page');
+
+        document.querySelectorAll<HTMLElement>(
+            '.options-sidebar, .employee-list-card, .page-subtitle, #deleteEmployeeBtn, #addEmployeeBtn, #assignUidBtn, #clearUidBtn'
+        ).forEach((element) => {
+            element.style.display = 'none';
+        });
+
+        document.querySelectorAll<HTMLElement>('.form-section').forEach((section) => {
+            const title = section.querySelector('.section-header h3')?.textContent?.trim() || '';
+            if (title !== 'Uprawnienia') {
+                section.style.display = 'none';
+            }
+        });
+
+        document.querySelectorAll<HTMLElement>('.toggle-group .toggle-item').forEach((item) => {
+            if (!item.querySelector('#employeeAccessMassage')) {
+                item.style.display = 'none';
+            }
+        });
+    };
+
     const resetDetailsPanel = (): void => {
         selectedEmployeeIndex = null;
         if (detailsPlaceholder) detailsPlaceholder.style.display = 'flex';
@@ -194,6 +244,7 @@ export const Options: OptionsAPI = (() => {
         }
 
         const sortedEmployees = Object.entries(employees)
+            .filter(([index]) => !currentUserIsMassageAccess || index === currentEmployeeId)
             .map(([index, data]) => ({
                 index: Number.parseInt(index, 10),
                 firstName: data.firstName,
@@ -202,10 +253,11 @@ export const Options: OptionsAPI = (() => {
                 isAdmin: data.role === 'admin',
                 isHidden: data.isHidden || false,
                 isScheduleOnly: data.isScheduleOnly || false,
+                isMassageAccess: data.accessMode === 'massage',
             }))
             .sort((a, b) => a.index - b.index);
 
-        sortedEmployees.forEach(({ index, firstName, lastName, displayName, isAdmin, isHidden, isScheduleOnly }) => {
+        sortedEmployees.forEach(({ index, firstName, lastName, displayName, isAdmin, isHidden, isScheduleOnly, isMassageAccess }) => {
             const nameToDisplay = firstName && lastName ? `${firstName} ${lastName}` : displayName;
             if (!nameToDisplay) return;
 
@@ -222,7 +274,7 @@ export const Options: OptionsAPI = (() => {
 
             // Generuj badge'e statusu
             let badgesHtml = '';
-            if (isAdmin || isHidden || isScheduleOnly) {
+            if (isAdmin || isHidden || isScheduleOnly || isMassageAccess) {
                 badgesHtml = '<div class="employee-badges">';
                 if (isAdmin) {
                     badgesHtml += '<span class="employee-badge admin" title="Administrator"><i class="fas fa-key"></i></span>';
@@ -232,6 +284,9 @@ export const Options: OptionsAPI = (() => {
                 }
                 if (isScheduleOnly) {
                     badgesHtml += '<span class="employee-badge schedule-only" title="Tylko w grafiku"><i class="fas fa-running"></i></span>';
+                }
+                if (isMassageAccess) {
+                    badgesHtml += '<span class="employee-badge massage" title="Tryb masażu"><i class="fas fa-hands"></i></span>';
                 }
                 badgesHtml += '</div>';
             }
@@ -264,6 +319,7 @@ export const Options: OptionsAPI = (() => {
 
         if (detailsPlaceholder) detailsPlaceholder.style.display = 'none';
         if (detailsEditForm) detailsEditForm.style.display = 'block';
+        isApplyingEmployeeFormState = true;
         if (employeeFirstNameInput) employeeFirstNameInput.value = employee.firstName || '';
         if (employeeLastNameInput) employeeLastNameInput.value = employee.lastName || '';
         if (employeeDisplayNameInput) employeeDisplayNameInput.value = employee.displayName || employee.name || '';
@@ -274,8 +330,10 @@ export const Options: OptionsAPI = (() => {
         if (adminCheckbox) adminCheckbox.checked = employee.role === 'admin';
         if (employeeIsHidden) employeeIsHidden.checked = employee.isHidden || false;
         if (employeeIsScheduleOnly) employeeIsScheduleOnly.checked = employee.isScheduleOnly || false;
+        if (employeeAccessMassage) employeeAccessMassage.checked = employee.accessMode === 'massage';
         if (employeeShiftGroup) employeeShiftGroup.value = employee.shiftGroup || '';
         if (employeeUidInput) employeeUidInput.value = employee.uid || '';
+        isApplyingEmployeeFormState = false;
     };
 
     const filterEmployees = (): void => {
@@ -364,6 +422,7 @@ export const Options: OptionsAPI = (() => {
         const newDisplayName = employeeDisplayNameInput?.value.trim() || '';
         const newEmployeeNumber = employeeNumberInput?.value.trim() || '';
         const newEntitlement = Number.parseInt(leaveEntitlementInput?.value || '0', 10);
+        const selectedEmployeeIsCurrentUser = Boolean(auth.currentUser?.uid && oldEmployee.uid === auth.currentUser.uid);
 
         const adminCheckbox = document.getElementById('employeeRoleAdmin') as HTMLInputElement | null;
         const isAdmin = adminCheckbox?.checked || false;
@@ -388,6 +447,7 @@ export const Options: OptionsAPI = (() => {
             role: isAdmin ? 'admin' : 'user',
             isHidden: isHidden,
             isScheduleOnly: employeeIsScheduleOnly?.checked || false,
+            accessMode: employeeAccessMassage?.checked ? 'massage' : 'full',
             shiftGroup: employeeShiftGroup?.value ? (employeeShiftGroup.value as ShiftGroup) : null,
             uid: newUid,
         };
@@ -410,6 +470,11 @@ export const Options: OptionsAPI = (() => {
             }
 
             await EmployeeManager.load();
+            const updatedCurrentEmployee = auth.currentUser
+                ? EmployeeManager.getEmployeeByUid(auth.currentUser.uid)
+                : null;
+            currentUserIsMassageAccess = updatedCurrentEmployee?.accessMode === 'massage';
+            currentEmployeeId = updatedCurrentEmployee?.id || currentEmployeeId;
 
             const listItem = employeeListContainer?.querySelector(
                 `.employee-list-item[data-employee-index="${selectedEmployeeIndex}"]`
@@ -420,6 +485,11 @@ export const Options: OptionsAPI = (() => {
                 if (span) span.textContent = nameToDisplay;
             }
             (globalThis as any).showToast('Dane pracownika zaktualizowane.', 2000);
+            if (selectedEmployeeIsCurrentUser && !currentUserIsMassageAccess && oldEmployee.accessMode === 'massage') {
+                window.location.hash = 'schedule';
+            } else if (selectedEmployeeIsCurrentUser) {
+                document.dispatchEvent(new CustomEvent('app:access-mode-updated'));
+            }
         } catch (error) {
             console.error('Błąd podczas zapisywania zmian pracownika:', error);
             (globalThis as any).showToast('Wystąpił błąd podczas zapisu. Spróbuj ponownie.', 5000);
@@ -528,6 +598,7 @@ export const Options: OptionsAPI = (() => {
         clearUidBtn = document.getElementById('clearUidBtn');
         employeeIsHidden = document.getElementById('employeeIsHidden') as HTMLInputElement | null;
         employeeIsScheduleOnly = document.getElementById('employeeIsScheduleOnly') as HTMLInputElement | null;
+        employeeAccessMassage = document.getElementById('employeeAccessMassage') as HTMLInputElement | null;
         employeeShiftGroup = document.getElementById('employeeShiftGroup') as HTMLSelectElement | null;
         createBackupBtn = document.getElementById('createBackupBtn');
         restoreBackupBtn = document.getElementById('restoreBackupBtn');
@@ -540,7 +611,17 @@ export const Options: OptionsAPI = (() => {
         showLoading(true);
         try {
             await EmployeeManager.load();
+            const currentEmployee = auth.currentUser ? EmployeeManager.getEmployeeByUid(auth.currentUser.uid) : null;
+            currentEmployeeId = currentEmployee?.id || null;
+            currentUserIsMassageAccess = currentEmployee?.accessMode === 'massage';
             renderEmployeeList();
+            applyMassageAccessOptionsMode();
+            if (currentUserIsMassageAccess && currentEmployeeId) {
+                const ownEmployeeIndex = Number.parseInt(currentEmployeeId, 10);
+                if (!Number.isNaN(ownEmployeeIndex)) {
+                    handleEmployeeSelect(ownEmployeeIndex);
+                }
+            }
             await displayLastBackupDate();
         } catch (error) {
             console.error('Błąd inicjalizacji strony opcji:', error);
@@ -555,6 +636,7 @@ export const Options: OptionsAPI = (() => {
         deleteEmployeeBtn?.addEventListener('click', handleDeleteEmployee);
         assignUidBtn?.addEventListener('click', handleAssignUid);
         clearUidBtn?.addEventListener('click', handleClearUid);
+        employeeAccessMassage?.addEventListener('change', handleMassageAccessToggle);
         createBackupBtn?.addEventListener('click', createBackup);
         restoreBackupBtn?.addEventListener('click', handleRestoreBackup);
         installAppBtn?.addEventListener('click', () => {
@@ -707,11 +789,13 @@ export const Options: OptionsAPI = (() => {
         deleteEmployeeBtn?.removeEventListener('click', handleDeleteEmployee);
         assignUidBtn?.removeEventListener('click', handleAssignUid);
         clearUidBtn?.removeEventListener('click', handleClearUid);
+        employeeAccessMassage?.removeEventListener('change', handleMassageAccessToggle);
         createBackupBtn?.removeEventListener('click', createBackup);
         restoreBackupBtn?.removeEventListener('click', handleRestoreBackup);
         mobileZenModeToggle?.removeEventListener('change', handleMobileZenToggle);
         window.removeEventListener('pwa-installable', updatePWAUI);
         window.removeEventListener('pwa-installed', updatePWAUI);
+        document.body.classList.remove('massage-access-options');
         debugLog('Options module destroyed');
     };
 

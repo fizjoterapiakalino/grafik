@@ -316,6 +316,10 @@
     background: var(--color-info);
 }
 
+.employee-badge.massage {
+    background: #be185d;
+}
+
 /* Add Employee Button */
 .add-employee-btn {
     display: flex;
@@ -598,6 +602,30 @@
 
 .toggle-item:hover .toggle-label i {
     color: var(--color-primary-500);
+}
+
+.massage-access-options-page {
+    max-width: 720px;
+    padding: var(--spacing-sm);
+}
+
+.massage-access-options-page .page-header {
+    margin-bottom: var(--spacing-md);
+}
+
+.massage-access-options-page .options-grid {
+    grid-template-columns: 1fr;
+    min-height: 0;
+}
+
+.massage-access-options-page .employee-details-card {
+    max-width: 640px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.massage-access-options-page .details-form {
+    display: block !important;
 }
 
 /* UID Field */

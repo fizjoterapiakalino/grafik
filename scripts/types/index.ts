@@ -44,6 +44,8 @@ export interface Employee {
     isScheduleOnly?: boolean;
     /** Rola pracownika */
     role?: 'admin' | 'user';
+    /** Ograniczony tryb dostępu do aplikacji */
+    accessMode?: 'full' | 'massage';
     /** Grupa zmianowa */
     shiftGroup?: ShiftGroup;
     /** Przysługujący wymiar urlopu */
