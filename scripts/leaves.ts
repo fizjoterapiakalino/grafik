@@ -83,6 +83,13 @@ export const Leaves: LeavesAPI = (() => {
     let undoManager: InstanceType<typeof UndoManager>;
     let appState: AppState = { leaves: {} };
 
+    const getDefaultMonthCellForRow = (row: HTMLTableRowElement | null): HTMLTableCellElement | null => {
+        if (!row) return null;
+        const now = new Date();
+        const monthIndex = currentYear === now.getUTCFullYear() ? now.getUTCMonth() : 0;
+        return row.querySelector(`.day-cell[data-month="${monthIndex}"]`) as HTMLTableCellElement | null;
+    };
+
     const _handleAppSearch = (e: Event): void => {
         const { searchTerm } = (e as CustomEvent<{ searchTerm: string }>).detail;
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
@@ -97,10 +104,9 @@ export const Leaves: LeavesAPI = (() => {
         const nameCell = (mouseEvent.target as HTMLElement).closest('.employee-name-cell');
         if (nameCell) {
             const row = nameCell.closest('tr');
-            const firstMonthCell = row?.querySelector('.day-cell[data-month="0"]') as HTMLTableCellElement | null;
-            if (firstMonthCell) {
-                showLeaveTypePopup(firstMonthCell, mouseEvent.clientX, mouseEvent.clientY);
-            }
+            const cell = getDefaultMonthCellForRow(row);
+            const rect = nameCell.getBoundingClientRect();
+            if (cell) showLeaveTypePopup(cell, rect.left, rect.bottom + 8);
             return;
         }
         const targetCell = (mouseEvent.target as HTMLElement).closest('.day-cell') as HTMLTableCellElement | null;
@@ -110,8 +116,40 @@ export const Leaves: LeavesAPI = (() => {
     };
 
     const _handleTableClick = (event: Event): void => {
-        const target = (event.target as HTMLElement).closest('.day-cell') as HTMLTableCellElement | null;
-        setActiveCell(target);
+        const element = event.target as HTMLElement;
+        const removeLeaveAction = element.closest('.leave-block-remove');
+        if (removeLeaveAction) {
+            event.preventDefault();
+            event.stopPropagation();
+            const leaveBlock = removeLeaveAction.closest('.leave-block') as HTMLElement | null;
+            const row = removeLeaveAction.closest('tr') as HTMLTableRowElement | null;
+            if (leaveBlock?.dataset.leaveId && row?.dataset.employee) {
+                void deleteSingleLeave(row.dataset.employee, leaveBlock.dataset.leaveId);
+            }
+            return;
+        }
+
+        const monthAction = element.closest('.month-cell-action');
+        if (monthAction) {
+            event.preventDefault();
+            event.stopPropagation();
+            const targetCell = monthAction.closest('.day-cell') as HTMLTableCellElement | null;
+            const rect = monthAction.getBoundingClientRect();
+            if (targetCell) showLeaveTypePopup(targetCell, rect.left, rect.bottom + 8);
+            return;
+        }
+
+        const clearAction = element.closest('.month-cell-clear');
+        if (clearAction) {
+            event.preventDefault();
+            event.stopPropagation();
+            const targetCell = clearAction.closest('.day-cell') as HTMLTableCellElement | null;
+            void clearCellLeaves(targetCell);
+            return;
+        }
+
+        const targetCell = element.closest('.day-cell') as HTMLTableCellElement | null;
+        setActiveCell(targetCell);
     };
 
     const setActiveCell = (cell: HTMLTableCellElement | null): void => {
@@ -172,7 +210,8 @@ export const Leaves: LeavesAPI = (() => {
 
         if (event.key === 'Enter') {
             event.preventDefault();
-            openCalendarForCell(activeCell);
+            const rect = activeCell.getBoundingClientRect();
+            showLeaveTypePopup(activeCell, rect.left, rect.bottom + 8);
         }
 
         if (event.ctrlKey && event.key === 'z') {
@@ -258,10 +297,11 @@ export const Leaves: LeavesAPI = (() => {
             const color = colors[key] || colors['default'] || '#4CAF50';
 
             const filterItem = document.createElement('label');
-            filterItem.className = 'legend-item filter-label';
+            filterItem.className = 'filter-toggle';
             filterItem.innerHTML = `
                 <input type="checkbox" class="filter-checkbox" value="${key}" ${activeFilters.has(key) ? 'checked' : ''}>
-                <span class="legend-color-box" style="background-color: ${color};"></span> ${option.textContent}
+                <span class="legend-color-box" style="background-color: ${color};"></span>
+                <span class="filter-toggle-text">${option.textContent}</span>
             `;
             legendContainer.appendChild(filterItem);
         });
@@ -381,12 +421,14 @@ export const Leaves: LeavesAPI = (() => {
             const updatedLeaves = await CalendarModal.open(employeeName, existingLeaves, monthIndex, currentYear, {
                 totalLimit: totalLimit,
                 defaultLeaveType: defaultLeaveType,
+                visibleMonthCount: 2,
             });
 
             appState.leaves = allLeaves;
             undoManager.pushState(appState);
 
             await saveLeavesData(employeeName, updatedLeaves);
+            appState.leaves[employeeName] = updatedLeaves;
             renderSingleEmployeeLeaves(employeeName, updatedLeaves);
         } catch (error) {
             debugLog('Operacja w kalendarzu została anulowana.', error);
@@ -397,7 +439,7 @@ export const Leaves: LeavesAPI = (() => {
     };
 
     /**
-     * Leave type configuration for popup (matches leaves-gantt.ts LEAVE_TYPES)
+     * Leave type configuration for popup (matches leaves-gantt.ts LEAVE_TYPES).
      */
     const LEAVE_TYPE_OPTIONS: Record<string, { label: string; color: string }> = {
         vacation: { label: 'Wypoczynkowy', color: '#3498db' },
@@ -407,17 +449,35 @@ export const Leaves: LeavesAPI = (() => {
         schedule_pickup: { label: 'Wybicie za święto', color: '#1abc9c' },
     };
 
-    /**
-     * Show leave type selection popup before opening the calendar modal
-     * Reuses the gantt-leave-popup styling from the Gantt view
-     */
     const showLeaveTypePopup = (cell: HTMLTableCellElement, x: number, y: number): void => {
-        // Remove any existing popup
         document.querySelectorAll('.gantt-leave-popup').forEach(el => el.remove());
 
-        const tr = cell.closest('tr') as HTMLTableRowElement;
-        const employeeName = tr?.dataset.employee || '';
+        const row = cell.closest('tr') as HTMLTableRowElement | null;
+        const employeeName = row?.dataset.employee || '';
+        const employeeId = row?.dataset.id || '';
+        const monthIndex = parseInt(cell.dataset.month || '0', 10);
+        const leaveInfo = EmployeeManager.getLeaveInfoById(employeeId, currentYear);
+        const totalLimit = (leaveInfo.entitlement || 0) + (leaveInfo.carriedOver || 0);
+        const employeeLeaves = appState.leaves[employeeName] || [];
+        let plannedVacationDays = 0;
 
+        employeeLeaves.forEach((leave) => {
+            if ((leave.type || 'vacation') !== 'vacation' || !leave.startDate || !leave.endDate) return;
+            const start = toUTCDate(leave.startDate);
+            const end = toUTCDate(leave.endDate);
+            const yearStart = new Date(Date.UTC(currentYear, 0, 1));
+            const yearEnd = new Date(Date.UTC(currentYear, 11, 31));
+            const effectiveStart = start < yearStart ? yearStart : start;
+            const effectiveEnd = end > yearEnd ? yearEnd : end;
+            if (effectiveStart > effectiveEnd) return;
+
+            for (let d = new Date(effectiveStart); d <= effectiveEnd; d.setUTCDate(d.getUTCDate() + 1)) {
+                const day = d.getUTCDay();
+                if (day !== 0 && day !== 6) plannedVacationDays++;
+            }
+        });
+
+        const remainingDays = totalLimit - plannedVacationDays;
         const typeButtons = Object.entries(LEAVE_TYPE_OPTIONS).map(([type, config]) => `
             <button class="gantt-popup-type-btn" data-type="${type}" style="background: ${config.color};">
                 ${config.label}
@@ -425,14 +485,19 @@ export const Leaves: LeavesAPI = (() => {
         `).join('');
 
         const popup = document.createElement('div');
-        popup.className = 'gantt-leave-popup';
+        popup.className = 'gantt-leave-popup monthly-leave-type-popup';
         popup.innerHTML = `
             <div class="gantt-popup-header">
                 <strong>${employeeName}</strong>
                 <button class="gantt-popup-close">&times;</button>
             </div>
-            <div class="gantt-popup-dates" style="font-size: 0.8rem; padding: 6px 12px;">
-                <i class="fas fa-calendar-alt"></i> Wybierz typ urlopu, aby otworzyć kalendarz
+            <div class="gantt-popup-dates">
+                ${months[monthIndex]} ${currentYear}
+            </div>
+            <div class="gantt-popup-limit-info">
+                <span class="limit-label">Urlop wypoczynkowy:</span>
+                <span class="limit-value">${plannedVacationDays}/${totalLimit} dni</span>
+                <span class="limit-remaining">(pozostało: ${remainingDays})</span>
             </div>
             <div class="gantt-popup-types">
                 ${typeButtons}
@@ -446,24 +511,19 @@ export const Leaves: LeavesAPI = (() => {
         popup.style.left = `${Math.min(x, window.innerWidth - 320)}px`;
         popup.style.top = `${Math.min(y, window.innerHeight - 350)}px`;
         popup.style.zIndex = '1000';
-
         document.body.appendChild(popup);
 
-        // Close handlers
         popup.querySelector('.gantt-popup-close')?.addEventListener('click', () => popup.remove());
         popup.querySelector('.gantt-popup-cancel')?.addEventListener('click', () => popup.remove());
-
-        // Type selection → open calendar with pre-selected type
         popup.querySelectorAll('.gantt-popup-type-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const leaveType = (btn as HTMLElement).dataset.type || 'vacation';
                 popup.remove();
-                openCalendarForCell(cell, leaveType);
+                void openCalendarForCell(cell, leaveType);
             });
         });
 
-        // Close on outside click
-        const closeOnOutside = (e: MouseEvent) => {
+        const closeOnOutside = (e: MouseEvent): void => {
             if (!popup.contains(e.target as Node)) {
                 popup.remove();
                 document.removeEventListener('mousedown', closeOnOutside);
@@ -538,6 +598,7 @@ export const Leaves: LeavesAPI = (() => {
         if (monthlyViewContainer) monthlyViewContainer.style.display = 'none';
         if (careViewContainer) careViewContainer.style.display = 'none';
         if (leavesFilterContainer) leavesFilterContainer.style.display = 'flex';
+        if (toggleAllMonthsBtn) toggleAllMonthsBtn.style.display = '';
 
         // Initialize expanded months for current year
         initExpandedMonths(currentYear);
@@ -743,11 +804,13 @@ export const Leaves: LeavesAPI = (() => {
         if (monthlyViewContainer) monthlyViewContainer.style.display = '';
         if (careViewContainer) careViewContainer.style.display = 'none';
         if (leavesFilterContainer) leavesFilterContainer.style.display = 'flex';
+        if (toggleAllMonthsBtn) toggleAllMonthsBtn.style.display = 'none';
 
         generateTableHeaders();
         const employees = EmployeeManager.getAll();
         generateTableRows(employees);
         const allLeaves = await getAllLeavesData();
+        appState.leaves = allLeaves;
         renderAllEmployeeLeaves(allLeaves);
         highlightCurrentMonth();
     };
@@ -839,6 +902,7 @@ export const Leaves: LeavesAPI = (() => {
         if (monthlyViewContainer) monthlyViewContainer.style.display = '';
         if (careViewContainer) careViewContainer.style.display = 'none';
         if (leavesFilterContainer) leavesFilterContainer.style.display = 'none';
+        if (toggleAllMonthsBtn) toggleAllMonthsBtn.style.display = 'none';
 
         const allLeaves = await getAllLeavesData();
         if (leavesHeaderRow && leavesTableBody) {
@@ -857,6 +921,7 @@ export const Leaves: LeavesAPI = (() => {
         if (monthlyViewContainer) monthlyViewContainer.style.display = 'none';
         if (careViewContainer) careViewContainer.style.display = 'block';
         if (leavesFilterContainer) leavesFilterContainer.style.display = 'none';
+        if (toggleAllMonthsBtn) toggleAllMonthsBtn.style.display = 'none';
 
         const allLeaves = await getAllLeavesData();
         if (careViewContainer) {
@@ -896,11 +961,15 @@ export const Leaves: LeavesAPI = (() => {
             tr.dataset.employee = name || '';
             tr.dataset.id = emp.id;
 
+            const fullName = EmployeeManager.getFullNameById(emp.id);
             const nameTd = document.createElement('td');
-            nameTd.textContent = EmployeeManager.getFullNameById(emp.id);
             nameTd.classList.add('employee-name-cell');
             nameTd.style.cursor = 'pointer';
-            nameTd.setAttribute('title', 'Dwuklik aby otworzyć kalendarz');
+            nameTd.setAttribute('title', 'Kliknij przycisk, aby dodać urlop');
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'employee-name-text';
+            nameSpan.textContent = fullName;
+            nameTd.appendChild(nameSpan);
             tr.appendChild(nameTd);
 
             months.forEach((_, monthIndex) => {
@@ -909,6 +978,12 @@ export const Leaves: LeavesAPI = (() => {
                 monthTd.dataset.month = String(monthIndex);
                 monthTd.setAttribute('data-label', months[monthIndex]);
                 monthTd.setAttribute('tabindex', '0');
+                const actionBtn = document.createElement('button');
+                actionBtn.type = 'button';
+                actionBtn.className = 'month-cell-action';
+                actionBtn.textContent = 'Dodaj';
+                actionBtn.setAttribute('aria-label', `Dodaj urlop w miesiącu ${months[monthIndex]}`);
+                monthTd.appendChild(actionBtn);
                 tr.appendChild(monthTd);
             });
             leavesTableBody!.appendChild(tr);
@@ -973,17 +1048,14 @@ export const Leaves: LeavesAPI = (() => {
             }
         });
 
-        nameCell.setAttribute('title', `Zaplanowano: ${plannedDays} / ${totalLimit}\nDwuklik aby otworzyć kalendarz`);
+        nameCell.setAttribute('title', `Zaplanowano: ${plannedDays} / ${totalLimit}\nUżyj przycisku Dodaj urlop, aby otworzyć kalendarz`);
     };
 
     const renderAllEmployeeLeaves = (allLeaves: Record<string, LeaveEntry[]>): void => {
-        Object.keys(allLeaves).forEach((employeeName) => {
-            renderSingleEmployeeLeaves(employeeName, allLeaves[employeeName] || []);
-        });
-
         leavesTableBody?.querySelectorAll('tr[data-employee]').forEach((row) => {
             const tr = row as HTMLTableRowElement;
             const employeeName = tr.dataset.employee || '';
+            renderSingleEmployeeLeaves(employeeName, allLeaves[employeeName] || []);
             updateEmployeeTooltip(tr, allLeaves[employeeName] || []);
         });
     };
@@ -1078,6 +1150,7 @@ export const Leaves: LeavesAPI = (() => {
 
                     const div = document.createElement('div');
                     div.classList.add('leave-block');
+                    div.dataset.leaveId = leave.id;
                     const leaveOption = document.querySelector(`#leaveTypeSelect option[value="${leave.type || 'vacation'}"]`);
                     const leaveTypeName = leaveOption ? leaveOption.textContent : 'Urlop';
 
@@ -1117,6 +1190,13 @@ export const Leaves: LeavesAPI = (() => {
                     textSpan.textContent = text;
                     div.appendChild(textSpan);
 
+                    const removeButton = document.createElement('button');
+                    removeButton.type = 'button';
+                    removeButton.className = 'leave-block-remove';
+                    removeButton.innerHTML = '&times;';
+                    removeButton.setAttribute('aria-label', `Usuń ${leaveTypeName || 'urlop'} ${formatDate(start)} - ${formatDate(end)}`);
+                    div.appendChild(removeButton);
+
                     // Add date badge for multi-month leaves (shows on hover)
                     if (isMultiMonth && (start < monthStart || end > monthEnd)) {
                         const badge = document.createElement('span');
@@ -1134,6 +1214,57 @@ export const Leaves: LeavesAPI = (() => {
                     cell.appendChild(spacer);
                 }
             }
+
+            const actions = document.createElement('div');
+            actions.className = 'month-cell-actions';
+
+            const editButton = document.createElement('button');
+            editButton.type = 'button';
+            editButton.className = 'month-cell-action';
+            editButton.textContent = cell.classList.contains('has-content') ? 'Edytuj' : 'Dodaj';
+            editButton.setAttribute(
+                'aria-label',
+                `${cell.classList.contains('has-content') ? 'Edytuj' : 'Dodaj'} urlop w miesiącu ${months[monthIndex]}`
+            );
+            actions.appendChild(editButton);
+
+            if (cell.classList.contains('has-content')) {
+                const clearButton = document.createElement('button');
+                clearButton.type = 'button';
+                clearButton.className = 'month-cell-clear';
+                clearButton.textContent = 'Usuń';
+                clearButton.setAttribute('aria-label', `Usuń urlopy z miesiąca ${months[monthIndex]}`);
+                actions.appendChild(clearButton);
+            }
+
+            cell.appendChild(actions);
+        }
+    };
+
+    const deleteSingleLeave = async (employeeName: string, leaveId: string): Promise<void> => {
+        try {
+            const allLeaves = await getAllLeavesData();
+            const employeeLeaves = allLeaves[employeeName] || [];
+            const leaveToDelete = employeeLeaves.find((leave) => leave.id === leaveId);
+            if (!leaveToDelete) return;
+
+            const start = toUTCDate(leaveToDelete.startDate);
+            const end = toUTCDate(leaveToDelete.endDate);
+            const formatDate = (d: Date): string => `${d.getUTCDate().toString().padStart(2, '0')}.${(d.getUTCMonth() + 1).toString().padStart(2, '0')}.${d.getUTCFullYear()}`;
+            if (!globalThis.confirm(`Usunąć urlop ${employeeName}: ${formatDate(start)} - ${formatDate(end)}?`)) {
+                return;
+            }
+
+            appState.leaves = allLeaves;
+            undoManager.pushState(appState);
+
+            const updatedLeaves = employeeLeaves.filter((leave) => leave.id !== leaveId);
+            await saveLeavesData(employeeName, updatedLeaves);
+            appState.leaves[employeeName] = updatedLeaves;
+            renderSingleEmployeeLeaves(employeeName, updatedLeaves);
+        } catch (error) {
+            console.error('Błąd podczas usuwania urlopu:', error);
+            window.showToast('Wystąpił błąd podczas usuwania urlopu. Spróbuj ponownie.', 5000);
         }
     };
 
@@ -1141,6 +1272,11 @@ export const Leaves: LeavesAPI = (() => {
         if (!cell) return;
         const employeeName = (cell.closest('tr') as HTMLTableRowElement).dataset.employee || '';
         const monthToClear = parseInt(cell.dataset.month || '0', 10);
+        const monthName = months[monthToClear] || 'wybrany miesiąc';
+        if (!globalThis.confirm(`Usunąć urlopy pracownika ${employeeName} widoczne w miesiącu ${monthName} ${currentYear}?`)) {
+            return;
+        }
+
         try {
             const allLeaves = await getAllLeavesData();
 
@@ -1148,12 +1284,15 @@ export const Leaves: LeavesAPI = (() => {
             undoManager.pushState(appState);
 
             const employeeLeaves = allLeaves[employeeName] || [];
+            const monthStart = new Date(Date.UTC(currentYear, monthToClear, 1));
+            const monthEnd = new Date(Date.UTC(currentYear, monthToClear + 1, 0));
             const remainingLeaves = employeeLeaves.filter((leave) => {
                 const start = toUTCDate(leave.startDate);
                 const end = toUTCDate(leave.endDate);
-                return end.getUTCMonth() < monthToClear || start.getUTCMonth() > monthToClear;
+                return end < monthStart || start > monthEnd;
             });
             await saveLeavesData(employeeName, remainingLeaves);
+            appState.leaves[employeeName] = remainingLeaves;
             renderSingleEmployeeLeaves(employeeName, remainingLeaves);
         } catch (error) {
             console.error('Błąd podczas czyszczenia urlopów w komórce:', error);

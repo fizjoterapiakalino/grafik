@@ -16,7 +16,7 @@
     <div id="leavesLegend" class="leaves-legend"></div>
     <button id="currentYearBtn" class="action-btn secondary" style="margin-left: auto">Ten Rok</button>
     <button id="toggleAllMonthsBtn" class="action-btn outline">Zwiń/Rozwiń wszystko</button>
-    <button id="clearFiltersBtn" class="action-btn outline">Wyczyść filtry</button>
+    <button id="clearFiltersBtn" class="action-btn outline">Pokaż wszystko</button>
 </div>
 
 <!-- Gantt View Container (Desktop) -->
@@ -116,12 +116,23 @@
 
             <div class="modal-system-info">
                 <i class="fas fa-info-circle"></i>
-                <span>Użyj <kbd>Ctrl</kbd> + klik dla pojedynczych dni. Przeciągnij, aby zaznaczyć zakres.</span>
+                <span>Kliknij ten sam dzień dwa razy, jeśli urlop trwa tylko jeden dzień. Zaznaczone dni widać od razu w kalendarzu.</span>
             </div>
+            <div id="saveSummaryText" class="save-summary-text">Wybierz daty, aby zobaczyć podsumowanie zapisu.</div>
 
             <div class="modal-actions-premium">
+                <div class="calendar-help-tooltip" tabindex="0" aria-label="Jak zaznaczyć urlop">
+                    <i class="fas fa-question"></i>
+                    <div class="calendar-help-content" role="tooltip">
+                        <strong>Jak zaznaczyć urlop</strong>
+                        <span>1. Kliknij pierwszy dzień</span>
+                        <span>2. Kliknij ostatni dzień</span>
+                        <span>3. Sprawdź podsumowanie</span>
+                        <span>4. Zapisz</span>
+                    </div>
+                </div>
                 <button id="clearSelectionBtn" class="premium-btn secondary">
-                    <i class="fas fa-eraser"></i> Wyczyść
+                    <i class="fas fa-eraser"></i> Wyczyść nowe zaznaczenie
                 </button>
                 <div class="primary-actions">
                     <button id="cancelSelectionBtn" class="premium-btn text">Anuluj</button>

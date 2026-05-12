@@ -8,6 +8,7 @@ import { toUTCDate, toDateString } from './utils.js';
 interface LeaveLimits {
     totalLimit?: number;
     defaultLeaveType?: string;
+    visibleMonthCount?: number;
 }
 
 /**
@@ -60,9 +61,13 @@ export const CalendarModal: CalendarModalAPI = (() => {
     let workdaysCounter: HTMLElement | null = null;
     let leaveTypeSelect: HTMLSelectElement | null = null;
     let leaveTypeColorIndicator: HTMLElement | null = null;
+    let saveSummaryText: HTMLElement | null = null;
 
     let currentYear = new Date().getUTCFullYear();
     let currentVacationLimit = 0;
+    let currentEmployeeName = '';
+    let visibleStartMonth = 0;
+    let visibleMonthCount = 12;
 
     let selectionStartDate: string | null = null;
     let hoverEndDate: string | null = null;
@@ -193,8 +198,11 @@ export const CalendarModal: CalendarModalAPI = (() => {
         calendarSlider.innerHTML = '';
         // Layout is now handled by CSS grid and media queries in leaves.css
 
-        for (let i = 0; i < 12; i++) {
-            calendarSlider.appendChild(createCalendar(currentYear, i));
+        for (let i = 0; i < visibleMonthCount; i++) {
+            const monthOffset = visibleStartMonth + i;
+            const year = currentYear + Math.floor(monthOffset / 12);
+            const month = monthOffset % 12;
+            calendarSlider.appendChild(createCalendar(year, month));
         }
         updateAllDayCells();
     };
@@ -375,6 +383,20 @@ export const CalendarModal: CalendarModalAPI = (() => {
                 workdaysCounter.classList.remove('limit-warning');
             }
         }
+
+        if (saveSummaryText) {
+            const selectedTypeLabel = leaveTypeSelect?.selectedOptions[0]?.textContent?.trim() || 'Urlop';
+            if (dates.length === 0 && isRangeSelectionActive && selectionStartDate) {
+                saveSummaryText.textContent = `${currentEmployeeName}: wybrano początek ${selectionStartDate}. Kliknij dzień końcowy.`;
+            } else if (dates.length === 0) {
+                saveSummaryText.textContent = `${currentEmployeeName}: wybierz daty, aby zobaczyć podsumowanie zapisu.`;
+            } else {
+                const workdays = countWorkdaysInSet(singleSelectedDays);
+                const start = dates[0];
+                const end = dates[dates.length - 1];
+                saveSummaryText.textContent = `${currentEmployeeName}: ${selectedTypeLabel}, ${start}${start !== end ? ` - ${end}` : ''}, ${workdays} dni roboczych.`;
+            }
+        }
     };
 
     const confirmSelection = (): void => {
@@ -485,6 +507,7 @@ export const CalendarModal: CalendarModalAPI = (() => {
         workdaysCounter = document.getElementById('workdaysCounter');
         leaveTypeSelect = document.getElementById('leaveTypeSelect') as HTMLSelectElement | null;
         leaveTypeColorIndicator = document.getElementById('leaveTypeColorIndicator');
+        saveSummaryText = document.getElementById('saveSummaryText');
 
         if (modal) {
             setupEventListeners();
@@ -492,14 +515,17 @@ export const CalendarModal: CalendarModalAPI = (() => {
     };
 
     const open = (
-        _employeeName: string,
+        employeeName: string,
         existingLeaves: LeaveInput[],
-        _monthIndex: number,
+        monthIndex: number,
         year?: number,
         limits: LeaveLimits = {}
     ): Promise<LeaveResult[]> => {
         currentYear = year || new Date().getUTCFullYear();
         currentVacationLimit = limits.totalLimit || 26;
+        currentEmployeeName = employeeName;
+        visibleStartMonth = Math.max(0, monthIndex);
+        visibleMonthCount = limits.visibleMonthCount || 12;
 
         if (prevMonthBtn) prevMonthBtn.style.display = 'none';
         if (nextMonthBtn) nextMonthBtn.style.display = 'none';
@@ -513,7 +539,10 @@ export const CalendarModal: CalendarModalAPI = (() => {
         }
 
         updateLeaveTypeIndicator();
-        if (modal) modal.style.display = 'flex';
+        if (modal) {
+            modal.classList.toggle('leave-type-locked', Boolean(limits.defaultLeaveType));
+            modal.style.display = 'flex';
+        }
 
         return new Promise((resolve, reject) => {
             _resolvePromise = resolve;
@@ -535,6 +564,10 @@ export const CalendarModal: CalendarModalAPI = (() => {
         workdaysCounter = null;
         leaveTypeSelect = null;
         leaveTypeColorIndicator = null;
+        saveSummaryText = null;
+        currentEmployeeName = '';
+        visibleStartMonth = 0;
+        visibleMonthCount = 12;
         _resolvePromise = null;
         _rejectPromise = null;
         debugLog('CalendarModal destroyed');

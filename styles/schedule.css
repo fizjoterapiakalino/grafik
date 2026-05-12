@@ -1620,24 +1620,34 @@ td.current-time-highlight {
 }
 
 .split-view-sidebar .station-timer {
-    font-size: 1.8rem;
+    font-size: 2.35rem;
     font-weight: 800;
     margin: 0;
-    min-width: 70px;
+    min-width: 0;
+    width: 100%;
 }
 
 .split-view-sidebar .station-emp-name {
-    font-size: 0.85rem;
+    font-size: 1.15rem;
     padding: 1px 4px;
+    max-width: 100%;
+    overflow-wrap: anywhere;
 }
 
 .split-view-sidebar .station-cancel-btn {
-    width: auto;
-    height: 28px;
-    min-width: 60px;
+    width: 100%;
+    height: 34px;
+    min-width: 0;
     padding: 2px 8px;
-    font-size: 0.72rem;
+    font-size: 0.84rem;
     border-radius: 4px;
+}
+
+.split-view-sidebar .station-end-action {
+    align-self: stretch;
+    box-sizing: border-box;
+    display: flex;
+    max-width: none;
 }
 
 /* Compact treatment tiles */
