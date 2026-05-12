@@ -100,28 +100,53 @@
 
 .massage-stations-page .station-occupied-content,
 .massage-stations-page .station-timer-content {
-    gap: 8px;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 4px;
+    justify-content: flex-start;
     padding: 2px;
 }
 
+.massage-stations-page .station-info {
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 0;
+    width: 100%;
+}
+
 .massage-stations-page .station-timer {
+    display: block;
     font-size: 5.3rem;
     line-height: 0.95;
     margin: 0;
-    min-width: 204px;
-    text-align: right;
+    min-width: 0;
+    text-align: left;
+    width: 100%;
 }
 
 .massage-stations-page .station-emp-name {
+    display: block;
     font-size: 2.5rem;
+    line-height: 1.05;
     margin-left: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    width: 100%;
 }
 
 .massage-stations-page .station-cancel-btn {
     height: 42px;
-    min-width: 64px;
     margin-right: 0;
     padding: 6px 10px;
+}
+
+.massage-stations-page .station-end-action {
+    align-self: stretch;
+    box-sizing: border-box;
+    display: flex;
+    margin-top: 6px;
+    max-width: none;
+    width: 100%;
 }
 
 .massage-stations-page .station-queue-container {
@@ -190,8 +215,11 @@
     }
 
     .massage-stations-page .station-timer {
-        font-size: 4.7rem;
-        min-width: 184px;
+        font-size: 4.2rem;
+    }
+
+    .massage-stations-page .station-emp-name {
+        font-size: 2.05rem;
     }
 }
 
@@ -201,16 +229,15 @@
         justify-content: flex-end;
     }
 
-    .massage-stations-page .station-occupied-content {
-        flex-direction: column;
-        align-items: stretch;
+    .massage-stations-page .station-cancel-btn {
+        width: 100%;
     }
 
     .massage-stations-page .station-timer {
-        text-align: left;
+        font-size: 3.4rem;
     }
 
-    .massage-stations-page .station-cancel-btn {
-        width: 100%;
+    .massage-stations-page .station-emp-name {
+        font-size: 1.65rem;
     }
 }

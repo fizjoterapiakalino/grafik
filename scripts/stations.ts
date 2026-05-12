@@ -2340,6 +2340,12 @@ export const Stations: StationsAPI = (() => {
         `;
     };
 
+    const renderEndTreatmentButton = (room: Room, station: Station): string => `
+        <button class="station-cancel-btn station-end-action" data-action="cancel" data-station="${station.id}" data-room="${room.id}">
+            Koniec
+        </button>
+    `;
+
     /**
      * Render simple station card (single click to start)
      */
@@ -2362,10 +2368,8 @@ export const Stations: StationsAPI = (() => {
                             <span class="station-emp-name">${employeeName}</span>
                         </div>
                         <span class="station-timer">${formatTime(remaining)}</span>
-                        <button class="station-cancel-btn" data-action="cancel" data-station="${station.id}" data-room="${room.id}">
-                            Koniec
-                        </button>
                     </div>
+                    ${renderEndTreatmentButton(room, station)}
                     ${queueHtml}
                 </div>
             `;
@@ -2471,10 +2475,8 @@ export const Stations: StationsAPI = (() => {
                             <span class="station-treatment-name">${treatment?.shortName || ''}</span>
                         </div>
                         <span class="station-timer">${formatTime(remaining)}</span>
-                        <button class="station-cancel-btn" data-action="cancel" data-station="${station.id}" data-room="${room.id}">
-                            Koniec
-                        </button>
                     </div>
+                    ${renderEndTreatmentButton(room, station)}
                     ${queueHtml}
                 </div>
             `;
