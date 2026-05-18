@@ -133,6 +133,38 @@ const THERAPY_MASSAGE_TREATMENT_ID = 'therapy_massage_20';
 const LEGACY_THERAPY_MASSAGE_IDS = new Set(['massage_treatment', 'therapy', 'gym_therapy', 'gym_massage']);
 const GLOBAL_SINGLE_DEVICE_TREATMENTS = new Set(['sollux']);
 
+interface RadioStationPreset {
+    id: string;
+    label: string;
+    searchName: string;
+    streamUrl?: string;
+    stationUuid?: string;
+}
+
+interface RadioBrowserStation {
+    stationuuid?: string;
+    name?: string;
+    url?: string;
+    url_resolved?: string;
+    favicon?: string;
+    codec?: string;
+    hls?: number | boolean;
+    lastcheckok?: number | boolean;
+}
+
+const RADIO_BROWSER_SERVERS = [
+    'https://de1.api.radio-browser.info',
+    'https://nl1.api.radio-browser.info',
+    'https://at1.api.radio-browser.info',
+];
+
+const RADIO_STATIONS: RadioStationPreset[] = [
+    { id: 'eska-warszawa', label: 'ESKA Warszawa', searchName: 'ESKA Warszawa' },
+    { id: 'rmf-fm', label: 'RMF FM', searchName: 'RMF FM' },
+    { id: 'radio-zet', label: 'Radio ZET', searchName: 'Radio ZET' },
+    { id: 'radio-357', label: 'Radio 357', searchName: 'Radio 357' },
+];
+
 /**
  * Moduł Stanowiska Zabiegowe
  */
@@ -272,6 +304,10 @@ export const Stations: StationsAPI = (() => {
     let isLayoutEditMode = false;
     let draggedRoomId: string | null = null;
     let focusedRoomIds: Set<string> | null = null;
+    let radioAudio: HTMLAudioElement | null = null;
+    let radioSelectedStation: RadioStationPreset = RADIO_STATIONS[0];
+    let radioIsLoading = false;
+    let radioLastStatus = 'Gotowe do odtwarzania';
 
     // User session state
     let currentUserUid: string | null = null;
@@ -328,6 +364,165 @@ export const Stations: StationsAPI = (() => {
         if (typeof docData._revision === 'number' && Number.isFinite(docData._revision)) {
             lastKnownRevision = Math.max(lastKnownRevision, Math.floor(docData._revision));
         }
+    };
+
+    const setRadioStatus = (message: string): void => {
+        radioLastStatus = message;
+        const statusEl = document.getElementById('stationsRadioStatus');
+        if (statusEl) statusEl.textContent = message;
+    };
+
+    const getRadioAudio = (): HTMLAudioElement => {
+        if (!radioAudio) {
+            radioAudio = new Audio();
+            radioAudio.preload = 'none';
+        }
+        return radioAudio;
+    };
+
+    const getStationStreamUrl = async (station: RadioStationPreset): Promise<string> => {
+        if (station.streamUrl) return station.streamUrl;
+
+        const params = new URLSearchParams({
+            name: station.searchName,
+            countrycode: 'PL',
+            hidebroken: 'true',
+            order: 'clickcount',
+            reverse: 'true',
+            limit: '8',
+        });
+
+        for (const server of RADIO_BROWSER_SERVERS) {
+            try {
+                const response = await fetch(`${server}/json/stations/search?${params.toString()}`, {
+                    cache: 'no-store',
+                });
+                if (!response.ok) continue;
+
+                const results = await response.json() as RadioBrowserStation[];
+                const playableStations = results.filter(result => {
+                    const streamUrl = result.url_resolved || result.url;
+                    return Boolean(streamUrl && (!result.lastcheckok || result.lastcheckok === true || result.lastcheckok === 1));
+                });
+                const playable = playableStations.find(result => {
+                    const streamUrl = (result.url_resolved || result.url || '').toLowerCase();
+                    const codec = (result.codec || '').toLowerCase();
+                    return result.hls !== true && result.hls !== 1 && !streamUrl.includes('.m3u8') && (!codec || codec.includes('mp3') || codec.includes('aac'));
+                }) || playableStations[0];
+
+                const streamUrl = playable?.url_resolved || playable?.url;
+                if (streamUrl) {
+                    station.streamUrl = streamUrl;
+                    station.stationUuid = playable?.stationuuid;
+                    return streamUrl;
+                }
+            } catch (error) {
+                console.warn('Radio Browser lookup failed:', error);
+            }
+        }
+
+        throw new Error(`No playable stream found for ${station.label}`);
+    };
+
+    const initRadioWidget = (): void => {
+        const player = document.getElementById('stationsRadioPlayer') as HTMLElement | null;
+        const panel = player?.closest<HTMLElement>('.stations-radio-widget-panel');
+        if (!player || (panel && getComputedStyle(panel).display === 'none') || player.dataset.bound === 'true') return;
+
+        const audio = getRadioAudio();
+        const playBtn = document.getElementById('stationsRadioPlayBtn') as HTMLButtonElement | null;
+        const nameEl = document.getElementById('stationsRadioName');
+        const listEl = document.getElementById('stationsRadioStationList');
+        if (!playBtn || !nameEl || !listEl) return;
+        const listenerOptions = eventAbortController ? { signal: eventAbortController.signal } : undefined;
+
+        const updatePlayButton = (playing: boolean): void => {
+            playBtn.innerHTML = playing ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
+            playBtn.setAttribute('aria-label', playing ? 'Zatrzymaj radio' : 'Odtwórz radio');
+            playBtn.classList.toggle('is-playing', playing);
+            playBtn.disabled = radioIsLoading;
+        };
+
+        const renderStationButtons = (): void => {
+            listEl.innerHTML = RADIO_STATIONS.map(station => `
+                <button class="stations-radio-station-btn${station.id === radioSelectedStation.id ? ' active' : ''}" type="button" data-radio-station="${station.id}">
+                    ${station.label}
+                </button>
+            `).join('');
+        };
+
+        const selectStation = async (station: RadioStationPreset, shouldPlay: boolean): Promise<void> => {
+            radioSelectedStation = station;
+            nameEl.textContent = station.label;
+            renderStationButtons();
+
+            if (audio.src && !shouldPlay) {
+                updatePlayButton(false);
+                setRadioStatus('Gotowe do odtwarzania');
+                return;
+            }
+
+            if (!shouldPlay) return;
+
+            try {
+                radioIsLoading = true;
+                updatePlayButton(false);
+                setRadioStatus('Łączenie...');
+                const streamUrl = await getStationStreamUrl(station);
+                if (audio.src !== streamUrl) {
+                    audio.src = streamUrl;
+                }
+                await audio.play();
+                setRadioStatus('Odtwarzanie');
+                updatePlayButton(true);
+            } catch (error) {
+                console.warn('Radio playback failed:', error);
+                audio.removeAttribute('src');
+                audio.load();
+                setRadioStatus('Nie udało się uruchomić stacji');
+                updatePlayButton(false);
+            } finally {
+                radioIsLoading = false;
+                updatePlayButton(!audio.paused);
+            }
+        };
+
+        playBtn.addEventListener('click', () => {
+            if (radioIsLoading) return;
+            if (!audio.paused) {
+                audio.pause();
+                setRadioStatus('Pauza');
+                updatePlayButton(false);
+                return;
+            }
+            void selectStation(radioSelectedStation, true);
+        }, listenerOptions);
+
+        listEl.addEventListener('click', event => {
+            const stationBtn = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-radio-station]');
+            if (!stationBtn) return;
+            const station = RADIO_STATIONS.find(item => item.id === stationBtn.dataset.radioStation);
+            if (station) {
+                void selectStation(station, !audio.paused);
+            }
+        }, listenerOptions);
+
+        audio.addEventListener('playing', () => {
+            setRadioStatus('Odtwarzanie');
+            updatePlayButton(true);
+        }, listenerOptions);
+        audio.addEventListener('pause', () => updatePlayButton(false), listenerOptions);
+        audio.addEventListener('waiting', () => setRadioStatus('Buforowanie...'), listenerOptions);
+        audio.addEventListener('error', () => {
+            setRadioStatus('Stream niedostępny');
+            updatePlayButton(false);
+        }, listenerOptions);
+
+        nameEl.textContent = radioSelectedStation.label;
+        setRadioStatus(audio.paused ? radioLastStatus : 'Odtwarzanie');
+        renderStationButtons();
+        updatePlayButton(!audio.paused);
+        player.dataset.bound = 'true';
     };
 
     const markQueueMove = (stationId: string, employeeId: string, direction: 'up' | 'down'): void => {
@@ -429,6 +624,7 @@ export const Stations: StationsAPI = (() => {
         // Update sound button state
         updateSoundButton();
         renderSectionsOptionsList();
+        initRadioWidget();
 
         console.log('Stations module initialized');
     };
@@ -437,6 +633,8 @@ export const Stations: StationsAPI = (() => {
      * Cleanup module
      */
     const destroy = (): void => {
+        const keepRadioPlaying = Boolean(document.querySelector('.split-view-sidebar .stations-radio-player'));
+
         if (unsubscribe) {
             unsubscribe();
             unsubscribe = null;
@@ -478,6 +676,13 @@ export const Stations: StationsAPI = (() => {
 
         // Remove employee picker modal if exists
         document.getElementById('employeePickerModal')?.remove();
+
+        if (!keepRadioPlaying && radioAudio) {
+            radioAudio.pause();
+            radioAudio.removeAttribute('src');
+            radioAudio.load();
+            radioLastStatus = 'Gotowe do odtwarzania';
+        }
 
         // Clear all maps and sets
         stationStates.clear();

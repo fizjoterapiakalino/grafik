@@ -1540,6 +1540,40 @@ td.current-time-highlight {
     flex-wrap: wrap;
 }
 
+.split-view-sidebar .stations-radio-widget-panel {
+    display: block;
+    padding: 0 6px 6px;
+}
+
+.split-view-sidebar .stations-radio-top {
+    padding: 6px;
+}
+
+.split-view-sidebar .stations-radio-play-btn {
+    flex-basis: 36px;
+    width: 36px;
+    height: 36px;
+}
+
+.split-view-sidebar .stations-radio-name {
+    font-size: 0.76rem;
+}
+
+.split-view-sidebar .stations-radio-status {
+    font-size: 0.64rem;
+}
+
+.split-view-sidebar .stations-radio-station-list {
+    gap: 4px;
+    padding: 5px;
+}
+
+.split-view-sidebar .stations-radio-station-btn {
+    min-height: 28px;
+    padding: 4px 5px;
+    font-size: 0.64rem;
+}
+
 .split-view-sidebar .status-legend {
     font-size: 0.6rem;
     gap: 6px;
@@ -1716,7 +1750,7 @@ td.current-time-highlight {
 
 /* Sections modal adjustments for sidebar */
 .split-view-sidebar .stations-sections-modal-content {
-    max-width: 240px;
+    max-width: 440px;
 }
 
 /* Awaiting start card compact */
