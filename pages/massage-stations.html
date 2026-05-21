@@ -26,6 +26,9 @@
             <button id="toggleSoundBtn" class="sound-toggle-btn" title="Włącz/Wyłącz dźwięk" aria-label="Dźwięk">
                 <i class="fas fa-volume-up"></i>
             </button>
+            <button id="toggleRadioBtn" class="sound-toggle-btn toggle-radio-btn" title="Włącz/Wyłącz radio" aria-label="Radio" aria-pressed="false">
+                <i class="fas fa-broadcast-tower"></i>
+            </button>
             <button id="refreshStationsBtn" class="sound-toggle-btn refresh-btn" title="Odśwież" aria-label="Odśwież">
                 <i class="fas fa-sync-alt"></i>
             </button>
@@ -36,6 +39,21 @@
     </div>
 
     <div id="stationsAttentionBar" class="stations-attention-bar" aria-live="polite" style="display: none !important;"></div>
+
+    <div class="stations-radio-widget-panel" aria-label="Radio online">
+        <div class="stations-radio-player" id="stationsRadioPlayer">
+            <div class="stations-radio-top">
+                <button id="stationsRadioPlayBtn" class="stations-radio-play-btn" type="button" aria-label="Odtwórz radio">
+                    <i class="fas fa-play"></i>
+                </button>
+                <div class="stations-radio-meta">
+                    <span id="stationsRadioName" class="stations-radio-name">ESKA Warszawa</span>
+                    <span id="stationsRadioStatus" class="stations-radio-status">Gotowe do odtwarzania</span>
+                </div>
+            </div>
+            <div id="stationsRadioStationList" class="stations-radio-station-list" aria-label="Stacje radiowe"></div>
+        </div>
+    </div>
 
     <div class="stations-mobile-view" id="stationsMobileView"></div>
     <div class="stations-desktop-view" id="stationsDesktopView"></div>

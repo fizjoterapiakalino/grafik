@@ -2,6 +2,7 @@
 import { db as dbRaw, auth as authRaw, FieldValue } from './firebase-config.js';
 import { EmployeeManager } from './employee-manager.js';
 import { MobileZen } from './mobile-zen.js';
+import Hls from 'hls.js';
 
 // Type for Firebase db wrapper (compatible with existing codebase)
 interface DbWrapper {
@@ -139,6 +140,8 @@ interface RadioStationPreset {
     searchName: string;
     streamUrl?: string;
     stationUuid?: string;
+    isHls?: boolean;
+    openFmBaseUrl?: string;
 }
 
 interface RadioBrowserStation {
@@ -163,6 +166,7 @@ const RADIO_STATIONS: RadioStationPreset[] = [
     { id: 'rmf-fm', label: 'RMF FM', searchName: 'RMF FM' },
     { id: 'radio-zet', label: 'Radio ZET', searchName: 'Radio ZET' },
     { id: 'radio-357', label: 'Radio 357', searchName: 'Radio 357' },
+    { id: 'openfm-impreza', label: 'Open FM Impreza', searchName: 'Open FM Impreza', openFmBaseUrl: 'https://stream-cdn-1.open.fm/OFM57/ngrp:standard/playlist.m3u8', isHls: true },
 ];
 
 /**
@@ -305,6 +309,7 @@ export const Stations: StationsAPI = (() => {
     let draggedRoomId: string | null = null;
     let focusedRoomIds: Set<string> | null = null;
     let radioAudio: HTMLAudioElement | null = null;
+    let radioHls: Hls | null = null;
     let radioSelectedStation: RadioStationPreset = RADIO_STATIONS[0];
     let radioIsLoading = false;
     let radioLastStatus = 'Gotowe do odtwarzania';
@@ -380,7 +385,23 @@ export const Stations: StationsAPI = (() => {
         return radioAudio;
     };
 
+    const getOpenFmAuthorizedUrl = async (baseStreamUrl: string): Promise<string> => {
+        const tokenUrl = `https://open.fm/api/user/token?fp=${encodeURIComponent(baseStreamUrl)}`;
+        const response = await fetch(tokenUrl, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Open FM token request failed: ${response.status}`);
+        const data = await response.json() as { url?: string };
+        if (!data.url) throw new Error('Open FM token response missing url');
+        return data.url;
+    };
+
     const getStationStreamUrl = async (station: RadioStationPreset): Promise<string> => {
+        // Open.FM stations: always fetch a fresh token (tokens are time-limited)
+        if (station.openFmBaseUrl) {
+            const authorizedUrl = await getOpenFmAuthorizedUrl(station.openFmBaseUrl);
+            station.streamUrl = authorizedUrl;
+            return authorizedUrl;
+        }
+
         if (station.streamUrl) return station.streamUrl;
 
         const params = new URLSearchParams({
@@ -451,12 +472,42 @@ export const Stations: StationsAPI = (() => {
             `).join('');
         };
 
+        const detachHls = (): void => {
+            if (radioHls) {
+                radioHls.destroy();
+                radioHls = null;
+            }
+        };
+
+        const attachHlsStream = (streamUrl: string): void => {
+            detachHls();
+            if (Hls.isSupported()) {
+                const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+                hls.loadSource(streamUrl);
+                hls.attachMedia(audio);
+                hls.on(Hls.Events.ERROR, (_event, data) => {
+                    if (data.fatal) {
+                        console.warn('HLS fatal error:', data.type, data.details);
+                        setRadioStatus('Stream niedostępny');
+                        updatePlayButton(false);
+                    }
+                });
+                radioHls = hls;
+            } else if (audio.canPlayType('application/vnd.apple.mpegurl')) {
+                // Safari native HLS
+                audio.src = streamUrl;
+            } else {
+                throw new Error('HLS not supported in this browser');
+            }
+        };
+
         const selectStation = async (station: RadioStationPreset, shouldPlay: boolean): Promise<void> => {
             radioSelectedStation = station;
             nameEl.textContent = station.label;
             renderStationButtons();
 
             if (audio.src && !shouldPlay) {
+                detachHls();
                 updatePlayButton(false);
                 setRadioStatus('Gotowe do odtwarzania');
                 return;
@@ -469,14 +520,22 @@ export const Stations: StationsAPI = (() => {
                 updatePlayButton(false);
                 setRadioStatus('Łączenie...');
                 const streamUrl = await getStationStreamUrl(station);
-                if (audio.src !== streamUrl) {
-                    audio.src = streamUrl;
+                const isHlsStream = station.isHls || streamUrl.includes('.m3u8');
+
+                if (isHlsStream) {
+                    attachHlsStream(streamUrl);
+                } else {
+                    detachHls();
+                    if (audio.src !== streamUrl) {
+                        audio.src = streamUrl;
+                    }
                 }
                 await audio.play();
                 setRadioStatus('Odtwarzanie');
                 updatePlayButton(true);
             } catch (error) {
                 console.warn('Radio playback failed:', error);
+                detachHls();
                 audio.removeAttribute('src');
                 audio.load();
                 setRadioStatus('Nie udało się uruchomić stacji');
@@ -678,6 +737,10 @@ export const Stations: StationsAPI = (() => {
         document.getElementById('employeePickerModal')?.remove();
 
         if (!keepRadioPlaying && radioAudio) {
+            if (radioHls) {
+                radioHls.destroy();
+                radioHls = null;
+            }
             radioAudio.pause();
             radioAudio.removeAttribute('src');
             radioAudio.load();
@@ -2823,6 +2886,29 @@ export const Stations: StationsAPI = (() => {
         // Sound toggle
         const soundBtn = document.getElementById('toggleSoundBtn');
         soundBtn?.addEventListener('click', toggleSound, { signal });
+
+        // Radio toggle
+        const toggleRadioBtn = document.getElementById('toggleRadioBtn');
+        const radioPanel = document.querySelector('.stations-radio-widget-panel') as HTMLElement | null;
+
+        if (toggleRadioBtn && radioPanel) {
+            // If already playing, show panel on load
+            if (radioAudio && !radioAudio.paused) {
+                radioPanel.style.display = 'block';
+                toggleRadioBtn.classList.add('active');
+                toggleRadioBtn.setAttribute('aria-pressed', 'true');
+            }
+
+            toggleRadioBtn.addEventListener('click', () => {
+                const isHidden = getComputedStyle(radioPanel).display === 'none';
+                radioPanel.style.display = isHidden ? 'block' : 'none';
+                toggleRadioBtn.classList.toggle('active', isHidden);
+                toggleRadioBtn.setAttribute('aria-pressed', String(isHidden));
+                if (isHidden) {
+                    initRadioWidget();
+                }
+            }, { signal });
+        }
 
         const refreshBtn = document.getElementById('refreshStationsBtn');
         refreshBtn?.addEventListener('click', () => {

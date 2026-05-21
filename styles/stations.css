@@ -246,6 +246,10 @@
     cursor: pointer;
 }
 
+.stations-radio-station-btn:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+}
+
 .stations-radio-station-btn:hover {
     border-color: var(--color-primary-500);
     color: var(--color-primary-700);
