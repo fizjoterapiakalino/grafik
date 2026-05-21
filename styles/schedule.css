@@ -373,7 +373,9 @@ td.split-cell>div.massage-text>span {
 }
 
 .every-other-day-text,
-td.split-cell>div.every-other-day-text>span {
+td.split-cell .split-cell-wrapper>div.every-other-day-text>span {
+    color: var(--bg-every-other-day);
+    font-weight: bold;
     position: relative;
 }
 

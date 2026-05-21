@@ -72,12 +72,21 @@ interface CellDisplayData {
  */
 type ScheduleCells = Record<string, Record<string, CellData>>;
 
+type ShiftType = 'first' | 'second' | null | undefined;
+
+interface WorkloadData {
+    filled: number;
+    total: number;
+    percentage: number;
+}
+
 /**
  * Interfejs publicznego API ScheduleLogic
  */
 interface ScheduleLogicAPI {
     getCellDisplayData(cellData: CellData | null | undefined): CellDisplayData;
     calculatePatientCount(scheduleCells: ScheduleCells | null | undefined): number;
+    calculateEmployeeWorkload(scheduleCells: ScheduleCells | null | undefined, employeeIndex: string, shiftType?: ShiftType): WorkloadData;
     calculateEndDate(startDate: string | undefined, extensionDays?: number): string;
 }
 
@@ -260,6 +269,62 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
         return count;
     };
 
+    const calculateEmployeeWorkload = (
+        scheduleCells: ScheduleCells | null | undefined,
+        employeeIndex: string,
+        shiftType?: ShiftType
+    ): WorkloadData => {
+        if (!scheduleCells) return { filled: 0, total: 0, percentage: 0 };
+
+        let filled = 0;
+        let total = 0;
+
+        let rangeStartHour = AppConfig.schedule.startHour;
+        let rangeStartMinute = 0;
+        let rangeEndHour = AppConfig.schedule.endHour;
+        let rangeEndMinute = 0;
+
+        if (shiftType === 'first') {
+            rangeStartHour = 7;
+            rangeStartMinute = 0;
+            rangeEndHour = 14;
+            rangeEndMinute = 30;
+        } else if (shiftType === 'second') {
+            rangeStartHour = 10;
+            rangeStartMinute = 30;
+            rangeEndHour = 17;
+            rangeEndMinute = 0;
+        }
+
+        for (let hour = rangeStartHour; hour <= rangeEndHour; hour++) {
+            for (let minute = 0; minute < 60; minute += 30) {
+                if (hour === rangeStartHour && minute < rangeStartMinute) continue;
+                if (hour === rangeEndHour && minute >= rangeEndMinute && rangeEndMinute !== 0) continue;
+                if (hour === rangeEndHour && minute === 30 && rangeEndMinute === 0) continue;
+
+                total++;
+                const timeString = `${hour}:${minute.toString().padStart(2, '0')}`;
+                const cellData = scheduleCells[timeString]?.[employeeIndex];
+
+                if (!cellData || cellData.isBreak || cellData.isHydrotherapy) {
+                    continue;
+                }
+
+                if (cellData.isSplit) {
+                    const part1Filled = !cellData.isHydrotherapy1 && cellData.content1 && String(cellData.content1).trim() !== '';
+                    const part2Filled = !cellData.isHydrotherapy2 && cellData.content2 && String(cellData.content2).trim() !== '';
+                    if (part1Filled) filled++;
+                    if (part2Filled) filled++;
+                } else if (cellData.content && cellData.content.trim() !== '') {
+                    filled++;
+                }
+            }
+        }
+
+        const percentage = total > 0 ? Math.round((filled / total) * 100) : 0;
+        return { filled, total, percentage };
+    };
+
     const calculateEndDate = (startDate: string | undefined, extensionDays?: number): string => {
         if (!startDate) return '';
         const endDate = new Date(startDate + 'T12:00:00Z');
@@ -281,6 +346,7 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
     return {
         getCellDisplayData,
         calculatePatientCount,
+        calculateEmployeeWorkload,
         calculateEndDate,
     };
 })();

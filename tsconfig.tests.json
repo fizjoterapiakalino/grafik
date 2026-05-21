@@ -8,10 +8,12 @@
     },
     "include": [
         "scripts/common.ts",
+        "scripts/context-menu.ts",
         "scripts/data-validation.ts",
         "scripts/employee-manager.ts",
         "scripts/firebase-config.js",
         "scripts/pdf-service.ts",
+        "scripts/schedule-data.ts",
         "scripts/schedule-helpers.ts",
         "scripts/schedule-logic.ts",
         "scripts/scrapped-pdfs.ts",

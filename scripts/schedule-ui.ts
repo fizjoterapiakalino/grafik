@@ -534,75 +534,10 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
      * @param employeeIndex - indeks pracownika
      * @param shiftType - grupa zmianowa ('first' = 7:00-14:30, 'second' = 10:30-17:00, null = pełny zakres)
      */
-    interface WorkloadData {
-        filled: number;
-        total: number;
-        percentage: number;
-    }
-
     type ShiftType = 'first' | 'second' | null | undefined;
 
-    const _calculateEmployeeWorkload = (employeeIndex: string, shiftType?: ShiftType): WorkloadData => {
-        if (!_appState) return { filled: 0, total: 0, percentage: 0 };
-
-        let filled = 0;
-        let total = 0;
-
-        // Określ zakres godzin na podstawie zmiany
-        let rangeStartHour = AppConfig.schedule.startHour; // domyślnie 7
-        let rangeStartMinute = 0;
-        let rangeEndHour = AppConfig.schedule.endHour;     // domyślnie 17
-        let rangeEndMinute = 0;
-
-        if (shiftType === 'first') {
-            // Poranna zmiana: 7:00-14:30
-            rangeStartHour = 7;
-            rangeStartMinute = 0;
-            rangeEndHour = 14;
-            rangeEndMinute = 30;
-        } else if (shiftType === 'second') {
-            // Popołudniowa zmiana: 10:30-17:00
-            rangeStartHour = 10;
-            rangeStartMinute = 30;
-            rangeEndHour = 17;
-            rangeEndMinute = 0;
-        }
-
-        // Iteruj po slotach w odpowiednim zakresie
-        for (let hour = rangeStartHour; hour <= rangeEndHour; hour++) {
-            for (let minute = 0; minute < 60; minute += 30) {
-                // Pomiń sloty przed rangeStartMinute na pierwszej godzinie
-                if (hour === rangeStartHour && minute < rangeStartMinute) continue;
-                // Pomiń sloty po rangeEndMinute na ostatniej godzinie
-                if (hour === rangeEndHour && minute >= rangeEndMinute && rangeEndMinute !== 0) continue;
-                if (hour === rangeEndHour && minute === 30 && rangeEndMinute === 0) continue;
-
-                total++;
-                const timeString = `${hour}:${minute.toString().padStart(2, '0')}`;
-                const cellData = _appState.scheduleCells[timeString]?.[employeeIndex];
-
-                if (cellData) {
-                    if (cellData.isBreak) {
-                        // Przerwa liczy się jako pełny slot.
-                        filled++;
-                    } else if (cellData.isHydrotherapy) {
-                        continue;
-                    } else if (cellData.isSplit) {
-                        // Podzielona komórka - każda zajęta część = 1 (umożliwia przekroczenie 100%)
-                        const part1Filled = !cellData.isHydrotherapy1 && cellData.content1 && String(cellData.content1).trim() !== '';
-                        const part2Filled = !cellData.isHydrotherapy2 && cellData.content2 && String(cellData.content2).trim() !== '';
-                        if (part1Filled) filled++;
-                        if (part2Filled) filled++;
-                    } else if (cellData.content && cellData.content.trim() !== '') {
-                        // Normalna komórka z treścią
-                        filled++;
-                    }
-                }
-            }
-        }
-
-        const percentage = total > 0 ? Math.round((filled / total) * 100) : 0;
-        return { filled, total, percentage };
+    const _calculateEmployeeWorkload = (employeeIndex: string, shiftType?: ShiftType) => {
+        return ScheduleLogic.calculateEmployeeWorkload(_appState?.scheduleCells, employeeIndex, shiftType);
     };
 
     const initialize = (appState: AppState): void => {
