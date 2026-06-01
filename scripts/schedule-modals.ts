@@ -59,7 +59,11 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
         if (!modal || !modalText || !moveBtn || !addBtn || !cancelBtn) return;
 
         const employeeName = EmployeeManager.getNameById(duplicateInfo.employeeIndex);
-        modalText.innerHTML = `Znaleziono identyczny wpis dla "<b>${employeeName}</b>" o godzinie ${duplicateInfo.time}. Co chcesz zrobić?`;
+        modalText.textContent = 'Znaleziono identyczny wpis dla "';
+        const b = document.createElement('b');
+        b.textContent = employeeName;
+        modalText.appendChild(b);
+        modalText.appendChild(document.createTextNode(`" o godzinie ${duplicateInfo.time}. Co chcesz zrobić?`));
         modal.style.display = 'flex';
 
         const closeAndCleanup = (): void => {
@@ -95,7 +99,11 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
 
         if (!modal || !modalText || !confirmBtn || !cancelBtn) return;
 
-        modalText.innerHTML = `Czy na pewno chcesz wprowadzić do grafiku ciąg cyfr: "<b>${text}</b>"?`;
+        modalText.textContent = 'Czy na pewno chcesz wprowadzić do grafiku ciąg cyfr: "';
+        const b = document.createElement('b');
+        b.textContent = text;
+        modalText.appendChild(b);
+        modalText.appendChild(document.createTextNode('"?'));
         modal.style.display = 'flex';
 
         const closeAndCleanup = (): void => {
@@ -207,25 +215,49 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
             return;
         }
 
+        modalBody.innerHTML = ''; // Clear previous content safely
+
         if (!cellState || !cellState.history || cellState.history.length === 0) {
-            modalBody.innerHTML = '<p>Brak historii dla tej komórki.</p>';
+            const p = document.createElement('p');
+            p.textContent = 'Brak historii dla tej komórki.';
+            modalBody.appendChild(p);
         } else {
-            modalBody.innerHTML = `
-                <ul class="history-list">
-                    ${cellState.history
-                    .map((entry) => `
-                        <li class="history-item">
-                            <div class="history-value">${entry.oldValue || '(pusty)'}</div>
-                            <div class="history-meta">
-                                <span>${new Date(entry.timestamp).toLocaleString('pl-PL')}</span>
-                                <span>przez: ${EmployeeManager.getEmployeeByUid(entry.userId ?? '')?.name || 'Nieznany'}</span>
-                            </div>
-                            <button class="action-btn outline revert-btn" data-value="${entry.oldValue}" title="Przywróć tę wartość"><i class="fas fa-undo"></i> Przywróć</button>
-                        </li>
-                    `)
-                    .join('')}
-                </ul>
-            `;
+            const ul = document.createElement('ul');
+            ul.className = 'history-list';
+
+            cellState.history.forEach((entry) => {
+                const li = document.createElement('li');
+                li.className = 'history-item';
+
+                const valueDiv = document.createElement('div');
+                valueDiv.className = 'history-value';
+                valueDiv.textContent = entry.oldValue || '(pusty)';
+                li.appendChild(valueDiv);
+
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'history-meta';
+
+                const timeSpan = document.createElement('span');
+                timeSpan.textContent = new Date(entry.timestamp).toLocaleString('pl-PL');
+                metaDiv.appendChild(timeSpan);
+
+                const authorSpan = document.createElement('span');
+                const authorName = EmployeeManager.getEmployeeByUid(entry.userId ?? '')?.name || 'Nieznany';
+                authorSpan.textContent = ` przez: ${authorName}`;
+                metaDiv.appendChild(authorSpan);
+
+                li.appendChild(metaDiv);
+
+                const revertBtn = document.createElement('button');
+                revertBtn.className = 'action-btn outline revert-btn';
+                revertBtn.dataset.value = entry.oldValue || '';
+                revertBtn.title = 'Przywróć tę wartość';
+                revertBtn.innerHTML = '<i class="fas fa-undo"></i> Przywróć'; // Icon is safe constant HTML
+                li.appendChild(revertBtn);
+
+                ul.appendChild(li);
+            });
+            modalBody.appendChild(ul);
         }
 
         modalBody.querySelectorAll<HTMLButtonElement>('.revert-btn').forEach((btn) => {

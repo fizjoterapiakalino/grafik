@@ -145,7 +145,15 @@ export const validateCellContent = (content: unknown): ValidationResult => {
         return { valid: false, error: 'Treść komórki nie może przekraczać 50 znaków' };
     }
 
-    const dangerousPatterns = [/<script/i, /javascript:/i, /on\w+=/i];
+    const dangerousPatterns = [
+        /<script/i,
+        /javascript:/i,
+        /on\w+=/i,
+        /<iframe/i,
+        /<embed/i,
+        /<object/i,
+        /<form/i,
+    ];
     for (const pattern of dangerousPatterns) {
         if (pattern.test(content)) {
             return { valid: false, error: 'Treść zawiera niedozwolone znaki' };

@@ -165,7 +165,7 @@ export const Schedule: ScheduleAPI = (() => {
             if (!isEditableTarget) return;
             const originalValue = ScheduleUI.getElementText(element);
             element.dataset.originalValue = originalValue;
-            element.innerHTML = ScheduleUI.getElementText(element);
+            element.textContent = ScheduleUI.getElementText(element);
             element.setAttribute('contenteditable', 'true');
             element.classList.remove('massage-text', 'pnf-text', 'empty-slot');
             delete element.dataset.isMassage;
