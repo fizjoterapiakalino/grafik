@@ -109,4 +109,13 @@ describe('utils', () => {
         expect(isWorkday(toUTCDate('2026-05-23'))).toBe(false);
         expect(isWorkday(toUTCDate('2026-05-24'))).toBe(false);
     });
+
+    test('escapeHTML escapes special characters', () => {
+        const { escapeHTML } = require('../scripts/utils.js');
+        expect(escapeHTML('<script>alert("xss")</script>')).toBe('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
+        expect(escapeHTML('John & Jane')).toBe('John &amp; Jane');
+        expect(escapeHTML("O'Reilly")).toBe('O&#39;Reilly');
+        expect(escapeHTML('')).toBe('');
+        expect(escapeHTML(null)).toBe('');
+    });
 });
