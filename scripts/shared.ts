@@ -313,11 +313,9 @@ export const Shared: SharedAPI = (() => {
     };
 
     const applyNavigationAccess = (employee: (Employee & { id?: string }) | null): void => {
-        const allowedKeys = employee?.role === 'admin'
-            ? getDefaultNavigationAccess()
-            : Array.isArray(employee?.menuAccess)
-                ? employee.menuAccess
-                : getDefaultNavigationAccess();
+        const allowedKeys = Array.isArray(employee?.menuAccess)
+            ? employee.menuAccess
+            : getDefaultNavigationAccess();
         const allowed = new Set(allowedKeys);
 
         document.querySelectorAll<HTMLElement>('.main-nav-list li[data-nav-access-key]').forEach((item) => {
