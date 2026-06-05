@@ -15,12 +15,16 @@ const db = dbRaw as unknown as FirestoreDbWrapper;
  */
 interface CellData {
     content?: string;
+    content1?: string;
+    content2?: string;
     isSplit?: boolean;
     isBreak?: boolean;
     isMassage?: boolean;
     isPnf?: boolean;
     isEveryOtherDay?: boolean;
     isHydrotherapy?: boolean;
+    isHydrotherapy1?: boolean;
+    isHydrotherapy2?: boolean;
     [key: string]: unknown;
 }
 
@@ -585,6 +589,53 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         return text.trim();
     };
 
+    const parseScheduleTimeToMinutes = (timeString: string): number | null => {
+        const [hourRaw, minuteRaw] = timeString.split(':');
+        const hour = Number(hourRaw);
+        const minute = Number(minuteRaw);
+        if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+        return hour * 60 + minute;
+    };
+
+    const isPastScheduleSlot = (timeString: string, now = new Date()): boolean => {
+        const slotMinutes = parseScheduleTimeToMinutes(timeString);
+        if (slotMinutes === null) return false;
+        return now.getHours() * 60 + now.getMinutes() > slotMinutes;
+    };
+
+    const hasFullPatientContent = (cellObj: CellData): boolean => {
+        return Boolean(cellObj.content?.trim() && !cellObj.isBreak && !cellObj.isHydrotherapy);
+    };
+
+    const applyPastTreatmentState = (cell: HTMLElement, cellObj: CellData, timeString: string): void => {
+        const isPastSlot = isPastScheduleSlot(timeString);
+
+        cell.classList.toggle('past-treatment-cell', isPastSlot && !cellObj.isSplit && hasFullPatientContent(cellObj));
+
+        if (!cellObj.isSplit) return;
+
+        cell.querySelectorAll<HTMLElement>('.split-cell-wrapper > div').forEach((partEl) => {
+            const part = partEl.dataset.splitPart;
+            const content = part === '1' ? cellObj.content1 : cellObj.content2;
+            const isHydrotherapy = part === '1' ? cellObj.isHydrotherapy1 : cellObj.isHydrotherapy2;
+            const shouldFade = isPastSlot && Boolean(content?.trim()) && !isHydrotherapy;
+            partEl.classList.toggle('past-treatment-part', shouldFade);
+        });
+    };
+
+    const refreshPastTreatmentStates = (): void => {
+        if (!_appState) return;
+
+        document.querySelectorAll<HTMLElement>('[data-time][data-employee-index]').forEach((cell) => {
+            const timeString = cell.dataset.time;
+            const employeeIndex = cell.dataset.employeeIndex;
+            if (!timeString || !employeeIndex) return;
+
+            const cellObj = _appState!.scheduleCells[timeString]?.[employeeIndex] || {};
+            applyPastTreatmentState(cell, cellObj, timeString);
+        });
+    };
+
     const applyCellDataToDom = (cell: HTMLTableCellElement, cellObj: CellData): void => {
         cell.className = 'editable-cell';
         cell.innerHTML = '';
@@ -816,6 +867,8 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                     cardBody.classList.add('empty-slot');
                 }
 
+                applyPastTreatmentState(cardBody, cellData, timeString);
+
                 card.appendChild(cardBody);
                 mobileContainer.appendChild(card);
             }
@@ -982,9 +1035,10 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                 for (const i of employeeIndices) {
                     const cell = tr.insertCell();
                     const cellData = _appState!.scheduleCells[timeString]?.[i] || {};
-                    applyCellDataToDom(cell, cellData);
                     cell.setAttribute('data-time', timeString);
                     cell.setAttribute('data-employee-index', i);
+                    applyCellDataToDom(cell, cellData);
+                    applyPastTreatmentState(cell, cellData, timeString);
                     cell.setAttribute('draggable', 'true');
                     cell.setAttribute('tabindex', '0');
                 }
@@ -1014,6 +1068,8 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                     break;
                 }
             }
+
+            refreshPastTreatmentStates();
         }, 60000);
 
         updatePatientCount();

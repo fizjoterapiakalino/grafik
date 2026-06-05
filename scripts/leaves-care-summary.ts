@@ -1,6 +1,7 @@
 // scripts/leaves-care-summary.ts
 import { EmployeeManager } from './employee-manager.js';
 import { AppConfig, countWorkdays } from './common.js';
+import { escapeHTML } from './utils.js';
 import type { LeaveEntry } from './types';
 
 /**
@@ -97,7 +98,7 @@ export const LeavesCareSummary: LeavesCareSummaryAPI = (() => {
             `;
 
             row.innerHTML = `
-                <td>${fullName}</td>
+                <td>${escapeHTML(fullName)}</td>
                 <td style="${getCellStyle(art188Percentage)}">${usedArt188Days} / ${art188Limit} dni</td>
                 <td style="${getCellStyle(sickChildPercentage)}">${usedSickChildDays} / ${sickChildLimit} dni</td>
                 <td style="${getCellStyle(familyMemberPercentage)}">${usedFamilyMemberDays} / ${familyMemberLimit} dni</td>

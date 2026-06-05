@@ -1,6 +1,8 @@
 // scripts/leaves-gantt.ts - Gantt View for Leaves Module
 import type { Employee, LeaveEntry, LeavesMap } from './types';
 import { EmployeeManager } from './employee-manager';
+import { countWorkdays, isHoliday } from './common';
+import { escapeHTML } from './utils';
 
 /**
  * Helper: Parse date string to Date object in UTC
@@ -12,7 +14,7 @@ const toUTCDate = (dateStr: string): Date => {
 
 /**
  * Calculate planned vacation days for an employee in a given year
- * Only counts vacation type leaves and excludes weekends
+ * Only counts vacation type leaves and excludes weekends/holidays
  */
 export const calculatePlannedVacationDays = (leaves: LeaveEntry[], year: number): number => {
     let plannedDays = 0;
@@ -33,39 +35,20 @@ export const calculatePlannedVacationDays = (leaves: LeaveEntry[], year: number)
 
         if (effectiveStart > effectiveEnd) return;
 
-        let current = new Date(effectiveStart);
-        while (current <= effectiveEnd) {
-            const dayOfWeek = current.getUTCDay();
-            // Exclude weekends (0 = Sunday, 6 = Saturday)
-            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-                plannedDays++;
-            }
-            current.setUTCDate(current.getUTCDate() + 1);
-        }
+        plannedDays += countWorkdays(
+            effectiveStart.toISOString().slice(0, 10),
+            effectiveEnd.toISOString().slice(0, 10)
+        );
     });
 
     return plannedDays;
 };
 
 /**
- * Calculate working days between two dates (excluding weekends)
+ * Calculate working days between two dates (excluding weekends/holidays)
  */
 export const calculateWorkingDays = (startDate: string, endDate: string): number => {
-    const start = toUTCDate(startDate);
-    const end = toUTCDate(endDate);
-
-    let workingDays = 0;
-    let current = new Date(start);
-
-    while (current <= end) {
-        const dayOfWeek = current.getUTCDay();
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-            workingDays++;
-        }
-        current.setUTCDate(current.getUTCDate() + 1);
-    }
-
-    return workingDays;
+    return countWorkdays(startDate, endDate);
 };
 
 /**
@@ -224,6 +207,13 @@ const isWeekend = (year: number, month: number, day: number): boolean => {
 };
 
 /**
+ * Check if a date is a Polish public holiday.
+ */
+const isGanttHoliday = (year: number, month: number, day: number): boolean => {
+    return isHoliday(new Date(Date.UTC(year, month, day)));
+};
+
+/**
  * Check if a date is today
  */
 const isToday = (year: number, month: number, day: number): boolean => {
@@ -272,9 +262,11 @@ export const renderGanttHeader = (year: number): string => {
 
             for (let day = 1; day <= daysInMonth; day++) {
                 const weekend = isWeekend(year, month, day) ? 'weekend' : '';
+                const holiday = isGanttHoliday(year, month, day) ? 'holiday' : '';
                 const today = isToday(year, month, day) ? 'today' : '';
                 const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                daysHtml += `<div class="gantt-day-header ${weekend} ${today}" data-date="${dateStr}">${day}</div>`;
+                const title = holiday ? ' title="Święto"' : '';
+                daysHtml += `<div class="gantt-day-header ${weekend} ${holiday} ${today}" data-date="${dateStr}"${title}>${day}</div>`;
             }
         } else {
             // Collapsed month - show full month name
@@ -446,11 +438,13 @@ const renderDayCells = (year: number): string => {
 
             for (let day = 1; day <= daysInMonth; day++) {
                 const weekend = isWeekend(year, month, day) ? 'weekend' : '';
+                const holiday = isGanttHoliday(year, month, day) ? 'holiday' : '';
                 const today = isToday(year, month, day) ? 'today' : '';
                 const monthStart = day === 1 ? 'month-start' : '';
+                const title = holiday ? ' title="Święto"' : '';
 
-                html += `<div class="gantt-day-cell ${weekend} ${today} ${monthStart}" 
-                             data-date="${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}">
+                html += `<div class="gantt-day-cell ${weekend} ${holiday} ${today} ${monthStart}" 
+                             data-date="${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}"${title}>
                          </div>`;
             }
         } else {
@@ -534,8 +528,8 @@ export const renderGanttView = (
         }
 
         employeesHtml += `
-            <div class="gantt-employee-cell" data-employee="${employeeName}" data-id="${empId}">
-                <span class="employee-name">${employeeName}</span>
+            <div class="gantt-employee-cell" data-employee="${escapeHTML(employeeName)}" data-id="${empId}">
+                <span class="employee-name">${escapeHTML(employeeName)}</span>
                 <span class="leave-counter ${statusClass}" title="Zaplanowano ${plannedDays} z ${totalLimit} dni urlopu wypoczynkowego">
                     ${plannedDays}/${totalLimit}
                 </span>
@@ -761,9 +755,9 @@ export const renderMobileView = (
         const leaveCount = employeeLeaves.length;
 
         html += `
-            <div class="gantt-mobile-employee" data-employee="${employeeName}">
+            <div class="gantt-mobile-employee" data-employee="${escapeHTML(employeeName)}">
                 <div class="gantt-mobile-employee-header">
-                    <span>${employeeName}</span>
+                    <span>${escapeHTML(employeeName)}</span>
                     <span class="badge">${leaveCount} urlopów</span>
                     <i class="fas fa-chevron-down arrow"></i>
                 </div>
@@ -1091,7 +1085,7 @@ const showLeaveTypePopup = (employeeName: string, startDate: string, endDate: st
     popup.className = 'gantt-leave-popup';
     popup.innerHTML = `
         <div class="gantt-popup-header">
-            <strong>${employeeName}</strong>
+            <strong>${escapeHTML(employeeName)}</strong>
             <button class="gantt-popup-close">&times;</button>
         </div>
         <div class="gantt-popup-dates">

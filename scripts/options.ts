@@ -5,6 +5,8 @@ import { EmployeeManager } from './employee-manager.js';
 import { BackupService } from './backup-service.js';
 import { ColorPreferences } from './color-preferences.js';
 import { MobileZen } from './mobile-zen.js';
+import { escapeHTML } from './utils.js';
+import { NAVIGATION_ACCESS_ITEMS, getDefaultNavigationAccess } from './navigation-access.js';
 import type { FirestoreDbWrapper, FirebaseAuthWrapper } from './types/firebase';
 import type { Employee, ShiftGroup } from './types';
 
@@ -43,6 +45,7 @@ export const Options: OptionsAPI = (() => {
     let employeeIsScheduleOnly: HTMLInputElement | null;
     let employeeAccessMassage: HTMLInputElement | null;
     let employeeShiftGroup: HTMLSelectElement | null;
+    let employeeMenuAccessList: HTMLElement | null;
 
     let selectedEmployeeIndex: number | null = null;
     let currentEmployeeId: string | null = null;
@@ -196,7 +199,7 @@ export const Options: OptionsAPI = (() => {
         optionsPage?.classList.add('massage-access-options-page');
 
         document.querySelectorAll<HTMLElement>(
-            '.options-sidebar, .employee-list-card, .page-subtitle, #deleteEmployeeBtn, #addEmployeeBtn, #assignUidBtn, #clearUidBtn'
+            '.options-sidebar, .employee-list-card, .page-subtitle, #deleteEmployeeBtn, #addEmployeeBtn, #assignUidBtn, #clearUidBtn, .menu-access-panel'
         ).forEach((element) => {
             element.style.display = 'none';
         });
@@ -215,10 +218,33 @@ export const Options: OptionsAPI = (() => {
         });
     };
 
+    const renderMenuAccessControls = (allowedKeys: string[] = getDefaultNavigationAccess()): void => {
+        if (!employeeMenuAccessList) return;
+        const allowed = new Set(allowedKeys);
+
+        employeeMenuAccessList.innerHTML = NAVIGATION_ACCESS_ITEMS.map((item) => {
+            const checked = allowed.has(item.key) ? ' checked' : '';
+            return `
+                <label class="menu-access-item">
+                    <input type="checkbox" value="${escapeHTML(item.key)}"${checked}>
+                    <span class="menu-access-icon"><i class="${escapeHTML(item.icon)}"></i></span>
+                    <span>${escapeHTML(item.text)}</span>
+                </label>
+            `;
+        }).join('');
+    };
+
+    const getSelectedMenuAccess = (): string[] => {
+        if (!employeeMenuAccessList) return getDefaultNavigationAccess();
+        return Array.from(employeeMenuAccessList.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked'))
+            .map((input) => input.value);
+    };
+
     const resetDetailsPanel = (): void => {
         selectedEmployeeIndex = null;
         if (detailsPlaceholder) detailsPlaceholder.style.display = 'flex';
         if (detailsEditForm) detailsEditForm.style.display = 'none';
+        renderMenuAccessControls();
 
         const activeItem = document.querySelector('.employee-list-item.active');
         if (activeItem) activeItem.classList.remove('active');
@@ -295,9 +321,9 @@ export const Options: OptionsAPI = (() => {
             item.className = 'employee-list-item';
             item.dataset.employeeIndex = String(index);
             item.innerHTML = `
-                <div class="employee-avatar">${initials}</div>
+                <div class="employee-avatar">${escapeHTML(initials)}</div>
                 <div class="employee-info">
-                    <span class="employee-name">${nameToDisplay}</span>
+                    <span class="employee-name">${escapeHTML(nameToDisplay)}</span>
                 </div>
                 ${badgesHtml}
             `;
@@ -333,6 +359,7 @@ export const Options: OptionsAPI = (() => {
         if (employeeAccessMassage) employeeAccessMassage.checked = employee.accessMode === 'massage';
         if (employeeShiftGroup) employeeShiftGroup.value = employee.shiftGroup || '';
         if (employeeUidInput) employeeUidInput.value = employee.uid || '';
+        renderMenuAccessControls(Array.isArray(employee.menuAccess) ? employee.menuAccess : getDefaultNavigationAccess());
         isApplyingEmployeeFormState = false;
     };
 
@@ -448,6 +475,7 @@ export const Options: OptionsAPI = (() => {
             isHidden: isHidden,
             isScheduleOnly: employeeIsScheduleOnly?.checked || false,
             accessMode: employeeAccessMassage?.checked ? 'massage' : 'full',
+            menuAccess: getSelectedMenuAccess(),
             shiftGroup: employeeShiftGroup?.value ? (employeeShiftGroup.value as ShiftGroup) : null,
             uid: newUid,
         };
@@ -600,6 +628,7 @@ export const Options: OptionsAPI = (() => {
         employeeIsScheduleOnly = document.getElementById('employeeIsScheduleOnly') as HTMLInputElement | null;
         employeeAccessMassage = document.getElementById('employeeAccessMassage') as HTMLInputElement | null;
         employeeShiftGroup = document.getElementById('employeeShiftGroup') as HTMLSelectElement | null;
+        employeeMenuAccessList = document.getElementById('employeeMenuAccessList');
         createBackupBtn = document.getElementById('createBackupBtn');
         restoreBackupBtn = document.getElementById('restoreBackupBtn');
         lastBackupDateSpan = document.getElementById('lastBackupDate');

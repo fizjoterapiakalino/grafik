@@ -23,57 +23,74 @@ function parseDocumentsInBrowser() {
         return [];
     }
 
-    // Pobieramy wszystkie elementy (węzły) wewnątrz kontenera
-    const nodes = Array.from(container.childNodes);
+    const getNodeText = (node) => {
+        if (!node) return '';
+        return (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim();
+    };
 
-    // Filtrujemy tylko istotne węzły: TextNode (nie puste) i Elementy
-    // To ułatwia nawigację, bo ignoruje przypadkowe spacje/znaki nowej linii
-    const meaningfulNodes = nodes.filter((node) => {
+    const meaningfulNodes = [];
+    const collectMeaningfulNodes = (node) => {
         if (node.nodeType === Node.TEXT_NODE) {
-            return node.textContent.trim().length > 0;
+            if (getNodeText(node).length > 0) {
+                meaningfulNodes.push(node);
+            }
+            return;
         }
-        return node.nodeType === Node.ELEMENT_NODE;
-    });
+
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+        if (node.nodeName === 'A' || node.nodeName === 'B') {
+            meaningfulNodes.push(node);
+            return;
+        }
+
+        Array.from(node.childNodes).forEach(collectMeaningfulNodes);
+    };
+
+    Array.from(container.childNodes).forEach(collectMeaningfulNodes);
 
     // Regex dla formatu daty YYYY-MM-DD
     const dateRegex = /(\d{4}-\d{2}-\d{2})/;
 
+    const isPdfLink = (href) => /\.pdf(?:$|[?#])/i.test(href || '');
+
     for (let i = 0; i < meaningfulNodes.length; i++) {
-        const currentNode = meaningfulNodes[i];
+        const linkNode = meaningfulNodes[i];
+        if (linkNode.nodeName !== 'A' || !linkNode.href || !isPdfLink(linkNode.href)) {
+            continue;
+        }
 
-        // Krok 1: Szukamy węzła tekstowego, który zawiera datę
-        if (currentNode.nodeType === Node.TEXT_NODE && dateRegex.test(currentNode.textContent)) {
-            // Krok 2: Sprawdzamy sekwencję: Data -> <b>Typ</b> -> <a>Link</a>
-            // W meaningfulNodes powinny to być kolejne elementy: i+1 oraz i+2
-            const typeNode = meaningfulNodes[i + 1];
-            const linkNode = meaningfulNodes[i + 2];
+        let date = '';
+        let type = '';
 
-            // Walidacja sekwencji
-            const isValidSequence =
-                typeNode && typeNode.nodeName === 'B' && linkNode && linkNode.nodeName === 'A' && linkNode.href;
+        for (let j = i - 1; j >= 0; j--) {
+            const previousNode = meaningfulNodes[j];
+            if (previousNode.nodeName === 'A') {
+                break;
+            }
 
-            if (isValidSequence) {
-                const dateMatch = currentNode.textContent.match(dateRegex);
+            if (!type && previousNode.nodeName === 'B') {
+                type = getNodeText(previousNode);
+            }
 
+            if (!date && previousNode.nodeType === Node.TEXT_NODE) {
+                const dateMatch = previousNode.textContent.match(dateRegex);
                 if (dateMatch) {
-                    // Bezpieczne pobieranie tekstu (innerText dla przeglądarki, textContent dla jsdom)
-                    const getNodeText = (node) => {
-                        if (!node) return '';
-                        return (node.innerText || node.textContent || '').trim();
-                    };
-
-                    results.push({
-                        date: dateMatch[0],
-                        type: getNodeText(typeNode),
-                        title: getNodeText(linkNode),
-                        url: linkNode.href,
-                    });
-
-                    // Przeskakujemy przetworzone elementy (optymalizacja)
-                    i += 2;
+                    date = dateMatch[0];
                 }
             }
+
+            if (date && type) break;
         }
+
+        if (!date) continue;
+
+        results.push({
+            date,
+            type,
+            title: getNodeText(linkNode),
+            url: linkNode.href,
+        });
     }
 
     return results;

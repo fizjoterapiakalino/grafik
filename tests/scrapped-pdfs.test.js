@@ -4,6 +4,7 @@ import { ScrappedPdfs } from '../scripts/scrapped-pdfs.js';
 jest.mock('../scripts/pdf-service.js', () => ({
     PdfService: {
         fetchAndCachePdfLinks: jest.fn(),
+        getServerStatus: jest.fn(),
     },
 }));
 
@@ -23,6 +24,7 @@ describe('ScrappedPdfs', () => {
         // Setup DOM
         document.body.innerHTML = `
             <div id="pdf-links-container"></div>
+            <div id="pdfServerStatus"></div>
             <div id="pdf-table-container" style="display: none;">
                 <input type="text" id="pdfSearchInput">
                 <table>
@@ -51,6 +53,12 @@ describe('ScrappedPdfs', () => {
 
         // Reset mocks
         jest.clearAllMocks();
+        PdfService.getServerStatus.mockResolvedValue({
+            documentsCount: 1,
+            lastScrapingTime: '2026-06-02T10:00:00.000Z',
+            isScrapingInProgress: false,
+            scrapingError: null,
+        });
     });
 
     afterEach(() => {
@@ -79,6 +87,7 @@ describe('ScrappedPdfs', () => {
         expect(rows[0].innerHTML).toContain('2023-10-25');
         expect(rows[0].innerHTML).toContain('Grafik');
         expect(rows[0].innerHTML).toContain('Plan.pdf');
+        expect(document.getElementById('pdfServerStatus').textContent).toContain('1 dokumentów');
     });
 
     test('should handle API errors gracefully', async () => {
@@ -177,7 +186,7 @@ describe('ScrappedPdfs', () => {
 
         expect(document.getElementById('pdfModal').style.display).toBe('flex');
         expect(document.getElementById('pdfOpenNewTabBtn').href).toBe('http://example.com/doc.pdf');
-        expect(document.getElementById('pdfIframe').src).toContain('http://example.com/doc.pdf#navpanes=0&toolbar=0&view=FitH');
+        expect(document.getElementById('pdfIframe').src).toContain('http://example.com/doc.pdf#navpanes=0&toolbar=0&view=Fit');
         expect(document.getElementById('pdfModalTitle').textContent).toBe('Plan.pdf');
     });
 });

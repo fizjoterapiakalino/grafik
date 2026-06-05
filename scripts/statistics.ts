@@ -3,8 +3,17 @@ import { debugLog } from './common.js';
 import { db as dbRaw } from './firebase-config.js';
 import { AppConfig } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
+import {
+    calculateScheduleMetrics,
+    calculateWeeklyAverages,
+    createWeeklyStatsSnapshot,
+    getActiveEmployeeIds,
+    getIsoWeekInfo,
+    type ScheduleMetrics,
+    type WeeklyStatsSnapshot,
+} from './statistics-helpers.js';
 import type { FirestoreDbWrapper } from './types/firebase';
-import type { LeaveEntry, ScheduleAppState } from './types/index.js';
+import type { CellState, LeaveEntry, ScheduleAppState, TreatmentData } from './types/index.js';
 
 const db = dbRaw as unknown as FirestoreDbWrapper;
 
@@ -16,7 +25,28 @@ declare const Chart: {
 
 interface ChartInstance {
     destroy(): void;
+    resize(): void;
     update(): void;
+}
+
+interface TreatmentAlert {
+    priority: number;
+    priorityLabel: string;
+    patientName: string;
+    employeeName: string;
+    time: string;
+    reason: string;
+    endDate: string;
+}
+
+interface PatientScheduleEntry {
+    patientName: string;
+    normalizedName: string;
+    employeeName: string;
+    time: string;
+    startDate?: string | null;
+    endDate?: string | null;
+    extensionDays?: number | null;
 }
 
 /**
@@ -38,6 +68,22 @@ const LEAVE_TYPES: Record<string, { label: string; color: string }> = {
     schedule_pickup: { label: 'Wybicie za święto', color: '#3b82f6' },
 };
 
+const WEEKLY_STATS_COLLECTION = 'statsWeekly';
+const CHART_COLOR_PALETTE = [
+    '#2563eb',
+    '#16a34a',
+    '#f59e0b',
+    '#dc2626',
+    '#7c3aed',
+    '#0891b2',
+    '#db2777',
+    '#65a30d',
+    '#ea580c',
+    '#4f46e5',
+    '#0d9488',
+    '#9333ea',
+];
+
 /**
  * Moduł statystyk
  */
@@ -45,10 +91,30 @@ export const Statistics: StatisticsAPI = (() => {
     let currentYear = new Date().getUTCFullYear();
     let leavesData: Record<string, LeaveEntry[]> = {};
     let scheduleData: ScheduleAppState | null = null;
+    let weeklyStatsData: WeeklyStatsSnapshot[] = [];
     let chartInstances: ChartInstance[] = [];
 
     // DOM Elements
     let yearSelect: HTMLSelectElement | null = null;
+
+    const normalizeLeavesData = (rawData: unknown): Record<string, LeaveEntry[]> => {
+        if (!rawData || typeof rawData !== 'object') return {};
+
+        const normalized: Record<string, LeaveEntry[]> = {};
+        Object.entries(rawData as Record<string, unknown>).forEach(([employeeName, value]) => {
+            if (!Array.isArray(value)) return;
+
+            const leaves = value.filter((leave): leave is LeaveEntry => {
+                if (!leave || typeof leave !== 'object') return false;
+                const candidate = leave as Partial<LeaveEntry>;
+                return typeof candidate.startDate === 'string' && typeof candidate.endDate === 'string';
+            });
+
+            normalized[employeeName] = leaves;
+        });
+
+        return normalized;
+    };
 
     /**
      * Inicjalizacja modułu
@@ -123,20 +189,44 @@ export const Statistics: StatisticsAPI = (() => {
         const tabButtons = document.querySelectorAll('.statistics-header-controls .tab-btn');
         tabButtons.forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const target = e.target as HTMLButtonElement;
+                const target = e.currentTarget as HTMLButtonElement;
 
                 // Update active tab
                 tabButtons.forEach(b => b.classList.remove('active'));
                 target.classList.add('active');
 
                 // Show corresponding view
-                const viewId = target.id.replace('Btn', 'View');
+                const viewMap: Record<string, string> = {
+                    overviewViewBtn: 'overviewView',
+                    leavesStatsBtn: 'leavesStatsView',
+                    scheduleStatsBtn: 'scheduleStatsView',
+                    employeeStatsBtn: 'employeeStatsView',
+                };
+                const viewId = viewMap[target.id];
+                if (!viewId) return;
+
                 const views = document.querySelectorAll('.stats-view');
                 views.forEach(v => v.classList.remove('active'));
                 const targetView = document.getElementById(viewId);
                 if (targetView) {
                     targetView.classList.add('active');
+                    refreshChartsAfterTabChange();
                 }
+            });
+        });
+    };
+
+    const refreshChartsAfterTabChange = (): void => {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                chartInstances.forEach(chart => {
+                    try {
+                        chart.resize();
+                        chart.update();
+                    } catch (error) {
+                        console.warn('Error refreshing chart after tab change:', error);
+                    }
+                });
             });
         });
     };
@@ -147,9 +237,9 @@ export const Statistics: StatisticsAPI = (() => {
     const loadAllData = async (): Promise<void> => {
         try {
             // Load leaves
-            const leavesDoc = await db.collection(AppConfig.firestore.collections.leaves).doc(String(currentYear)).get();
+            const leavesDoc = await db.collection(AppConfig.firestore.collections.leaves).doc(AppConfig.firestore.docs.mainLeaves).get();
             if (leavesDoc.exists) {
-                leavesData = leavesDoc.data() as Record<string, LeaveEntry[]>;
+                leavesData = normalizeLeavesData(leavesDoc.data());
             } else {
                 leavesData = {};
             }
@@ -161,8 +251,60 @@ export const Statistics: StatisticsAPI = (() => {
             } else {
                 scheduleData = null;
             }
+
+            void refreshWeeklyStatsData();
         } catch (error) {
             console.error('Error loading data:', error);
+        }
+    };
+
+    const refreshWeeklyStatsData = async (): Promise<void> => {
+        try {
+            if (currentYear === getIsoWeekInfo().year) {
+                await persistCurrentWeeklyStats();
+            }
+
+            await loadWeeklyStats();
+            updateWeeklyAverageStats();
+
+            if (typeof Chart !== 'undefined') {
+                renderCharts();
+                refreshChartsAfterTabChange();
+            }
+        } catch (error) {
+            console.warn('Unable to refresh weekly statistics in background:', error);
+        }
+    };
+
+    /**
+     * Stores a lightweight weekly aggregate without patient names.
+     */
+    const persistCurrentWeeklyStats = async (): Promise<void> => {
+        if (!scheduleData?.scheduleCells) return;
+
+        try {
+            const employees = EmployeeManager.getAll();
+            const snapshot = createWeeklyStatsSnapshot(scheduleData.scheduleCells, employees, leavesData);
+            await db.collection<WeeklyStatsSnapshot>(WEEKLY_STATS_COLLECTION)
+                .doc(snapshot.weekKey)
+                .set(snapshot, { merge: true });
+        } catch (error) {
+            console.warn('Unable to persist weekly statistics snapshot:', error);
+        }
+    };
+
+    /**
+     * Loads saved weekly aggregates for the selected year.
+     */
+    const loadWeeklyStats = async (): Promise<void> => {
+        try {
+            const snapshot = await db.collection<WeeklyStatsSnapshot>(WEEKLY_STATS_COLLECTION).get();
+            weeklyStatsData = snapshot.docs
+                .map(doc => doc.data())
+                .filter((stats): stats is WeeklyStatsSnapshot => !!stats && stats.year === currentYear);
+        } catch (error) {
+            console.warn('Unable to load weekly statistics snapshots:', error);
+            weeklyStatsData = [];
         }
     };
 
@@ -170,11 +312,21 @@ export const Statistics: StatisticsAPI = (() => {
      * Aktualizuje wszystkie statystyki
      */
     const updateAllStats = (): void => {
-        updateOverviewStats();
-        updateLeavesStats();
-        updateScheduleStats();
-        updateEmployeeStats();
-        renderCharts();
+        const updates = [
+            updateOverviewStats,
+            updateLeavesStats,
+            updateScheduleStats,
+            updateEmployeeStats,
+            renderCharts,
+        ];
+
+        updates.forEach(update => {
+            try {
+                update();
+            } catch (error) {
+                console.error('Error updating statistics section:', error);
+            }
+        });
     };
 
     /**
@@ -195,6 +347,158 @@ export const Statistics: StatisticsAPI = (() => {
         }
 
         return count;
+    };
+
+    const getCurrentScheduleMetrics = (): ScheduleMetrics => {
+        const employees = EmployeeManager.getAll();
+        return calculateScheduleMetrics(scheduleData?.scheduleCells, getActiveEmployeeIds(employees));
+    };
+
+    const getDateDiffInDays = (dateIso: string): number => {
+        const target = new Date(`${dateIso}T12:00:00Z`);
+        const now = new Date();
+        const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12));
+        return Math.round((target.getTime() - today.getTime()) / 86400000);
+    };
+
+    const normalizePatientName = (patientName: string): string => patientName.trim().toLocaleLowerCase('pl-PL');
+
+    const createEntry = (
+        patientName: string | null | undefined,
+        employeeName: string,
+        time: string,
+        treatmentData?: TreatmentData | null,
+        fallbackStartDate?: string | null,
+        fallbackEndDate?: string | null,
+        fallbackExtensionDays?: number | null
+    ): PatientScheduleEntry | null => {
+        if (!patientName || !patientName.trim()) return null;
+
+        return {
+            patientName: patientName.trim(),
+            normalizedName: normalizePatientName(patientName),
+            employeeName,
+            time,
+            startDate: treatmentData?.startDate ?? fallbackStartDate,
+            endDate: treatmentData?.endDate ?? fallbackEndDate,
+            extensionDays: treatmentData?.extensionDays ?? fallbackExtensionDays,
+        };
+    };
+
+    const getCurrentPatientEntries = (): PatientScheduleEntry[] => {
+        if (!scheduleData?.scheduleCells) return [];
+
+        const employees = EmployeeManager.getAll();
+        const activeEmployeeIds = getActiveEmployeeIds(employees);
+        const entries: PatientScheduleEntry[] = [];
+
+        for (const [time, row] of Object.entries(scheduleData.scheduleCells)) {
+            activeEmployeeIds.forEach(employeeId => {
+                const cell = row?.[employeeId] as CellState | undefined;
+                if (!cell || cell.isBreak) return;
+
+                const employeeName = EmployeeManager.getNameById(employeeId);
+
+                if (cell.isSplit) {
+                    if (!cell.isHydrotherapy1) {
+                        const entry = createEntry(cell.content1, employeeName, time, cell.treatmentData1);
+                        if (entry) entries.push(entry);
+                    }
+                    if (!cell.isHydrotherapy2) {
+                        const entry = createEntry(cell.content2, employeeName, time, cell.treatmentData2);
+                        if (entry) entries.push(entry);
+                    }
+                    return;
+                }
+
+                if (cell.isHydrotherapy) return;
+                const entry = createEntry(
+                    cell.content,
+                    employeeName,
+                    time,
+                    null,
+                    cell.treatmentStartDate,
+                    cell.treatmentEndDate,
+                    cell.treatmentExtensionDays
+                );
+                if (entry) entries.push(entry);
+            });
+        }
+
+        return entries;
+    };
+
+    const getTreatmentAlerts = (): TreatmentAlert[] => {
+        const entries = getCurrentPatientEntries();
+        const nameCounts = new Map<string, number>();
+        entries.forEach(entry => {
+            nameCounts.set(entry.normalizedName, (nameCounts.get(entry.normalizedName) || 0) + 1);
+        });
+
+        const alerts: TreatmentAlert[] = [];
+
+        entries.forEach(entry => {
+            if (!entry.startDate || !entry.endDate) {
+                alerts.push({
+                    priority: 2,
+                    priorityLabel: 'Wysoki',
+                    patientName: entry.patientName,
+                    employeeName: entry.employeeName,
+                    time: entry.time,
+                    reason: 'Brak daty startu lub końca turnusu',
+                    endDate: entry.endDate || '-',
+                });
+            } else {
+                const diffDays = getDateDiffInDays(entry.endDate);
+                if (diffDays < 0) {
+                    alerts.push({
+                        priority: 1,
+                        priorityLabel: 'Pilny',
+                        patientName: entry.patientName,
+                        employeeName: entry.employeeName,
+                        time: entry.time,
+                        reason: `Turnus po terminie o ${Math.abs(diffDays)} dni`,
+                        endDate: entry.endDate,
+                    });
+                } else if (diffDays === 0) {
+                    alerts.push({
+                        priority: 2,
+                        priorityLabel: 'Wysoki',
+                        patientName: entry.patientName,
+                        employeeName: entry.employeeName,
+                        time: entry.time,
+                        reason: 'Turnus kończy się dzisiaj',
+                        endDate: entry.endDate,
+                    });
+                } else if (diffDays <= 3) {
+                    alerts.push({
+                        priority: 3,
+                        priorityLabel: 'Uwaga',
+                        patientName: entry.patientName,
+                        employeeName: entry.employeeName,
+                        time: entry.time,
+                        reason: `Turnus kończy się za ${diffDays} dni`,
+                        endDate: entry.endDate,
+                    });
+                }
+            }
+
+            if ((nameCounts.get(entry.normalizedName) || 0) > 1) {
+                alerts.push({
+                    priority: 4,
+                    priorityLabel: 'Duplikat',
+                    patientName: entry.patientName,
+                    employeeName: entry.employeeName,
+                    time: entry.time,
+                    reason: 'Pacjent występuje w grafiku więcej niż raz',
+                    endDate: entry.endDate || '-',
+                });
+            }
+        });
+
+        return alerts
+            .sort((a, b) => a.priority - b.priority || a.time.localeCompare(b.time))
+            .slice(0, 20);
     };
 
     /**
@@ -291,7 +595,7 @@ export const Statistics: StatisticsAPI = (() => {
         // Total patients today
         const totalPatientsEl = document.getElementById('totalPatientsValue');
         if (totalPatientsEl) {
-            totalPatientsEl.textContent = String(countPatientsToday());
+            totalPatientsEl.textContent = String(getCurrentScheduleMetrics().totalSlots);
         }
 
         // On leave today
@@ -307,29 +611,6 @@ export const Statistics: StatisticsAPI = (() => {
         if (totalLeaveDaysEl) {
             totalLeaveDaysEl.textContent = String(totalLeaveDays);
         }
-    };
-
-    /**
-     * Liczba pacjentów dzisiaj (z harmonogramu)
-     */
-    const countPatientsToday = (): number => {
-        if (!scheduleData?.scheduleCells) return 0;
-
-        let count = 0;
-        for (const time of Object.keys(scheduleData.scheduleCells)) {
-            for (const empIdx of Object.keys(scheduleData.scheduleCells[time])) {
-                const cell = scheduleData.scheduleCells[time][empIdx];
-                if (cell) {
-                    if (cell.isSplit) {
-                        if (cell.content1 && !cell.isBreak) count++;
-                        if (cell.content2) count++;
-                    } else if (cell.content && !cell.isBreak) {
-                        count++;
-                    }
-                }
-            }
-        }
-        return count;
     };
 
     /**
@@ -415,57 +696,151 @@ export const Statistics: StatisticsAPI = (() => {
      * Aktualizuje statystyki grafiku
      */
     const updateScheduleStats = (): void => {
+        const weeklyValueIds = [
+            'weeklyAverageSlotsValue',
+            'weeklyAveragePerEmployeeValue',
+            'weeklyAvailabilityValue',
+            'weeklyTrendValue',
+        ];
+        const treatmentValueIds = [
+            'overdueTreatmentsValue',
+            'endingTodayValue',
+            'endingSoonValue',
+            'extendedTreatmentsValue',
+            'missingTreatmentDatesValue',
+            'duplicatePatientsValue',
+            'handoverMorningValue',
+            'handoverAfternoonValue',
+            'dataQualityScoreValue',
+        ];
+
         if (!scheduleData?.scheduleCells) {
             const defaultValue = '-';
-            ['uniquePatientsValue', 'totalSlotsValue', 'breaksValue', 'treatmentTypesValue'].forEach(id => {
+            ['uniquePatientsValue', 'totalSlotsValue', 'breaksValue', 'treatmentTypesValue', ...weeklyValueIds, ...treatmentValueIds].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.textContent = defaultValue;
             });
+            updateTreatmentAlertsTable([]);
             return;
         }
 
-        const uniquePatients = new Set<string>();
-        let totalSlots = 0;
-        let breaks = 0;
-        let treatmentTypes = 0;
-
-        for (const time of Object.keys(scheduleData.scheduleCells)) {
-            for (const empIdx of Object.keys(scheduleData.scheduleCells[time])) {
-                const cell = scheduleData.scheduleCells[time][empIdx];
-                if (cell) {
-                    if (cell.isBreak) {
-                        breaks++;
-                    } else if (cell.isSplit) {
-                        if (cell.content1) {
-                            uniquePatients.add(cell.content1);
-                            totalSlots++;
-                            if (cell.isMassage1 || cell.isPnf1) treatmentTypes++;
-                        }
-                        if (cell.content2) {
-                            uniquePatients.add(cell.content2);
-                            totalSlots++;
-                            if (cell.isMassage2 || cell.isPnf2) treatmentTypes++;
-                        }
-                    } else if (cell.content) {
-                        uniquePatients.add(cell.content);
-                        totalSlots++;
-                        if (cell.isMassage || cell.isPnf) treatmentTypes++;
-                    }
-                }
-            }
-        }
+        const metrics = getCurrentScheduleMetrics();
 
         const uniquePatientsEl = document.getElementById('uniquePatientsValue');
-        if (uniquePatientsEl) uniquePatientsEl.textContent = String(uniquePatients.size);
+        if (uniquePatientsEl) uniquePatientsEl.textContent = String(metrics.uniquePatients);
 
         const totalSlotsEl = document.getElementById('totalSlotsValue');
-        if (totalSlotsEl) totalSlotsEl.textContent = String(totalSlots);
+        if (totalSlotsEl) totalSlotsEl.textContent = String(metrics.totalSlots);
 
         const breaksEl = document.getElementById('breaksValue');
-        if (breaksEl) breaksEl.textContent = String(breaks);
+        if (breaksEl) breaksEl.textContent = String(metrics.breaks);
 
         const treatmentTypesEl = document.getElementById('treatmentTypesValue');
-        if (treatmentTypesEl) treatmentTypesEl.textContent = String(treatmentTypes);
+        if (treatmentTypesEl) treatmentTypesEl.textContent = String(metrics.massageOrPnf);
+
+        const operationalValues: Record<string, number> = {
+            overdueTreatmentsValue: metrics.overdue,
+            endingTodayValue: metrics.endingToday,
+            endingSoonValue: metrics.endingSoon,
+            extendedTreatmentsValue: metrics.extendedTreatments,
+            missingTreatmentDatesValue: metrics.missingTreatmentDates,
+            duplicatePatientsValue: metrics.duplicatePatientEntries,
+            handoverMorningValue: metrics.handoverMorning,
+            handoverAfternoonValue: metrics.handoverAfternoon,
+            dataQualityScoreValue: metrics.dataQualityScore,
+        };
+        Object.entries(operationalValues).forEach(([id, value]) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = id === 'dataQualityScoreValue' ? `${value}%` : String(value);
+        });
+
+        updateTreatmentAlertsTable(getTreatmentAlerts());
+
+        updateWeeklyAverageStats();
+    };
+
+    const updateTreatmentAlertsTable = (alerts: TreatmentAlert[]): void => {
+        const tbody = document.getElementById('treatmentAlertsBody');
+        if (!tbody) return;
+
+        tbody.innerHTML = '';
+
+        if (alerts.length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = '<td colspan="6" class="no-data-cell">Brak pilnych alertów turnusów.</td>';
+            tbody.appendChild(row);
+            return;
+        }
+
+        alerts.forEach(alert => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><span class="status-badge ${alert.priority <= 2 ? 'on-leave' : alert.priority === 3 ? 'hidden' : 'active'}">${alert.priorityLabel}</span></td>
+                <td>${alert.patientName}</td>
+                <td>${alert.employeeName}</td>
+                <td>${alert.time}</td>
+                <td>${alert.reason}</td>
+                <td>${alert.endDate}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    };
+
+    const updateWeeklyAverageStats = (): void => {
+        const weeklyAverages = calculateWeeklyAverages(weeklyStatsData);
+
+        const weeklyAverageSlotsEl = document.getElementById('weeklyAverageSlotsValue');
+        if (weeklyAverageSlotsEl) weeklyAverageSlotsEl.textContent = String(weeklyAverages.averageTotalSlots);
+
+        const weeklyAveragePerEmployeeEl = document.getElementById('weeklyAveragePerEmployeeValue');
+        if (weeklyAveragePerEmployeeEl) weeklyAveragePerEmployeeEl.textContent = String(weeklyAverages.averagePatientsPerAvailableEmployee);
+
+        const weeklyAvailabilityEl = document.getElementById('weeklyAvailabilityValue');
+        if (weeklyAvailabilityEl) weeklyAvailabilityEl.textContent = String(weeklyAverages.averageAvailableEmployees);
+
+        const weeklyTrendEl = document.getElementById('weeklyTrendValue');
+        if (weeklyTrendEl) {
+            weeklyTrendEl.textContent = weeklyAverages.trendPercent === null
+                ? '-'
+                : `${weeklyAverages.trendPercent > 0 ? '+' : ''}${weeklyAverages.trendPercent}%`;
+        }
+
+        const rangeEl = document.getElementById('weeklyStatsRange');
+        if (rangeEl) {
+            rangeEl.textContent = weeklyAverages.weeks.length > 0
+                ? `Na podstawie ${weeklyAverages.weeks.length} zapisanych tygodni. Aktualny tydzień zapisuje się automatycznie po wejściu w statystyki.`
+                : 'Brak zapisanych agregatów tygodniowych dla wybranego roku.';
+        }
+
+        updateWeeklyAvailabilityTable(weeklyAverages.weeks);
+    };
+
+    const updateWeeklyAvailabilityTable = (weeks: WeeklyStatsSnapshot[]): void => {
+        const tbody = document.getElementById('weeklyAvailabilityBody');
+        if (!tbody) return;
+
+        tbody.innerHTML = '';
+
+        if (weeks.length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = '<td colspan="7" class="no-data-cell">Brak danych tygodniowych.</td>';
+            tbody.appendChild(row);
+            return;
+        }
+
+        weeks.forEach(week => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${week.weekKey}</td>
+                <td>${week.scheduleMetrics.totalSlots}</td>
+                <td>${week.scheduleMetrics.uniquePatients}</td>
+                <td>${week.averageAvailableEmployees}</td>
+                <td>${week.leaveDays}</td>
+                <td><strong>${week.averagePatientsPerAvailableEmployee}</strong></td>
+                <td>${week.scheduleMetrics.occupancyPercent}%</td>
+            `;
+            tbody.appendChild(row);
+        });
     };
 
     /**
@@ -606,6 +981,7 @@ export const Statistics: StatisticsAPI = (() => {
         renderEmployeeWorkloadChart();
         renderPatientsByEmployeeChart();
         renderPatientsByTimeChart();
+        renderWeeklyTrendChart();
     };
 
     /**
@@ -700,31 +1076,10 @@ export const Statistics: StatisticsAPI = (() => {
         if (!ctx || !scheduleData?.scheduleCells) return;
 
         const employees = EmployeeManager.getAll();
-        const patientCounts: Record<string, number> = {};
-
-        // Count patients per employee
-        for (const time of Object.keys(scheduleData.scheduleCells)) {
-            for (const empIdx of Object.keys(scheduleData.scheduleCells[time])) {
-                const cell = scheduleData.scheduleCells[time][empIdx];
-                if (cell && !cell.isBreak) {
-                    patientCounts[empIdx] = patientCounts[empIdx] || 0;
-                    if (cell.isSplit) {
-                        if (cell.content1) patientCounts[empIdx]++;
-                        if (cell.content2) patientCounts[empIdx]++;
-                    } else if (cell.content) {
-                        patientCounts[empIdx]++;
-                    }
-                }
-            }
-        }
-
-        const employeeIds = Object.keys(employees).filter(id => !employees[id].isHidden && !employees[id].isScheduleOnly);
+        const employeeIds = getActiveEmployeeIds(employees);
+        const metrics = calculateScheduleMetrics(scheduleData.scheduleCells, employeeIds);
         const labels = employeeIds.map(id => EmployeeManager.getNameById(id));
-        const data = employeeIds.map(id => {
-            // Find matching index in patientCounts
-            const idx = employeeIds.indexOf(id);
-            return patientCounts[String(idx)] || 0;
-        });
+        const data = employeeIds.map(id => metrics.byEmployee[id] || 0);
         const colors = employeeIds.map(id => employees[id].color || '#94a3b8');
 
         const chart = new Chart(ctx.getContext('2d')!, {
@@ -769,37 +1124,19 @@ export const Statistics: StatisticsAPI = (() => {
         if (!ctx || !scheduleData?.scheduleCells) return;
 
         const employees = EmployeeManager.getAll();
-        const patientCounts: Record<string, number> = {};
-
-        // Count patients per employee
-        for (const time of Object.keys(scheduleData.scheduleCells)) {
-            for (const empIdx of Object.keys(scheduleData.scheduleCells[time])) {
-                const cell = scheduleData.scheduleCells[time][empIdx];
-                if (cell && !cell.isBreak) {
-                    patientCounts[empIdx] = patientCounts[empIdx] || 0;
-                    if (cell.isSplit) {
-                        if (cell.content1) patientCounts[empIdx]++;
-                        if (cell.content2) patientCounts[empIdx]++;
-                    } else if (cell.content) {
-                        patientCounts[empIdx]++;
-                    }
-                }
-            }
-        }
-
-        const employeeIds = Object.keys(employees).filter(id => !employees[id].isHidden && !employees[id].isScheduleOnly);
+        const employeeIds = getActiveEmployeeIds(employees);
+        const metrics = calculateScheduleMetrics(scheduleData.scheduleCells, employeeIds);
         const labels: string[] = [];
         const data: number[] = [];
-        const colors: string[] = [];
 
-        employeeIds.forEach((id, idx) => {
-            const count = patientCounts[String(idx)] || 0;
+        employeeIds.forEach(id => {
+            const count = metrics.byEmployee[id] || 0;
             if (count > 0) {
                 labels.push(EmployeeManager.getNameById(id));
                 data.push(count);
-                colors.push(employees[id].color || '#94a3b8');
             }
         });
+        const colors = labels.map((_, index) => CHART_COLOR_PALETTE[index % CHART_COLOR_PALETTE.length]);
 
         const chart = new Chart(ctx.getContext('2d')!, {
             type: 'pie',
@@ -807,7 +1144,7 @@ export const Statistics: StatisticsAPI = (() => {
                 labels,
                 datasets: [{
                     data,
-                    backgroundColor: colors.map(c => c + 'DD'),
+                    backgroundColor: colors,
                     borderColor: colors,
                     borderWidth: 2,
                 }]
@@ -837,25 +1174,15 @@ export const Statistics: StatisticsAPI = (() => {
         const ctx = document.getElementById('patientsByTimeChart') as HTMLCanvasElement | null;
         if (!ctx || !scheduleData?.scheduleCells) return;
 
-        const patientsByTime: Record<string, number> = {};
+        const employees = EmployeeManager.getAll();
+        const metrics = calculateScheduleMetrics(scheduleData.scheduleCells, getActiveEmployeeIds(employees));
+        const patientsByTime = metrics.byHour;
 
-        // Count patients per time slot
-        for (const time of Object.keys(scheduleData.scheduleCells)) {
-            patientsByTime[time] = 0;
-            for (const empIdx of Object.keys(scheduleData.scheduleCells[time])) {
-                const cell = scheduleData.scheduleCells[time][empIdx];
-                if (cell && !cell.isBreak) {
-                    if (cell.isSplit) {
-                        if (cell.content1) patientsByTime[time]++;
-                        if (cell.content2) patientsByTime[time]++;
-                    } else if (cell.content) {
-                        patientsByTime[time]++;
-                    }
-                }
-            }
-        }
-
-        const sortedTimes = Object.keys(patientsByTime).sort();
+        const sortedTimes = Object.keys(patientsByTime).sort((a, b) => {
+            const [aHour, aMinute] = a.split(':').map(Number);
+            const [bHour, bMinute] = b.split(':').map(Number);
+            return (aHour * 60 + aMinute) - (bHour * 60 + bMinute);
+        });
         const labels = sortedTimes;
         const data = sortedTimes.map(t => patientsByTime[t]);
 
@@ -882,6 +1209,81 @@ export const Statistics: StatisticsAPI = (() => {
                     y: {
                         beginAtZero: true,
                         grid: { color: '#f1f5f9' }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+        chartInstances.push(chart);
+    };
+
+    /**
+     * Weekly trend combines patient entries, leave days, and team availability.
+     */
+    const renderWeeklyTrendChart = (): void => {
+        const ctx = document.getElementById('weeklyTrendChart') as HTMLCanvasElement | null;
+        if (!ctx) return;
+
+        const weeklyAverages = calculateWeeklyAverages(weeklyStatsData);
+        const weeks = weeklyAverages.weeks;
+
+        const chart = new Chart(ctx.getContext('2d')!, {
+            type: 'bar',
+            data: {
+                labels: weeks.map(week => week.weekKey),
+                datasets: [
+                    {
+                        type: 'bar',
+                        label: 'Wpisy',
+                        data: weeks.map(week => week.scheduleMetrics.totalSlots),
+                        backgroundColor: 'rgba(59, 130, 246, 0.65)',
+                        borderColor: '#3b82f6',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                    },
+                    {
+                        type: 'line',
+                        label: 'Dni urlopowe',
+                        data: weeks.map(week => week.leaveDays),
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                        tension: 0.25,
+                        yAxisID: 'y1',
+                    },
+                    {
+                        type: 'line',
+                        label: 'Dost\u0119pni pracownicy \u015br.',
+                        data: weeks.map(week => week.averageAvailableEmployees),
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                        tension: 0.25,
+                        yAxisID: 'y1',
+                    },
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            font: { size: 11 }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#f1f5f9' }
+                    },
+                    y1: {
+                        beginAtZero: true,
+                        position: 'right',
+                        grid: { drawOnChartArea: false }
                     },
                     x: {
                         grid: { display: false }

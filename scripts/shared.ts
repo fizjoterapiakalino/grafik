@@ -1,5 +1,7 @@
 // scripts/shared.ts
 import { debounce } from './common.js';
+import { getDefaultNavigationAccess } from './navigation-access.js';
+import type { Employee } from './types';
 
 /**
  * Link nawigacyjny
@@ -24,6 +26,7 @@ interface SharedAPI {
     updateUserInfo(userName: string | null): void;
     setIsoLinkActive(isActive: boolean): void;
     setMassageStationsLinkVisible(isVisible: boolean): void;
+    applyNavigationAccess(employee: (Employee & { id?: string }) | null): void;
 }
 
 /**
@@ -88,6 +91,7 @@ export const Shared: SharedAPI = (() => {
             ul.className = 'main-nav-list';
             navLinks.forEach((link) => {
                 const li = document.createElement('li');
+                li.dataset.navAccessKey = link.href.replace(/^#/, '');
                 const a = document.createElement('a');
                 a.href = link.href;
 
@@ -98,6 +102,14 @@ export const Shared: SharedAPI = (() => {
                 const textSpan = document.createElement('span');
                 textSpan.textContent = ' ' + link.text;
                 a.appendChild(textSpan);
+
+                if (link.id === 'navLinkIso') {
+                    const notificationDot = document.createElement('span');
+                    notificationDot.className = 'iso-notification-dot';
+                    notificationDot.setAttribute('aria-hidden', 'true');
+                    notificationDot.style.display = 'none';
+                    a.appendChild(notificationDot);
+                }
 
                 li.appendChild(a);
                 ul.appendChild(li);
@@ -293,9 +305,34 @@ export const Shared: SharedAPI = (() => {
         const listItem = massageStationsLink?.closest('li') as HTMLElement | null;
         if (!massageStationsLink || !listItem) return;
 
-        listItem.style.display = isVisible ? '' : 'none';
+        listItem.dataset.massageVisible = String(isVisible);
+        const accessHidden = listItem.dataset.accessHidden === 'true';
+        listItem.style.display = isVisible && !accessHidden ? '' : 'none';
         massageStationsLink.tabIndex = isVisible ? 0 : -1;
         massageStationsLink.setAttribute('aria-hidden', String(!isVisible));
+    };
+
+    const applyNavigationAccess = (employee: (Employee & { id?: string }) | null): void => {
+        const allowedKeys = employee?.role === 'admin'
+            ? getDefaultNavigationAccess()
+            : Array.isArray(employee?.menuAccess)
+                ? employee.menuAccess
+                : getDefaultNavigationAccess();
+        const allowed = new Set(allowedKeys);
+
+        document.querySelectorAll<HTMLElement>('.main-nav-list li[data-nav-access-key]').forEach((item) => {
+            const key = item.dataset.navAccessKey || '';
+            const accessHidden = !allowed.has(key);
+            item.dataset.accessHidden = String(accessHidden);
+
+            if (key === 'massage-stations') {
+                const massageVisible = item.dataset.massageVisible === 'true';
+                item.style.display = !accessHidden && massageVisible ? '' : 'none';
+                return;
+            }
+
+            item.style.display = accessHidden ? 'none' : '';
+        });
     };
 
     return {
@@ -303,6 +340,7 @@ export const Shared: SharedAPI = (() => {
         updateUserInfo,
         setIsoLinkActive,
         setMassageStationsLinkVisible,
+        applyNavigationAccess,
     };
 })();
 

@@ -26,7 +26,7 @@
                 <div class="stat-icon"><i class="fas fa-user-injured"></i></div>
                 <div class="stat-info">
                     <span class="stat-value" id="totalPatientsValue">-</span>
-                    <span class="stat-label">Pacjenci (dziś)</span>
+                    <span class="stat-label">Wpisy w aktualnym grafiku</span>
                 </div>
             </div>
             <div class="stat-card warning" id="onLeaveCard">
@@ -62,7 +62,7 @@
 
         <div class="stats-row">
             <div class="stats-chart-container full-width">
-                <h3><i class="fas fa-user-clock"></i> Obciążenie pracowników (pacjenci/tydzień)</h3>
+                <h3><i class="fas fa-user-clock"></i> Obciążenie pracowników z aktualnego grafiku</h3>
                 <div class="chart-wrapper">
                     <canvas id="employeeWorkloadChart"></canvas>
                 </div>
@@ -129,14 +129,14 @@
                 <div class="stat-icon"><i class="fas fa-user-friends"></i></div>
                 <div class="stat-info">
                     <span class="stat-value" id="uniquePatientsValue">-</span>
-                    <span class="stat-label">Unikalnych pacjentów</span>
+                    <span class="stat-label">Unikalnych nazw w grafiku</span>
                 </div>
             </div>
             <div class="stat-card success" id="totalSlotsCard">
                 <div class="stat-icon"><i class="fas fa-clock"></i></div>
                 <div class="stat-info">
                     <span class="stat-value" id="totalSlotsValue">-</span>
-                    <span class="stat-label">Zajętych slotów</span>
+                    <span class="stat-label">Wpisów pacjentów</span>
                 </div>
             </div>
             <div class="stat-card warning" id="breaksCard">
@@ -150,7 +150,114 @@
                 <div class="stat-icon"><i class="fas fa-hands"></i></div>
                 <div class="stat-info">
                     <span class="stat-value" id="treatmentTypesValue">-</span>
-                    <span class="stat-label">Z masażem/PNF</span>
+                    <span class="stat-label">Masaż/PNF</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-section-header">
+            <h3><i class="fas fa-stethoscope"></i> Turnusy i przekazania</h3>
+            <span class="stats-section-subtitle">Alerty są liczone z aktualnego grafiku i dat leczenia zapisanych w komórkach.</span>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card danger" id="overdueTreatmentsCard">
+                <div class="stat-icon"><i class="fas fa-bell"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="overdueTreatmentsValue">-</span>
+                    <span class="stat-label">Po terminie</span>
+                </div>
+            </div>
+            <div class="stat-card warning" id="endingTodayCard">
+                <div class="stat-icon"><i class="fas fa-calendar-day"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="endingTodayValue">-</span>
+                    <span class="stat-label">Kończą się dziś</span>
+                </div>
+            </div>
+            <div class="stat-card info" id="endingSoonCard">
+                <div class="stat-icon"><i class="fas fa-hourglass-half"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="endingSoonValue">-</span>
+                    <span class="stat-label">Kończą się w 3 dni</span>
+                </div>
+            </div>
+            <div class="stat-card success" id="extendedTreatmentsCard">
+                <div class="stat-icon"><i class="fas fa-notes-medical"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="extendedTreatmentsValue">-</span>
+                    <span class="stat-label">Z przedłużeniem</span>
+                </div>
+            </div>
+            <div class="stat-card warning" id="missingTreatmentDatesCard">
+                <div class="stat-icon"><i class="fas fa-calendar-times"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="missingTreatmentDatesValue">-</span>
+                    <span class="stat-label">Braki dat leczenia</span>
+                </div>
+            </div>
+            <div class="stat-card danger" id="duplicatePatientsCard">
+                <div class="stat-icon"><i class="fas fa-copy"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="duplicatePatientsValue">-</span>
+                    <span class="stat-label">Duplikaty wpisów</span>
+                </div>
+            </div>
+            <div class="stat-card primary" id="handoverMorningCard">
+                <div class="stat-icon"><i class="fas fa-sun"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="handoverMorningValue">-</span>
+                    <span class="stat-label">Poranne do przekazania</span>
+                </div>
+            </div>
+            <div class="stat-card secondary" id="handoverAfternoonCard">
+                <div class="stat-icon"><i class="fas fa-moon"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="handoverAfternoonValue">-</span>
+                    <span class="stat-label">Popołudniowe do przekazania</span>
+                </div>
+            </div>
+            <div class="stat-card info" id="dataQualityScoreCard">
+                <div class="stat-icon"><i class="fas fa-clipboard-check"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="dataQualityScoreValue">-</span>
+                    <span class="stat-label">Wiarygodność danych</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-section-header">
+            <h3><i class="fas fa-chart-line"></i> Średnia z ostatnich 4 tygodni</h3>
+            <span id="weeklyStatsRange" class="stats-section-subtitle">Dane będą budowane od momentu wdrożenia agregatów tygodniowych.</span>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card primary" id="weeklyAverageSlotsCard">
+                <div class="stat-icon"><i class="fas fa-calendar-week"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="weeklyAverageSlotsValue">-</span>
+                    <span class="stat-label">Śr. wpisów / tydzień</span>
+                </div>
+            </div>
+            <div class="stat-card success" id="weeklyAveragePerEmployeeCard">
+                <div class="stat-icon"><i class="fas fa-user-clock"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="weeklyAveragePerEmployeeValue">-</span>
+                    <span class="stat-label">Śr. wpisów / dostępnego pracownika</span>
+                </div>
+            </div>
+            <div class="stat-card warning" id="weeklyAvailabilityCard">
+                <div class="stat-icon"><i class="fas fa-users-cog"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="weeklyAvailabilityValue">-</span>
+                    <span class="stat-label">Śr. dostępnych pracowników</span>
+                </div>
+            </div>
+            <div class="stat-card info" id="weeklyTrendCard">
+                <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="weeklyTrendValue">-</span>
+                    <span class="stat-label">Zmiana tydzień do tygodnia</span>
                 </div>
             </div>
         </div>
@@ -168,6 +275,50 @@
                     <canvas id="patientsByTimeChart"></canvas>
                 </div>
             </div>
+        </div>
+
+        <div class="stats-table-container">
+            <h3><i class="fas fa-clipboard-list"></i> Alerty turnusów i duplikatów</h3>
+            <table class="stats-table" id="treatmentAlertsTable">
+                <thead>
+                    <tr>
+                        <th>Priorytet</th>
+                        <th>Pacjent</th>
+                        <th>Pracownik</th>
+                        <th>Godzina</th>
+                        <th>Powód</th>
+                        <th>Data końca</th>
+                    </tr>
+                </thead>
+                <tbody id="treatmentAlertsBody"></tbody>
+            </table>
+        </div>
+
+        <div class="stats-row">
+            <div class="stats-chart-container full-width">
+                <h3><i class="fas fa-chart-area"></i> Trend tygodniowy: wpisy, dostępność i urlopy</h3>
+                <div class="chart-wrapper">
+                    <canvas id="weeklyTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-table-container">
+            <h3><i class="fas fa-table"></i> Obciążenie zespołu z uwzględnieniem urlopów</h3>
+            <table class="stats-table" id="weeklyAvailabilityTable">
+                <thead>
+                    <tr>
+                        <th>Tydzień</th>
+                        <th>Wpisy</th>
+                        <th>Unikalne nazwy</th>
+                        <th>Dostępni pracownicy śr.</th>
+                        <th>Dni urlopowe</th>
+                        <th>Wpisy / dostępnego</th>
+                        <th>Obłożenie</th>
+                    </tr>
+                </thead>
+                <tbody id="weeklyAvailabilityBody"></tbody>
+            </table>
         </div>
     </div>
 

@@ -1,6 +1,7 @@
 // scripts/leaves-summary.ts
 import { EmployeeManager } from './employee-manager.js';
 import { countWorkdays } from './common.js';
+import { escapeHTML } from './utils.js';
 import type { LeaveEntry } from './types';
 
 /**
@@ -105,7 +106,7 @@ export const LeavesSummary: LeavesSummaryAPI = (() => {
             const row = tableBody.insertRow();
             row.dataset.employeeId = employeeId;
             row.innerHTML = `
-                <td>${EmployeeManager.getFullNameById(employeeId)}</td>
+                <td>${escapeHTML(EmployeeManager.getFullNameById(employeeId))}</td>
                 <td>${entitlement}</td>
                 <td class="editable-carried-over" contenteditable="true" 
                     title="Kliknij, aby edytować urlop zaległy"

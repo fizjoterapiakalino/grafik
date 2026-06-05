@@ -1907,6 +1907,7 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     font-size: 0.7rem;
     border-right: 1px solid rgba(255, 255, 255, 0.1);
     flex-shrink: 0;
+    position: relative;
 }
 
 .gantt-day-header.weekend {
@@ -1915,9 +1916,25 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     font-style: italic;
 }
 
+.gantt-day-header.weekend::after {
+    background: rgba(17, 24, 39, 0.55);
+    bottom: 0;
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 3px;
+}
+
 .gantt-day-header.today {
     background: var(--color-secondary);
     font-weight: bold;
+}
+
+.gantt-day-header.holiday {
+    background: #dc2626;
+    color: #ffffff;
+    font-weight: 700;
 }
 
 /* Timeline body with leave rows */
@@ -1960,12 +1977,27 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     border-right-color: #c5cdd8;
 }
 
+.gantt-day-cell.weekend::after {
+    background: #64748b;
+    bottom: 0;
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 3px;
+}
+
 .gantt-day-cell.month-start {
     border-left: 2px solid var(--color-gray-300);
 }
 
 .gantt-day-cell.today {
     background: rgba(var(--color-secondary-rgb), 0.2);
+}
+
+.gantt-day-cell.holiday {
+    background: #fee2e2;
+    border-right-color: #fca5a5;
 }
 
 /* ── Crosshair highlighting (column overlay + row on hover) ── */

@@ -248,6 +248,35 @@
     margin-bottom: 1.5rem;
 }
 
+.stats-section-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 0.25rem 0 1rem;
+    flex-wrap: wrap;
+}
+
+.stats-section-header h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--stats-text);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.stats-section-header h3 i {
+    color: var(--stats-primary);
+    font-size: 0.95rem;
+}
+
+.stats-section-subtitle {
+    color: var(--stats-text-muted);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
 /* Chart Container */
 .stats-chart-container {
     background: var(--stats-card-bg);
@@ -341,6 +370,12 @@
 
 .stats-table tbody tr:last-child td {
     border-bottom: none;
+}
+
+.stats-table .no-data-cell {
+    text-align: center;
+    color: var(--stats-text-muted);
+    padding: 1.5rem;
 }
 
 /* Employee Name Cell */
@@ -458,6 +493,11 @@
 
     .stats-row {
         grid-template-columns: 1fr;
+    }
+
+    .stats-section-header {
+        align-items: flex-start;
+        flex-direction: column;
     }
 
     .stats-grid {

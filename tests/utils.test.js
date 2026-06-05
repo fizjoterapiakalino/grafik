@@ -8,6 +8,7 @@ import {
     safeCopy,
     toDateString,
     toUTCDate,
+    escapeHTML,
 } from '../scripts/utils.js';
 
 describe('utils', () => {
@@ -108,5 +109,13 @@ describe('utils', () => {
         expect(isWorkday(toUTCDate('2026-05-22'))).toBe(true);
         expect(isWorkday(toUTCDate('2026-05-23'))).toBe(false);
         expect(isWorkday(toUTCDate('2026-05-24'))).toBe(false);
+    });
+
+    test('escapeHTML escapes special HTML characters to prevent XSS', () => {
+        expect(escapeHTML('')).toBe('');
+        expect(escapeHTML(null)).toBe('');
+        expect(escapeHTML('John Doe')).toBe('John Doe');
+        expect(escapeHTML('<script>alert("xss")</script>')).toBe('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
+        expect(escapeHTML('M&M\'s')).toBe('M&amp;M&#039;s');
     });
 });

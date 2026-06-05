@@ -11,14 +11,19 @@ export interface PdfDocument {
     url: string;
     date?: string;
     type?: string;
+    sourceUrl?: string;
+    scrapedAt?: string;
 }
 
 /**
  * Status serwera
  */
 interface ServerStatus {
-    status: string;
-    lastScrape?: string;
+    documentsCount: number;
+    lastScrapingTime?: string | null;
+    isScrapingInProgress: boolean;
+    scrapingError?: string | null;
+    uptime?: number;
 }
 
 /**
@@ -33,7 +38,7 @@ interface CachedPdfData {
  * Interfejs publicznego API PdfService
  */
 interface PdfServiceAPI {
-    fetchAndCachePdfLinks(forceScrape?: boolean): Promise<PdfDocument[]>;
+    fetchAndCachePdfLinks(forceScrape?: boolean, runServerScrape?: boolean): Promise<PdfDocument[]>;
     initRealtimeUpdates(): void;
     destroy(): void;
     markAsSeen(): void;
@@ -45,6 +50,7 @@ interface PdfServiceAPI {
 export const PdfService: PdfServiceAPI = (() => {
     const SCRAPED_PDFS_CACHE_KEY = 'scrapedPdfLinksV2'; // Nowa wersja cache z TTL
     const SEEN_DOCS_COUNT_KEY = 'seenPdfDocsCount';
+    const SEEN_DOC_IDS_KEY = 'seenPdfDocIdsV2';
     const RENDER_API_BASE_URL = 'https://pdf-scraper-api-5qqr.onrender.com';
 
     const MAX_RETRIES = 3;
@@ -61,23 +67,74 @@ export const PdfService: PdfServiceAPI = (() => {
     let isDestroyed = false;
     let isBackgroundRefreshInProgress = false;
 
-    const checkForNewDocuments = (docs: PdfDocument[]): void => {
-        const seenCount = parseInt(localStorage.getItem(SEEN_DOCS_COUNT_KEY) || '0', 10);
-        const currentCount = docs.length;
+    const getDocumentIdentity = (doc: PdfDocument): string => {
+        return String(doc.id || doc.url || `${doc.date || ''}|${doc.type || ''}|${doc.title || ''}`).trim();
+    };
 
-        if (currentCount > seenCount) {
-            const newCount = currentCount - seenCount;
+    const getDocumentIds = (docs: PdfDocument[]): string[] => {
+        return docs.map(getDocumentIdentity).filter(Boolean);
+    };
+
+    const getSeenDocIds = (): Set<string> | null => {
+        try {
+            const stored = localStorage.getItem(SEEN_DOC_IDS_KEY);
+            if (!stored) return null;
+            const parsed = JSON.parse(stored);
+            if (!Array.isArray(parsed)) return null;
+            return new Set(parsed.map(String).filter(Boolean));
+        } catch (error) {
+            console.error('Błąd odczytu listy widzianych dokumentów ISO:', error);
+            return null;
+        }
+    };
+
+    const saveSeenDocIds = (docs: PdfDocument[]): void => {
+        localStorage.setItem(SEEN_DOC_IDS_KEY, JSON.stringify(getDocumentIds(docs)));
+        localStorage.setItem(SEEN_DOCS_COUNT_KEY, docs.length.toString());
+    };
+
+    const checkForNewDocuments = (docs: PdfDocument[]): void => {
+        const currentIds = getDocumentIds(docs);
+        const seenIds = getSeenDocIds();
+
+        if (seenIds) {
+            const newIds = currentIds.filter((id) => !seenIds.has(id));
+            if (newIds.length > 0) {
+                window.dispatchEvent(new CustomEvent('iso-updates-available', { detail: { count: newIds.length } }));
+                debugLog(`${newIds.length} nowych dokumentów ISO od ostatniej wizyty.`);
+            } else {
+                window.dispatchEvent(new CustomEvent('iso-updates-cleared'));
+            }
+            return;
+        }
+
+        const seenCount = parseInt(localStorage.getItem(SEEN_DOCS_COUNT_KEY) || '0', 10);
+        if (seenCount > 0 && docs.length > seenCount) {
+            const newCount = docs.length - seenCount;
+            const seenLegacyDocs = docs.slice(newCount);
+            saveSeenDocIds(seenLegacyDocs);
+            localStorage.setItem(SEEN_DOCS_COUNT_KEY, seenLegacyDocs.length.toString());
             window.dispatchEvent(new CustomEvent('iso-updates-available', { detail: { count: newCount } }));
             debugLog(`${newCount} nowych dokumentów ISO od ostatniej wizyty.`);
-        } else {
-            window.dispatchEvent(new CustomEvent('iso-updates-cleared'));
+            return;
         }
+
+        if (seenCount > 0 && docs.length <= seenCount) {
+            saveSeenDocIds(docs);
+            window.dispatchEvent(new CustomEvent('iso-updates-cleared'));
+            return;
+        }
+
+        if (docs.length > 0) {
+            saveSeenDocIds(docs);
+        }
+        window.dispatchEvent(new CustomEvent('iso-updates-cleared'));
     };
 
     const markAsSeen = (): void => {
         const cached = getCachedDataWithMeta();
         if (cached && cached.data.length > 0) {
-            localStorage.setItem(SEEN_DOCS_COUNT_KEY, cached.data.length.toString());
+            saveSeenDocIds(cached.data);
             window.dispatchEvent(new CustomEvent('iso-updates-cleared'));
         }
     };
@@ -180,7 +237,48 @@ export const PdfService: PdfServiceAPI = (() => {
         }
     };
 
-    const fetchAndCachePdfLinks = async (forceScrape: boolean = false): Promise<PdfDocument[]> => {
+    const triggerServerScrape = async (): Promise<boolean> => {
+        try {
+            const scraperToken = localStorage.getItem('pdfScraperToken') || '';
+            const headers: Record<string, string> = {};
+            if (scraperToken) {
+                headers['X-Scraper-Token'] = scraperToken;
+            }
+
+            const response = await fetch(`${RENDER_API_BASE_URL}/api/scrape`, {
+                method: 'POST',
+                headers,
+            });
+
+            if (response.ok) {
+                return true;
+            }
+
+            if (response.status === 409) {
+                debugLog('Scraping jest już w toku na serwerze.');
+                return true;
+            }
+
+            if (response.status === 429) {
+                const retryAfter = response.headers.get('Retry-After');
+                debugLog(`Serwer ograniczył ręczne odświeżenie ISO. Retry-After: ${retryAfter || 'brak'}s`);
+                return false;
+            }
+
+            if (response.status === 401) {
+                debugLog('Ręczne uruchomienie scrapera wymaga tokena.');
+                return false;
+            }
+
+            debugLog(`Nie udało się uruchomić scrapingu. Status: ${response.status}`);
+            return false;
+        } catch (error) {
+            console.warn('Nie można uruchomić scrapingu na serwerze:', error);
+            return false;
+        }
+    };
+
+    const fetchAndCachePdfLinks = async (forceScrape: boolean = false, runServerScrape: boolean = true): Promise<PdfDocument[]> => {
         Shared.setIsoLinkActive(false);
 
         const cachedWithMeta = getCachedDataWithMeta();
@@ -209,8 +307,9 @@ export const PdfService: PdfServiceAPI = (() => {
         }
 
         // Brak cache lub wymuszony refresh - pobierz synchronicznie
-        if (forceScrape) {
+        if (forceScrape && runServerScrape) {
             window.showToast?.('Odświeżanie linków ISO...', 3000);
+            await triggerServerScrape();
         }
 
         const data = await fetchFromApi();
@@ -253,7 +352,7 @@ export const PdfService: PdfServiceAPI = (() => {
             sse.addEventListener('scrapingComplete', (event) => {
                 debugLog('Otrzymano zdarzenie scrapingComplete:', event.data);
                 window.showToast?.('Nowe dokumenty ISO dostępne!', 5000);
-                fetchAndCachePdfLinks(true);
+                fetchAndCachePdfLinks(true, false);
             });
 
             sse.onerror = () => {

@@ -5,15 +5,18 @@ const chromium = require('@sparticuz/chromium');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const { normalizeDocuments } = require('./documentNormalizer');
 
 const app = express();
 const port = process.env.PORT || 3000;
+app.disable('x-powered-by');
 
 // Konfiguracja CORS z określonymi origin dla bezpieczeństwa
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)
+    : ['http://localhost:8000', 'http://localhost:3000', 'https://fizjoterapiakalino.github.io'];
 const corsOptions = {
-    origin: process.env.ALLOWED_ORIGINS
-        ? process.env.ALLOWED_ORIGINS.split(',')
-        : ['http://localhost:8000', 'http://localhost:3000', 'https://fizjoterapiakalino.github.io'],
+    origin: allowedOrigins,
     optionsSuccessStatus: 200,
 };
 app.use(cors(corsOptions));
@@ -24,11 +27,14 @@ const DATA_FILE = path.join(__dirname, 'scrapedData.json');
 // Stałe konfiguracyjne
 const SCRAPING_INTERVAL_MS = 60 * 60 * 1000; // 1 godzina
 const SCRAPING_TIMEOUT_MS = 60 * 1000; // 1 minuta timeout dla scrapingu
+const MANUAL_SCRAPE_MIN_INTERVAL_MS = Number(process.env.MANUAL_SCRAPE_MIN_INTERVAL_MS || 5 * 60 * 1000);
+const SCRAPER_API_TOKEN = process.env.SCRAPER_API_TOKEN || '';
 
 let scrapedData = [];
 let isScrapingInProgress = false;
 let lastScrapingTime = null;
 let scrapingError = null;
+let lastManualScrapeTime = 0;
 
 // SSE clients for real-time updates
 const sseClients = new Set();
@@ -71,10 +77,22 @@ const loadDataFromFile = () => {
  */
 const saveDataToFile = () => {
     try {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(scrapedData, null, 2));
+        const tempFile = `${DATA_FILE}.tmp`;
+        fs.writeFileSync(tempFile, JSON.stringify(scrapedData, null, 2));
+        fs.renameSync(tempFile, DATA_FILE);
     } catch (err) {
         console.error('Błąd zapisu danych do pliku:', err);
     }
+};
+
+const isAuthorizedScrapeRequest = (req) => {
+    if (!SCRAPER_API_TOKEN) return true;
+    return req.get('x-scraper-token') === SCRAPER_API_TOKEN;
+};
+
+const getAllowedSseOrigin = (origin) => {
+    if (!origin) return allowedOrigins[0] || '*';
+    return allowedOrigins.includes(origin) ? origin : allowedOrigins[0] || '*';
 };
 
 // Read the parser logic from file to inject into browser
@@ -134,8 +152,18 @@ async function scrapePdfLinks() {
         );
 
         if (Array.isArray(documents)) {
-            scrapedData = documents;
-            lastScrapingTime = new Date().toISOString();
+            const scrapedAt = new Date().toISOString();
+            const normalizedDocuments = normalizeDocuments(documents, {
+                scrapedAt,
+                sourceUrl: process.env.TARGET_URL,
+            });
+
+            if (normalizedDocuments.length === 0 && scrapedData.length > 0) {
+                throw new Error('Scraper zwrócił pustą listę. Zachowuję poprzedni cache, żeby nie ukrywać dokumentów.');
+            }
+
+            scrapedData = normalizedDocuments;
+            lastScrapingTime = scrapedAt;
             console.log(`Pobrano dane ${scrapedData.length} dokumentów.`);
 
             saveDataToFile();
@@ -194,9 +222,26 @@ app.get('/api/status', (req, res) => {
  * POST /api/scrape - Wymusza natychmiastowy scraping
  */
 app.post('/api/scrape', async (req, res) => {
+    if (!isAuthorizedScrapeRequest(req)) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     if (isScrapingInProgress) {
         return res.status(409).json({ error: 'Scraping już w toku' });
     }
+
+    const now = Date.now();
+    const msSinceLastManualScrape = now - lastManualScrapeTime;
+    if (msSinceLastManualScrape < MANUAL_SCRAPE_MIN_INTERVAL_MS) {
+        const retryAfterSeconds = Math.ceil((MANUAL_SCRAPE_MIN_INTERVAL_MS - msSinceLastManualScrape) / 1000);
+        res.setHeader('Retry-After', String(retryAfterSeconds));
+        return res.status(429).json({
+            error: 'Scraping był uruchomiony niedawno',
+            retryAfterSeconds,
+        });
+    }
+
+    lastManualScrapeTime = now;
 
     const success = await scrapePdfLinks();
     if (success) {
@@ -213,7 +258,7 @@ app.get('/api/events', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', getAllowedSseOrigin(req.get('origin')));
 
     // Wyślij początkowe wydarzenie
     res.write(`event: connected\ndata: ${JSON.stringify({ timestamp: new Date().toISOString() })}\n\n`);

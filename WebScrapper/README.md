@@ -38,7 +38,11 @@ Aby uruchomić ten projekt na Render.com, wykonaj następujące kroki:
         - `TARGET_URL`: `https://zla-chrzanow.pl/private/`
         - `LOGIN_USERNAME`: Twoja nazwa użytkownika do logowania.
         - `LOGIN_PASSWORD`: Twoje hasło do logowania.
+        - `ALLOWED_ORIGINS`: lista dozwolonych originów po przecinku, np. `https://fizjoterapiakalino.github.io,http://localhost:3000`
+        - `SCRAPER_API_TOKEN`: opcjonalny token chroniący endpoint `POST /api/scrape`.
+        - `MANUAL_SCRAPE_MIN_INTERVAL_MS`: opcjonalny minimalny odstęp między ręcznymi uruchomieniami scrapingu, domyślnie 5 minut.
     - **Ważne:** Nigdy nie umieszczaj danych logowania bezpośrednio w kodzie! Zmienne środowiskowe Render.com są bezpieczne.
+    - Jeśli ustawisz `SCRAPER_API_TOKEN`, ręczne odświeżanie z aplikacji musi wysłać ten token w nagłówku `X-Scraper-Token`. W statycznym froncie nie umieszczaj tokena na stałe w kodzie; do lokalnego/adminowego użycia można go ustawić w `localStorage` pod kluczem `pdfScraperToken`.
 
 5.  **Dostosuj selektory (jeśli to konieczne):**
     - W pliku `server.js` znajdują się miejsca oznaczone `TODO: Uzupełnij selektory...`. Będziesz musiał/a dostosować selektory CSS dla pól nazwy użytkownika, hasła i przycisku logowania, a także dla linków do PDF-ów, aby pasowały do struktury HTML strony `https://zla-chrzanow.pl/private/`.
@@ -55,6 +59,15 @@ Po uruchomieniu projektu na Render.com, będziesz mógł/mogła uzyskać dostęp
 `https://[NAZWA_TWOJEJ_USLUGI].onrender.com/api/pdfs`
 
 Zastąp `[NAZWA_TWOJEJ_USLUGI]` rzeczywistą nazwą Twojej usługi webowej na Render.com.
+
+Ręczne uruchomienie scrapingu:
+
+```bash
+curl -X POST https://[NAZWA_TWOJEJ_USLUGI].onrender.com/api/scrape \
+  -H "X-Scraper-Token: [SCRAPER_API_TOKEN]"
+```
+
+Endpoint jest ograniczony czasowo przez `MANUAL_SCRAPE_MIN_INTERVAL_MS`. Jeśli scraping był uruchomiony niedawno, API zwróci `429` oraz nagłówek `Retry-After`.
 
 ## Integracja z Twoją stroną na GitHub Pages
 

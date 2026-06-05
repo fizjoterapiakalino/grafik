@@ -51,7 +51,7 @@ export const UIShell: UIShellAPI = (() => {
                     <button id="btnSplitView" class="action-icon-btn header-action-btn" title="Panel stanowisk" style="display: none;">
                         <span style="display: inline-block; width: 24px; height: 24px; background-color: white; -webkit-mask: url('icons/massage.png') no-repeat center / contain; mask: url('icons/massage.png') no-repeat center / contain; vertical-align: middle;"></span>
                     </button>
-                    <button id="btnIso" class="action-icon-btn active header-action-btn" title="Dokumenty ISO"><i class="fas fa-file-alt"></i><span class="notification-badge" style="display: none;"></span></button>
+                    <button id="btnIso" class="action-icon-btn active header-action-btn iso-header-btn" title="Dokumenty ISO" aria-label="Dokumenty ISO"><i class="fas fa-file-alt"></i><span class="iso-header-label">ISO</span><span class="notification-badge iso-notification-dot" style="display: none;"></span></button>
                     <div class="search-container">
                         <button id="searchToggleBtn" class="search-toggle-btn" title="Szukaj"><i class="fas fa-search"></i></button>
                         <input type="text" id="searchInput" class="search-input" placeholder="Szukaj...">
@@ -113,17 +113,25 @@ export const UIShell: UIShellAPI = (() => {
             void auth.signOut();
         });
 
-        window.addEventListener('iso-updates-available', () => {
-            const badge = document.querySelector('#btnIso .notification-badge') as HTMLElement | null;
-            if (badge) {
+        window.addEventListener('iso-updates-available', (event) => {
+            const detail = (event as CustomEvent<{ count?: number }>).detail;
+            const count = detail?.count || 0;
+            document.querySelectorAll<HTMLElement>('.iso-notification-dot').forEach((badge) => {
                 badge.style.display = 'block';
+                badge.title = count > 0 ? `${count} nowych dokumentów ISO` : 'Nowe dokumenty ISO';
+            });
+            if (btnIso) {
+                btnIso.title = count > 0 ? `Dokumenty ISO - ${count} nowych` : 'Dokumenty ISO - nowe dokumenty';
             }
         });
 
         window.addEventListener('iso-updates-cleared', () => {
-            const badge = document.querySelector('#btnIso .notification-badge') as HTMLElement | null;
-            if (badge) {
+            document.querySelectorAll<HTMLElement>('.iso-notification-dot').forEach((badge) => {
                 badge.style.display = 'none';
+                badge.removeAttribute('title');
+            });
+            if (btnIso) {
+                btnIso.title = 'Dokumenty ISO';
             }
         });
 
@@ -226,10 +234,12 @@ export const UIShell: UIShellAPI = (() => {
         if (!appHeader) return;
 
         const isMassageAccess = user ? EmployeeManager.isMassageAccessUser(user.uid) : false;
+        const currentEmployee = user ? EmployeeManager.getEmployeeByUid(user.uid) : null;
         const isMassageView = window.location.hash === '#massage-stations';
         const useMassageLightShell = Boolean(user && (isMassageAccess || isMassageView));
         document.body.classList.toggle('massage-access-shell', useMassageLightShell);
         Shared.setMassageStationsLinkVisible(isMassageAccess);
+        Shared.applyNavigationAccess(currentEmployee || null);
 
         if (massageLightHeader) {
             massageLightHeader.style.display = useMassageLightShell ? 'flex' : 'none';

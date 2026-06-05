@@ -8,6 +8,7 @@ import { ScheduleEvents } from './schedule-events.js';
 import { ScheduleData } from './schedule-data.js';
 import { ScheduleModals } from './schedule-modals.js';
 import { UXEnhancements } from './ux-enhancements.js';
+import { TestDataGenerator } from './test-data-generator.js';
 import { safeCopy } from './utils.js';
 import {
     getTargetPart,
@@ -505,6 +506,7 @@ export const Schedule: ScheduleAPI = (() => {
         } finally {
             if (loadingOverlay) hideLoadingOverlay(loadingOverlay);
             UXEnhancements.initScheduleEnhancements();
+            TestDataGenerator.init();
         }
 
         // Setup split-view toggle button
@@ -535,6 +537,7 @@ export const Schedule: ScheduleAPI = (() => {
         ScheduleEvents.destroy();
         ScheduleData.destroy();
         ScheduleUI.destroy();
+        TestDataGenerator.destroy();
         debugLog('Schedule module destroyed');
     };
 

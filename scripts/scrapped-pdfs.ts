@@ -118,7 +118,61 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
         tableBody.appendChild(fragment);
     };
 
-    const fetchAndDisplayPdfLinks = async (): Promise<void> => {
+    const formatStatusDate = (isoDate: string | null | undefined): string => {
+        if (!isoDate) return 'brak danych';
+        const date = new Date(isoDate);
+        if (Number.isNaN(date.getTime())) return 'brak danych';
+        return date.toLocaleString('pl-PL', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    };
+
+    const renderServerStatus = async (): Promise<void> => {
+        const statusContainer = document.getElementById('pdfServerStatus');
+        if (!statusContainer) return;
+
+        try {
+            const status = await PdfService.getServerStatus();
+            if (!status) {
+                statusContainer.classList.add('error');
+                statusContainer.textContent = 'Status scrapera niedostępny.';
+                return;
+            }
+
+            statusContainer.classList.toggle('error', Boolean(status.scrapingError));
+            statusContainer.innerHTML = '';
+
+            const count = document.createElement('span');
+            count.textContent = `${status.documentsCount} dokumentów`;
+            statusContainer.appendChild(count);
+
+            const lastScrape = document.createElement('span');
+            lastScrape.textContent = `Ostatni scraping: ${formatStatusDate(status.lastScrapingTime)}`;
+            statusContainer.appendChild(lastScrape);
+
+            if (status.isScrapingInProgress) {
+                const inProgress = document.createElement('span');
+                inProgress.textContent = 'Scraping w toku';
+                statusContainer.appendChild(inProgress);
+            }
+
+            if (status.scrapingError) {
+                const error = document.createElement('span');
+                error.textContent = `Błąd: ${status.scrapingError}`;
+                statusContainer.appendChild(error);
+            }
+        } catch (error) {
+            console.warn('Nie można wyrenderować statusu scrapera:', error);
+            statusContainer.classList.add('error');
+            statusContainer.textContent = 'Status scrapera niedostępny.';
+        }
+    };
+
+    const fetchAndDisplayPdfLinks = async (forceScrape: boolean = false): Promise<void> => {
         const container = document.getElementById('pdf-links-container');
         const tableContainer = document.getElementById('pdf-table-container');
 
@@ -126,10 +180,11 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
         container.textContent = 'Ładowanie dokumentów...';
 
         try {
-            const documents = await PdfService.fetchAndCachePdfLinks(true);
+            const documents = await PdfService.fetchAndCachePdfLinks(forceScrape);
 
             if (!documents || !Array.isArray(documents) || documents.length === 0) {
                 container.textContent = 'Brak dostępnych dokumentów.';
+                await renderServerStatus();
                 return;
             }
 
@@ -146,9 +201,11 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
             } else {
                 displayLinks(allLinksData);
             }
+            await renderServerStatus();
         } catch (error) {
             console.error('Błąd podczas pobierania dokumentów PDF:', error);
             container.textContent = 'Wystąpił błąd podczas ładowania dokumentów.';
+            await renderServerStatus();
         }
     };
 
@@ -165,7 +222,7 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
             if (span) span.textContent = 'Ładowanie...';
 
             try {
-                await fetchAndDisplayPdfLinks();
+                await fetchAndDisplayPdfLinks(true);
             } finally {
                 refreshBtn.classList.remove('loading');
                 if (span) span.textContent = originalText;
@@ -240,7 +297,7 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
         if (title) title.textContent = docTitle || 'Podgląd dokumentu';
 
         const separator = url.includes('#') ? '&' : '#';
-        const cleanUrl = `${url}${separator}navpanes=0&toolbar=0&view=FitH`;
+        const cleanUrl = `${url}${separator}navpanes=0&toolbar=0&view=Fit`;
 
         iframe.src = cleanUrl;
         modal.style.display = 'flex';

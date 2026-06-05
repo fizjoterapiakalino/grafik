@@ -3,6 +3,7 @@ import { debugLog } from './common.js';
 import { db as dbRaw } from './firebase-config.js';
 import { AppConfig } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
+import { escapeHTML } from './utils.js';
 import {
     PdfColors,
     PdfStyles,
@@ -100,6 +101,8 @@ export const Changes: ChangesAPI = (() => {
     let rowClipboard: Record<number, string[]> | null = null;
 
     const TEMPLATES_STORAGE_KEY = 'changesTemplates';
+    const EDITABLE_COLUMN_COUNT = 7;
+    const COLUMN_NAMES = ['', 'HYDRO', 'MASAŻ', 'FIZYKO', 'SALA', 'MASAŻ', 'FIZYKO', 'SALA'];
 
     const isWeekend = (date: Date): boolean => {
         const day = date.getUTCDay();
@@ -411,7 +414,7 @@ export const Changes: ChangesAPI = (() => {
         loadTemplates();
 
         if (templates.length === 0) {
-            window.showToast('Brak zapisanych szablonów. Najpierw zapisz szablon z istniejącego wiersza.', 3000);
+            window.showToast('Brak szablonów. Uzupełnij jeden okres i kliknij "Zapisz wzór".', 3500);
             return;
         }
 
@@ -435,14 +438,13 @@ export const Changes: ChangesAPI = (() => {
                 const selectedId = select.value;
                 const tpl = templates.find(t => t.id === selectedId);
 
-                if (preview && tpl) {
-                    const columnNames = ['', 'HYDRO', 'MASAŻ', 'FIZYKO', 'SALA', 'MASAŻ', 'FIZYKO', 'SALA'];
-                    const previewHtml = Object.entries(tpl.columns)
-                        .map(([colIdx, empIds]) => {
-                            const names = (empIds as string[]).map(id => EmployeeManager.getFullNameById(id)).join(', ');
-                            return `<div><strong>${columnNames[Number(colIdx)] || 'Kol. ' + colIdx}:</strong> ${names}</div>`;
-                        })
-                        .join('');
+            if (preview && tpl) {
+                const previewHtml = Object.entries(tpl.columns)
+                    .map(([colIdx, empIds]) => {
+                        const names = (empIds as string[]).map(id => EmployeeManager.getFullNameById(id)).join(', ');
+                        return `<div><strong>${COLUMN_NAMES[Number(colIdx)] || 'Kol. ' + colIdx}:</strong> ${escapeHTML(names)}</div>`;
+                    })
+                    .join('');
                     preview.innerHTML = previewHtml || '<em>Pusty szablon</em>';
                 } else if (preview) {
                     preview.innerHTML = '';
@@ -519,17 +521,15 @@ export const Changes: ChangesAPI = (() => {
                 <div class="template-empty">
                     <i class="fas fa-folder-open"></i>
                     <p>Brak zapisanych szablonów</p>
-                    <small>Kliknij prawym przyciskiem na wiersz i wybierz "Zapisz jako szablon"</small>
+                    <small>Uzupełnij jeden okres i kliknij przy nim "Zapisz wzór".</small>
                 </div>
             `;
             return;
         }
 
-        const columnNames = ['', 'HYDRO', 'MASAŻ', 'FIZYKO', 'SALA', 'MASAŻ', 'FIZYKO', 'SALA'];
-
         list.innerHTML = templates.map(tpl => `
             <div class="template-item" data-template-id="${tpl.id}">
-                <span class="template-item-name">${tpl.name}</span>
+                <span class="template-item-name">${escapeHTML(tpl.name)}</span>
                 <div class="template-item-actions">
                     <button class="template-item-btn delete-btn" data-action="delete" title="Usuń"><i class="fas fa-trash"></i></button>
                 </div>
@@ -556,10 +556,10 @@ export const Changes: ChangesAPI = (() => {
                 if (preview && tpl) {
                     const previewGrid = Object.entries(tpl.columns)
                         .map(([colIdx, empIds]) => {
-                            const names = (empIds as string[]).map(id => EmployeeManager.getFullNameById(id)).join('<br>');
+                            const names = (empIds as string[]).map(id => escapeHTML(EmployeeManager.getFullNameById(id))).join('<br>');
                             return `
                                 <div class="template-preview-cell">
-                                    <div class="template-preview-cell-header">${columnNames[Number(colIdx)] || 'Kol. ' + colIdx}</div>
+                                    <div class="template-preview-cell-header">${COLUMN_NAMES[Number(colIdx)] || 'Kol. ' + colIdx}</div>
                                     <div class="template-preview-cell-content">${names || '—'}</div>
                                 </div>
                             `;
@@ -598,10 +598,6 @@ export const Changes: ChangesAPI = (() => {
     const initTemplateUI = (): void => {
         loadTemplates();
 
-        // Przycisk "Szablony" w nagłówku
-        const manageBtn = document.getElementById('manageTemplatesBtn');
-        manageBtn?.addEventListener('click', openTemplateManagerModal);
-
         // Modal zarządzania szablonami - przycisk zamknij
         document.getElementById('closeTemplateModal')?.addEventListener('click', () => {
             const modal = document.getElementById('templateModal');
@@ -624,20 +620,12 @@ export const Changes: ChangesAPI = (() => {
             pendingTemplateRow = null;
         });
 
-        // Przycisk "Szybkie planowanie"
-        document.getElementById('quickPlanningBtn')?.addEventListener('click', openMultiPeriodModal);
-
-        // Modal szybkiego planowania
-        document.getElementById('confirmMultiPeriodTemplate')?.addEventListener('click', applyTemplateToMultiplePeriods);
-        document.getElementById('cancelMultiPeriodTemplate')?.addEventListener('click', () => {
-            const modal = document.getElementById('multiPeriodTemplateModal');
-            if (modal) modal.style.display = 'none';
+        // Przycisk "Zaplanuj obsadę" prowadzi do testowego generatora rotacji.
+        document.getElementById('quickPlanningBtn')?.addEventListener('click', () => {
+            window.location.hash = 'changes-rotation';
         });
-
-        // Opcje context menu są obsługiwane przez initializeContextMenu w init()
     };
 
-    /** Pobiera listę okresów z obecnego roku */
     const getCurrentPeriods = (): { value: string; label: string }[] => {
         const periods = generateTwoWeekPeriods(currentYear);
         return periods.map(p => ({
@@ -646,14 +634,41 @@ export const Changes: ChangesAPI = (() => {
         }));
     };
 
-    /** Formatuje datę do krótkiego formatu */
     const formatDate = (date: Date): string => {
         const day = date.getUTCDate().toString().padStart(2, '0');
         const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
         return `${day}.${month}`;
     };
 
-    /** Otwiera modal szybkiego planowania */
+    const periodHasAssignments = (periodKey: string): boolean => {
+        const periodCells = appState.changesCells[periodKey] || {};
+        for (let colIdx = 1; colIdx <= EDITABLE_COLUMN_COUNT; colIdx++) {
+            if ((periodCells[colIdx]?.assignedEmployees || []).length > 0) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    const getCurrentPeriodIndex = (periods: { value: string; label: string }[]): number => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const fullPeriods = generateTwoWeekPeriods(currentYear);
+
+        const currentIndex = periods.findIndex((period) => {
+            const sourcePeriod = fullPeriods.find((item) => item.start === period.value);
+            if (!sourcePeriod) return false;
+            const start = new Date(sourcePeriod.start);
+            const end = new Date(sourcePeriod.end);
+            return today >= start && today <= end;
+        });
+
+        if (currentIndex >= 0) return currentIndex;
+
+        const nextIndex = periods.findIndex((period) => new Date(period.value) >= today);
+        return nextIndex >= 0 ? nextIndex : Math.max(periods.length - 1, 0);
+    };
+
     const openMultiPeriodModal = (): void => {
         loadTemplates();
 
@@ -666,6 +681,7 @@ export const Changes: ChangesAPI = (() => {
         const templateSelect = document.getElementById('multiTemplateSelect') as HTMLSelectElement;
         const periodFromSelect = document.getElementById('periodFromSelect') as HTMLSelectElement;
         const periodToSelect = document.getElementById('periodToSelect') as HTMLSelectElement;
+        const overwriteModeSelect = document.getElementById('overwriteModeSelect') as HTMLSelectElement | null;
         const preview = document.getElementById('multiTemplatePreview');
 
         if (!modal || !templateSelect || !periodFromSelect || !periodToSelect) return;
@@ -687,17 +703,15 @@ export const Changes: ChangesAPI = (() => {
         periodFromSelect.innerHTML = periodOptionsHtml;
         periodToSelect.innerHTML = periodOptionsHtml;
 
-        // Event na zmianę szablonu - pokaż podgląd
-        templateSelect.onchange = () => {
+        const renderTemplatePreview = (): void => {
             const selectedId = templateSelect.value;
             const tpl = templates.find(t => t.id === selectedId);
 
             if (preview && tpl) {
-                const columnNames = ['', 'HYDRO', 'MASAŻ', 'FIZYKO', 'SALA', 'MASAŻ', 'FIZYKO', 'SALA'];
                 const previewHtml = Object.entries(tpl.columns)
                     .map(([colIdx, empIds]) => {
                         const names = (empIds as string[]).map(id => EmployeeManager.getFullNameById(id)).join(', ');
-                        return `<div><strong>${columnNames[Number(colIdx)] || 'Kol. ' + colIdx}:</strong> ${names}</div>`;
+                        return `<div><strong>${COLUMN_NAMES[Number(colIdx)] || 'Kol. ' + colIdx}:</strong> ${escapeHTML(names)}</div>`;
                     })
                     .join('');
                 preview.innerHTML = previewHtml || '<em>Pusty szablon</em>';
@@ -705,6 +719,9 @@ export const Changes: ChangesAPI = (() => {
                 preview.innerHTML = '';
             }
         };
+
+        // Event na zmianę szablonu - pokaż podgląd
+        templateSelect.onchange = renderTemplatePreview;
 
         // Eventy na zmianę okresów - aktualizuj licznik
         const updatePeriodsCount = (): void => {
@@ -727,15 +744,42 @@ export const Changes: ChangesAPI = (() => {
             }
 
             const count = toIndex - fromIndex + 1;
-            countSpan.textContent = `Wybrano: ${count} ${count === 1 ? 'okres' : count < 5 ? 'okresy' : 'okresów'}`;
+            const occupiedCount = periods
+                .slice(fromIndex, toIndex + 1)
+                .filter((period) => periodHasAssignments(period.value)).length;
+            const occupiedText = occupiedCount > 0 ? `, ${occupiedCount} z obsadą` : '';
+            countSpan.textContent = `Wybrano: ${count} ${count === 1 ? 'okres' : count < 5 ? 'okresy' : 'okresów'}${occupiedText}`;
         };
 
         periodFromSelect.onchange = updatePeriodsCount;
         periodToSelect.onchange = updatePeriodsCount;
 
+        const setQuickRange = (range: string): void => {
+            const startIndex = getCurrentPeriodIndex(periods);
+            let endIndex = startIndex;
+
+            if (range === 'next3') {
+                endIndex = Math.min(startIndex + 2, periods.length - 1);
+            } else if (range === 'yearEnd') {
+                endIndex = periods.length - 1;
+            }
+
+            periodFromSelect.value = periods[startIndex]?.value || '';
+            periodToSelect.value = periods[endIndex]?.value || '';
+            updatePeriodsCount();
+        };
+
+        document.querySelectorAll<HTMLButtonElement>('.quick-range-btn').forEach((button) => {
+            button.onclick = () => setQuickRange(button.dataset.range || 'current');
+        });
+
         // Reset
-        if (preview) preview.innerHTML = '';
+        templateSelect.value = templates[0]?.id || '';
+        if (overwriteModeSelect) overwriteModeSelect.value = 'replace';
+        setQuickRange('current');
+        renderTemplatePreview();
         document.getElementById('selectedPeriodsCount')!.textContent = 'Wybrano: 0 okresów';
+        updatePeriodsCount();
 
         modal.style.display = 'flex';
     };
@@ -745,6 +789,7 @@ export const Changes: ChangesAPI = (() => {
         const templateSelect = document.getElementById('multiTemplateSelect') as HTMLSelectElement;
         const periodFromSelect = document.getElementById('periodFromSelect') as HTMLSelectElement;
         const periodToSelect = document.getElementById('periodToSelect') as HTMLSelectElement;
+        const overwriteModeSelect = document.getElementById('overwriteModeSelect') as HTMLSelectElement | null;
         const modal = document.getElementById('multiPeriodTemplateModal');
 
         if (!templateSelect || !periodFromSelect || !periodToSelect) return;
@@ -774,19 +819,34 @@ export const Changes: ChangesAPI = (() => {
             return;
         }
 
+        const selectedPeriods = periods.slice(fromIndex, toIndex + 1);
+        const occupiedPeriods = selectedPeriods.filter((period) => periodHasAssignments(period.value));
+        const overwriteMode = overwriteModeSelect?.value || 'replace';
+
+        if (occupiedPeriods.length > 0 && overwriteMode === 'replace') {
+            const shouldContinue = confirm(`${occupiedPeriods.length} okresów ma już obsadę. Nadpisać je wybranym szablonem?`);
+            if (!shouldContinue) return;
+        }
+
         // Zapisz stan przed zmianą
         pushUndoState();
 
         // Zastosuj szablon do każdego okresu w zakresie
         let appliedCount = 0;
-        for (let i = fromIndex; i <= toIndex; i++) {
-            const periodKey = periods[i].value;
+        let skippedCount = 0;
+        for (const selectedPeriod of selectedPeriods) {
+            const periodKey = selectedPeriod.value;
+
+            if (overwriteMode === 'skip' && periodHasAssignments(periodKey)) {
+                skippedCount++;
+                continue;
+            }
 
             if (!appState.changesCells[periodKey]) {
                 appState.changesCells[periodKey] = {};
             }
 
-            for (let colIdx = 1; colIdx <= 7; colIdx++) {
+            for (let colIdx = 1; colIdx <= EDITABLE_COLUMN_COUNT; colIdx++) {
                 const employees = template.columns[colIdx];
                 if (employees && employees.length > 0) {
                     appState.changesCells[periodKey][colIdx] = {
@@ -801,9 +861,17 @@ export const Changes: ChangesAPI = (() => {
 
         if (modal) modal.style.display = 'none';
 
-        window.showToast(`Zastosowano szablon "${template.name}" do ${appliedCount} ${appliedCount === 1 ? 'okresu' : appliedCount < 5 ? 'okresów' : 'okresów'}.`, 3000);
+        const skippedText = skippedCount > 0 ? ` Pominięto ${skippedCount}.` : '';
+        window.showToast(`Zastosowano szablon "${template.name}" do ${appliedCount} ${appliedCount === 1 ? 'okresu' : 'okresów'}.${skippedText}`, 3500);
     };
 
+    void openMultiPeriodModal;
+    void applyTemplateToMultiplePeriods;
+    void copyRowToClipboard;
+    void pasteRowFromClipboard;
+    void openSaveTemplateModal;
+    void openApplyTemplateModal;
+    void openTemplateManagerModal;
     const generateTwoWeekPeriods = (year: number): Period[] => {
         const periods: Period[] = [];
         let currentDate = new Date(Date.UTC(year, 0, 1));
@@ -846,14 +914,11 @@ export const Changes: ChangesAPI = (() => {
         changesHeaderRow.innerHTML = '';
         const headers = [
             'Okres', 'HYDRO 7:00-14:30', 'MASAŻ 7-14:30', 'FIZYKO 7-14:30', 'SALA 7-14:30',
-            'MASAŻ 10:30-18:00', 'FIZYKO 10:30-18:00', 'SALA 10:30-18:00', 'URLOPY', 'Akcje',
+            'MASAŻ 10:30-18:00', 'FIZYKO 10:30-18:00', 'SALA 10:30-18:00', 'URLOPY',
         ];
         headers.forEach((headerText) => {
             const th = document.createElement('th');
             th.textContent = headerText;
-            if (headerText === 'Akcje') {
-                th.classList.add('actions-header');
-            }
             changesHeaderRow!.appendChild(th);
         });
 
@@ -866,14 +931,6 @@ export const Changes: ChangesAPI = (() => {
             const start = new Date(period.start);
             const end = new Date(period.end);
 
-            const hasClipboard = rowClipboard && Object.keys(rowClipboard).length > 0;
-            const actionBtnsHtml = `
-                <div class="row-action-buttons">
-                    <button class="row-action-btn copy-row-btn" title="Kopiuj wiersz"><i class="fas fa-copy"></i></button>
-                    <button class="row-action-btn paste-row-btn${hasClipboard ? ' has-clipboard' : ''}" title="Wklej wiersz"><i class="fas fa-paste"></i></button>
-                </div>
-            `;
-
             tr.innerHTML = `
                 <td class="period-cell">
                     <span class="collapse-toggle"><i class="fas fa-chevron-down"></i></span>
@@ -881,36 +938,11 @@ export const Changes: ChangesAPI = (() => {
                 </td>
                 <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                 <td class="leaves-cell"></td>
-                <td class="actions-cell">${actionBtnsHtml}</td>
             `;
             changesTableBody!.appendChild(tr);
         });
 
-        // Dodaj event listenery do komórek edytowalnych
-        document.querySelectorAll('#changesTableBody td').forEach((cell) => {
-            if (!cell.classList.contains('leaves-cell') &&
-                !cell.classList.contains('actions-cell') &&
-                (cell as HTMLTableCellElement).cellIndex !== 0) {
-                const htmlCell = cell as HTMLTableCellElement;
-                htmlCell.setAttribute('tabindex', '0');
-                htmlCell.addEventListener('click', handleCellClick);
-                htmlCell.addEventListener('dblclick', handleCellDblClick);
-            }
-        });
-
-        // Dodaj event listenery do przycisków kopiowania/wklejania wiersza
-        document.querySelectorAll('.copy-row-btn').forEach((btn) => {
-            btn.addEventListener('click', (e) => {
-                const row = (e.currentTarget as HTMLElement).closest('tr') as HTMLTableRowElement;
-                if (row) copyRowToClipboard(row);
-            });
-        });
-        document.querySelectorAll('.paste-row-btn').forEach((btn) => {
-            btn.addEventListener('click', (e) => {
-                const row = (e.currentTarget as HTMLElement).closest('tr') as HTMLTableRowElement;
-                if (row) pasteRowFromClipboard(row);
-            });
-        });
+        setActiveCell(null);
     };
 
     const getAllLeavesData = async (): Promise<Record<string, unknown>> => {
@@ -985,7 +1017,8 @@ export const Changes: ChangesAPI = (() => {
                                 }
                             }
 
-                            leavesHtml += `<span class="leave-entry" title="${tooltipText}">${lastName || employeeName} <small>(${dateRange})</small></span><br>`;
+                            const escapedName = escapeHTML(lastName || employeeName);
+                            leavesHtml += `<span class="leave-entry" title="${tooltipText}">${escapedName} <small>(${dateRange})</small></span><br>`;
                         }
                     });
                 }
@@ -1023,35 +1056,6 @@ export const Changes: ChangesAPI = (() => {
             const newRow = activeCell.closest('tr');
             if (newRow) newRow.classList.add('has-active-cell');
         }
-    };
-
-    /**
-     * Obsługuje pojedyncze kliknięcie - zaznaczenie komórki
-     */
-    const handleCellClick = (event: Event): void => {
-        const mouseEvent = event as MouseEvent;
-        const cell = (event.target as HTMLElement).closest('td') as HTMLTableCellElement | null;
-        if (!cell || cell.cellIndex === 0) return; // Ignoruj pierwszą kolumnę (daty)
-
-        // Ctrl+Click - zaznacz wiele komórek
-        if (mouseEvent.ctrlKey || mouseEvent.metaKey) {
-            toggleMultiSelection(cell);
-            return;
-        }
-
-        // Normalne kliknięcie - wyczyść multi-select i zaznacz pojedynczą
-        clearMultiSelection();
-        setActiveCell(cell);
-    };
-
-    /**
-     * Obsługuje podwójne kliknięcie - otwarcie modala
-     */
-    const handleCellDblClick = (event: Event): void => {
-        const cell = (event.target as HTMLElement).closest('td') as HTMLTableCellElement | null;
-        if (!cell || cell.cellIndex === 0) return;
-
-        openEmployeeSelectionModal(cell);
     };
 
     /**
@@ -1101,15 +1105,6 @@ export const Changes: ChangesAPI = (() => {
         if (event.key === 'Tab') {
             event.preventDefault();
             navigateWithArrows(event.shiftKey ? 'ArrowLeft' : 'ArrowRight');
-            return;
-        }
-
-        // Enter - Otwórz modal
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            if (activeCell.cellIndex !== 0) {
-                openEmployeeSelectionModal(activeCell);
-            }
             return;
         }
 
@@ -1186,6 +1181,7 @@ export const Changes: ChangesAPI = (() => {
         const saveBtn = document.getElementById('saveEmployeeSelection');
         const cancelBtn = document.getElementById('cancelEmployeeSelection');
         const searchInput = document.getElementById('employeeSearchInput') as HTMLInputElement | null;
+        const selectedSummary = document.getElementById('selectedEmployeeSummary');
 
         if (!modal || !employeeListDiv || !saveBtn || !cancelBtn || !searchInput) return;
 
@@ -1239,6 +1235,18 @@ export const Changes: ChangesAPI = (() => {
         // Tymczasowe przechowywanie zastępstw (przed zapisem)
         const tempSubstitutes: Record<string, string> = { ...(cellState.substitutes || {}) };
         const periodEnd = row.dataset.endDate || '';
+
+        const updateSelectedSummary = (): void => {
+            if (!selectedSummary) return;
+            const selectedNames = Array.from(employeeListDiv.querySelectorAll('.selected-employee'))
+                .map((el) => (el as HTMLElement).dataset.employeeId)
+                .filter((id): id is string => !!id)
+                .map((id) => EmployeeManager.getLastNameById(id) || EmployeeManager.getFullNameById(id));
+
+            selectedSummary.textContent = selectedNames.length > 0
+                ? `Wybrano: ${selectedNames.length} - ${selectedNames.join(', ')}`
+                : 'Wybrano: 0 pracowników';
+        };
 
         const renderGroup = (title: string, ids: string[]) => {
             if (ids.length === 0) return;
@@ -1312,6 +1320,7 @@ export const Changes: ChangesAPI = (() => {
                     // Nie przełączaj jeśli kliknięto w select
                     if ((e.target as HTMLElement).tagName === 'SELECT' || (e.target as HTMLElement).tagName === 'OPTION') return;
                     employeeEl.classList.toggle('selected-employee');
+                    updateSelectedSummary();
                 });
 
                 employeeListDiv.appendChild(employeeEl);
@@ -1321,6 +1330,7 @@ export const Changes: ChangesAPI = (() => {
         renderGroup('Pierwsza zmiana', groups.first);
         renderGroup('Druga zmiana', groups.second);
         renderGroup('Pozostali', groups.other);
+        updateSelectedSummary();
 
         const filterEmployees = (): void => {
             const searchTerm = searchInput.value.toLowerCase();
@@ -1447,6 +1457,8 @@ export const Changes: ChangesAPI = (() => {
             cell.classList.add('multi-selected');
         }
     };
+    void openEmployeeSelectionModal;
+    void toggleMultiSelection;
 
     const updateCellState = (cell: HTMLTableCellElement, updateFn: (state: ChangesCellState) => void): void => {
         if (!cell) return;
@@ -1541,7 +1553,7 @@ export const Changes: ChangesAPI = (() => {
 
             Array.from(tr.cells).forEach((cell, index) => {
                 // Ignoruj pierwszą kolumnę (daty), urlopy i akcje
-                if (index === 0 || cell.classList.contains('leaves-cell') || cell.classList.contains('actions-cell')) return;
+                if (index === 0 || cell.classList.contains('leaves-cell')) return;
 
                 const hasAssignedEmployees =
                     appState.changesCells[period]?.[index]?.assignedEmployees &&
@@ -1554,13 +1566,13 @@ export const Changes: ChangesAPI = (() => {
                     const substitutes = cellState.substitutes || {};
 
                     const employeeNames = assignedIds.map((id) => {
-                        const name = EmployeeManager.getFullNameById(id);
+                        const name = escapeHTML(EmployeeManager.getFullNameById(id));
                         const isOnLeave = isEmployeeOnLeave(id, period, periodEnd);
                         const substituteId = substitutes[id];
 
                         if (isOnLeave && substituteId) {
                             // Pracownik na urlopie z zastępcą
-                            const substituteName = EmployeeManager.getFullNameById(substituteId);
+                            const substituteName = escapeHTML(EmployeeManager.getFullNameById(substituteId));
                             return `<span class="employee-on-leave">${name}</span> <span class="substitute-separator">/</span> <span class="substitute-name">${substituteName}</span>`;
                         } else if (isOnLeave) {
                             // Pracownik na urlopie bez zastępcy
@@ -1599,9 +1611,8 @@ export const Changes: ChangesAPI = (() => {
         const table = document.getElementById('changesTable');
         if (!table) return;
 
-        // Pobierz nagłówki, ale pomiń ostatnią kolumnę (Akcje)
+        // Pobierz nagłówki tabeli.
         const tableHeaders = Array.from(table.querySelectorAll('thead th'))
-            .filter((_, index, array) => index < array.length - 1)
             .map((th, index) => ({
                 text: th.textContent || '',
                 style: 'tableHeader',
@@ -1609,11 +1620,10 @@ export const Changes: ChangesAPI = (() => {
                 color: PdfHeaderColors.text,
             }));
 
-        // Pobierz wiersze, ale pomiń ostatnią kolumnę (Akcje)
+        // Pobierz wiersze tabeli.
         const tableBody = Array.from(table.querySelectorAll('tbody tr')).map((row) => {
             const tr = row as HTMLTableRowElement;
-            // Pomiń ostatnią komórkę (Akcje)
-            const cells = Array.from(tr.cells).filter((_, index, array) => index < array.length - 1);
+            const cells = Array.from(tr.cells);
 
             return cells.map((cell, cellIndex) => {
                 let textContent = '';
@@ -1753,24 +1763,6 @@ export const Changes: ChangesAPI = (() => {
         // Inicjalizacja szablonów
         initTemplateUI();
 
-        const contextMenuItems = [
-            { id: 'ctxCopyCell', action: (cell: HTMLElement) => copyCell(cell as HTMLTableCellElement) },
-            { id: 'ctxPasteCell', action: (cell: HTMLElement) => pasteCell(cell as HTMLTableCellElement) },
-            { id: 'ctxClearCell', action: (cell: HTMLElement) => clearCell(cell as HTMLTableCellElement) },
-            {
-                id: 'ctxSaveAsTemplate', action: (cell: HTMLElement) => {
-                    const row = (cell as HTMLTableCellElement).parentElement as HTMLTableRowElement;
-                    if (row) openSaveTemplateModal(row);
-                }
-            },
-            {
-                id: 'ctxApplyTemplate', action: (cell: HTMLElement) => {
-                    const row = (cell as HTMLTableCellElement).parentElement as HTMLTableRowElement;
-                    if (row) openApplyTemplateModal(row);
-                }
-            },
-        ];
-        window.initializeContextMenu('changesContextMenu', '#changesTableBody td:not(.leaves-cell)', contextMenuItems);
     };
 
     /**
@@ -1835,9 +1827,6 @@ export const Changes: ChangesAPI = (() => {
         document.removeEventListener('keydown', handleKeyDown);
         if (printButton) {
             printButton.removeEventListener('click', printChangesTableToPdf);
-        }
-        if (window.destroyContextMenu) {
-            window.destroyContextMenu('changesContextMenu');
         }
         setActiveCell(null);
         debugLog('Changes module destroyed');

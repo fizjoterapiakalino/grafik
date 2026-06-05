@@ -8,6 +8,7 @@ import type { FirebaseAuthWrapper, FirebaseUser } from './types/firebase';
 import { Schedule } from './schedule.js';
 import { Leaves } from './leaves.js';
 import { Changes } from './changes.js';
+import { ChangesRotation } from './changes-rotation.js';
 import { ScrappedPdfs } from './scrapped-pdfs.js';
 import { Options } from './options.js';
 import { Login } from './login.js';
@@ -60,6 +61,11 @@ export const Router: RouterAPI = (() => {
             page: 'changes',
             init: () => Changes.init(),
             getModule: () => Changes,
+        },
+        'changes-rotation': {
+            page: 'changes-rotation',
+            init: () => ChangesRotation.init(),
+            getModule: () => ChangesRotation,
         },
         'scrapped-pdfs': {
             page: 'scrapped-pdfs',
@@ -201,7 +207,6 @@ export const Router: RouterAPI = (() => {
             activeModule = route.getModule ? route.getModule() : null;
 
             if (targetPage === 'scrapped-pdfs') {
-                await PdfService.fetchAndCachePdfLinks(true);
                 PdfService.markAsSeen();
             }
         } catch (error) {

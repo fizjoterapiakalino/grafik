@@ -1,0 +1,103 @@
+<section class="rotation-planner">
+    <header class="rotation-header">
+        <div>
+            <h1>Planowanie zmian</h1>
+            <p>Generator i edytor rotacji dwutygodniowej. Zmiany trafiają do harmonogramu po publikacji.</p>
+        </div>
+        <a class="rotation-back-link" href="#changes">
+            <i class="fas fa-arrow-left"></i>
+            Wróć do obecnego harmonogramu
+        </a>
+    </header>
+
+    <div class="rotation-setup-row">
+        <div class="rotation-control-panel">
+            <label>
+                <span>Rok</span>
+                <select id="rotationYearSelect"></select>
+            </label>
+            <label>
+                <span>Zakres</span>
+                <select id="rotationHorizonSelect">
+                    <option value="half">Pół roku do przodu</option>
+                    <option value="year">Cały rok</option>
+                </select>
+            </label>
+            <label>
+                <span>Pierwszy okres rano</span>
+                <select id="rotationFirstMorningSelect">
+                    <option value="first">Zespół ranny</option>
+                    <option value="second">Zespół popołudniowy</option>
+                </select>
+            </label>
+            <button id="generateRotationPlanBtn" class="rotation-primary-btn" type="button">
+                <i class="fas fa-wand-magic-sparkles"></i>
+                Wygeneruj plan
+            </button>
+        </div>
+
+        <div class="rotation-summary" id="rotationSummary"></div>
+
+        <section class="rotation-fixed-panel">
+            <div class="rotation-fixed-header">
+                <div>
+                    <h2>Stałe przypisania</h2>
+                    <p>Opcjonalne. Przypisanie działa niezależnie od zmiany, jeśli dane stanowisko występuje w tej zmianie.</p>
+                </div>
+            </div>
+            <div class="rotation-fixed-form">
+                <label>
+                    <span>Pracownik</span>
+                    <select id="fixedEmployeeSelect"></select>
+                </label>
+                <label>
+                    <span>Stanowisko</span>
+                    <select id="fixedStationSelect">
+                        <option value="hydro">HYDRO</option>
+                        <option value="massage">MASAŻ</option>
+                        <option value="physio">FIZYKO</option>
+                        <option value="gym">SALA</option>
+                    </select>
+                </label>
+                <label class="rotation-fixed-checkbox">
+                    <input type="checkbox" id="fixedAlwaysMorningCheckbox">
+                    <span>Zawsze rano</span>
+                </label>
+                <button id="addFixedAssignmentBtn" class="rotation-secondary-btn" type="button">
+                    <i class="fas fa-thumbtack"></i>
+                    Dodaj
+                </button>
+            </div>
+            <div id="fixedAssignmentsList" class="rotation-fixed-list"></div>
+        </section>
+    </div>
+
+    <div class="rotation-toolbar">
+        <button id="saveRotationDraftBtn" class="rotation-secondary-btn" type="button">
+            <i class="fas fa-save"></i>
+            Zapisz szkic
+        </button>
+        <button id="publishRotationDraftBtn" class="rotation-primary-btn rotation-publish-btn" type="button">
+            <i class="fas fa-upload"></i>
+            Publikuj do harmonogramu
+        </button>
+        <button id="clearRotationDraftBtn" class="rotation-danger-btn" type="button">
+            <i class="fas fa-trash-alt"></i>
+            Wyczyść szkic
+        </button>
+    </div>
+
+    <div id="rotationPlanList" class="rotation-plan-list"></div>
+</section>
+
+<div id="rotationEditModal" class="modal-overlay" style="display: none">
+    <div class="modal-content rotation-edit-modal">
+        <h2 class="modal-title">Popraw wyjątek</h2>
+        <p id="rotationEditPeriodLabel" class="modal-subtitle"></p>
+        <div id="rotationEditBody" class="rotation-edit-body"></div>
+        <div class="modal-actions">
+            <button id="saveRotationEditBtn" class="action-btn confirm-btn">Zapisz wyjątek</button>
+            <button id="cancelRotationEditBtn" class="action-btn cancel-btn">Anuluj</button>
+        </div>
+    </div>
+</div>

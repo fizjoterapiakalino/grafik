@@ -64,6 +64,15 @@ service cloud.firestore {
       // Tylko admin może zapisywać
       allow write: if isAuthenticated() && isAdmin();
     }
+
+    // Tygodniowe agregaty statystyk
+    match /statsWeekly/{document} {
+      // Każdy zalogowany może czytać
+      allow read: if isAuthenticated();
+      
+      // Tylko admin może zapisywać
+      allow write: if isAuthenticated() && isAdmin();
+    }
     
     // Backup
     match /backups/{document} {

@@ -1,0 +1,21 @@
+TURNUSY I ZABIEGI
+1. Turnusy standardowe: Rozpoczynają się co tydzień i trwają domyślnie 15 dni zabiegowych (dni roboczych). Z powodu świąt i dni wolnych koniec turnusu przesuwa się automatycznie tak, aby pacjent otrzymał pełną pulę zabiegów (15 dni roboczych), a koniec nie nakładał się z początkiem kolejnego turnusu.
+2. Przedłużenia lekarskie: Istnieje możliwość przedłużenia turnusu decyzją lekarza do 30 dni zabiegowych (co odpowiada dodatkowym 15 dniom). Przedłużenie to powinno być odnotowane w systemie (informacja o pacjencie), ale z powodu czynnika ludzkiego nie zawsze jest uzupełniane na czas.
+3. Nieobecności i odrabianie: Pacjenci mogą zgłaszać nieobecności. Dni nieobecności są odrabiane, co wymaga ręcznej aktualizacji daty końcowej (endDate) przez pracownika (zwiększenie liczby dni przedłużenia).
+   - UWAGA: Odrabianie nieobecności dotyczy wyłącznie podstawowych 15 dni zabiegowych. Przedłużenia wystawiane przez lekarza w przypadku nieobecności pacjenta NIE są odrabiane.
+
+DODAWANIE, PRZENOSZENIE I USUWANIE PACJENTÓW
+1. Każdy pracownik dba o swoją kolumnę grafiku w danym tygodniu – wpisuje pacjenta, a po zakończeniu zabiegów samodzielnie go usuwa (dodatkowym przypomnieniem jest ikona dzwoneczka).
+2. Data rozpoczęcia (startDate) generowana jest automatycznie w momencie wpisania wartości (nazwiska pacjenta) do komórki grafiku.
+3. Przenoszenie (Drag-Drop): Przy przeciąganiu pacjenta do innej komórki grafiku dane turnusu (daty rozpoczęcia/zakończenia, historia komórki) są w całości przenoszone.
+4. Przepisywanie i duplikaty: Przy próbie przypisania pacjenta, który już istnieje w systemie, pojawia się monit o duplikacie. Użytkownik ma wtedy do wyboru dwie akcje:
+   - Przeniesienie wpisu (zachowanie dotychczasowej daty startowej i danych turnusu).
+   - Utworzenie nowego wpisu (duplikowanie - powoduje wygenerowanie nowej daty startowej).
+
+ZMIANY I PRZEKAZYWANIE PACJENTÓW (HANDOVER)
+1. Pracownicy pracują na dwie zmiany, które rotują co 2 tygodnie (zamiana godzinami pracy).
+2. Ze względu na zmianę godzin pracy fizjoterapeutów, część pacjentów porannych (do godziny 10:30) oraz popołudniowych (od godziny 14:30) jest przejmowana przez pracowników z nowej zmiany.
+
+HISTORIA KOMÓRKI I UŻYTKOWNICY
+1. Każda komórka przechowuje pełną historię wpisów zawierającą dokładną datę i godzinę zmian.
+2. Z powodu braku wdrożonej pełnej autoryzacji/zarządzania użytkownikami w historii, obecnie każdy historyczny wpis jest opisany jako dokonany przez użytkownika "nieznanego" (unknown).

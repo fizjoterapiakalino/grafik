@@ -88,6 +88,42 @@ describe('DOM Parser Logic', () => {
             expect(results[1].date).toBe('2023-10-28');
         });
 
+        test('should parse entries wrapped in additional HTML elements', () => {
+            const container = document.getElementById('tresc');
+            container.innerHTML = `
+                <div class="doc-row">
+                    Data publikacji: 2024-02-01
+                    <span><b>ISO</b></span>
+                    <span class="actions"><a href="wrapped.pdf">Procedura w wrapperze</a></span>
+                </div>
+            `;
+
+            const results = parseDocumentsInBrowser();
+            expect(results).toHaveLength(1);
+            expect(results[0]).toMatchObject({
+                date: '2024-02-01',
+                type: 'ISO',
+                title: 'Procedura w wrapperze',
+            });
+        });
+
+        test('should tolerate neutral elements between date, type and link', () => {
+            const container = document.getElementById('tresc');
+            container.innerHTML = `
+                2024-03-10
+                <span>opublikowano</span>
+                <b>NFZ</b>
+                <em>ważne</em>
+                <a href="nfz.pdf">Komunikat</a>
+            `;
+
+            const results = parseDocumentsInBrowser();
+            expect(results).toHaveLength(1);
+            expect(results[0].date).toBe('2024-03-10');
+            expect(results[0].type).toBe('NFZ');
+            expect(results[0].title).toBe('Komunikat');
+        });
+
         test('should not parse incomplete sequences', () => {
             const container = document.getElementById('tresc');
             container.innerHTML = `

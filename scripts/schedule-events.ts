@@ -114,19 +114,61 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
 
     const _handleAppSearch = (e: Event): void => {
         const { searchTerm } = (e as CustomEvent<{ searchTerm: string }>).detail;
-        const searchAndHighlight = (term: string, tableSelector: string, cellSelector: string): void => {
+        const searchAndHighlight = (term: string, tableSelector: string): void => {
             const table = document.querySelector(tableSelector);
             if (!table) return;
-            table.querySelectorAll<HTMLElement>(cellSelector).forEach((cell) => {
-                const cellText = (cell.textContent || '').toLowerCase();
-                if (term && cellText.includes(term.toLowerCase())) {
-                    cell.classList.add('search-highlight');
+
+            const hasTerm = !!term.trim();
+            const lowerTerm = term.toLowerCase();
+            table.classList.toggle('search-active', hasTerm);
+
+            table.querySelectorAll<HTMLElement>('td.editable-cell, th').forEach((cell) => {
+                cell.classList.remove('search-highlight', 'search-dimmed');
+
+                if (cell.tagName === 'TH') {
+                    if (hasTerm) {
+                        if (cell.textContent?.toLowerCase().includes(lowerTerm)) {
+                            cell.classList.add('search-highlight');
+                        } else {
+                            cell.classList.add('search-dimmed');
+                        }
+                    }
+                    return;
+                }
+
+                const splitDivs = cell.querySelectorAll<HTMLElement>('.split-cell-wrapper > div');
+                if (splitDivs.length > 0) {
+                    let cellHasHighlight = false;
+
+                    splitDivs.forEach((div) => {
+                        div.classList.remove('search-highlight', 'search-dimmed');
+                        if (hasTerm) {
+                            if (div.textContent?.toLowerCase().includes(lowerTerm)) {
+                                div.classList.add('search-highlight');
+                                cellHasHighlight = true;
+                            } else {
+                                div.classList.add('search-dimmed');
+                            }
+                        }
+                    });
+
+                    if (hasTerm) {
+                        if (!cellHasHighlight) {
+                            cell.classList.add('search-dimmed');
+                        }
+                    }
                 } else {
-                    cell.classList.remove('search-highlight');
+                    if (hasTerm) {
+                        if (cell.textContent?.toLowerCase().includes(lowerTerm)) {
+                            cell.classList.add('search-highlight');
+                        } else {
+                            cell.classList.add('search-dimmed');
+                        }
+                    }
                 }
             });
         };
-        searchAndHighlight(searchTerm, '#mainScheduleTable', 'td.editable-cell, th');
+        searchAndHighlight(searchTerm, '#mainScheduleTable');
     };
 
     const clearDuplicateHighlights = (): void => {

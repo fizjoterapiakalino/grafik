@@ -236,9 +236,15 @@ table.schedule-table thead tr th {
 
 .schedule-table td.station-column-locked {
     pointer-events: none;
-    filter: blur(1.8px) saturate(0.85);
-    opacity: 0.88;
-    transition: filter 0.2s ease, opacity 0.2s ease;
+    opacity: 0.55;
+    background-image: repeating-linear-gradient(
+        45deg,
+        rgba(239, 68, 68, 0.05),
+        rgba(239, 68, 68, 0.05) 8px,
+        transparent 8px,
+        transparent 16px
+    ) !important;
+    transition: opacity 0.2s ease;
 }
 
 .schedule-table th.employee-header.station-column-locked {
@@ -326,6 +332,7 @@ table.schedule-table thead tr th:first-child {
 .schedule-table td.editable-cell {
     background-color: var(--bg-editable);
     cursor: pointer;
+    position: relative;
     transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
@@ -394,6 +401,23 @@ td.split-cell>div.hydrotherapy-text>span {
 .hydrotherapy-cell-bg {
     background-color: var(--bg-hydrotherapy) !important;
     color: var(--color-white) !important;
+}
+
+.schedule-table td.past-treatment-cell > span,
+.split-cell-wrapper > div.past-treatment-part > span,
+.appointment-card .past-treatment-cell,
+.appointment-card .past-treatment-part {
+    opacity: 0.68;
+    filter: saturate(0.88);
+}
+
+.schedule-table td.past-treatment-cell::after,
+.split-cell-wrapper > div.past-treatment-part::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .schedule-table tr.current-time-row td:first-child {
@@ -692,6 +716,39 @@ td.split-cell {
     font-size: 1rem;
     line-height: 1.1;
     color: var(--color-text);
+    position: relative;
+    transition: background-color 0.15s ease;
+}
+
+.split-cell-wrapper>div::before {
+    position: absolute;
+    top: 2px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: var(--color-gray-400);
+    opacity: 0.25;
+    pointer-events: none;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.split-cell-wrapper>div[data-split-part="1"]::before {
+    left: 6px;
+    content: "I";
+}
+
+.split-cell-wrapper>div[data-split-part="2"]::before {
+    right: 6px;
+    content: "II";
+}
+
+.split-cell-wrapper>div:hover::before,
+.split-cell-wrapper>div:focus::before {
+    opacity: 0.8;
+    color: var(--color-primary-600);
+}
+
+.split-cell-wrapper>div:hover {
+    background-color: rgba(13, 148, 136, 0.08) !important;
 }
 
 .split-cell-wrapper>div:last-child {
@@ -699,7 +756,7 @@ td.split-cell {
 }
 
 .split-cell-wrapper>div:first-child {
-    border-right: 1px solid var(--color-border-dark);
+    border-right: 1.5px dashed var(--color-gray-400);
 }
 
 /* Klasy podświetlenia - zwiększona specyficzność dla nadpisania stylów komórek */
@@ -712,6 +769,31 @@ table.schedule-table tbody tr td.search-highlight,
 table.schedule-table tbody tr td.search-highlight.editable-cell {
     background-color: var(--bg-search-highlight);
     box-shadow: inset 0 0 0 2px var(--color-secondary);
+}
+
+/* Wyszukiwanie - Focus Mode (ściemnianie niepasujących elementów) */
+.schedule-table.search-active td.editable-cell.search-dimmed,
+.schedule-table.search-active th.employee-header.search-dimmed {
+    opacity: 0.35;
+    filter: grayscale(0.3);
+    transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+/* Kiedy komórka jest przyciemniona, jej wewnętrzne divy też są */
+.schedule-table.search-active .split-cell-wrapper > div.search-dimmed {
+    opacity: 0.25;
+    filter: grayscale(0.5);
+    transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+/* Wyróżnienie pasującej połówki w podzielonej komórce */
+.schedule-table.search-active .split-cell-wrapper > div.search-highlight {
+    opacity: 1;
+    filter: none;
+    background-color: var(--bg-search-highlight) !important;
+    box-shadow: inset 0 0 0 2px var(--color-secondary) !important;
+    border-radius: var(--border-radius-sm);
+    color: var(--color-gray-900) !important;
 }
 
 table.schedule-table tbody tr.current-time-row>td:not(.break-cell) {

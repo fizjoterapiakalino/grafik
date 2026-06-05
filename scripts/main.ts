@@ -18,6 +18,7 @@ import './leaves-care-summary.js';
 import './calendar-modal.js';
 import './leaves.js';
 import './changes.js';
+import './changes-rotation.js';
 import './scrapped-pdfs.js';
 import './options.js';
 import './login.js';

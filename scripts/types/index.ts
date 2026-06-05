@@ -46,6 +46,8 @@ export interface Employee {
     role?: 'admin' | 'user';
     /** Ograniczony tryb dostępu do aplikacji */
     accessMode?: 'full' | 'massage';
+    /** Widoczne pozycje bocznego menu dla pracownika */
+    menuAccess?: string[];
     /** Grupa zmianowa */
     shiftGroup?: ShiftGroup;
     /** Przysługujący wymiar urlopu */
