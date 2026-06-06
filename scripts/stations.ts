@@ -2,6 +2,7 @@
 import { db as dbRaw, auth as authRaw, FieldValue } from './firebase-config.js';
 import { EmployeeManager } from './employee-manager.js';
 import { MobileZen } from './mobile-zen.js';
+import { escapeHTML } from './utils.js';
 import Hls from 'hls.js';
 
 // Type for Firebase db wrapper (compatible with existing codebase)
@@ -467,7 +468,7 @@ export const Stations: StationsAPI = (() => {
         const renderStationButtons = (): void => {
             listEl.innerHTML = RADIO_STATIONS.map(station => `
                 <button class="stations-radio-station-btn${station.id === radioSelectedStation.id ? ' active' : ''}" type="button" data-radio-station="${station.id}">
-                    ${station.label}
+                    ${escapeHTML(station.label)}
                 </button>
             `).join('');
         };
@@ -2180,7 +2181,7 @@ export const Stations: StationsAPI = (() => {
                 return `
                     <div class="layout-edit-room" draggable="true" data-layout-room-id="${room.id}" data-layout-column="${columnIndex}">
                         <i class="fas ${room.icon}"></i>
-                        <span>${room.name}</span>
+                        <span>${escapeHTML(room.name)}</span>
                         ${hiddenBadge}
                     </div>
                 `;
@@ -2235,7 +2236,7 @@ export const Stations: StationsAPI = (() => {
             <div class="section-options-group-title">Widoczność sekcji</div>
             ${rooms.map(room => `
             <label class="section-option-item">
-                <span class="section-option-label">${room.name}</span>
+                <span class="section-option-label">${escapeHTML(room.name)}</span>
                 <input
                     class="section-option-checkbox"
                     type="checkbox"
@@ -2347,7 +2348,7 @@ export const Stations: StationsAPI = (() => {
                         <div class="room-panel-header">
                             <div class="room-panel-title">
                                 <i class="fas ${room.icon}"></i>
-                                ${room.name}
+                                ${escapeHTML(room.name)}
                             </div>
                             <div class="room-stats">
                                 <span class="room-stat" data-room-stats="${room.id}">
@@ -2387,7 +2388,7 @@ export const Stations: StationsAPI = (() => {
                     <button class="mobile-room-tile ${isActive ? 'active' : ''}" data-mobile-room-tab="${room.id}" data-room="${room.id}">
                         <span class="mobile-room-tile-title">
                             <i class="fas ${room.icon}"></i>
-                            ${room.name}
+                            ${escapeHTML(room.name)}
                         </span>
                         <span class="mobile-room-tile-meta">
                             <span class="mobile-room-status" data-room-status="${room.id}">
@@ -2458,11 +2459,11 @@ export const Stations: StationsAPI = (() => {
         return `
             <div class="station-card ${room.type === 'simple' ? 'station-simple' : 'station-multi'} awaiting-start" data-station-id="${station.id}">
                 <div class="station-awaiting-content">
-                    <span class="station-name">${station.name}</span>
+                    <span class="station-name">${escapeHTML(station.name)}</span>
                     <span class="station-reserved-badge">Zarezerwowane, odliczanie nieaktywne</span>
                     <div class="queue-next-action">
                         <div class="queue-next-info">
-                            <i class="fas fa-user-clock"></i> Czeka: ${nextName}
+                            <i class="fas fa-user-clock"></i> Czeka: ${escapeHTML(nextName)}
                         </div>
                         <div class="awaiting-actions-row">
                             <button class="btn-start-queue" data-action="start-queue" data-station="${station.id}" data-room="${room.id}">
@@ -2495,7 +2496,7 @@ export const Stations: StationsAPI = (() => {
                 .map(t => `
                             <button class="queue-picker-tile" data-action="queue-treatment"
                                     data-station="${station.id}" data-room="${room.id}" data-treatment="${t.id}">
-                                <span>${t.shortName}</span>
+                                <span>${escapeHTML(t.shortName)}</span>
                                 <span class="queue-picker-time">${t.duration}'</span>
                             </button>
                         `).join('')}
@@ -2550,8 +2551,8 @@ export const Stations: StationsAPI = (() => {
             return `
                 <div class="queue-item ${isOwn ? 'own' : ''}${moveAnimClass}">
                     <span class="queue-index">${index + 1}.</span>
-                    <span class="queue-emp">${empName}</span>
-                    <span class="queue-treat">${treatmentName}</span>
+                    <span class="queue-emp">${escapeHTML(empName)}</span>
+                    <span class="queue-treat">${escapeHTML(treatmentName)}</span>
                     <div class="queue-item-actions">
                         ${canMoveUp ? `
                             <button class="btn-move-queue" data-action="move-queue-up" 
@@ -2588,7 +2589,7 @@ export const Stations: StationsAPI = (() => {
         if (station.status === 'FINISHED' && nextEntry) {
             nextPreviewHtml = `
                 <div class="queue-next">
-                    <i class="fas fa-forward"></i> Następny: ${EmployeeManager.getNameById(nextEntry.employeeId)}
+                    <i class="fas fa-forward"></i> Następny: ${escapeHTML(EmployeeManager.getNameById(nextEntry.employeeId))}
                 </div>
             `;
         }
@@ -2622,7 +2623,7 @@ export const Stations: StationsAPI = (() => {
             return `
                 <div class="station-card station-simple ${statusClass}" data-station-id="${station.id}">
                     <div class="station-simple-content" data-action="start-simple" data-station="${station.id}" data-room="${room.id}">
-                        <span class="station-name">${station.name}</span>
+                        <span class="station-name">${escapeHTML(station.name)}</span>
                         <span class="station-duration">${room.defaultDuration} min</span>
                     </div>
                 </div>
@@ -2632,8 +2633,8 @@ export const Stations: StationsAPI = (() => {
                 <div class="station-card station-simple ${statusClass}" data-station-id="${station.id}">
                     <div class="station-timer-content">
                         <div class="station-info">
-                            <span class="station-name">${station.name}</span>
-                            <span class="station-emp-name">${employeeName}</span>
+                            <span class="station-name">${escapeHTML(station.name)}</span>
+                            <span class="station-emp-name">${escapeHTML(employeeName)}</span>
                         </div>
                         <span class="station-timer">${formatTime(remaining)}</span>
                     </div>
@@ -2645,8 +2646,8 @@ export const Stations: StationsAPI = (() => {
             return `
                 <div class="station-card station-simple ${statusClass}" data-station-id="${station.id}">
                     <div class="station-finished-content" data-action="release" data-station="${station.id}" data-room="${room.id}">
-                        <span class="station-name">${station.name}</span>
-                        <span class="station-emp-name">${employeeName}</span>
+                        <span class="station-name">${escapeHTML(station.name)}</span>
+                        <span class="station-emp-name">${escapeHTML(employeeName)}</span>
                         <span class="station-timer">00:00</span>
                         <span class="station-release-hint">Kliknij aby zwolnić</span>
                     </div>
@@ -2692,7 +2693,7 @@ export const Stations: StationsAPI = (() => {
                                     data-treatment="${t.id}"
                                     title="${disabledTitle}"
                                     ${available ? '' : 'disabled'}>
-                                <span class="treatment-tile-name">${t.shortName}</span>
+                                <span class="treatment-tile-name">${escapeHTML(t.shortName)}</span>
                                 <span class="treatment-tile-time">${t.duration}'</span>
                                 ${usageInfo ? `<span class="treatment-tile-limit">${usageInfo}</span>` : ''}
                             </button>
@@ -2716,7 +2717,7 @@ export const Stations: StationsAPI = (() => {
                             data-treatment="${t.id}"
                             title="${disabledTitle}"
                             ${available ? '' : 'disabled'}>
-                        <span class="treatment-tile-name">${t.shortName}</span>
+                        <span class="treatment-tile-name">${escapeHTML(t.shortName)}</span>
                         <span class="treatment-tile-time">${t.duration}'</span>
                         ${usageInfo ? `<span class="treatment-tile-limit">${usageInfo}</span>` : ''}
                     </button>
@@ -2726,7 +2727,7 @@ export const Stations: StationsAPI = (() => {
             return `
                 <div class="station-card station-multi ${statusClass}" data-station-id="${station.id}">
                     <div class="station-header">
-                        <span class="station-name">${station.name}</span>
+                        <span class="station-name">${escapeHTML(station.name)}</span>
                     </div>
                     <div class="treatment-tiles">
                         ${treatmentTiles}
@@ -2738,9 +2739,9 @@ export const Stations: StationsAPI = (() => {
                 <div class="station-card station-multi ${statusClass}" data-station-id="${station.id}">
                     <div class="station-occupied-content">
                         <div class="station-info">
-                            <span class="station-name">${station.name}</span>
-                            <span class="station-emp-name">${employeeName}</span>
-                            <span class="station-treatment-name">${treatment?.shortName || ''}</span>
+                            <span class="station-name">${escapeHTML(station.name)}</span>
+                            <span class="station-emp-name">${escapeHTML(employeeName)}</span>
+                            <span class="station-treatment-name">${escapeHTML(treatment?.shortName || '')}</span>
                         </div>
                         <span class="station-timer">${formatTime(remaining)}</span>
                     </div>
@@ -2754,9 +2755,9 @@ export const Stations: StationsAPI = (() => {
                 <div class="station-card station-multi ${statusClass}" data-station-id="${station.id}">
                     <div class="station-finished-content" data-action="release" data-station="${station.id}" data-room="${room.id}">
                         <div class="station-info">
-                            <span class="station-name">${station.name}</span>
-                            <span class="station-emp-name">${employeeName}</span>
-                            <span class="station-treatment-name">${treatment?.shortName || ''}</span>
+                            <span class="station-name">${escapeHTML(station.name)}</span>
+                            <span class="station-emp-name">${escapeHTML(employeeName)}</span>
+                            <span class="station-treatment-name">${escapeHTML(treatment?.shortName || '')}</span>
                         </div>
                         <span class="station-timer">00:00</span>
                         <span class="station-release-hint">Kliknij aby zwolnić</span>

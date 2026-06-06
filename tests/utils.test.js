@@ -2,6 +2,7 @@ import {
     clearCellContentKeys,
     copyTreatmentData,
     deepClone,
+    escapeHTML,
     formatDatePL,
     isWorkday,
     safeBool,
@@ -108,5 +109,12 @@ describe('utils', () => {
         expect(isWorkday(toUTCDate('2026-05-22'))).toBe(true);
         expect(isWorkday(toUTCDate('2026-05-23'))).toBe(false);
         expect(isWorkday(toUTCDate('2026-05-24'))).toBe(false);
+    });
+
+    test('escapeHTML escapes special characters and handles null/undefined', () => {
+        expect(escapeHTML('<b>"Test" & \'Demo\'</b>')).toBe('&lt;b&gt;&quot;Test&quot; &amp; &#039;Demo&#039;&lt;/b&gt;');
+        expect(escapeHTML(null)).toBe('');
+        expect(escapeHTML(undefined)).toBe('');
+        expect(escapeHTML(123)).toBe('123');
     });
 });
