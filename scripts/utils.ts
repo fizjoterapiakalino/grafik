@@ -20,6 +20,22 @@ export const safeBool = (val: unknown): boolean =>
     (val === undefined ? false : !!val);
 
 /**
+ * Escapes special HTML characters to prevent XSS.
+ * @param str - The string to escape
+ * @returns Escaped string
+ */
+export const escapeHTML = (str: unknown): string => {
+    if (str === null || str === undefined) return '';
+    const stringValue = String(str);
+    return stringValue
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+};
+
+/**
  * Tworzy głęboką kopię obiektu lub tablicy.
  */
 export const deepClone = <T>(obj: T): T =>

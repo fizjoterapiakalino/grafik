@@ -2,6 +2,7 @@
 import { EmployeeManager } from './employee-manager.js';
 import { ScheduleUI } from './schedule-ui.js';
 import { ScheduleLogic } from './schedule-logic.js';
+import { escapeHTML } from './utils.js';
 import type { CellState } from './types/index.js';
 
 /**
@@ -59,7 +60,7 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
         if (!modal || !modalText || !moveBtn || !addBtn || !cancelBtn) return;
 
         const employeeName = EmployeeManager.getNameById(duplicateInfo.employeeIndex);
-        modalText.innerHTML = `Znaleziono identyczny wpis dla "<b>${employeeName}</b>" o godzinie ${duplicateInfo.time}. Co chcesz zrobić?`;
+        modalText.innerHTML = `Znaleziono identyczny wpis dla "<b>${escapeHTML(employeeName)}</b>" o godzinie ${escapeHTML(duplicateInfo.time)}. Co chcesz zrobić?`;
         modal.style.display = 'flex';
 
         const closeAndCleanup = (): void => {
@@ -95,7 +96,7 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
 
         if (!modal || !modalText || !confirmBtn || !cancelBtn) return;
 
-        modalText.innerHTML = `Czy na pewno chcesz wprowadzić do grafiku ciąg cyfr: "<b>${text}</b>"?`;
+        modalText.innerHTML = `Czy na pewno chcesz wprowadzić do grafiku ciąg cyfr: "<b>${escapeHTML(text)}</b>"?`;
         modal.style.display = 'flex';
 
         const closeAndCleanup = (): void => {
@@ -213,16 +214,22 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
             modalBody.innerHTML = `
                 <ul class="history-list">
                     ${cellState.history
-                    .map((entry) => `
+                    .map((entry) => {
+                        const escapedValue = escapeHTML(entry.oldValue || '(pusty)');
+                        const employee = EmployeeManager.getEmployeeByUid(entry.userId ?? '');
+                        const employeeName = employee ? escapeHTML(employee.name || 'Nieznany') : 'Nieznany';
+
+                        return `
                         <li class="history-item">
-                            <div class="history-value">${entry.oldValue || '(pusty)'}</div>
+                            <div class="history-value">${escapedValue}</div>
                             <div class="history-meta">
                                 <span>${new Date(entry.timestamp).toLocaleString('pl-PL')}</span>
-                                <span>przez: ${EmployeeManager.getEmployeeByUid(entry.userId ?? '')?.name || 'Nieznany'}</span>
+                                <span>przez: ${employeeName}</span>
                             </div>
-                            <button class="action-btn outline revert-btn" data-value="${entry.oldValue}" title="Przywróć tę wartość"><i class="fas fa-undo"></i> Przywróć</button>
+                            <button class="action-btn outline revert-btn" data-value="${escapeHTML(entry.oldValue || '')}" title="Przywróć tę wartość"><i class="fas fa-undo"></i> Przywróć</button>
                         </li>
-                    `)
+                    `;
+                    })
                     .join('')}
                 </ul>
             `;
