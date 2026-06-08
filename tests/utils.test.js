@@ -8,6 +8,7 @@ import {
     safeCopy,
     toDateString,
     toUTCDate,
+    escapeHTML,
 } from '../scripts/utils.js';
 
 describe('utils', () => {
@@ -61,7 +62,7 @@ describe('utils', () => {
                 treatmentEndDate: '2026-01-20',
                 additionalInfo: 'Notatka',
             },
-            target
+            target,
         );
 
         expect(target).toEqual({
@@ -85,7 +86,7 @@ describe('utils', () => {
                 },
             },
             target,
-            '2'
+            '2',
         );
 
         expect(target.treatmentData2).toEqual({
@@ -108,5 +109,13 @@ describe('utils', () => {
         expect(isWorkday(toUTCDate('2026-05-22'))).toBe(true);
         expect(isWorkday(toUTCDate('2026-05-23'))).toBe(false);
         expect(isWorkday(toUTCDate('2026-05-24'))).toBe(false);
+    });
+
+    test('escapeHTML escapes special characters', () => {
+        expect(escapeHTML('<b>Test & "quote" \'single\'</b>')).toBe(
+            '&lt;b&gt;Test &amp; &quot;quote&quot; &#039;single&#039;&lt;/b&gt;',
+        );
+        expect(escapeHTML('')).toBe('');
+        expect(escapeHTML(null)).toBe('');
     });
 });

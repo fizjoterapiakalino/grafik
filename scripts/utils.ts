@@ -174,3 +174,16 @@ export const isWorkday = (date: Date): boolean => {
     const day = date.getUTCDay();
     return day !== 0 && day !== 6;
 };
+
+/**
+ * Escapes HTML special characters to prevent XSS.
+ */
+export const escapeHTML = (str: string | null | undefined): string => {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+};

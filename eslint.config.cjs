@@ -19,6 +19,9 @@ module.exports = [
     pluginJs.configs.recommended,
     eslintPluginPrettier,
     {
+        ignores: ['tests/__build__/**'],
+    },
+    {
         rules: {
             'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
             'no-console': 'off',

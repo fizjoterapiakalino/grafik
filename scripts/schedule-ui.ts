@@ -3,7 +3,7 @@ import { AppConfig, capitalizeFirstLetter } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
 import { auth as authRaw, db as dbRaw } from './firebase-config.js';
 import { ScheduleLogic } from './schedule-logic.js';
-import { toUTCDate } from './utils.js';
+import { toUTCDate, escapeHTML } from './utils.js';
 import type { FirebaseAuthWrapper, FirestoreDbWrapper } from './types/firebase';
 import type { LeaveEntry } from './types/index.js';
 
@@ -310,9 +310,9 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             overlayEl.className = 'employee-station-overlay';
             overlayEl.innerHTML = `
                 <div class="employee-station-overlay-card ${overlay.isQueue ? 'is-queue' : ''}">
-                    <div class="employee-station-overlay-room">${overlay.roomName}</div>
-                    <div class="employee-station-overlay-station">${overlay.stationName}</div>
-                    <div class="employee-station-overlay-treatment">${overlay.treatmentName}</div>
+                    <div class="employee-station-overlay-room">${escapeHTML(overlay.roomName)}</div>
+                    <div class="employee-station-overlay-station">${escapeHTML(overlay.stationName)}</div>
+                    <div class="employee-station-overlay-treatment">${escapeHTML(overlay.treatmentName)}</div>
                     ${overlay.isQueue
                     ? '<div class="employee-station-overlay-queue-label">W kolejce</div>'
                     : `<div class="employee-station-overlay-timer" data-end-time="${overlay.endTime}">${_formatCountdown(Math.ceil(((overlay.endTime || 0) - Date.now()) / 1000))}</div>`
@@ -810,7 +810,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                 } else if (displayData.isSplit) {
                     const part1 = displayData.parts[0];
                     const part2 = displayData.parts[1];
-                    cardBody.innerHTML = `<div>${part1.text}</div><div style="border-top:1px solid #ccc; margin-top:4px; padding-top:4px;">${part2.text}</div>`;
+                    cardBody.innerHTML = `<div>${escapeHTML(part1.text)}</div><div style="border-top:1px solid #ccc; margin-top:4px; padding-top:4px;">${escapeHTML(part2.text)}</div>`;
                 } else {
                     cardBody.textContent = 'Wolny termin';
                     cardBody.classList.add('empty-slot');
