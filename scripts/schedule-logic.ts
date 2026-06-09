@@ -23,14 +23,17 @@ interface CellData {
     isMassage?: boolean;
     isPnf?: boolean;
     isEveryOtherDay?: boolean;
+    isSharedPatient?: boolean;
     isHydrotherapy?: boolean;
     isMassage1?: boolean;
     isMassage2?: boolean;
     isPnf1?: boolean;
     isPnf2?: boolean;
     isEveryOtherDay1?: boolean;
+    isSharedPatient1?: boolean;
     isHydrotherapy1?: boolean;
     isEveryOtherDay2?: boolean;
+    isSharedPatient2?: boolean;
     isHydrotherapy2?: boolean;
     treatmentStartDate?: string;
     treatmentExtensionDays?: number;
@@ -48,6 +51,7 @@ interface PartData {
     isMassage: boolean;
     isPnf: boolean;
     isEveryOtherDay: boolean;
+    isSharedPatient: boolean;
     isHydrotherapy: boolean;
     treatmentEndDate?: string | null;
     daysRemaining?: number | null;
@@ -129,6 +133,7 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
                 isMassage: boolean | undefined,
                 isPnf: boolean | undefined,
                 isEveryOtherDay: boolean | undefined,
+                isSharedPatient: boolean | undefined,
                 isHydrotherapy: boolean | undefined
             ): PartData => {
                 const part: PartData = {
@@ -137,12 +142,14 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
                     isMassage: !!isMassage,
                     isPnf: !!isPnf,
                     isEveryOtherDay: !!isEveryOtherDay,
+                    isSharedPatient: !!isSharedPatient,
                     isHydrotherapy: !!isHydrotherapy,
                 };
 
                 if (isMassage) part.classes.push('massage-text');
                 if (isPnf) part.classes.push('pnf-text');
                 if (isEveryOtherDay) part.classes.push('every-other-day-text');
+                if (isSharedPatient) part.classes.push('shared-patient-cell');
                 if (isHydrotherapy) {
                     part.classes.push('hydrotherapy-text');
                     part.classes.push('hydrotherapy-cell-bg'); // Helper class for partial split bg if needed
@@ -157,6 +164,7 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
                     cellData.isMassage1,
                     cellData.isPnf1,
                     cellData.isEveryOtherDay1,
+                    cellData.isSharedPatient1,
                     cellData.isHydrotherapy1
                 )
             );
@@ -167,6 +175,7 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
                     cellData.isMassage2,
                     cellData.isPnf2,
                     cellData.isEveryOtherDay2,
+                    cellData.isSharedPatient2,
                     cellData.isHydrotherapy2
                 )
             );
@@ -214,6 +223,7 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
         if (cellData.isMassage) result.classes.push('massage-text');
         if (cellData.isPnf) result.classes.push('pnf-text');
         if (cellData.isEveryOtherDay) result.classes.push('every-other-day-text');
+        if (cellData.isSharedPatient) result.classes.push('shared-patient-cell');
 
         if (cellData.isHydrotherapy) {
             result.text = 'Hydro.'; // Enforce text for full cell

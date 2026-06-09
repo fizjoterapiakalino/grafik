@@ -62,6 +62,22 @@ export const Schedule: ScheduleAPI = (() => {
         }
     };
 
+    const markEveryOtherDay = (state: CellState, part: number | null): void => {
+        if (part) {
+            state[`isEveryOtherDay${part}`] = true;
+        } else {
+            state.isEveryOtherDay = true;
+        }
+    };
+
+    const markSharedPatient = (state: CellState, part: number | null): void => {
+        if (part) {
+            state[`isSharedPatient${part}`] = true;
+        } else {
+            state.isSharedPatient = true;
+        }
+    };
+
     const mainController = {
         processExitEditMode(element: HTMLElement, newText: string): void {
             element.setAttribute('contenteditable', 'false');
@@ -103,12 +119,39 @@ export const Schedule: ScheduleAPI = (() => {
                 }
             };
 
+            const createSharedPatient = (): void => {
+                if (!duplicate) return;
+                const oldCellState = duplicate.cellData;
+                const sourcePart = getSourcePart(oldCellState, newText);
+
+                ScheduleData.updateMultipleCells([
+                    {
+                        time,
+                        employeeIndex,
+                        updateFn: (cellState: CellState) => {
+                            createTargetUpdateFn(oldCellState, sourcePart, targetPart)(cellState);
+                            markEveryOtherDay(cellState, targetPart);
+                            markSharedPatient(cellState, targetPart);
+                        },
+                    },
+                    {
+                        time: duplicate.time,
+                        employeeIndex: duplicate.employeeIndex,
+                        updateFn: (cellState: CellState) => {
+                            markEveryOtherDay(cellState, sourcePart);
+                            markSharedPatient(cellState, sourcePart);
+                        },
+                    },
+                ]);
+            };
+
             if (duplicate) {
                 ScheduleModals.showDuplicateConfirmationDialog(
                     duplicate,
                     () => updateSchedule(true),
                     () => updateSchedule(false),
-                    () => ScheduleUI.render()
+                    () => ScheduleUI.render(),
+                    createSharedPatient
                 );
             } else {
                 updateSchedule(false);
@@ -239,7 +282,7 @@ export const Schedule: ScheduleAPI = (() => {
         },
 
         openPatientInfoModal(element: HTMLElement): void {
-            const parentCell = element.closest('td') as HTMLTableCellElement | null;
+            const parentCell = element.closest('[data-time][data-employee-index]') as HTMLElement | null;
             if (!parentCell) return;
             const time = parentCell.dataset.time || '';
             const employeeIndex = parentCell.dataset.employeeIndex || '';

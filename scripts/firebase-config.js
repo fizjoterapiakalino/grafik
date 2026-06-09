@@ -13,6 +13,7 @@ import {
     collection,
     doc,
     getDoc,
+    getDocFromServer,
     setDoc,
     onSnapshot,
     updateDoc,
@@ -119,6 +120,14 @@ const createDocWrapper = (collectionName, docId) => {
     return {
         get: async () => {
             const snapshot = await getDoc(docRef);
+            return {
+                exists: snapshot.exists(),
+                data: () => snapshot.data(),
+                id: snapshot.id,
+            };
+        },
+        getFromServer: async () => {
+            const snapshot = await getDocFromServer(docRef);
             return {
                 exists: snapshot.exists(),
                 data: () => snapshot.data(),

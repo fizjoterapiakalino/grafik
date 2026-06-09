@@ -59,6 +59,10 @@
         grid-template-columns: 1fr 1fr;
     }
 
+    #duplicateModal .modal-buttons #sharedPatientBtn {
+        grid-column: span 2;
+    }
+
     #duplicateModal .modal-buttons #cancelBtn {
         grid-column: span 2;
     }
@@ -76,6 +80,11 @@
 
 #duplicateModal #addAnywayBtn {
     background: linear-gradient(135deg, var(--color-secondary-500) 0%, var(--color-secondary-600) 100%);
+    color: white;
+}
+
+#duplicateModal #sharedPatientBtn {
+    background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
     color: white;
 }
 

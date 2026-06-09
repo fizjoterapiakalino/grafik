@@ -28,7 +28,7 @@
 
 .banner-logo {
     height: 36px;
-    filter: grayscale(1) brightness(2);
+    filter: brightness(0) saturate(100%) invert(41%) sepia(96%) saturate(1423%) hue-rotate(177deg) brightness(96%) contrast(93%);
 }
 
 .banner-title {
@@ -37,6 +37,16 @@
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: white;
+    transition: color var(--transition-normal), text-shadow var(--transition-normal);
+}
+
+.banner-title:hover,
+.banner-title:focus-visible {
+    color: #dbeafe;
+    text-shadow:
+        0 0 8px rgba(147, 197, 253, 0.95),
+        0 0 18px rgba(59, 130, 246, 0.75),
+        0 0 30px rgba(14, 165, 233, 0.45);
 }
 
 /* Structural Header Data */

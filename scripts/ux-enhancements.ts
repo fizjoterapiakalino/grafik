@@ -189,13 +189,26 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
 
         // Minięty czas
         if (progressElapsed) {
+            let elapsedText = '';
+            let remainingText = '';
             if (currentHour >= startHour && currentHour < endHour) {
-                progressElapsed.innerHTML = `<small>Minęło: ${hoursElapsed}h ${minsElapsed}min</small>`;
+                elapsedText = `Minęło: ${hoursElapsed}h ${minsElapsed}min`;
+                remainingText = `Pozostało: ${hoursRemaining}h ${minsRemaining}min`;
             } else if (currentHour < startHour) {
-                progressElapsed.innerHTML = `<small>Przed rozpoczęciem</small>`;
+                const minsToStart = (startHour - currentHour) * 60 - currentMinute;
+                const hToStart = Math.floor(minsToStart / 60);
+                const mToStart = minsToStart % 60;
+                elapsedText = 'Przed rozpoczęciem';
+                remainingText = `Start za: ${hToStart}h ${mToStart}min`;
             } else {
-                progressElapsed.innerHTML = `<small>Zmiana zakończona</small>`;
+                elapsedText = 'Zmiana zakończona';
+                remainingText = 'Do jutra 7:00';
             }
+
+            progressElapsed.innerHTML = `
+                <small class="day-progress-elapsed-text">${elapsedText}<span class="day-progress-mobile-detail"> · ${remainingText}</span></small>
+                <strong class="day-progress-percent-mobile">${Math.round(progress)}%</strong>
+            `;
         }
 
         // Pozostały czas

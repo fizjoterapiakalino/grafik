@@ -22,6 +22,7 @@ interface CellData {
     isMassage?: boolean;
     isPnf?: boolean;
     isEveryOtherDay?: boolean;
+    isSharedPatient?: boolean;
     isHydrotherapy?: boolean;
     isHydrotherapy1?: boolean;
     isHydrotherapy2?: boolean;
@@ -643,6 +644,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         delete cell.dataset.isMassage;
         delete cell.dataset.isPnf;
         delete cell.dataset.isEveryOtherDay;
+        delete cell.dataset.isSharedPatient;
         delete cell.dataset.isHydrotherapy;
 
         if (cell.tagName === 'TH') {
@@ -683,6 +685,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                 if (part.isMassage) div.dataset.isMassage = 'true';
                 if (part.isPnf) div.dataset.isPnf = 'true';
                 if (part.isEveryOtherDay) div.dataset.isEveryOtherDay = 'true';
+                if (part.isSharedPatient) div.dataset.isSharedPatient = 'true';
                 if (part.isHydrotherapy) div.dataset.isHydrotherapy = 'true';
 
                 // Dodaj tooltip z datą końca zabiegu
@@ -714,6 +717,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             if (cellObj.isMassage) cell.dataset.isMassage = 'true';
             if (cellObj.isPnf) cell.dataset.isPnf = 'true';
             if (cellObj.isEveryOtherDay) cell.dataset.isEveryOtherDay = 'true';
+            if (cellObj.isSharedPatient) cell.dataset.isSharedPatient = 'true';
             if (cellObj.isHydrotherapy) cell.dataset.isHydrotherapy = 'true';
 
             // Dodaj tooltip z datą końca zabiegu
@@ -750,6 +754,157 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         });
     };
 
+    const getCurrentTimeString = (): string => {
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes() < 30 ? 0 : 30;
+        return `${currentHour}:${currentMinute.toString().padStart(2, '0')}`;
+    };
+
+    const timeToMinutes = (time: string): number => {
+        const [hour, minute] = time.split(':').map(Number);
+        return hour * 60 + minute;
+    };
+
+    const appendMobileTag = (container: HTMLElement, label: string, className = ''): void => {
+        const tag = document.createElement('span');
+        tag.className = `mobile-schedule-tag${className ? ` ${className}` : ''}`;
+        tag.textContent = label;
+        container.appendChild(tag);
+    };
+
+    const appendMobileTreatmentTags = (container: HTMLElement, displayData: ReturnType<typeof ScheduleLogic.getCellDisplayData>): void => {
+        if (displayData.isBreak) {
+            appendMobileTag(container, 'Przerwa', 'break');
+            return;
+        }
+
+        const parts = displayData.isSplit ? displayData.parts : [{
+            isMassage: displayData.classes.includes('massage-text'),
+            isPnf: displayData.classes.includes('pnf-text'),
+            isEveryOtherDay: displayData.classes.includes('every-other-day-text'),
+            isHydrotherapy: displayData.classes.includes('hydrotherapy-cell'),
+            treatmentEndDate: displayData.treatmentEndDate,
+        }];
+
+        if (displayData.isSplit) {
+            parts.forEach((part, index) => {
+                const prefix = `${index + 1}: `;
+                if (part.isMassage) appendMobileTag(container, `${prefix}Masaż`, 'massage');
+                if (part.isPnf) appendMobileTag(container, `${prefix}PNF`, 'pnf');
+                if (part.isEveryOtherDay) appendMobileTag(container, `${prefix}Co 2 dni`);
+                if (part.isHydrotherapy) appendMobileTag(container, `${prefix}Hydroterapia`, 'hydro');
+                if (part.treatmentEndDate) appendMobileTag(container, `${prefix}Koniec ${formatDatePolish(part.treatmentEndDate)}`);
+            });
+            if (!container.children.length) appendMobileTag(container, 'Podzielona');
+            return;
+        }
+
+        const part = parts[0];
+        if (part.isMassage) appendMobileTag(container, 'Masaż', 'massage');
+        if (part.isPnf) appendMobileTag(container, 'PNF', 'pnf');
+        if (part.isEveryOtherDay) appendMobileTag(container, 'Co 2 dni');
+        if (part.isHydrotherapy) appendMobileTag(container, 'Hydroterapia', 'hydro');
+        if (part.treatmentEndDate) appendMobileTag(container, `Koniec ${formatDatePolish(part.treatmentEndDate)}`);
+        if (!container.children.length) appendMobileTag(container, '30 min');
+    };
+    void appendMobileTreatmentTags;
+
+    type MobileTreatmentTagSource = {
+        isBreak?: boolean;
+        isMassage?: boolean;
+        isPnf?: boolean;
+        isEveryOtherDay?: boolean;
+        isSharedPatient?: boolean;
+        isHydrotherapy?: boolean;
+        treatmentEndDate?: string | null;
+    };
+
+    const appendMobileTreatmentTagsInline = (
+        container: HTMLElement,
+        tagSource: MobileTreatmentTagSource,
+        fallbackLabel = '30 min'
+    ): void => {
+        if (tagSource.isBreak) {
+            appendMobileTag(container, 'Przerwa', 'break');
+            return;
+        }
+
+        if (tagSource.isMassage) appendMobileTag(container, 'Masaż', 'massage');
+        if (tagSource.isPnf) appendMobileTag(container, 'PNF', 'pnf');
+        if (tagSource.isEveryOtherDay) appendMobileTag(container, 'Co 2 dni');
+        if (tagSource.isSharedPatient) appendMobileTag(container, 'Wsp.', 'shared');
+        if (tagSource.isHydrotherapy) appendMobileTag(container, 'Hydroterapia', 'hydro');
+        if (tagSource.treatmentEndDate) appendMobileTag(container, `Koniec ${formatDatePolish(tagSource.treatmentEndDate)}`);
+        if (!container.children.length && fallbackLabel) appendMobileTag(container, fallbackLabel);
+    };
+
+    const getMobileTagSourceFromDisplayData = (
+        displayData: ReturnType<typeof ScheduleLogic.getCellDisplayData>
+    ): MobileTreatmentTagSource => ({
+        isBreak: displayData.isBreak,
+        isMassage: displayData.classes.includes('massage-text'),
+        isPnf: displayData.classes.includes('pnf-text'),
+        isEveryOtherDay: displayData.classes.includes('every-other-day-text'),
+        isSharedPatient: displayData.classes.includes('shared-patient-cell'),
+        isHydrotherapy: displayData.classes.includes('hydrotherapy-cell'),
+        treatmentEndDate: displayData.treatmentEndDate,
+    });
+
+    const appendMobileInlineMeta = (
+        container: HTMLElement,
+        tagSource: MobileTreatmentTagSource,
+        fallbackLabel = '30 min'
+    ): void => {
+        const meta = document.createElement('div');
+        meta.className = 'mobile-schedule-meta cell-icon';
+        appendMobileTreatmentTagsInline(meta, tagSource, fallbackLabel);
+        container.appendChild(meta);
+    };
+
+    const calculateEmployeeTherapyCount = (employeeIndex: string): number => {
+        if (!_appState?.scheduleCells) return 0;
+
+        let count = 0;
+        Object.values(_appState.scheduleCells).forEach((employeeCells) => {
+            const cell = employeeCells?.[employeeIndex];
+            if (!cell || cell.isBreak || cell.isHydrotherapy) return;
+
+            if (cell.isSplit) {
+                if (cell.content1 && cell.content1.trim()) count++;
+                if (cell.content2 && cell.content2.trim()) count++;
+                return;
+            }
+
+            if (cell.content && cell.content.trim()) count++;
+        });
+
+        return count;
+    };
+
+    const createMobileSlotPart = (
+        timeString: string,
+        selectedEmployeeIndex: string,
+        text: string,
+        classes: string[] = [],
+        tagSource?: MobileTreatmentTagSource,
+        fallbackLabel = '30 min'
+    ): HTMLDivElement => {
+        const part = document.createElement('div');
+        part.className = 'mobile-schedule-patient editable-cell';
+        part.setAttribute('data-time', timeString);
+        part.setAttribute('data-employee-index', selectedEmployeeIndex);
+        part.setAttribute('tabindex', '0');
+        const label = document.createElement('span');
+        label.className = 'mobile-schedule-patient-name';
+        label.textContent = text || 'Wolny termin';
+        part.appendChild(label);
+        if (tagSource) appendMobileInlineMeta(part, tagSource, fallbackLabel);
+        if (classes.length > 0) part.classList.add(...classes);
+        if (!text) part.classList.add('empty-slot');
+        return part;
+    };
+
     const renderMobileView = (employeeIndices: string[]): void => {
         let mobileContainer = document.querySelector('.mobile-schedule-container') as HTMLDivElement | null;
         if (!mobileContainer) {
@@ -773,27 +928,49 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
 
         if (!_appState) return;
 
-        // Get selected employee index from container's data attribute, or default to first
         let selectedEmployeeIndex = mobileContainer.dataset.selectedEmployee || employeeIndices[0];
 
-        // Validate that selected employee is still in the list
         if (!employeeIndices.includes(selectedEmployeeIndex)) {
             selectedEmployeeIndex = employeeIndices[0];
         }
+        mobileContainer.dataset.selectedEmployee = selectedEmployeeIndex;
 
-        // Add employee selector if multiple employees
+        const currentTimeString = getCurrentTimeString();
+        const therapyCount = calculateEmployeeTherapyCount(selectedEmployeeIndex);
+
+        const statusBar = document.createElement('div');
+        statusBar.className = 'mobile-schedule-status';
+
+        const timeBadge = document.createElement('div');
+        timeBadge.className = 'mobile-schedule-time';
+        timeBadge.textContent = currentTimeString;
+        statusBar.appendChild(timeBadge);
+
+        const progressTrack = document.createElement('div');
+        progressTrack.className = 'mobile-schedule-progress';
+        const progressFill = document.createElement('span');
+        const startMinutes = AppConfig.schedule.startHour * 60;
+        const endMinutes = AppConfig.schedule.endHour * 60;
+        const progress = ((timeToMinutes(currentTimeString) - startMinutes) / (endMinutes - startMinutes)) * 100;
+        progressFill.style.width = `${Math.max(0, Math.min(100, progress))}%`;
+        progressTrack.appendChild(progressFill);
+        statusBar.appendChild(progressTrack);
+
+        const countBadge = document.createElement('div');
+        countBadge.className = 'mobile-schedule-count';
+        countBadge.textContent = `Terapie: ${therapyCount}`;
+        statusBar.appendChild(countBadge);
+
+        mobileContainer.appendChild(statusBar);
+
+        const controls = document.createElement('div');
+        controls.className = 'mobile-schedule-controls';
+
         if (employeeIndices.length > 1) {
-            const selectorWrapper = document.createElement('div');
-            selectorWrapper.className = 'mobile-employee-selector';
-
-            const label = document.createElement('label');
-            label.textContent = 'Wybierz pracownika: ';
-            label.htmlFor = 'mobileEmployeeSelect';
-            selectorWrapper.appendChild(label);
-
             const select = document.createElement('select');
             select.id = 'mobileEmployeeSelect';
-            select.className = 'employee-select';
+            select.className = 'mobile-employee-select';
+            select.setAttribute('aria-label', 'Wybierz pracownika');
 
             employeeIndices.forEach((empId) => {
                 const option = document.createElement('option');
@@ -812,16 +989,31 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                 renderMobileView(employeeIndices);
             });
 
-            selectorWrapper.appendChild(select);
-            mobileContainer.appendChild(selectorWrapper);
+            controls.appendChild(select);
+        } else {
+            const employeeData = EmployeeManager.getById(selectedEmployeeIndex);
+            const employeeLabel = document.createElement('div');
+            employeeLabel.className = 'mobile-employee-static';
+            employeeLabel.textContent = capitalizeFirstLetter(employeeData?.displayName || 'Pracownik');
+            controls.appendChild(employeeLabel);
         }
 
-        const employeeData = EmployeeManager.getById(selectedEmployeeIndex);
-        const header = document.createElement('h3');
-        header.textContent = `Grafik: ${capitalizeFirstLetter(employeeData?.displayName || 'Pracownik')}`;
-        header.style.textAlign = 'center';
-        header.style.color = 'var(--color-primary-700)';
-        mobileContainer.appendChild(header);
+        const jumpButton = document.createElement('button');
+        jumpButton.type = 'button';
+        jumpButton.className = 'mobile-now-button';
+        jumpButton.textContent = 'Teraz';
+        jumpButton.addEventListener('click', () => {
+            mobileContainer?.querySelector<HTMLElement>('.mobile-schedule-slot.is-current')?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+            });
+        });
+        controls.appendChild(jumpButton);
+        mobileContainer.appendChild(controls);
+
+        const timeline = document.createElement('div');
+        timeline.className = 'mobile-schedule-timeline';
+        timeline.setAttribute('aria-label', 'Harmonogram dnia');
 
         for (let hour = AppConfig.schedule.startHour; hour <= AppConfig.schedule.endHour; hour++) {
             for (let minute = 0; minute < 60; minute += 30) {
@@ -831,74 +1023,70 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                 const cellData = _appState.scheduleCells[timeString]?.[selectedEmployeeIndex] || {};
                 const displayData = ScheduleLogic.getCellDisplayData(cellData);
 
-                const card = document.createElement('div');
-                card.className = 'appointment-card';
-                card.setAttribute('data-time', timeString);
+                const slot = document.createElement('article');
+                slot.className = 'mobile-schedule-slot';
+                slot.setAttribute('data-time', timeString);
+                if (timeString === currentTimeString) slot.classList.add('is-current');
+                if (timeToMinutes(timeString) < timeToMinutes(currentTimeString)) slot.classList.add('is-past');
+                if (!displayData.text && !displayData.isSplit && !displayData.isBreak) slot.classList.add('is-empty');
 
-                const cardHeader = document.createElement('div');
-                cardHeader.className = 'card-header';
-                cardHeader.textContent = timeString;
-
-                // Add click handler for accordion toggle
-                cardHeader.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    card.classList.toggle('expanded');
-                });
-
-                card.appendChild(cardHeader);
-
-                const cardBody = document.createElement('div');
-                cardBody.className = 'card-body editable-cell';
-                cardBody.setAttribute('data-time', timeString);
-                cardBody.setAttribute('data-employee-index', selectedEmployeeIndex);
-                cardBody.setAttribute('tabindex', '0');
-
-                if (displayData.text) {
-                    cardBody.textContent = displayData.text;
-                    if (displayData.classes.length > 0) cardBody.classList.add(...displayData.classes);
-                    if (displayData.styles.backgroundColor)
-                        cardBody.style.backgroundColor = displayData.styles.backgroundColor;
-                } else if (displayData.isSplit) {
-                    const part1 = displayData.parts[0];
-                    const part2 = displayData.parts[1];
-                    cardBody.innerHTML = `<div>${part1.text}</div><div style="border-top:1px solid #ccc; margin-top:4px; padding-top:4px;">${part2.text}</div>`;
-                } else {
-                    cardBody.textContent = 'Wolny termin';
-                    cardBody.classList.add('empty-slot');
+                const hourCell = document.createElement('div');
+                hourCell.className = 'mobile-schedule-hour';
+                const hourText = document.createElement('span');
+                hourText.textContent = timeString;
+                hourCell.appendChild(hourText);
+                if (timeString === currentTimeString) {
+                    const nowLabel = document.createElement('span');
+                    nowLabel.className = 'mobile-schedule-now';
+                    nowLabel.textContent = 'Teraz';
+                    hourCell.appendChild(nowLabel);
                 }
 
-                applyPastTreatmentState(cardBody, cellData, timeString);
+                const card = document.createElement('div');
+                card.className = 'mobile-schedule-card';
 
-                card.appendChild(cardBody);
-                mobileContainer.appendChild(card);
+                if (displayData.isSplit) {
+                    const splitWrapper = document.createElement('div');
+                    splitWrapper.className = 'mobile-schedule-split split-cell-wrapper';
+                    displayData.parts.forEach((part) => {
+                        const partEl = createMobileSlotPart(
+                            timeString,
+                            selectedEmployeeIndex,
+                            part.text,
+                            part.classes,
+                            part,
+                            ''
+                        );
+                        splitWrapper.appendChild(partEl);
+                    });
+                    card.appendChild(splitWrapper);
+                } else {
+                    const patientEl = createMobileSlotPart(
+                        timeString,
+                        selectedEmployeeIndex,
+                        displayData.text,
+                        displayData.classes,
+                        getMobileTagSourceFromDisplayData(displayData)
+                    );
+                    if (displayData.styles.backgroundColor) {
+                        patientEl.style.backgroundColor = displayData.styles.backgroundColor;
+                    }
+                    applyPastTreatmentState(patientEl, cellData, timeString);
+                    card.appendChild(patientEl);
+                }
+
+                slot.appendChild(hourCell);
+                slot.appendChild(card);
+                timeline.appendChild(slot);
             }
         }
 
-        // Auto-expand all cards from current time onwards
-        const now = new Date();
-        const currentHour = now.getHours();
-        const currentMinute = now.getMinutes() < 30 ? 0 : 30;
-        const currentTimeString = `${currentHour}:${currentMinute.toString().padStart(2, '0')}`;
+        mobileContainer.appendChild(timeline);
 
-        let foundCurrent = false;
-        const allCards = mobileContainer.querySelectorAll('.appointment-card');
-        allCards.forEach((card) => {
-            const cardTime = card.getAttribute('data-time');
-            if (cardTime === currentTimeString) {
-                foundCurrent = true;
-                card.classList.add('current-time');
-            }
-            // Expand all cards from current time onwards
-            if (foundCurrent) {
-                card.classList.add('expanded');
-            }
-        });
-
-        // Scroll to current time card
-        const currentCard = mobileContainer.querySelector('.current-time') as HTMLElement;
+        const currentCard = mobileContainer.querySelector('.mobile-schedule-slot.is-current') as HTMLElement;
         if (currentCard) {
             setTimeout(() => {
-                currentCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                currentCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }, 100);
         }
     };
@@ -1079,7 +1267,13 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         const patientCountElement = document.getElementById('patientCount');
         if (!patientCountElement || !_appState) return;
 
-        const therapyCount = ScheduleLogic.calculatePatientCount(_appState.scheduleCells);
+        const mobileContainer = document.querySelector<HTMLElement>('.mobile-schedule-container');
+        const selectedEmployeeIndex = mobileContainer && mobileContainer.style.display !== 'none'
+            ? mobileContainer.dataset.selectedEmployee
+            : null;
+        const therapyCount = selectedEmployeeIndex
+            ? calculateEmployeeTherapyCount(selectedEmployeeIndex)
+            : ScheduleLogic.calculatePatientCount(_appState.scheduleCells);
         patientCountElement.textContent = `Terapie: ${therapyCount}`;
     };
 

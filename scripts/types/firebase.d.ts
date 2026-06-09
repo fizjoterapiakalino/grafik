@@ -34,6 +34,7 @@ export interface SetOptions {
  */
 export interface FirestoreDocumentWrapper<T = unknown> {
     get(): Promise<FirestoreDocumentSnapshot<T>>;
+    getFromServer?(): Promise<FirestoreDocumentSnapshot<T>>;
     set(data: T, options?: SetOptions): Promise<void>;
     update(data: Partial<T> | Record<string, unknown>): Promise<void>;
     delete(): Promise<void>;

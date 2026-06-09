@@ -48,6 +48,15 @@ export const ScheduleData: ScheduleDataAPI = (() => {
     let currentUserId: string | null = null;
     let isInitialLoad = true;
     let _onDataChange: (() => void) | null = null;
+    const PENDING_SAVE_STORAGE_KEY = 'schedulePendingServerSave';
+    const PENDING_SAVE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+    const SAVE_CONFIRM_TIMEOUT_MS = 10000;
+
+    interface PendingScheduleSave {
+        payload: ScheduleAppState;
+        token: string;
+        createdAt: string;
+    }
 
     const getScheduleDocRef = () => {
         return db.collection(AppConfig.firestore.collections.schedules).doc(AppConfig.firestore.docs.mainSchedule);
@@ -81,6 +90,96 @@ export const ScheduleData: ScheduleDataAPI = (() => {
     const notifyChange = (): void => {
         if (_onDataChange && typeof _onDataChange === 'function') {
             _onDataChange();
+        }
+    };
+
+    const createSaveToken = (): string => {
+        if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+            return crypto.randomUUID();
+        }
+        return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    };
+
+    const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> => {
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+        });
+
+        try {
+            return await Promise.race([promise, timeoutPromise]);
+        } finally {
+            if (timeoutId) clearTimeout(timeoutId);
+        }
+    };
+
+    const readPendingSave = (): PendingScheduleSave | null => {
+        try {
+            const raw = localStorage.getItem(PENDING_SAVE_STORAGE_KEY);
+            if (!raw) return null;
+
+            const pending = JSON.parse(raw) as PendingScheduleSave;
+            const createdAt = new Date(pending.createdAt).getTime();
+            if (!pending.payload?.scheduleCells || !pending.token || Number.isNaN(createdAt)) {
+                localStorage.removeItem(PENDING_SAVE_STORAGE_KEY);
+                return null;
+            }
+
+            if (Date.now() - createdAt > PENDING_SAVE_MAX_AGE_MS) {
+                localStorage.removeItem(PENDING_SAVE_STORAGE_KEY);
+                return null;
+            }
+
+            return pending;
+        } catch (error) {
+            console.warn('Nie udało się odczytać lokalnej kopii oczekującego zapisu:', error);
+            localStorage.removeItem(PENDING_SAVE_STORAGE_KEY);
+            return null;
+        }
+    };
+
+    const storePendingSave = (payload: ScheduleAppState, token: string): void => {
+        try {
+            const pending: PendingScheduleSave = {
+                payload,
+                token,
+                createdAt: new Date().toISOString(),
+            };
+            localStorage.setItem(PENDING_SAVE_STORAGE_KEY, JSON.stringify(pending));
+        } catch (error) {
+            console.warn('Nie udało się zapisać lokalnej kopii oczekującego zapisu:', error);
+        }
+    };
+
+    const clearPendingSave = (token: string): void => {
+        const pending = readPendingSave();
+        if (!pending || pending.token === token) {
+            localStorage.removeItem(PENDING_SAVE_STORAGE_KEY);
+        }
+    };
+
+    const verifyScheduleSaved = async (token: string): Promise<void> => {
+        const docRef = getScheduleDocRef();
+        const snapshot = docRef.getFromServer ? await docRef.getFromServer() : await docRef.get();
+        const serverData = snapshot.data() as ScheduleAppState | undefined;
+
+        if (!snapshot.exists || serverData?.saveToken !== token) {
+            throw new Error('Nie potwierdzono zapisu harmonogramu na serwerze.');
+        }
+    };
+
+    const restorePendingSaveIfNeeded = async (): Promise<void> => {
+        const pending = readPendingSave();
+        if (!pending || isSaving) return;
+
+        try {
+            await verifyScheduleSaved(pending.token);
+            clearPendingSave(pending.token);
+        } catch {
+            appState.scheduleCells = pending.payload.scheduleCells;
+            notifyChange();
+            window.showToast('Przywrócono niezapisane zmiany i ponawiam zapis...', 5000);
+            await saveSchedule();
         }
     };
 
@@ -126,6 +225,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
                 if (isInitialLoad) {
                     undoManager.initialize(getCurrentTableState());
                     isInitialLoad = false;
+                    void restorePendingSaveIfNeeded();
                 }
 
                 notifyChange();
@@ -158,7 +258,26 @@ export const ScheduleData: ScheduleDataAPI = (() => {
                 }
             }
 
-            await getScheduleDocRef().set(appState, { merge: true });
+            const saveToken = createSaveToken();
+            const payload: ScheduleAppState = {
+                ...appState,
+                lastSavedAt: new Date().toISOString(),
+                lastSavedBy: currentUserId,
+                saveToken,
+            };
+
+            storePendingSave(payload, saveToken);
+            await withTimeout(
+                getScheduleDocRef().set(payload, { merge: true }),
+                SAVE_CONFIRM_TIMEOUT_MS,
+                'Przekroczono czas zapisu harmonogramu.'
+            );
+            await withTimeout(
+                verifyScheduleSaved(saveToken),
+                SAVE_CONFIRM_TIMEOUT_MS,
+                'Przekroczono czas potwierdzenia zapisu harmonogramu.'
+            );
+            clearPendingSave(saveToken);
             window.setSaveStatus('saved');
             isSaving = false;
 
@@ -169,6 +288,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
         } catch (error) {
             console.error('Error saving schedule to Firestore:', error);
             window.setSaveStatus('error');
+            window.showToast('Nie potwierdzono zapisu na serwerze. Zmiany zapisano lokalnie i zostaną ponowione.', 7000);
             isSaving = false;
         }
     };

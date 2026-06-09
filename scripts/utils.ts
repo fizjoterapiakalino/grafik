@@ -42,6 +42,9 @@ export const CELL_CONTENT_KEYS = [
     'isEveryOtherDay',
     'isEveryOtherDay1',
     'isEveryOtherDay2',
+    'isSharedPatient',
+    'isSharedPatient1',
+    'isSharedPatient2',
     'treatmentStartDate',
     'treatmentExtensionDays',
     'treatmentEndDate',
@@ -187,4 +190,3 @@ export const escapeHTML = (str: string): string => {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 };
-

@@ -392,6 +392,58 @@ td.split-cell>div.hydrotherapy-text>span {
     font-weight: bold;
 }
 
+.split-cell-wrapper>div.pnf-text,
+.split-cell-wrapper>div.pnf-text>span {
+    color: var(--bg-pnf) !important;
+    font-weight: bold;
+}
+
+.split-cell-wrapper>div.massage-text,
+.split-cell-wrapper>div.massage-text>span {
+    color: var(--bg-massage) !important;
+    font-weight: bold;
+}
+
+.split-cell-wrapper>div.every-other-day-text,
+.split-cell-wrapper>div.every-other-day-text>span {
+    color: var(--bg-every-other-day) !important;
+    font-weight: bold;
+}
+
+.split-cell-wrapper>div.hydrotherapy-text,
+.split-cell-wrapper>div.hydrotherapy-text>span {
+    color: var(--color-white) !important;
+    font-weight: bold;
+}
+
+.shared-patient-cell {
+    box-shadow: inset 0 0 0 1px rgba(109, 40, 217, 0.28);
+}
+
+.shared-patient-cell::before,
+.split-cell-wrapper>div.shared-patient-cell::after {
+    content: 'W';
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 13px;
+    height: 13px;
+    border-radius: 999px;
+    background: #6d28d9;
+    color: var(--color-white);
+    font-size: 0.55rem;
+    font-weight: 900;
+    line-height: 13px;
+    text-align: center;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85), 0 2px 5px rgba(109, 40, 217, 0.25);
+    pointer-events: none;
+    z-index: 2;
+}
+
+.split-cell-wrapper>div.shared-patient-cell::before {
+    content: none;
+}
+
 .hydrotherapy-cell {
     background-color: var(--bg-hydrotherapy) !important;
     color: var(--color-white) !important;
@@ -800,10 +852,22 @@ table.schedule-table tbody tr.current-time-row>td:not(.break-cell) {
     background-color: #fffde7;
     /* Jasnożółte tło */
     font-weight: bold;
+    opacity: 1 !important;
+    filter: none !important;
+    box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.35);
 }
 
 .schedule-table tbody tr.current-time-row>td:first-child {
-    color: var(--color-text);
+    color: var(--color-white);
+    background: var(--color-primary-600) !important;
+}
+
+.schedule-table.search-active tbody tr.current-time-row td.editable-cell.search-dimmed,
+.schedule-table.search-active tbody tr.current-time-row .split-cell-wrapper > div.search-dimmed,
+.schedule-table tbody tr.current-time-row td.past-treatment-cell > span,
+.schedule-table tbody tr.current-time-row .split-cell-wrapper > div.past-treatment-part > span {
+    opacity: 1 !important;
+    filter: none !important;
 }
 
 td.current-time-highlight {
@@ -929,6 +993,11 @@ td.current-time-highlight {
 
 #addAnywayBtn {
     background-color: #005f80;
+    color: white;
+}
+
+#sharedPatientBtn {
+    background-color: #6d28d9;
     color: white;
 }
 
@@ -1079,6 +1148,257 @@ td.current-time-highlight {
         /* Smaller empty slots */
     }
 
+    .mobile-schedule-container {
+        max-width: 520px;
+        margin: 0 auto;
+        padding: 10px;
+        gap: 10px;
+        background: var(--color-gray-100);
+        box-sizing: border-box;
+    }
+
+    .mobile-schedule-status {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: grid;
+        grid-template-columns: auto minmax(64px, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: var(--color-gray-900);
+        color: var(--color-white);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .mobile-schedule-time {
+        font-size: 1rem;
+        font-weight: 800;
+        letter-spacing: 0.03em;
+    }
+
+    .mobile-schedule-progress {
+        min-width: 0;
+        height: 5px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.16);
+    }
+
+    .mobile-schedule-progress span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--color-primary-400);
+    }
+
+    .mobile-schedule-count {
+        font-size: 0.72rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: #bbf7d0;
+        white-space: nowrap;
+    }
+
+    .mobile-schedule-controls {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+    }
+
+    .mobile-employee-select,
+    .mobile-employee-static,
+    .mobile-now-button {
+        min-width: 0;
+        border: 1px solid var(--color-gray-300);
+        border-radius: 8px;
+        background: var(--color-white);
+        color: var(--color-gray-900);
+        font: inherit;
+        font-weight: 800;
+        padding: 10px 12px;
+    }
+
+    .mobile-employee-static {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mobile-now-button {
+        background: var(--color-primary-600);
+        color: var(--color-white);
+        border-color: var(--color-primary-600);
+        cursor: pointer;
+    }
+
+    .mobile-schedule-timeline {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .mobile-schedule-slot {
+        display: grid;
+        grid-template-columns: 54px minmax(0, 1fr);
+        gap: 8px;
+        padding: 8px;
+        border: 1px solid var(--color-gray-200);
+        border-radius: 8px;
+        background: var(--color-white);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    }
+
+    .mobile-schedule-slot.is-current {
+        border-color: var(--color-primary-500);
+        background: #eff6ff;
+        box-shadow: inset 0 0 0 1px var(--color-primary-400), 0 6px 16px rgba(37, 99, 235, 0.16);
+    }
+
+    .mobile-schedule-slot.is-past {
+        opacity: 0.58;
+    }
+
+    .mobile-schedule-slot.is-current,
+    .mobile-schedule-slot:has(.active-cell) {
+        opacity: 1;
+    }
+
+    .mobile-schedule-hour {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        color: var(--color-gray-500);
+        font-size: 0.78rem;
+        font-weight: 800;
+    }
+
+    .mobile-schedule-now {
+        padding: 2px 5px;
+        border-radius: 999px;
+        background: var(--color-primary-600);
+        color: var(--color-white);
+        font-size: 0.56rem;
+        line-height: 1;
+        text-transform: uppercase;
+    }
+
+    .mobile-schedule-card {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .mobile-schedule-patient {
+        min-height: 24px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        color: var(--color-gray-900);
+        font-size: 0.96rem;
+        font-weight: 800;
+        line-height: 1.2;
+        white-space: nowrap;
+        cursor: pointer;
+        border-radius: 6px;
+        padding: 2px 4px;
+        text-align: left;
+    }
+
+    .mobile-schedule-patient-name {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mobile-schedule-patient.empty-slot {
+        color: var(--color-gray-500);
+        font-weight: 700;
+        font-style: normal;
+        background: transparent;
+    }
+
+    .mobile-schedule-patient[contenteditable='true'] {
+        display: block;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        background: var(--color-white);
+        box-shadow: inset 0 0 0 2px var(--color-primary-500);
+    }
+
+    .mobile-schedule-patient.shared-patient-cell::before,
+    .mobile-schedule-patient.shared-patient-cell::after {
+        content: none;
+    }
+
+    .mobile-schedule-split {
+        display: grid;
+        gap: 4px;
+    }
+
+    .mobile-schedule-split .mobile-schedule-patient {
+        border: 1px dashed var(--color-gray-300);
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+
+    .mobile-schedule-meta {
+        display: flex;
+        flex: 0 0 auto;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 3px;
+        max-width: 62%;
+        overflow: hidden;
+    }
+
+    .mobile-schedule-tag {
+        flex: 0 0 auto;
+        padding: 2px 5px;
+        border-radius: 5px;
+        background: var(--color-gray-100);
+        color: var(--color-gray-700);
+        font-size: 0.62rem;
+        font-weight: 800;
+        line-height: 1.1;
+        text-transform: uppercase;
+    }
+
+    .mobile-schedule-tag.massage {
+        background: var(--bg-massage);
+        color: var(--color-white);
+    }
+
+    .mobile-schedule-tag.pnf {
+        background: var(--bg-pnf);
+        color: var(--color-white);
+    }
+
+    .mobile-schedule-tag.hydro {
+        background: var(--bg-hydrotherapy);
+        color: var(--color-white);
+    }
+
+    .mobile-schedule-tag.shared {
+        background: #6d28d9;
+        color: var(--color-white);
+    }
+
+    .mobile-schedule-tag.break {
+        background: var(--bg-break);
+        color: var(--color-white);
+    }
+
     /* Reuse existing text classes */
     .massage-text {
         color: var(--bg-massage);
@@ -1130,26 +1450,36 @@ td.current-time-highlight {
     border-top: 2px solid var(--color-primary-600);
     margin-top: 0;
     font-family: var(--font-body);
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
 }
 
 .schedule-footer-bar #dayProgressContainer {
     flex: 1;
     max-width: 500px;
+    min-width: 0;
 }
 
 .compact-legend {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 20px;
     background: rgba(255, 255, 255, 0.05);
     padding: 6px 16px;
     border-radius: var(--border-radius-sm);
     border: 1px solid rgba(255, 255, 255, 0.1);
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .legend-item {
     display: flex;
     align-items: center;
+    flex: 0 1 auto;
+    min-width: 0;
     gap: 8px;
     font-size: 0.75rem;
     font-weight: 700;
@@ -1181,6 +1511,8 @@ td.current-time-highlight {
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 
 /* Cleaned up redundant progress bar styles */
@@ -1194,6 +1526,7 @@ td.current-time-highlight {
     padding: 0 !important;
     margin: 0 !important;
     border: none !important;
+    min-width: 0;
 }
 
 .day-progress-info {
@@ -1207,6 +1540,31 @@ td.current-time-highlight {
     color: white !important;
     font-weight: 700 !important;
     font-family: var(--font-body);
+}
+
+.day-progress-percent-mobile {
+    display: none;
+}
+
+.day-progress-elapsed-text {
+    display: inline;
+}
+
+.day-progress-mobile-detail {
+    display: none;
+}
+
+.day-progress-elapsed strong.day-progress-percent-mobile {
+    display: none;
+    align-items: center;
+    min-width: 42px;
+    justify-content: center;
+    padding: 4px 8px;
+    border-radius: var(--border-radius-sm);
+    background: var(--color-primary-600);
+    color: var(--color-white);
+    font-size: 0.82rem;
+    line-height: 1;
 }
 
 .day-prog.break-cell {
@@ -1227,6 +1585,141 @@ td.current-time-highlight {
     border-radius: 3px;
     position: relative;
     min-width: 150px;
+}
+
+.day-progress-remaining {
+    display: inline;
+}
+
+@media (max-width: 640px) {
+    .schedule-footer-bar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        overflow-x: hidden;
+    }
+
+    .schedule-footer-bar #dayProgressContainer {
+        width: 100%;
+        max-width: none;
+        grid-column: 1;
+        min-width: 0;
+    }
+
+    .day-progress-bar {
+        width: 100%;
+        gap: 8px !important;
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+        display: grid;
+        grid-template-columns: auto auto auto;
+        grid-template-areas:
+            "label percent time"
+            "detail detail detail";
+        align-items: center;
+        column-gap: 8px !important;
+        row-gap: 2px !important;
+    }
+
+    .day-progress-info {
+        min-width: 0;
+        flex: 0 1 auto;
+        display: contents;
+    }
+
+    .day-progress-track {
+        display: none !important;
+    }
+
+    .day-progress-label {
+        grid-area: label;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        min-width: 0;
+        overflow: hidden;
+        font-size: 0.68rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.72);
+    }
+
+    .day-progress-label i {
+        display: none;
+    }
+
+    .day-progress-label {
+        font-size: 0;
+    }
+
+    .day-progress-label::after {
+        content: 'Dzień';
+        font-size: 0.68rem;
+    }
+
+    .day-progress-remaining {
+        display: none;
+    }
+
+    .day-progress-elapsed-text {
+        grid-area: detail;
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 0.66rem;
+        line-height: 1.15;
+    }
+
+    .day-progress-mobile-detail {
+        display: inline;
+    }
+
+    .day-progress-time {
+        grid-area: time;
+        font-size: 0.8rem !important;
+        color: rgba(255, 255, 255, 0.68) !important;
+    }
+
+    .day-progress-percent-mobile {
+        grid-area: percent;
+        display: inline-flex;
+    }
+
+    .day-progress-elapsed strong.day-progress-percent-mobile {
+        display: inline-flex;
+    }
+
+    .compact-legend {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        width: 100%;
+        justify-content: center;
+        gap: 6px 10px;
+        padding: 6px 8px;
+    }
+
+    .legend-item {
+        gap: 5px;
+        font-size: 0.66rem;
+        letter-spacing: 0.02em;
+        overflow-wrap: anywhere;
+    }
+
+    .patient-count-badge {
+        grid-column: 2;
+        grid-row: 1;
+        align-self: center;
+        max-width: 100%;
+        text-align: center;
+        white-space: nowrap;
+        padding: 6px 10px;
+        font-size: 0.68rem;
+    }
 }
 
 .day-progress-fill {

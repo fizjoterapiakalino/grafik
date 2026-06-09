@@ -20,7 +20,8 @@ interface ScheduleModalsAPI {
         duplicateInfo: DuplicateInfo,
         onMove: () => void,
         onAdd: () => void,
-        onCancel?: () => void
+        onCancel?: () => void,
+        onSharedPatient?: () => void
     ): void;
     showNumericConfirmationDialog(
         text: string,
@@ -48,12 +49,14 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
         duplicateInfo: DuplicateInfo,
         onMove: () => void,
         onAdd: () => void,
-        onCancel?: () => void
+        onCancel?: () => void,
+        onSharedPatient?: () => void
     ): void => {
         const modal = document.getElementById('duplicateModal');
         const modalText = document.getElementById('duplicateModalText');
         const moveBtn = document.getElementById('moveEntryBtn') as HTMLButtonElement | null;
         const addBtn = document.getElementById('addAnywayBtn') as HTMLButtonElement | null;
+        const sharedBtn = document.getElementById('sharedPatientBtn') as HTMLButtonElement | null;
         const cancelBtn = document.getElementById('cancelBtn') as HTMLButtonElement | null;
 
         if (!modal || !modalText || !moveBtn || !addBtn || !cancelBtn) return;
@@ -66,6 +69,7 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
             modal.style.display = 'none';
             moveBtn.onclick = null;
             addBtn.onclick = null;
+            if (sharedBtn) sharedBtn.onclick = null;
             cancelBtn.onclick = null;
         };
 
@@ -77,6 +81,12 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
             closeAndCleanup();
             onAdd();
         };
+        if (sharedBtn) {
+            sharedBtn.onclick = (): void => {
+                closeAndCleanup();
+                if (onSharedPatient) onSharedPatient();
+            };
+        }
         cancelBtn.onclick = (): void => {
             closeAndCleanup();
             if (onCancel) onCancel();

@@ -1,0 +1,573 @@
+<style>
+    .mobile-schedule-test {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-width: 520px;
+        min-height: 100%;
+        margin: 0 auto;
+        padding: 10px;
+        background: var(--color-gray-100);
+        box-sizing: border-box;
+    }
+
+    .mobile-schedule-test * {
+        box-sizing: border-box;
+    }
+
+    .mobile-test-status {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        background: var(--color-gray-900);
+        color: var(--color-white);
+        border-radius: 8px;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .mobile-test-time {
+        font-size: 1rem;
+        font-weight: 800;
+        letter-spacing: 0.03em;
+    }
+
+    .mobile-test-progress {
+        min-width: 0;
+        height: 5px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+    }
+
+    .mobile-test-progress span {
+        display: block;
+        width: 52%;
+        height: 100%;
+        background: var(--color-primary-400);
+        border-radius: inherit;
+    }
+
+    .mobile-test-save {
+        font-size: 0.72rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: #bbf7d0;
+        white-space: nowrap;
+    }
+
+    .mobile-test-summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 0 2px;
+    }
+
+    .mobile-test-employee {
+        min-width: 0;
+        flex: 1;
+        border: 1px solid var(--color-gray-300);
+        border-radius: 8px;
+        background: var(--color-white);
+        color: var(--color-gray-900);
+        font: inherit;
+        font-weight: 700;
+        padding: 10px 12px;
+    }
+
+    .mobile-test-count {
+        flex: 0 0 auto;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: var(--color-primary-600);
+        color: var(--color-white);
+        font-size: 0.78rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .mobile-test-filters {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+    }
+
+    .mobile-test-filter {
+        border: 1px solid var(--color-gray-300);
+        border-radius: 8px;
+        background: var(--color-white);
+        color: var(--color-gray-700);
+        font: inherit;
+        font-size: 0.78rem;
+        font-weight: 800;
+        padding: 9px 6px;
+    }
+
+    .mobile-test-filter.is-active {
+        border-color: var(--color-primary-600);
+        background: var(--color-primary-600);
+        color: var(--color-white);
+    }
+
+    .mobile-test-timeline {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+.mobile-test-slot {
+        display: grid;
+        grid-template-columns: 54px minmax(0, 1fr);
+        gap: 8px;
+        padding: 8px;
+        border: 1px solid var(--color-gray-200);
+        border-radius: 8px;
+    background: var(--color-white);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    cursor: pointer;
+}
+
+    .mobile-test-slot.is-current {
+        border-color: var(--color-primary-500);
+        background: #eff6ff;
+        box-shadow: inset 0 0 0 1px var(--color-primary-400), 0 6px 16px rgba(37, 99, 235, 0.16);
+    }
+
+    .mobile-test-slot.is-past {
+        opacity: 0.58;
+    }
+
+.mobile-test-slot.is-current {
+    opacity: 1;
+}
+
+.mobile-test-slot.is-selected {
+    border-color: var(--color-secondary);
+    box-shadow: inset 0 0 0 2px var(--color-secondary), 0 8px 18px rgba(59, 130, 246, 0.18);
+}
+
+    .mobile-test-hour {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        color: var(--color-gray-500);
+        font-size: 0.78rem;
+        font-weight: 800;
+    }
+
+    .mobile-test-now {
+        padding: 2px 5px;
+        border-radius: 999px;
+        background: var(--color-primary-600);
+        color: var(--color-white);
+        font-size: 0.56rem;
+        line-height: 1;
+        text-transform: uppercase;
+    }
+
+    .mobile-test-card {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .mobile-test-patient {
+        overflow: hidden;
+        color: var(--color-gray-900);
+        font-size: 0.96rem;
+        font-weight: 800;
+        line-height: 1.2;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mobile-test-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+
+    .mobile-test-tag {
+        padding: 3px 6px;
+        border-radius: 5px;
+        background: var(--color-gray-100);
+        color: var(--color-gray-700);
+        font-size: 0.68rem;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+
+    .mobile-test-tag.massage {
+        background: var(--bg-massage);
+        color: var(--color-white);
+    }
+
+    .mobile-test-tag.pnf {
+        background: var(--bg-pnf);
+        color: var(--color-white);
+    }
+
+    .mobile-test-tag.hydro {
+        background: var(--bg-hydrotherapy);
+        color: var(--color-white);
+    }
+
+    .mobile-test-note {
+        color: var(--color-gray-500);
+        font-size: 0.76rem;
+        font-weight: 600;
+        line-height: 1.25;
+    }
+
+    .mobile-test-slot.is-empty .mobile-test-patient {
+        color: var(--color-gray-500);
+        font-weight: 700;
+    }
+
+.mobile-test-actions {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+        padding: 8px;
+        border: 1px solid var(--color-gray-200);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.12);
+    backdrop-filter: blur(10px);
+}
+
+.mobile-test-add-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+}
+
+.mobile-test-input {
+    min-width: 0;
+    border: 1px solid var(--color-gray-300);
+    border-radius: 8px;
+    background: var(--color-white);
+    color: var(--color-gray-900);
+    font: inherit;
+    font-size: 0.9rem;
+    padding: 10px;
+}
+
+.mobile-test-action-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+    .mobile-test-action {
+        border: 0;
+        border-radius: 8px;
+        background: var(--color-gray-100);
+        color: var(--color-gray-800);
+        font: inherit;
+        font-size: 0.72rem;
+        font-weight: 800;
+        padding: 9px 4px;
+    }
+
+.mobile-test-action.primary {
+    background: var(--color-primary-600);
+    color: var(--color-white);
+}
+
+.mobile-test-action.danger {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+    .mobile-test-footer {
+        border-radius: 8px;
+        background: var(--color-gray-900);
+        color: var(--color-white);
+        overflow: hidden;
+    }
+
+    .mobile-test-footer summary {
+        cursor: pointer;
+        padding: 10px 12px;
+        font-size: 0.78rem;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+
+    .mobile-test-legend {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding: 0 12px 12px;
+    }
+
+    .mobile-test-legend .legend-item {
+        color: rgba(255, 255, 255, 0.78);
+    }
+
+    .schedule-mobile-test-source {
+        display: none;
+    }
+
+    @media (min-width: 641px) {
+        .mobile-schedule-test {
+            border-radius: 14px;
+            margin-top: 16px;
+        }
+    }
+</style>
+
+<section class="mobile-schedule-test" aria-label="Testowy mobilny widok harmonogramu">
+    <div class="mobile-test-status">
+        <div class="mobile-test-time">12:30</div>
+        <div class="mobile-test-progress" aria-label="Postęp dnia"><span></span></div>
+        <div class="mobile-test-save">Zapisano</div>
+    </div>
+
+    <div class="mobile-test-summary">
+        <select class="mobile-test-employee" aria-label="Wybierz pracownika">
+            <option>Anna Kowalska</option>
+            <option>Piotr Nowak</option>
+            <option>Maria Zielińska</option>
+        </select>
+        <div class="mobile-test-count">Terapie: 18</div>
+    </div>
+
+    <div class="mobile-test-filters" aria-label="Filtry harmonogramu">
+        <button class="mobile-test-filter is-active" type="button">Teraz</button>
+        <button class="mobile-test-filter" type="button">Zajęte</button>
+        <button class="mobile-test-filter" type="button">Wolne</button>
+    </div>
+
+    <div class="mobile-test-timeline">
+        <article class="mobile-test-slot is-past">
+            <div class="mobile-test-hour">11:30</div>
+            <div class="mobile-test-card">
+                <div class="mobile-test-patient">Jan Kowalski</div>
+                <div class="mobile-test-meta">
+                    <span class="mobile-test-tag massage">Masaż</span>
+                    <span class="mobile-test-tag">Koniec 24.06</span>
+                </div>
+                <div class="mobile-test-note">Zakończony slot, niższy priorytet wizualny.</div>
+            </div>
+        </article>
+
+        <article class="mobile-test-slot is-current is-empty">
+            <div class="mobile-test-hour">
+                <span>12:30</span>
+                <span class="mobile-test-now">Teraz</span>
+            </div>
+            <div class="mobile-test-card">
+                <div class="mobile-test-patient">Wolny termin</div>
+                <div class="mobile-test-meta">
+                    <span class="mobile-test-tag">30 min</span>
+                </div>
+                <div class="mobile-test-note">Aktualny slot pozostaje wyraźny nawet gdy jest pusty.</div>
+            </div>
+        </article>
+
+        <article class="mobile-test-slot">
+            <div class="mobile-test-hour">13:00</div>
+            <div class="mobile-test-card">
+                <div class="mobile-test-patient">Maria Nowak</div>
+                <div class="mobile-test-meta">
+                    <span class="mobile-test-tag pnf">PNF</span>
+                    <span class="mobile-test-tag">Co 2 dni</span>
+                </div>
+                <div class="mobile-test-note">Informacje dodatkowe są krótkie i nie rozpychają karty.</div>
+            </div>
+        </article>
+
+        <article class="mobile-test-slot">
+            <div class="mobile-test-hour">13:30</div>
+            <div class="mobile-test-card">
+                <div class="mobile-test-patient">Adam Wiśniewski / Ewa Maj</div>
+                <div class="mobile-test-meta">
+                    <span class="mobile-test-tag hydro">Hydroterapia</span>
+                    <span class="mobile-test-tag">Podzielona</span>
+                </div>
+                <div class="mobile-test-note">Podzielone komórki mogą być pokazane jako jeden wpis z etykietą.</div>
+            </div>
+        </article>
+
+        <article class="mobile-test-slot is-empty">
+            <div class="mobile-test-hour">14:00</div>
+            <div class="mobile-test-card">
+                <div class="mobile-test-patient">Wolny termin</div>
+                <div class="mobile-test-note">Puste sloty są kompaktowe i szybkie do przeskanowania.</div>
+            </div>
+        </article>
+    </div>
+
+    <div class="mobile-test-actions" aria-label="Akcje zaznaczonego slotu">
+        <div class="mobile-test-add-row">
+            <input id="mobileTestPatientInput" class="mobile-test-input" type="text" placeholder="Nowy pacjent w zaznaczonym slocie">
+            <button id="mobileTestAddPatient" class="mobile-test-action primary" type="button">Dodaj</button>
+        </div>
+        <div class="mobile-test-action-row">
+            <button id="mobileTestEdit" class="mobile-test-action primary" type="button">Edytuj</button>
+            <button id="mobileTestInfo" class="mobile-test-action" type="button">Info</button>
+            <button id="mobileTestPnf" class="mobile-test-action" type="button">PNF</button>
+            <button id="mobileTestClear" class="mobile-test-action danger" type="button">Wyczyść</button>
+        </div>
+    </div>
+
+    <details class="mobile-test-footer">
+        <summary>Legenda</summary>
+        <div class="mobile-test-legend">
+            <div class="legend-item" data-type="massage"><span class="legend-dot massage-color"></span>Masaż</div>
+            <div class="legend-item" data-type="pnf"><span class="legend-dot pnf-color"></span>PNF</div>
+            <div class="legend-item" data-type="every-other-day"><span
+                    class="legend-dot every-other-day-color"></span>Co 2 dni</div>
+            <div class="legend-item" data-type="hydrotherapy"><span
+                    class="legend-dot hydrotherapy-color"></span>Hydroterapia</div>
+            <div class="legend-item" data-type="break"><span class="legend-dot break-color"></span>Przerwa</div>
+        </div>
+    </details>
+</section>
+
+<div class="table-container schedule-mobile-test-source">
+    <table id="mainScheduleTable" class="schedule-table">
+        <thead>
+            <tr id="tableHeaderRow">
+                <th>Godzina</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- Połączony pasek informacji i legendy -->
+    <div class="schedule-footer-bar">
+        <div id="dayProgressContainer"></div>
+        <div class="compact-legend">
+            <div class="legend-item" data-type="massage"><span class="legend-dot massage-color"></span>Masaż</div>
+            <div class="legend-item" data-type="pnf"><span class="legend-dot pnf-color"></span>PNF</div>
+            <div class="legend-item" data-type="every-other-day"><span
+                    class="legend-dot every-other-day-color"></span>Co 2 Dni</div>
+            <div class="legend-item" data-type="hydrotherapy"><span
+                    class="legend-dot hydrotherapy-color"></span>Hydroterapia</div>
+            <div class="legend-item" data-type="break"><span class="legend-dot break-color"></span>Przerwa</div>
+        </div>
+        <div id="patientCount" class="patient-count-badge"></div>
+    </div>
+</div>
+
+<div id="contextMenu" class="context-menu">
+    <ul>
+        <li id="contextPatientInfo" class="info">
+            <i class="fas fa-user-circle"></i><span>Informacje o pacjencie</span>
+        </li>
+        <li id="contextSplitCell"><i class="fas fa-columns"></i><span>Podziel komórkę</span></li>
+        <li id="contextMergeCells"><i class="fas fa-compress-arrows-alt"></i><span>Scal komórki</span></li>
+        <li id="contextAddBreak"><i class="fas fa-coffee"></i><span>Dodaj przerwę</span></li>
+        <li id="contextHydrotherapy">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="lucide lucide-waves-ladder-icon lucide-waves-ladder">
+                <path d="M19 5a2 2 0 0 0-2 2v11" />
+                <path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1" />
+                <path d="M7 13h10" />
+                <path d="M7 9h10" />
+                <path d="M9 5a2 2 0 0 0-2 2v11" />
+            </svg>
+            <span>Hydroterapia</span>
+        </li>
+        <li class="has-submenu">
+            <i class="fas fa-cogs"></i><span>Rodzaj zabiegu</span><i class="fas fa-chevron-right submenu-arrow"></i>
+            <ul class="context-submenu">
+                <li id="contextMassage"><i class="fas fa-hand-paper"></i><span>Masaż</span></li>
+                <li id="contextPnf"><i class="fas fa-brain"></i><span>PNF</span></li>
+                <li id="contextEveryOtherDay"><i class="fas fa-calendar-alt"></i><span>Co drugi dzień</span></li>
+                <li id="contextClearFormatting"><i class="fas fa-eraser"></i><span>Wyczyść</span></li>
+            </ul>
+        </li>
+        <li id="contextShowHistory"><i class="fas fa-history"></i><span>Pokaż historię</span></li>
+        <li id="contextClear" class="danger"><i class="fas fa-trash-alt"></i><span>Wyczyść komórkę</span></li>
+        <li id="contextRemoveBreak" class="danger" style="display: none">
+            <i class="fas fa-backspace"></i><span>Usuń przerwę</span>
+        </li>
+    </ul>
+</div>
+
+<!-- Modal Historii Zmian -->
+<div id="historyModal" class="modal-overlay" style="display: none">
+    <div class="modal-content">
+        <h2 class="modal-title">Historia zmian komórki</h2>
+        <div id="historyModalBody" class="modal-body">
+            <!-- History entries will be injected here -->
+        </div>
+        <div class="modal-actions">
+            <button id="closeHistoryModal" class="action-btn outline">Zamknij</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal informacji o pacjencie -->
+<div id="patientInfoModal" class="modal-overlay" style="display: none">
+    <div class="modal-content">
+        <h2 class="modal-title">Informacje o pacjencie</h2>
+        <div class="modal-body">
+            <div class="form-group patient-name-row">
+                <label for="patientName">Imię i nazwisko:</label>
+                <input type="text" id="patientName" readonly />
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="treatmentStartDate">Data rozpoczęcia:</label>
+                    <input type="date" id="treatmentStartDate" />
+                </div>
+                <div class="form-group">
+                    <label for="treatmentExtensionDays">Przedłużenie (dni):</label>
+                    <input type="number" id="treatmentExtensionDays" min="0" value="0" />
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="treatmentEndDate">Data zakończenia:</label>
+                <input type="text" id="treatmentEndDate" readonly class="bold-large-font" />
+            </div>
+            <div class="form-group">
+                <label for="additionalInfo">Informacje dodatkowe:</label>
+                <textarea id="additionalInfo" rows="3"></textarea>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button id="savePatientInfoModal" class="action-btn primary">Zapisz</button>
+            <button id="closePatientInfoModal" class="action-btn outline">Anuluj</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal do potwierdzenia wprowadzenia ciągu cyfr -->
+<div id="numericConfirmationModal" class="modal-overlay" style="display: none">
+    <div class="modal-content">
+        <h2 class="modal-title">Potwierdź wprowadzenie danych</h2>
+        <p id="numericConfirmationModalText">Czy na pewno chcesz wprowadzić ten ciąg cyfr?</p>
+        <div class="modal-actions">
+            <button id="confirmNumericBtn" class="action-btn primary">Tak, wprowadź</button>
+            <button id="cancelNumericBtn" class="action-btn outline">Anuluj</button>
+        </div>
+    </div>
+</div>
+
+<div id="duplicateModal" class="modal-overlay" style="display: none">
+    <div class="modal-content">
+        <p id="duplicateModalText"></p>
+        <div class="modal-buttons modal-actions">
+            <button id="moveEntryBtn" class="action-btn primary">Przenieś</button>
+            <button id="addAnywayBtn" class="action-btn secondary">Dodaj mimo to</button>
+            <button id="cancelBtn" class="action-btn outline">Anuluj</button>
+        </div>
+    </div>
+</div>

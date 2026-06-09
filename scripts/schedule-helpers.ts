@@ -48,7 +48,7 @@ export const getTreatmentData = (cellState: CellState, part: number | null): Tre
  * Kopiuje flagi specjalne z komórki źródłowej do docelowej
  */
 export const copyFlags = (source: CellState, target: CellState, sourcePart: number | null, targetPart: number | null): void => {
-    const flags = ['isMassage', 'isPnf', 'isEveryOtherDay'];
+    const flags = ['isMassage', 'isPnf', 'isEveryOtherDay', 'isSharedPatient'];
 
     flags.forEach((flag) => {
         const sourceKey = sourcePart ? `${flag}${sourcePart}` : flag;
@@ -83,6 +83,7 @@ export const clearSplitFields = (state: CellState): void => {
     const splitFields = [
         'content1', 'content2', 'isMassage1', 'isMassage2',
         'isPnf1', 'isPnf2', 'isEveryOtherDay1', 'isEveryOtherDay2',
+        'isSharedPatient1', 'isSharedPatient2',
         'treatmentData1', 'treatmentData2',
     ];
     splitFields.forEach((field) => delete state[field]);
@@ -127,7 +128,7 @@ export const copyFullCellState = (source: CellState, target: CellState): void =>
     target.content1 = safeCopy(source.content1) as string | undefined;
     target.content2 = safeCopy(source.content2) as string | undefined;
 
-    ['isMassage', 'isPnf', 'isEveryOtherDay'].forEach((flag) => {
+    ['isMassage', 'isPnf', 'isEveryOtherDay', 'isSharedPatient'].forEach((flag) => {
         target[flag] = safeBool(source[flag] as boolean);
         target[`${flag}1`] = safeBool(source[`${flag}1`] as boolean);
         target[`${flag}2`] = safeBool(source[`${flag}2`] as boolean);
@@ -156,6 +157,7 @@ export const createSourceClearFn = (sourcePart: number | null): ((state: CellSta
             delete state[`isMassage${sourcePart}`];
             delete state[`isPnf${sourcePart}`];
             delete state[`isEveryOtherDay${sourcePart}`];
+            delete state[`isSharedPatient${sourcePart}`];
             delete state[`treatmentData${sourcePart}`];
 
             const otherPart = sourcePart === 1 ? 2 : 1;
@@ -245,6 +247,7 @@ const updateSplitCellPart = (
         delete cellState[`isMassage${part}`];
         delete cellState[`isPnf${part}`];
         delete cellState[`isEveryOtherDay${part}`];
+        delete cellState[`isSharedPatient${part}`];
         delete cellState[`isHydrotherapy${part}`];
         return;
     }
@@ -287,6 +290,7 @@ const updateNormalCell = (cellState: CellState, newText: string): void => {
         cellState.isMassage = null;
         cellState.isPnf = null;
         cellState.isEveryOtherDay = null;
+        cellState.isSharedPatient = null;
         cellState.isHydrotherapy = null;
         return;
     }
