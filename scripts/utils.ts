@@ -176,14 +176,19 @@ export const isWorkday = (date: Date): boolean => {
 };
 
 /**
- * Escapes HTML special characters to prevent XSS.
+ * Escapes HTML special characters in a string to prevent XSS.
+ *
+ * @param str - The string to escape
+ * @returns The escaped string
  */
 export const escapeHTML = (str: string | null | undefined): string => {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+    if (str === null || str === undefined) return '';
+    const map: Record<string, string> = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;',
+    };
+    return str.replace(/[&<>"']/g, (m) => map[m]);
 };

@@ -2,13 +2,13 @@ import {
     clearCellContentKeys,
     copyTreatmentData,
     deepClone,
+    escapeHTML,
     formatDatePL,
     isWorkday,
     safeBool,
     safeCopy,
     toDateString,
     toUTCDate,
-    escapeHTML,
 } from '../scripts/utils.js';
 
 describe('utils', () => {
@@ -111,11 +111,15 @@ describe('utils', () => {
         expect(isWorkday(toUTCDate('2026-05-24'))).toBe(false);
     });
 
-    test('escapeHTML escapes special characters', () => {
+    test('escapeHTML sanitizes special characters', () => {
         expect(escapeHTML('<b>Test & "quote" \'single\'</b>')).toBe(
             '&lt;b&gt;Test &amp; &quot;quote&quot; &#039;single&#039;&lt;/b&gt;',
         );
-        expect(escapeHTML('')).toBe('');
+        expect(escapeHTML('<b>Hello & "World"</b>')).toBe('&lt;b&gt;Hello &amp; &quot;World&quot;&lt;/b&gt;');
+        expect(escapeHTML("'Single quotes'")).toBe('&#039;Single quotes&#039;');
         expect(escapeHTML(null)).toBe('');
+        expect(escapeHTML(undefined)).toBe('');
+        expect(escapeHTML('')).toBe('');
+        expect(escapeHTML('Plain text')).toBe('Plain text');
     });
 });

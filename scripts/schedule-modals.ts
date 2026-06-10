@@ -214,16 +214,20 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
             modalBody.innerHTML = `
                 <ul class="history-list">
                     ${cellState.history
-                    .map((entry) => `
+                    .map((entry) => {
+                        const employee = EmployeeManager.getEmployeeByUid(entry.userId ?? '');
+                        const employeeName = employee?.name || 'Nieznany';
+                        return `
                         <li class="history-item">
                             <div class="history-value">${escapeHTML(entry.oldValue) || '(pusty)'}</div>
                             <div class="history-meta">
                                 <span>${escapeHTML(new Date(entry.timestamp).toLocaleString('pl-PL'))}</span>
-                                <span>przez: ${escapeHTML(EmployeeManager.getEmployeeByUid(entry.userId ?? '')?.name || 'Nieznany')}</span>
+                                <span>przez: ${escapeHTML(employeeName)}</span>
                             </div>
                             <button class="action-btn outline revert-btn" data-value="${escapeHTML(entry.oldValue || '')}" title="Przywróć tę wartość"><i class="fas fa-undo"></i> Przywróć</button>
                         </li>
-                    `)
+                    `;
+                    })
                     .join('')}
                 </ul>
             `;
