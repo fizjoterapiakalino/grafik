@@ -78,6 +78,123 @@ export const Schedule: ScheduleAPI = (() => {
         }
     };
 
+    const normalizePatientName = (value: unknown): string => String(value || '').trim().toLowerCase();
+
+    type SharedPatientRef = {
+        time: string;
+        employeeIndex: string;
+        part: number | null;
+        patientName: string;
+    };
+
+    const getSharedPatientRefs = (patientName: string, excludedRefs: SharedPatientRef[] = []): SharedPatientRef[] => {
+        const normalizedName = normalizePatientName(patientName);
+        if (!normalizedName) return [];
+
+        const isExcluded = (ref: SharedPatientRef): boolean =>
+            excludedRefs.some((excluded) =>
+                excluded.time === ref.time &&
+                excluded.employeeIndex === ref.employeeIndex &&
+                excluded.part === ref.part
+            );
+
+        const refs: SharedPatientRef[] = [];
+        const scheduleCells = ScheduleData.getAppState().scheduleCells;
+
+        Object.entries(scheduleCells).forEach(([entryTime, employees]) => {
+            Object.entries(employees).forEach(([entryEmployeeIndex, state]) => {
+                if (state.isSplit) {
+                    ([1, 2] as const).forEach((part) => {
+                        const partName = String(state[`content${part}`] || '');
+                        const ref = {
+                            time: entryTime,
+                            employeeIndex: entryEmployeeIndex,
+                            part,
+                            patientName: partName,
+                        };
+                        if (
+                            normalizePatientName(partName) === normalizedName &&
+                            state[`isSharedPatient${part}`] === true &&
+                            !isExcluded(ref)
+                        ) {
+                            refs.push(ref);
+                        }
+                    });
+                    return;
+                }
+
+                const ref = {
+                    time: entryTime,
+                    employeeIndex: entryEmployeeIndex,
+                    part: null,
+                    patientName: String(state.content || ''),
+                };
+                if (
+                    normalizePatientName(state.content) === normalizedName &&
+                    state.isSharedPatient === true &&
+                    !isExcluded(ref)
+                ) {
+                    refs.push(ref);
+                }
+            });
+        });
+
+        return refs;
+    };
+
+    const createSharedMarkerCleanupUpdates = (
+        removedRefs: SharedPatientRef[]
+    ): { time: string; employeeIndex: string; updateFn: (state: CellState) => void }[] => {
+        const updates: { time: string; employeeIndex: string; updateFn: (state: CellState) => void }[] = [];
+        const processedNames = new Set<string>();
+
+        removedRefs.forEach((removedRef) => {
+            const normalizedName = normalizePatientName(removedRef.patientName);
+            if (!normalizedName || processedNames.has(normalizedName)) return;
+            processedNames.add(normalizedName);
+
+            const remainingRefs = getSharedPatientRefs(removedRef.patientName, removedRefs);
+            if (remainingRefs.length > 1) return;
+
+            remainingRefs.forEach((ref) => {
+                updates.push({
+                    time: ref.time,
+                    employeeIndex: ref.employeeIndex,
+                    updateFn: (state: CellState) => {
+                        if (ref.part) {
+                            state[`isSharedPatient${ref.part}`] = null;
+                        } else {
+                            state.isSharedPatient = null;
+                        }
+                    },
+                });
+            });
+        });
+
+        return updates;
+    };
+
+    const getSharedRefsFromCellState = (time: string, employeeIndex: string, state: CellState, part: number | null = null): SharedPatientRef[] => {
+        if (part) {
+            const patientName = String(state[`content${part}`] || '');
+            return state[`isSharedPatient${part}`] === true && patientName.trim() !== ''
+                ? [{ time, employeeIndex, part, patientName }]
+                : [];
+        }
+
+        if (state.isSplit) {
+            return [
+                ...getSharedRefsFromCellState(time, employeeIndex, state, 1),
+                ...getSharedRefsFromCellState(time, employeeIndex, state, 2),
+            ];
+        }
+
+        const patientName = String(state.content || '');
+        return state.isSharedPatient === true && patientName.trim() !== ''
+            ? [{ time, employeeIndex, part: null, patientName }]
+            : [];
+    };
+
     const mainController = {
         processExitEditMode(element: HTMLElement, newText: string): void {
             element.setAttribute('contenteditable', 'false');
@@ -88,6 +205,11 @@ export const Schedule: ScheduleAPI = (() => {
             const time = (parentCell as HTMLElement & { dataset: { time?: string } }).dataset.time || '';
             const duplicate = this.findDuplicateEntry(newText, time, employeeIndex);
             const targetPart = getTargetPart(element);
+            const currentCellState = ScheduleData.getCellState(time, employeeIndex) || {};
+            const currentSharedRefs = getSharedRefsFromCellState(time, employeeIndex, currentCellState, targetPart);
+            const removedSharedRefs = currentSharedRefs.filter((ref) =>
+                normalizePatientName(ref.patientName) !== normalizePatientName(newText)
+            );
 
             const updateSchedule = (isMove = false): void => {
                 if (isMove && duplicate) {
@@ -109,13 +231,28 @@ export const Schedule: ScheduleAPI = (() => {
 
                     ScheduleData.updateMultipleCells(updates as any);
                 } else {
-                    ScheduleData.updateCellState(time, employeeIndex, (cellState) => {
-                        updateCellContent(cellState, newText, targetPart, element, parentCell);
+                    const cleanupUpdates = createSharedMarkerCleanupUpdates(removedSharedRefs);
+                    if (cleanupUpdates.length > 0) {
+                        ScheduleData.updateMultipleCells([
+                            {
+                                time,
+                                employeeIndex,
+                                updateFn: (cellState: CellState) => {
+                                    updateCellContent(cellState, newText, targetPart, element, parentCell);
+                                    initTreatmentData(cellState);
+                                },
+                            },
+                            ...cleanupUpdates,
+                        ]);
+                    } else {
+                        ScheduleData.updateCellState(time, employeeIndex, (cellState) => {
+                            updateCellContent(cellState, newText, targetPart, element, parentCell);
 
-                        if (!isMove) {
-                            initTreatmentData(cellState);
-                        }
-                    });
+                            if (!isMove) {
+                                initTreatmentData(cellState);
+                            }
+                        });
+                    }
                 }
             };
 
@@ -269,6 +406,8 @@ export const Schedule: ScheduleAPI = (() => {
                     isMassage2: part2?.dataset.isMassage === 'true',
                     isPnf1: part1?.dataset.isPnf === 'true',
                     isPnf2: part2?.dataset.isPnf === 'true',
+                    isSharedPatient1: part1?.dataset.isSharedPatient === 'true',
+                    isSharedPatient2: part2?.dataset.isSharedPatient === 'true',
                     isHydrotherapy1: part1?.dataset.isHydrotherapy === 'true',
                     isHydrotherapy2: part2?.dataset.isHydrotherapy === 'true',
                 };
@@ -277,6 +416,7 @@ export const Schedule: ScheduleAPI = (() => {
                 content: ScheduleUI.getElementText(cell),
                 isMassage: (cell as HTMLElement).dataset.isMassage === 'true',
                 isPnf: (cell as HTMLElement).dataset.isPnf === 'true',
+                isSharedPatient: (cell as HTMLElement).dataset.isSharedPatient === 'true',
                 isHydrotherapy: (cell as HTMLElement).dataset.isHydrotherapy === 'true',
             };
         },
@@ -394,6 +534,7 @@ export const Schedule: ScheduleAPI = (() => {
                 state.isMassage = safeCopy(state[`isMassage${activePart}`]);
                 state.isPnf = safeCopy(state[`isPnf${activePart}`]);
                 state.isEveryOtherDay = safeCopy(state[`isEveryOtherDay${activePart}`]);
+                state.isSharedPatient = safeCopy(state[`isSharedPatient${activePart}`]);
                 state.isHydrotherapy = safeCopy(state[`isHydrotherapy${activePart}`]);
 
                 const treatmentData = (state[`treatmentData${activePart}`] as TreatmentData) || {};
@@ -411,6 +552,8 @@ export const Schedule: ScheduleAPI = (() => {
                 state.isPnf2 = null;
                 state.isEveryOtherDay1 = null;
                 state.isEveryOtherDay2 = null;
+                state.isSharedPatient1 = null;
+                state.isSharedPatient2 = null;
                 state.isHydrotherapy1 = null;
                 state.isHydrotherapy2 = null;
                 state.isHydrotherapy = null;
@@ -427,12 +570,18 @@ export const Schedule: ScheduleAPI = (() => {
         },
 
         clearCell(cell: HTMLElement): void {
+            const cellData = cell as HTMLElement & { dataset: { time?: string; employeeIndex?: string } };
+            const time = cellData.dataset.time || '';
+            const employeeIndex = cellData.dataset.employeeIndex || '';
+            const currentCellState = time && employeeIndex ? ScheduleData.getCellState(time, employeeIndex) : undefined;
+            const removedSharedRefs = currentCellState ? getSharedRefsFromCellState(time, employeeIndex, currentCellState) : [];
             const clearContent = (state: CellState): void => {
                 const contentKeys = [
                     'content', 'content1', 'content2', 'isSplit', 'isBreak',
-                    'isMassage', 'isPnf', 'isEveryOtherDay',
+                    'isMassage', 'isPnf', 'isEveryOtherDay', 'isSharedPatient',
                     'treatmentStartDate', 'treatmentExtensionDays', 'treatmentEndDate', 'additionalInfo',
                     'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2',
+                    'isEveryOtherDay1', 'isEveryOtherDay2', 'isSharedPatient1', 'isSharedPatient2',
                     'isHydrotherapy', 'isHydrotherapy1', 'isHydrotherapy2',
                 ];
                 for (const key of contentKeys) {
@@ -442,7 +591,16 @@ export const Schedule: ScheduleAPI = (() => {
                 }
                 window.showToast('Wyczyszczono komórkę');
             };
-            updateCellState(cell, clearContent);
+
+            const cleanupUpdates = createSharedMarkerCleanupUpdates(removedSharedRefs);
+            if (time && employeeIndex && cleanupUpdates.length > 0) {
+                ScheduleData.updateMultipleCells([
+                    { time, employeeIndex, updateFn: clearContent },
+                    ...cleanupUpdates,
+                ]);
+            } else {
+                updateCellState(cell, clearContent);
+            }
         },
     };
 

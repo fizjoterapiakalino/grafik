@@ -424,7 +424,7 @@ td.split-cell>div.hydrotherapy-text>span {
 .split-cell-wrapper>div.shared-patient-cell::after {
     content: 'W';
     position: absolute;
-    top: 2px;
+    bottom: 2px;
     right: 2px;
     width: 13px;
     height: 13px;

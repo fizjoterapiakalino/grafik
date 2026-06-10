@@ -575,6 +575,10 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                             state.isEveryOtherDay1 = true;
                             state.isEveryOtherDay = null;
                         }
+                        if (state.isSharedPatient) {
+                            state.isSharedPatient1 = true;
+                            state.isSharedPatient = null;
+                        }
 
                         state.treatmentData1 = {
                             startDate: safeCopy(state.treatmentStartDate),
@@ -616,6 +620,7 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                         state.isMassage = false;
                         state.isPnf = false;
                         state.isEveryOtherDay = false;
+                        state.isSharedPatient = false;
                         if (state.isSplit) {
                             state.isMassage1 = false;
                             state.isMassage2 = false;
@@ -623,6 +628,8 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                             state.isPnf2 = false;
                             state.isEveryOtherDay1 = false;
                             state.isEveryOtherDay2 = false;
+                            state.isSharedPatient1 = false;
+                            state.isSharedPatient2 = false;
                         }
                         window.showToast('Wyczyszczono formatowanie');
                     });
@@ -658,6 +665,10 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                     if (state.isEveryOtherDay) {
                         state.isEveryOtherDay1 = true;
                         delete state.isEveryOtherDay;
+                    }
+                    if (state.isSharedPatient) {
+                        state.isSharedPatient1 = true;
+                        delete state.isSharedPatient;
                     }
 
                     state.treatmentData1 = {

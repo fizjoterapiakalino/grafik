@@ -149,7 +149,7 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
                 if (isMassage) part.classes.push('massage-text');
                 if (isPnf) part.classes.push('pnf-text');
                 if (isEveryOtherDay) part.classes.push('every-other-day-text');
-                if (isSharedPatient) part.classes.push('shared-patient-cell');
+                if (isSharedPatient && part.text.trim() !== '') part.classes.push('shared-patient-cell');
                 if (isHydrotherapy) {
                     part.classes.push('hydrotherapy-text');
                     part.classes.push('hydrotherapy-cell-bg'); // Helper class for partial split bg if needed
@@ -223,7 +223,7 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
         if (cellData.isMassage) result.classes.push('massage-text');
         if (cellData.isPnf) result.classes.push('pnf-text');
         if (cellData.isEveryOtherDay) result.classes.push('every-other-day-text');
-        if (cellData.isSharedPatient) result.classes.push('shared-patient-cell');
+        if (cellData.isSharedPatient && result.text.trim() !== '') result.classes.push('shared-patient-cell');
 
         if (cellData.isHydrotherapy) {
             result.text = 'Hydro.'; // Enforce text for full cell
