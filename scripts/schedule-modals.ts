@@ -221,10 +221,10 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
                         <li class="history-item">
                             <div class="history-value">${escapeHTML(entry.oldValue) || '(pusty)'}</div>
                             <div class="history-meta">
-                                <span>${new Date(entry.timestamp).toLocaleString('pl-PL')}</span>
+                                <span>${escapeHTML(new Date(entry.timestamp).toLocaleString('pl-PL'))}</span>
                                 <span>przez: ${escapeHTML(employeeName)}</span>
                             </div>
-                            <button class="action-btn outline revert-btn" data-value="${escapeHTML(entry.oldValue)}" title="Przywróć tę wartość"><i class="fas fa-undo"></i> Przywróć</button>
+                            <button class="action-btn outline revert-btn" data-value="${escapeHTML(entry.oldValue || '')}" title="Przywróć tę wartość"><i class="fas fa-undo"></i> Przywróć</button>
                         </li>
                     `;
                     })

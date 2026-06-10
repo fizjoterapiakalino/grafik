@@ -62,7 +62,7 @@ describe('utils', () => {
                 treatmentEndDate: '2026-01-20',
                 additionalInfo: 'Notatka',
             },
-            target
+            target,
         );
 
         expect(target).toEqual({
@@ -86,7 +86,7 @@ describe('utils', () => {
                 },
             },
             target,
-            '2'
+            '2',
         );
 
         expect(target.treatmentData2).toEqual({
@@ -112,6 +112,9 @@ describe('utils', () => {
     });
 
     test('escapeHTML sanitizes special characters', () => {
+        expect(escapeHTML('<b>Test & "quote" \'single\'</b>')).toBe(
+            '&lt;b&gt;Test &amp; &quot;quote&quot; &#039;single&#039;&lt;/b&gt;',
+        );
         expect(escapeHTML('<b>Hello & "World"</b>')).toBe('&lt;b&gt;Hello &amp; &quot;World&quot;&lt;/b&gt;');
         expect(escapeHTML("'Single quotes'")).toBe('&#039;Single quotes&#039;');
         expect(escapeHTML(null)).toBe('');
