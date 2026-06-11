@@ -2,6 +2,7 @@
 import { db as dbRaw, auth as authRaw, FieldValue } from './firebase-config.js';
 import { EmployeeManager } from './employee-manager.js';
 import { MobileZen } from './mobile-zen.js';
+import { escapeHTML } from './utils.js';
 import Hls from 'hls.js';
 
 // Type for Firebase db wrapper (compatible with existing codebase)
@@ -964,7 +965,7 @@ export const Stations: StationsAPI = (() => {
                     const isCurrent = id === currentEmployeeId;
                     return `
                         <button class="emp-picker-btn ${isCurrent ? 'current' : ''}" data-emp-id="${id}">
-                            <span class="emp-picker-name">${name}</span>
+                            <span class="emp-picker-name">${escapeHTML(name)}</span>
                         </button>
                     `;
                 }).join('');
@@ -2462,7 +2463,7 @@ export const Stations: StationsAPI = (() => {
                     <span class="station-reserved-badge">Zarezerwowane, odliczanie nieaktywne</span>
                     <div class="queue-next-action">
                         <div class="queue-next-info">
-                            <i class="fas fa-user-clock"></i> Czeka: ${nextName}
+                            <i class="fas fa-user-clock"></i> Czeka: ${escapeHTML(nextName)}
                         </div>
                         <div class="awaiting-actions-row">
                             <button class="btn-start-queue" data-action="start-queue" data-station="${station.id}" data-room="${room.id}">
@@ -2550,7 +2551,7 @@ export const Stations: StationsAPI = (() => {
             return `
                 <div class="queue-item ${isOwn ? 'own' : ''}${moveAnimClass}">
                     <span class="queue-index">${index + 1}.</span>
-                    <span class="queue-emp">${empName}</span>
+                    <span class="queue-emp">${escapeHTML(empName)}</span>
                     <span class="queue-treat">${treatmentName}</span>
                     <div class="queue-item-actions">
                         ${canMoveUp ? `
@@ -2588,7 +2589,7 @@ export const Stations: StationsAPI = (() => {
         if (station.status === 'FINISHED' && nextEntry) {
             nextPreviewHtml = `
                 <div class="queue-next">
-                    <i class="fas fa-forward"></i> Następny: ${EmployeeManager.getNameById(nextEntry.employeeId)}
+                    <i class="fas fa-forward"></i> Następny: ${escapeHTML(EmployeeManager.getNameById(nextEntry.employeeId))}
                 </div>
             `;
         }
@@ -2633,7 +2634,7 @@ export const Stations: StationsAPI = (() => {
                     <div class="station-timer-content">
                         <div class="station-info">
                             <span class="station-name">${station.name}</span>
-                            <span class="station-emp-name">${employeeName}</span>
+                            <span class="station-emp-name">${escapeHTML(employeeName)}</span>
                         </div>
                         <span class="station-timer">${formatTime(remaining)}</span>
                     </div>
@@ -2646,7 +2647,7 @@ export const Stations: StationsAPI = (() => {
                 <div class="station-card station-simple ${statusClass}" data-station-id="${station.id}">
                     <div class="station-finished-content" data-action="release" data-station="${station.id}" data-room="${room.id}">
                         <span class="station-name">${station.name}</span>
-                        <span class="station-emp-name">${employeeName}</span>
+                        <span class="station-emp-name">${escapeHTML(employeeName)}</span>
                         <span class="station-timer">00:00</span>
                         <span class="station-release-hint">Kliknij aby zwolnić</span>
                     </div>
@@ -2739,7 +2740,7 @@ export const Stations: StationsAPI = (() => {
                     <div class="station-occupied-content">
                         <div class="station-info">
                             <span class="station-name">${station.name}</span>
-                            <span class="station-emp-name">${employeeName}</span>
+                            <span class="station-emp-name">${escapeHTML(employeeName)}</span>
                             <span class="station-treatment-name">${treatment?.shortName || ''}</span>
                         </div>
                         <span class="station-timer">${formatTime(remaining)}</span>
@@ -2755,7 +2756,7 @@ export const Stations: StationsAPI = (() => {
                     <div class="station-finished-content" data-action="release" data-station="${station.id}" data-room="${room.id}">
                         <div class="station-info">
                             <span class="station-name">${station.name}</span>
-                            <span class="station-emp-name">${employeeName}</span>
+                            <span class="station-emp-name">${escapeHTML(employeeName)}</span>
                             <span class="station-treatment-name">${treatment?.shortName || ''}</span>
                         </div>
                         <span class="station-timer">00:00</span>
