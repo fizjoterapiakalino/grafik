@@ -19,6 +19,11 @@ interface ContextMenuInstance {
     handleContextMenu: (event: MouseEvent) => void;
     handleClickOutside: (event: MouseEvent) => void;
     itemClickHandlers: Map<string, () => void>;
+    submenuHandlers: Array<{
+        element: HTMLElement;
+        mouseenter: () => void;
+        focusin: () => void;
+    }>;
     itemConfig: ContextMenuItemConfig[];
 }
 
@@ -30,6 +35,8 @@ interface ContextMenuElement extends HTMLElement {
 }
 
 const contextMenuInstances: Record<string, ContextMenuInstance> = {};
+const VIEWPORT_MARGIN = 8;
+const SUBMENU_GAP = 5;
 
 export const initializeContextMenu = (
     menuId: string,
@@ -43,6 +50,49 @@ export const initializeContextMenu = (
     }
 
     let currentTarget: HTMLElement | null = null;
+
+    const resetSubmenuPosition = (submenu: HTMLElement): void => {
+        submenu.classList.remove('open-left');
+        submenu.style.removeProperty('--submenu-offset-y');
+    };
+
+    const positionSubmenu = (item: HTMLElement): void => {
+        const submenu = item.querySelector<HTMLElement>(':scope > .context-submenu');
+        if (!submenu) return;
+
+        resetSubmenuPosition(submenu);
+
+        const previousDisplay = submenu.style.display;
+        const previousVisibility = submenu.style.visibility;
+        submenu.style.display = 'block';
+        submenu.style.visibility = 'hidden';
+
+        const itemRect = item.getBoundingClientRect();
+        const submenuRect = submenu.getBoundingClientRect();
+        const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+        const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+
+        const wouldOverflowRight = itemRect.right + SUBMENU_GAP + submenuRect.width > viewportWidth - VIEWPORT_MARGIN;
+        const hasSpaceOnLeft = itemRect.left - SUBMENU_GAP - submenuRect.width >= VIEWPORT_MARGIN;
+        if (wouldOverflowRight && hasSpaceOnLeft) {
+            submenu.classList.add('open-left');
+        }
+
+        let offsetY = 0;
+        const bottomOverflow = itemRect.top + submenuRect.height - (viewportHeight - VIEWPORT_MARGIN);
+        if (bottomOverflow > 0) {
+            offsetY -= bottomOverflow;
+        }
+
+        const topOverflow = itemRect.top + offsetY - VIEWPORT_MARGIN;
+        if (topOverflow < 0) {
+            offsetY -= topOverflow;
+        }
+
+        submenu.style.setProperty('--submenu-offset-y', `${Math.round(offsetY)}px`);
+        submenu.style.display = previousDisplay;
+        submenu.style.visibility = previousVisibility;
+    };
 
     const handleContextMenu = (event: MouseEvent): void => {
         const target = (event.target as HTMLElement).closest(targetSelector) as HTMLElement | null;
@@ -72,7 +122,8 @@ export const initializeContextMenu = (
             contextMenu.classList.add('visible');
 
             const { clientX: mouseX, clientY: mouseY } = event;
-            const { innerWidth: windowWidth, innerHeight: windowHeight } = window;
+            const windowWidth = document.documentElement.clientWidth || window.innerWidth;
+            const windowHeight = document.documentElement.clientHeight || window.innerHeight;
             const menuWidth = contextMenu.offsetWidth;
             const menuHeight = contextMenu.offsetHeight;
 
@@ -80,15 +131,15 @@ export const initializeContextMenu = (
             let y = mouseY;
 
             if (x + menuWidth > windowWidth) {
-                x = windowWidth - menuWidth - 10;
+                x = windowWidth - menuWidth - VIEWPORT_MARGIN;
             }
 
             if (y + menuHeight > windowHeight) {
-                y = windowHeight - menuHeight - 10;
+                y = windowHeight - menuHeight - VIEWPORT_MARGIN;
             }
 
-            if (x < 0) x = 10;
-            if (y < 0) y = 10;
+            if (x < VIEWPORT_MARGIN) x = VIEWPORT_MARGIN;
+            if (y < VIEWPORT_MARGIN) y = VIEWPORT_MARGIN;
 
             contextMenu.style.left = `${x}px`;
             contextMenu.style.top = `${y}px`;
@@ -104,6 +155,7 @@ export const initializeContextMenu = (
     };
 
     const itemClickHandlers = new Map<string, () => void>();
+    const submenuHandlers: ContextMenuInstance['submenuHandlers'] = [];
     itemConfig.forEach((item) => {
         const element = document.getElementById(item.id);
         if (element) {
@@ -117,6 +169,14 @@ export const initializeContextMenu = (
             itemClickHandlers.set(item.id, handler);
             element.addEventListener('click', handler);
         }
+    });
+
+    contextMenu.querySelectorAll<HTMLElement>('.has-submenu').forEach((element) => {
+        const mouseenter = (): void => positionSubmenu(element);
+        const focusin = (): void => positionSubmenu(element);
+        element.addEventListener('mouseenter', mouseenter);
+        element.addEventListener('focusin', focusin);
+        submenuHandlers.push({ element, mouseenter, focusin });
     });
 
     document.addEventListener('contextmenu', handleContextMenu);
@@ -162,6 +222,7 @@ export const initializeContextMenu = (
         handleContextMenu,
         handleClickOutside,
         itemClickHandlers,
+        submenuHandlers,
         itemConfig,
     };
 };
@@ -177,6 +238,10 @@ export const destroyContextMenu = (menuId: string): void => {
             if (element && handler) {
                 element.removeEventListener('click', handler);
             }
+        });
+        instance.submenuHandlers.forEach(({ element, mouseenter, focusin }) => {
+            element.removeEventListener('mouseenter', mouseenter);
+            element.removeEventListener('focusin', focusin);
         });
         delete contextMenuInstances[menuId];
         debugLog(`Context menu ${menuId} destroyed.`);
