@@ -304,7 +304,9 @@ describe('data-validation', () => {
             expect(result.valid).toBe(false);
             expect(result.errors.some((error) => error.includes('Komórka [08:00][0]'))).toBe(true);
             expect(result.errors.some((error) => error.includes('50 znaków'))).toBe(true);
-            expect(result.errors.some((error) => error.includes('isMassage musi być wartością boolean lub null'))).toBe(true);
+            expect(result.errors.some((error) => error.includes('isMassage musi być wartością boolean lub null'))).toBe(
+                true,
+            );
         });
     });
 

@@ -65,7 +65,8 @@ const testFirebaseConfig = {
 };
 
 // Automatyczne wykrywanie środowiska
-const isLocalDevelopment = typeof window !== 'undefined' &&
+const isLocalDevelopment =
+    typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' ||
         window.location.hostname === '127.0.0.1' ||
         window.location.hostname === '');
@@ -82,8 +83,8 @@ try {
     firestoreDb = initializeFirestore(app, {
         localCache: persistentLocalCache({
             tabManager: persistentMultipleTabManager(),
-            cacheSizeBytes: CACHE_SIZE_UNLIMITED
-        })
+            cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+        }),
     });
     console.log('✅ Firestore offline persistence enabled (multi-tab)');
 } catch (e) {
@@ -96,7 +97,9 @@ try {
         .then(() => console.log('✅ Firestore offline persistence enabled (legacy mode)'))
         .catch((err) => {
             if (err.code === 'failed-precondition') {
-                console.warn('⚠️ Persistence failed: Multiple tabs open. Data will still sync but offline mode limited.');
+                console.warn(
+                    '⚠️ Persistence failed: Multiple tabs open. Data will still sync but offline mode limited.',
+                );
             } else if (err.code === 'unimplemented') {
                 console.warn('⚠️ Persistence not supported in this browser.');
             } else {

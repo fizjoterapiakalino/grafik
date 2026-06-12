@@ -132,9 +132,7 @@ describe('ScrappedPdfs', () => {
     });
 
     test('should show empty search state when nothing matches', async () => {
-        const mockData = [
-            { date: '2023-10-25', type: 'Grafik', title: 'Plan A', url: '#' },
-        ];
+        const mockData = [{ date: '2023-10-25', type: 'Grafik', title: 'Plan A', url: '#' }];
 
         PdfService.fetchAndCachePdfLinks.mockResolvedValue(mockData);
 
@@ -177,7 +175,9 @@ describe('ScrappedPdfs', () => {
 
         expect(document.getElementById('pdfModal').style.display).toBe('flex');
         expect(document.getElementById('pdfOpenNewTabBtn').href).toBe('http://example.com/doc.pdf');
-        expect(document.getElementById('pdfIframe').src).toContain('http://example.com/doc.pdf#navpanes=0&toolbar=0&view=FitH');
+        expect(document.getElementById('pdfIframe').src).toContain(
+            'http://example.com/doc.pdf#navpanes=0&toolbar=0&view=FitH',
+        );
         expect(document.getElementById('pdfModalTitle').textContent).toBe('Plan.pdf');
     });
 });

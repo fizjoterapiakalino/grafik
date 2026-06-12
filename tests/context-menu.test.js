@@ -39,12 +39,14 @@ describe('context-menu', () => {
         ]);
 
         const target = document.querySelector('.target');
-        target.dispatchEvent(new MouseEvent('contextmenu', {
-            bubbles: true,
-            cancelable: true,
-            clientX: 20,
-            clientY: 30,
-        }));
+        target.dispatchEvent(
+            new MouseEvent('contextmenu', {
+                bubbles: true,
+                cancelable: true,
+                clientX: 20,
+                clientY: 30,
+            }),
+        );
 
         const menu = document.getElementById('contextMenu');
         expect(menu.style.display).toBe('block');
@@ -52,10 +54,12 @@ describe('context-menu', () => {
         expect(document.getElementById('conditionalItem').style.display).toBe('flex');
         expect(onShow).toHaveBeenCalledWith(target, expect.any(MouseEvent));
 
-        document.querySelector('.disabled-target').dispatchEvent(new MouseEvent('contextmenu', {
-            bubbles: true,
-            cancelable: true,
-        }));
+        document.querySelector('.disabled-target').dispatchEvent(
+            new MouseEvent('contextmenu', {
+                bubbles: true,
+                cancelable: true,
+            }),
+        );
 
         expect(document.getElementById('conditionalItem').style.display).toBe('none');
     });
@@ -64,9 +68,7 @@ describe('context-menu', () => {
         setupDom();
         const action = jest.fn();
 
-        initializeContextMenu('contextMenu', '.target', [
-            { id: 'copyItem', action },
-        ]);
+        initializeContextMenu('contextMenu', '.target', [{ id: 'copyItem', action }]);
 
         const target = document.querySelector('.target');
         target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
@@ -81,11 +83,11 @@ describe('context-menu', () => {
     test('clicking outside hides an open menu', () => {
         setupDom();
 
-        initializeContextMenu('contextMenu', '.target', [
-            { id: 'copyItem', action: jest.fn() },
-        ]);
+        initializeContextMenu('contextMenu', '.target', [{ id: 'copyItem', action: jest.fn() }]);
 
-        document.querySelector('.target').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+        document
+            .querySelector('.target')
+            .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
         document.getElementById('outside').click();
 
         expect(document.getElementById('contextMenu').style.display).toBe('none');

@@ -65,10 +65,12 @@ describe('EmployeeManager', () => {
     });
 
     test('load() should handle missing data gracefully', async () => {
-        db.collection().doc().get.mockResolvedValue({
-            exists: false,
-            data: () => ({}),
-        });
+        db.collection()
+            .doc()
+            .get.mockResolvedValue({
+                exists: false,
+                data: () => ({}),
+            });
 
         await EmployeeManager.load();
         expect(EmployeeManager.getAll()).toEqual({});
@@ -142,10 +144,7 @@ describe('EmployeeManager', () => {
 
     test('compareEmployees() should sort by composed display key', () => {
         expect(
-            EmployeeManager.compareEmployees(
-                { firstName: 'Żaneta', lastName: 'Nowak' },
-                { displayName: 'Adam' }
-            )
+            EmployeeManager.compareEmployees({ firstName: 'Żaneta', lastName: 'Nowak' }, { displayName: 'Adam' }),
         ).toBeGreaterThan(0);
     });
 

@@ -2,6 +2,7 @@
 import { db as dbRaw, auth as authRaw, FieldValue } from './firebase-config.js';
 import { EmployeeManager } from './employee-manager.js';
 import { MobileZen } from './mobile-zen.js';
+import { escapeHTML } from './utils.js';
 import Hls from 'hls.js';
 
 // Type for Firebase db wrapper (compatible with existing codebase)
@@ -960,7 +961,7 @@ export const Stations: StationsAPI = (() => {
             const employeeButtons = Object.entries(employees)
                 .filter(([_, emp]) => !emp.isHidden)
                 .map(([id, emp]) => {
-                    const name = emp.displayName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim();
+                    const name = escapeHTML(emp.displayName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim());
                     const isCurrent = id === currentEmployeeId;
                     return `
                         <button class="emp-picker-btn ${isCurrent ? 'current' : ''}" data-emp-id="${id}">
@@ -1495,7 +1496,7 @@ export const Stations: StationsAPI = (() => {
             return `${parts[0][0]}.${parts[1][0]}.`.toUpperCase();
         }
 
-        return parts[0].slice(0, 10);
+        return escapeHTML(parts[0].slice(0, 10));
     };
 
     /**
@@ -2453,7 +2454,7 @@ export const Stations: StationsAPI = (() => {
      * Render a station card in 'awaiting start' mode (FREE but Therapy/Massage queued)
      */
     const renderAwaitingStartCard = (room: Room, station: Station, nextEntry: QueueEntry, queueHtml: string): string => {
-        const nextName = EmployeeManager.getNameById(nextEntry.employeeId);
+        const nextName = escapeHTML(EmployeeManager.getNameById(nextEntry.employeeId));
         const addQueueAction = room.type === 'simple' ? 'add-to-queue' : 'show-queue-treatments';
         return `
             <div class="station-card ${room.type === 'simple' ? 'station-simple' : 'station-multi'} awaiting-start" data-station-id="${station.id}">
@@ -2529,7 +2530,7 @@ export const Stations: StationsAPI = (() => {
         }
 
         const queueList = station.queue.map((q, index) => {
-            const empName = EmployeeManager.getNameById(q.employeeId);
+            const empName = escapeHTML(EmployeeManager.getNameById(q.employeeId));
             const treatmentName = getQueueTreatmentLabel(room, station, q);
             const queueEta = formatQueueEta(getQueueWaitSeconds(station, index));
             const isOwn = q.employeeId === currentEmployeeId;
@@ -2588,7 +2589,7 @@ export const Stations: StationsAPI = (() => {
         if (station.status === 'FINISHED' && nextEntry) {
             nextPreviewHtml = `
                 <div class="queue-next">
-                    <i class="fas fa-forward"></i> Następny: ${EmployeeManager.getNameById(nextEntry.employeeId)}
+                    <i class="fas fa-forward"></i> Następny: ${escapeHTML(EmployeeManager.getNameById(nextEntry.employeeId))}
                 </div>
             `;
         }

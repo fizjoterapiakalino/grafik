@@ -462,7 +462,13 @@ describe('schedule-helpers', () => {
                 additionalInfo: 'Legacy note',
             };
 
-            updateCellContent(cellState, 'Nowy Pacjent', null, document.createElement('td'), document.createElement('td'));
+            updateCellContent(
+                cellState,
+                'Nowy Pacjent',
+                null,
+                document.createElement('td'),
+                document.createElement('td'),
+            );
 
             expect(cellState.content).toBe('Nowy Pacjent');
             expect(cellState.treatmentStartDate).toBe('2024-01-10');
