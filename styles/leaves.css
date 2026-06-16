@@ -1911,19 +1911,72 @@ table.summary-table tbody tr td.editable-carried-over:focus {
 }
 
 .gantt-day-header.weekend {
-    background: rgba(0, 0, 0, 0.18);
+    background-color: rgba(0, 0, 0, 0.18);
+    background-image: repeating-linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.12) 0,
+        rgba(255, 255, 255, 0.12) 1px,
+        transparent 1px,
+        transparent 8px
+    );
     color: rgba(255, 255, 255, 0.7);
     font-style: italic;
 }
 
-.gantt-day-header.weekend::after {
-    background: rgba(17, 24, 39, 0.55);
-    bottom: 0;
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 0;
-    width: 3px;
+.gantt-day-header.weekend.holiday {
+    background-color: #dc2626;
+    background-image: repeating-linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.16) 0,
+        rgba(255, 255, 255, 0.16) 1px,
+        transparent 1px,
+        transparent 8px
+    );
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.gantt-day-header.today.weekend {
+    background-color: var(--color-secondary);
+    background-image: repeating-linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.14) 0,
+        rgba(255, 255, 255, 0.14) 1px,
+        transparent 1px,
+        transparent 8px
+    );
+}
+
+.gantt-day-header.today.weekend.holiday {
+    background-color: #dc2626;
+    background-image: repeating-linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.16) 0,
+        rgba(255, 255, 255, 0.16) 1px,
+        transparent 1px,
+        transparent 8px
+    );
+}
+
+.gantt-day-header.gantt-crosshair-col.weekend {
+    background-image: repeating-linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.18) 0,
+        rgba(255, 255, 255, 0.18) 1px,
+        transparent 1px,
+        transparent 8px
+    ) !important;
+}
+
+.gantt-day-header.gantt-crosshair-col.weekend.holiday {
+    background-color: #dc2626 !important;
+    background-image: repeating-linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.2) 0,
+        rgba(255, 255, 255, 0.2) 1px,
+        transparent 1px,
+        transparent 8px
+    ) !important;
 }
 
 .gantt-day-header.today {
@@ -1972,21 +2025,6 @@ table.summary-table tbody tr td.editable-carried-over:focus {
     background: rgba(0, 0, 0, 0.08);
 }
 
-.gantt-day-cell.weekend {
-    background: #dde3ea;
-    border-right-color: #c5cdd8;
-}
-
-.gantt-day-cell.weekend::after {
-    background: #64748b;
-    bottom: 0;
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 0;
-    width: 3px;
-}
-
 .gantt-day-cell.month-start {
     border-left: 2px solid var(--color-gray-300);
 }
@@ -1998,6 +2036,73 @@ table.summary-table tbody tr td.editable-carried-over:focus {
 .gantt-day-cell.holiday {
     background: #fee2e2;
     border-right-color: #fca5a5;
+}
+
+.gantt-day-cell.weekend {
+    background-color: #dde3ea;
+    background-image: repeating-linear-gradient(
+        135deg,
+        rgba(100, 116, 139, 0.16) 0,
+        rgba(100, 116, 139, 0.16) 1px,
+        transparent 1px,
+        transparent 9px
+    );
+    border-right-color: #c5cdd8;
+}
+
+.gantt-day-cell.today.weekend {
+    background-color: rgba(var(--color-secondary-rgb), 0.2);
+    background-image: repeating-linear-gradient(
+        135deg,
+        rgba(100, 116, 139, 0.16) 0,
+        rgba(100, 116, 139, 0.16) 1px,
+        transparent 1px,
+        transparent 9px
+    );
+}
+
+.gantt-day-cell.weekend.holiday {
+    background-color: #fee2e2;
+    background-image: repeating-linear-gradient(
+        135deg,
+        rgba(220, 38, 38, 0.18) 0,
+        rgba(220, 38, 38, 0.18) 1px,
+        transparent 1px,
+        transparent 9px
+    );
+    border-right-color: #fca5a5;
+}
+
+.gantt-day-cell.today.weekend.holiday {
+    background-color: #fee2e2;
+    background-image: repeating-linear-gradient(
+        135deg,
+        rgba(220, 38, 38, 0.2) 0,
+        rgba(220, 38, 38, 0.2) 1px,
+        transparent 1px,
+        transparent 9px
+    );
+}
+
+.gantt-day-cell:hover.weekend {
+    background-image: repeating-linear-gradient(
+        135deg,
+        rgba(100, 116, 139, 0.2) 0,
+        rgba(100, 116, 139, 0.2) 1px,
+        transparent 1px,
+        transparent 9px
+    );
+}
+
+.gantt-day-cell:hover.weekend.holiday {
+    background-color: #fee2e2;
+    background-image: repeating-linear-gradient(
+        135deg,
+        rgba(220, 38, 38, 0.22) 0,
+        rgba(220, 38, 38, 0.22) 1px,
+        transparent 1px,
+        transparent 9px
+    );
 }
 
 /* ── Crosshair highlighting (column overlay + row on hover) ── */
