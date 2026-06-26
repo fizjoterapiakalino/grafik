@@ -463,13 +463,18 @@ td.split-cell>div.hydrotherapy-text>span {
     filter: saturate(0.88);
 }
 
-.schedule-table td.past-treatment-cell::after,
-.split-cell-wrapper > div.past-treatment-part::after {
+.schedule-table td.past-treatment-cell:not(.treatment-end-marker)::after,
+.split-cell-wrapper > div.past-treatment-part:not(.treatment-end-marker)::after {
     content: '';
     position: absolute;
     inset: 0;
     pointer-events: none;
     background: rgba(255, 255, 255, 0.08);
+}
+
+.schedule-table td.past-treatment-cell.treatment-end-marker::after,
+.split-cell-wrapper > div.past-treatment-part.treatment-end-marker::after {
+    z-index: 3;
 }
 
 .schedule-table tr.current-time-row td:first-child {

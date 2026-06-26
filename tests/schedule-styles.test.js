@@ -18,4 +18,10 @@ describe('schedule styles', () => {
         expect(pastTreatmentRule).toContain('opacity: 0.68');
         expect(pastTreatmentRule).toContain('filter: saturate(0.88)');
     });
+    test('keeps treatment bell visible on past schedule treatments', () => {
+        expect(css).toContain('.schedule-table td.past-treatment-cell:not(.treatment-end-marker)::after');
+        expect(css).toContain('.split-cell-wrapper > div.past-treatment-part:not(.treatment-end-marker)::after');
+        expect(css).toContain('.schedule-table td.past-treatment-cell.treatment-end-marker::after');
+        expect(css).toContain('.split-cell-wrapper > div.past-treatment-part.treatment-end-marker::after');
+    });
 });
