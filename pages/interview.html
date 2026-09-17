@@ -1,0 +1,109 @@
+<div class="interview-page">
+    <header class="interview-page-header">
+        <div>
+            <h1><i class="fas fa-notes-medical" aria-hidden="true"></i> Wywiad z pacjentem</h1>
+            <p>Formularz badania fizjoterapeutycznego</p>
+        </div>
+        <div class="interview-header-actions">
+            <button id="scanInterviewButton" class="interview-button secondary" type="button"><i class="fas fa-camera" aria-hidden="true"></i> Skanuj kod</button>
+            <button id="newInterviewButton" class="interview-button" type="button"><i class="fas fa-plus" aria-hidden="true"></i> Nowy pacjent</button>
+            <label id="activeBarcodeField" class="active-barcode-field" hidden>Kod karty<input id="activeBarcodeInput" type="text" inputmode="numeric" aria-label="Kod karty pacjenta"></label>
+        </div>
+    </header>
+
+    <section id="interviewListView" class="interview-list-view" aria-label="Lista pacjentów">
+        <div id="interviewCards" class="interview-cards"></div>
+        <div id="interviewEmptyState" class="interview-empty-state" hidden>
+            <i class="fas fa-user-plus" aria-hidden="true"></i>
+            <p>Brak lokalnych kart pacjentów.</p>
+        </div>
+    </section>
+
+    <div id="interviewFormView" hidden>
+        <div class="interview-toolbar">
+            <button id="backToInterviewListButton" class="interview-button secondary" type="button"><i class="fas fa-arrow-left" aria-hidden="true"></i> Lista pacjentów</button>
+            <span id="interviewSaveStatus" class="interview-save-status" aria-live="polite"></span>
+            <span class="interview-local-note"><i class="fas fa-lock" aria-hidden="true"></i> Dane są zapisywane wyłącznie na tym urządzeniu.</span>
+            <button id="deleteInterviewButton" class="interview-icon-button danger" type="button" title="Usuń bieżącą kartę" aria-label="Usuń bieżącą kartę"><i class="fas fa-trash-alt" aria-hidden="true"></i></button>
+        </div>
+        <form id="patientInterviewForm" autocomplete="off">
+        <section class="interview-section interview-patient-section">
+            <div class="section-heading"><span>01</span><h2>Dane karty</h2></div>
+            <div class="interview-patient-grid">
+                <label>Imię i nazwisko pacjenta<input name="patientName" data-field type="text" placeholder="Imię i nazwisko"></label>
+                <label>Data badania<input name="examDate" data-field type="date"></label>
+            </div>
+        </section>
+
+        <section class="interview-section interview-flags-section">
+            <button id="flagsToggle" class="section-toggle flags-toggle" type="button" aria-expanded="false" aria-controls="flagsContent"><span><i class="fas fa-triangle-exclamation" aria-hidden="true"></i> Choroby przewlekłe oraz czerwone / żółte flagi</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+            <div id="flagsContent" class="flags-content" hidden>
+                <label class="field-block full-width flags-note">Inne dolegliwości / czerwone / żółte flagi<textarea name="flagsNotes" data-field rows="3"></textarea></label>
+                <div class="flags-grid">
+                    <label><input name="pacemaker" data-field type="checkbox"><span>Stymulator mięśnia sercowego</span></label>
+                    <label><input name="venousThrombosis" data-field type="checkbox"><span>Zakrzepica żylna</span></label>
+                    <label><input name="diabetes" data-field type="checkbox"><span>Cukrzyca</span></label>
+                    <label><input name="pregnancy" data-field type="checkbox"><span>Ciąża</span></label>
+                    <label><input name="arrhythmia" data-field type="checkbox"><span>Arytmia</span></label>
+                    <label><input name="cancer" data-field type="checkbox"><span>Choroby nowotworowe</span></label>
+                    <label><input name="incontinence" data-field type="checkbox"><span>Nietrzymanie moczu</span></label>
+                    <label><input name="weightLoss" data-field type="checkbox"><span>Utrata wagi</span></label>
+                    <label><input name="heartAttack" data-field type="checkbox"><span>Zawał mięśnia sercowego</span></label>
+                    <label><input name="osteoporosis" data-field type="checkbox"><span>Osteoporoza</span></label>
+                    <label><input name="eyeDisease" data-field type="checkbox"><span>Choroby oczu</span></label>
+                    <label><input name="hypertension" data-field type="checkbox"><span>Nadciśnienie tętnicze</span></label>
+                    <label><input name="epilepsy" data-field type="checkbox"><span>Epilepsja</span></label>
+                    <label><input name="skinDisease" data-field type="checkbox"><span>Choroby skóry</span></label>
+                </div>
+            </div>
+        </section>
+
+        <section class="interview-section">
+            <div class="section-heading"><span>02</span><h2>Wywiad</h2></div>
+            <div class="interview-grid two-columns">
+                <label class="field-block highlighted">Główny problem funkcjonalny<textarea name="mainProblem" data-field rows="5" placeholder="Opisz główny problem funkcjonalny"></textarea></label>
+                <label class="field-block">Objawy początkowe, kiedy i jak się zaczęły<textarea name="initialSymptoms" data-field rows="5"></textarea></label>
+                <label class="field-block">Cel terapii - bliższy<textarea name="therapyGoal" data-field rows="3"></textarea></label>
+                <label class="field-block highlighted">Czynniki zwiększające ból / problem<textarea name="aggravatingFactors" data-field rows="3"></textarea></label>
+                <label class="field-block">Czynniki zmniejszające ból / problem<textarea name="relievingFactors" data-field rows="3"></textarea></label>
+            </div>
+            <div class="interview-grid pain-grid">
+                <fieldset class="choice-fieldset"><legend>Ból</legend><div class="segmented-options"><label><input name="painFrequency" data-field type="radio" value="Stały"><span>Stały</span></label><label><input name="painFrequency" data-field type="radio" value="Niestaly"><span>Niestaly</span></label></div></fieldset>
+                <label class="field-block">Gdzie?<input name="painLocation" data-field type="text"></label>
+                <label class="field-block">Charakter bólu<textarea name="painCharacter" data-field rows="3"></textarea></label>
+            </div>
+            <div class="interview-grid two-columns scales-grid">
+                <fieldset class="choice-fieldset"><legend>Skala VAS - przed terapią</legend><div class="number-scale" data-scale="vasBefore"></div></fieldset>
+                <fieldset class="choice-fieldset"><legend>Skala VAS - po terapii</legend><div class="number-scale" data-scale="vasAfter"></div></fieldset>
+            </div>
+            <label class="field-block full-width">Inne badania (RTG / MRI / inne) / data badania<textarea name="additionalExaminations" data-field rows="4"></textarea></label>
+        </section>
+
+        <section class="interview-section">
+            <div class="section-heading"><span>03</span><h2>Badanie</h2></div>
+            <label class="field-block full-width">Oglądanie / postawa / sposób poruszania się<textarea name="observation" data-field rows="4"></textarea></label>
+            <div class="assessment-list">
+                <div class="assessment-item"><h3>Testy funkcjonalne - lokalizacja</h3><div class="before-after"><label>Przed terapią<textarea name="functionalTestsBefore" data-field rows="3"></textarea></label><label>Po terapii<textarea name="functionalTestsAfter" data-field rows="3"></textarea></label></div></div>
+                <div class="assessment-item"><h3>Zakres ruchu - lokalizacja</h3><label class="inline-label">Lokalizacja<input name="rangeLocation" data-field type="text"></label><div class="before-after"><label>Przed terapią<textarea name="rangeBefore" data-field rows="3"></textarea></label><label>Po terapii<textarea name="rangeAfter" data-field rows="3"></textarea></label></div></div>
+                <div class="assessment-item"><h3>Testy: badania siły i napięcia mięśni</h3><div class="before-after"><label>Przed terapią<textarea name="strengthBefore" data-field rows="3"></textarea></label><label>Po terapii<textarea name="strengthAfter" data-field rows="3"></textarea></label></div></div>
+                <div class="assessment-item"><h3>Testy inne</h3><div class="before-after"><label>Przed terapią<textarea name="otherTestsBefore" data-field rows="3"></textarea></label><label>Po terapii<textarea name="otherTestsAfter" data-field rows="3"></textarea></label></div></div>
+            </div>
+        </section>
+
+        <section class="interview-section">
+            <div class="section-heading"><span>04</span><h2>Ocena końcowa</h2></div>
+            <fieldset class="choice-fieldset activity-scale"><legend>Według pacjenta: na ile problem ogranicza codzienną aktywność?</legend><div class="activity-rows"><div><strong>Przed terapią</strong><div class="activity-options" data-scale="activityBefore"></div></div><div><strong>Po terapii</strong><div class="activity-options" data-scale="activityAfter"></div></div></div></fieldset>
+            <fieldset class="choice-fieldset"><legend>Cel terapii został</legend><div class="goal-options"><label><input name="therapyResult" data-field type="radio" value="osiagniety-calkowicie"><span>osiągnięty całkowicie</span></label><label><input name="therapyResult" data-field type="radio" value="osiagniety-czesciowo"><span>częściowo osiągnięty</span></label><label><input name="therapyResult" data-field type="radio" value="nieosiagniety"><span>nieosiągnięty</span></label><label><input name="therapyResult" data-field type="radio" value="terapia-przerwana"><span>terapia przerwana</span></label></div></fieldset>
+            <label class="field-block full-width">Aktualny stan pacjenta / zalecenia do dalszego postępowania fizjoterapeutycznego<textarea name="recommendations" data-field rows="5"></textarea></label>
+        </section>
+        </form>
+    </div>
+
+    <div id="barcodeScannerModal" class="barcode-scanner-modal" hidden role="dialog" aria-modal="true" aria-labelledby="barcodeScannerTitle">
+        <div class="barcode-scanner-panel">
+            <div class="barcode-scanner-header"><h2 id="barcodeScannerTitle">Skanowanie kodu kreskowego</h2><button id="closeScannerButton" class="interview-icon-button" type="button" aria-label="Zamknij skaner"><i class="fas fa-times" aria-hidden="true"></i></button></div>
+            <div class="barcode-camera-frame"><video id="barcodeScannerVideo" autoplay playsinline muted></video><div class="barcode-scan-line" aria-hidden="true"></div></div>
+            <p id="barcodeScannerStatus" class="barcode-scanner-status" aria-live="polite">Uruchamianie kamery...</p>
+        </div>
+    </div>
+</div>

@@ -16,6 +16,7 @@ import { Statistics } from './statistics.js';
 import { Stations } from './stations.js';
 import { Appointments } from './appointments.js';
 import { ScheduleMobileTest } from './schedule-mobile-test.js';
+import { Interview } from './interview.js';
 
 const auth = authRaw as unknown as FirebaseAuthWrapper;
 
@@ -102,6 +103,11 @@ export const Router: RouterAPI = (() => {
             page: 'appointments',
             init: () => Appointments.init(),
             getModule: () => Appointments,
+        },
+        interview: {
+            page: 'interview',
+            init: () => Interview.init(),
+            getModule: () => Interview,
         },
         login: {
             page: 'login',

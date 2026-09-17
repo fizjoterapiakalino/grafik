@@ -1,0 +1,97 @@
+.interview-page { max-width: 1320px; margin: 0 auto; padding: 24px 0 40px; color: var(--color-gray-800); }
+.interview-page-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 0 0 16px; }
+.interview-page h1 { margin: 0; color: var(--color-primary-800); font-size: 1.55rem; letter-spacing: 0; }
+.interview-page h1 i { color: var(--color-primary-600); margin-right: 8px; }
+.interview-page-header p { margin: 4px 0 0; color: var(--color-gray-500); font-size: .9rem; }
+.interview-actions, .interview-toolbar, .interview-header-actions { display: flex; align-items: center; gap: 10px; }
+.interview-save-status { color: var(--color-gray-500); font-size: .82rem; white-space: nowrap; }
+.interview-button, .interview-icon-button { border: 1px solid var(--color-primary-600); background: var(--color-primary-600); color: #fff; cursor: pointer; min-height: 36px; font: inherit; font-weight: 600; }
+.interview-button { border-radius: 6px; padding: 0 13px; }
+.interview-button.secondary { background: #fff; color: var(--color-primary-700); }
+.active-barcode-field { align-items: center; color: var(--color-gray-600); display: flex; font-size: .72rem; font-weight: 700; gap: 7px; text-transform: uppercase; }
+.active-barcode-field input { background: var(--color-gray-50); border: 1px solid var(--color-gray-300); border-radius: 5px; color: var(--color-gray-800); font-family: monospace; font-size: .92rem; font-weight: 700; letter-spacing: 1px; padding: 8px 9px; width: 145px; }
+.active-barcode-field input:read-only { border-color: var(--color-gray-200); cursor: default; }
+.interview-icon-button { width: 36px; border-radius: 6px; }
+.interview-icon-button.danger { border-color: #fecaca; color: #dc2626; background: #fff; }
+.interview-button:hover, .interview-icon-button:hover { filter: brightness(.96); }
+.interview-toolbar { background: var(--color-white); border: 1px solid var(--color-gray-200); padding: 12px 14px; margin-bottom: 16px; border-radius: 8px; box-shadow: var(--shadow-sm); }
+.interview-toolbar label { font-weight: 700; color: var(--color-gray-700); white-space: nowrap; }
+.interview-toolbar label i, .interview-local-note i { color: var(--color-primary-600); margin-right: 5px; }
+.interview-toolbar select { min-width: 260px; max-width: 420px; height: 36px; border: 1px solid var(--color-gray-300); border-radius: 5px; padding: 0 8px; color: var(--color-gray-700); background: #fff; }
+.interview-local-note { margin-left: auto; font-size: .82rem; color: var(--color-gray-500); }
+.interview-list-view { min-height: 320px; }
+.interview-cards { display: grid; grid-auto-rows: 250px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.interview-card { align-items: stretch; background: var(--color-white); border: 1px solid var(--color-gray-200); border-radius: 8px; color: var(--color-gray-800); cursor: pointer; display: flex; flex-direction: column; height: 250px; min-width: 0; padding: 18px; text-align: left; transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast); }
+.interview-card:hover { border-color: var(--color-primary-400); box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.interview-card strong { font-family: var(--font-heading); font-size: .98rem; line-height: 1.35; }
+.interview-barcode { display: block; flex: 1; margin: 16px 2px 10px; min-height: 0; }
+.interview-barcode svg { display: block; height: 100%; width: 100%; }
+.interview-barcode-digits { color: var(--color-gray-700); font-family: monospace; font-size: .9rem; letter-spacing: 2px; text-align: center; }
+.interview-empty-state { align-items: center; background: var(--color-white); border: 1px dashed var(--color-gray-300); border-radius: 8px; color: var(--color-gray-500); display: flex; flex-direction: column; justify-content: center; min-height: 240px; }
+.interview-empty-state i { color: var(--color-primary-500); font-size: 2rem; }
+.interview-empty-state p { margin: 12px 0 0; }
+.barcode-scanner-modal { align-items: center; background: rgba(15, 23, 42, .7); display: flex; inset: 0; justify-content: center; padding: 20px; position: fixed; z-index: 3000; }
+.barcode-scanner-modal[hidden] { display: none !important; }
+.barcode-scanner-panel { background: var(--color-white); border-radius: 8px; box-shadow: var(--shadow-xl); max-width: 680px; overflow: hidden; width: min(100%, 680px); }
+.barcode-scanner-header { align-items: center; display: flex; justify-content: space-between; padding: 14px 16px; }
+.barcode-scanner-header h2 { color: var(--color-gray-800); font-size: 1rem; letter-spacing: 0; margin: 0; }
+.barcode-scanner-header .interview-icon-button { background: var(--color-gray-100); border-color: var(--color-gray-200); color: var(--color-gray-700); }
+.barcode-camera-frame { background: #020617; min-height: 300px; overflow: hidden; position: relative; }
+.barcode-camera-frame video { display: block; height: min(55vh, 460px); object-fit: cover; width: 100%; }
+.barcode-camera-frame::before { border: 2px solid rgba(255, 255, 255, .85); box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .24); content: ''; inset: 22% 10%; pointer-events: none; position: absolute; z-index: 1; }
+.barcode-scan-line { animation: scanLine 2s ease-in-out infinite; background: #14b8a6; box-shadow: 0 0 12px #14b8a6; height: 2px; left: 10%; position: absolute; right: 10%; top: 26%; z-index: 2; }
+.barcode-scanner-status { color: var(--color-gray-600); font-size: .86rem; margin: 0; padding: 13px 16px 16px; text-align: center; }
+@keyframes scanLine { 50% { transform: translateY(200px); } }
+.interview-flags-section { padding: 0; overflow: hidden; }
+.section-toggle { align-items: center; background: var(--color-white); border: 0; color: var(--color-gray-800); cursor: pointer; display: flex; font: inherit; font-size: 1rem; font-weight: 700; justify-content: space-between; padding: 17px 20px; text-align: left; width: 100%; }
+.section-toggle:not(.flags-toggle) > span:first-child { align-items: center; background: var(--color-primary-100); border-radius: 50%; color: var(--color-primary-800); display: inline-flex; font-size: .75rem; font-weight: 800; height: 26px; justify-content: center; width: 26px; }
+.section-toggle h2 { font-family: var(--font-heading); font-size: 1rem; letter-spacing: 0; margin: 0 auto 0 10px; }
+.section-toggle > i { color: var(--color-gray-500); transition: transform var(--transition-fast); }
+.section-toggle[aria-expanded="true"] > i { transform: rotate(180deg); }
+.section-toggle:hover { background: var(--color-gray-50); }
+.flags-toggle > span > i { color: var(--color-warning-dark); }
+.flags-toggle > span { align-items: center; display: flex; gap: 9px; }
+.section-content { border-top: 1px solid var(--color-gray-200); padding: 4px 20px 20px; }
+.flags-content { border-top: 1px solid var(--color-gray-200); padding: 4px 20px 20px; }
+.interview-section { background: var(--color-white); border: 1px solid var(--color-gray-200); border-radius: 8px; margin: 16px 0; padding: 20px; box-shadow: var(--shadow-sm); }
+.section-heading { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--color-gray-200); padding-bottom: 12px; margin-bottom: 16px; }
+.section-heading span { align-items: center; background: var(--color-primary-100); border-radius: 50%; color: var(--color-primary-800); display: inline-flex; font-size: .75rem; font-weight: 800; height: 26px; justify-content: center; width: 26px; }
+.section-heading h2 { font-size: 1rem; letter-spacing: 0; margin: 0; color: var(--color-gray-800); }
+.interview-patient-grid, .interview-grid { display: grid; gap: 14px; }
+.interview-patient-grid { grid-template-columns: minmax(0, 2fr) minmax(160px, 1fr); }
+.two-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pain-grid { grid-template-columns: 1fr 1fr 2fr; margin: 16px 0; }
+.field-block, .interview-patient-grid > label, .before-after > label { color: var(--color-gray-600); display: flex; flex-direction: column; font-size: .82rem; font-weight: 700; gap: 6px; }
+.field-block.full-width { display: flex; margin-top: 16px; }
+.field-block textarea, .field-block input, .interview-patient-grid input, .inline-label input, .before-after textarea { background: var(--color-gray-50); border: 1px solid var(--color-gray-300); border-radius: 5px; box-sizing: border-box; color: var(--color-gray-800); font: inherit; font-size: .9rem; font-weight: 400; padding: 9px 10px; resize: vertical; width: 100%; }
+.field-block textarea:focus, .field-block input:focus, .interview-patient-grid input:focus, .inline-label input:focus, .before-after textarea:focus { border-color: var(--color-primary-500); box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), .12); outline: 0; }
+.field-block.highlighted textarea { background: var(--color-warning-50); }
+.choice-fieldset { border: 0; margin: 0; min-width: 0; padding: 0; }
+.choice-fieldset legend { color: var(--color-gray-600); font-size: .82rem; font-weight: 700; margin-bottom: 8px; padding: 0; }
+.segmented-options, .number-scale, .activity-options, .goal-options { display: flex; align-items: stretch; }
+.segmented-options label, .number-scale label, .activity-options label, .goal-options label { flex: 1; position: relative; }
+.segmented-options input, .number-scale input, .activity-options input, .goal-options input { opacity: 0; position: absolute; }
+.segmented-options span, .number-scale span, .activity-options span, .goal-options span { align-items: center; background: var(--color-primary-50); border: 1px solid var(--color-primary-200); color: var(--color-gray-600); cursor: pointer; display: flex; font-size: .8rem; font-weight: 600; justify-content: center; min-height: 38px; padding: 0 8px; text-align: center; }
+.segmented-options label + label span, .number-scale label + label span, .activity-options label + label span, .goal-options label + label span { border-left: 0; }
+.segmented-options label:first-child span, .number-scale label:first-child span, .activity-options label:first-child span, .goal-options label:first-child span { border-radius: 5px 0 0 5px; }
+.segmented-options label:last-child span, .number-scale label:last-child span, .activity-options label:last-child span, .goal-options label:last-child span { border-radius: 0 5px 5px 0; }
+.segmented-options input:checked + span, .number-scale input:checked + span, .activity-options input:checked + span, .goal-options input:checked + span { background: var(--color-primary-600); border-color: var(--color-primary-600); color: #fff; }
+.scales-grid { margin: 16px 0; }
+.number-scale span { min-width: 20px; padding: 0 4px; }
+.flags-grid { display: grid; gap: 7px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 16px; }
+.flags-grid label { align-items: center; background: var(--color-gray-50); border: 1px solid var(--color-gray-200); border-radius: 5px; cursor: pointer; display: flex; font-size: .82rem; gap: 8px; min-height: 40px; padding: 6px 9px; }
+.flags-grid input { accent-color: var(--color-primary-600); height: 16px; margin: 0; width: 16px; }
+.flags-grid label:has(input:checked) { background: var(--color-warning-50); border-color: var(--color-warning); }
+.assessment-list { display: grid; gap: 16px; margin-top: 16px; }
+.assessment-item { border-top: 1px solid var(--color-gray-200); padding-top: 16px; }
+.assessment-item h3 { color: var(--color-gray-700); font-size: .9rem; margin: 0 0 10px; }
+.before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.before-after > label { background: var(--color-gray-50); border-radius: 5px; padding: 8px; }
+.before-after textarea { background: #fff; }
+.inline-label { align-items: center; display: grid; gap: 8px; grid-template-columns: 105px minmax(0, 1fr); color: var(--color-gray-600); font-size: .82rem; font-weight: 700; margin-bottom: 10px; }
+.activity-rows { display: grid; gap: 10px; }
+.activity-rows > div { align-items: center; display: grid; gap: 12px; grid-template-columns: 105px minmax(0, 1fr); }
+.activity-rows strong { color: var(--color-gray-600); font-size: .82rem; }
+.goal-options { margin-top: 2px; }
+@media (max-width: 900px) { .flags-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pain-grid { grid-template-columns: 1fr 1fr; } .pain-grid > :last-child { grid-column: 1 / -1; } .interview-local-note { display: none; } }
+@media (max-width: 650px) { .interview-page { padding-top: 16px; } .interview-page-header, .interview-toolbar { align-items: stretch; flex-direction: column; } .interview-header-actions { align-items: stretch; flex-wrap: wrap; } .interview-header-actions .interview-button { flex: 1; } .active-barcode-field { justify-content: space-between; width: 100%; } .interview-actions { justify-content: flex-end; } .interview-toolbar select { max-width: none; width: 100%; } .interview-patient-grid, .two-columns, .pain-grid, .before-after { grid-template-columns: 1fr; } .pain-grid > :last-child { grid-column: auto; } .flags-grid { grid-template-columns: 1fr; } .scales-grid { gap: 16px; } .number-scale span { font-size: .7rem; min-width: 0; } .activity-rows > div { align-items: stretch; grid-template-columns: 1fr; gap: 5px; } .activity-options { flex-direction: column; } .activity-options label + label span { border-left: 1px solid var(--color-primary-200); border-top: 0; } .activity-options label:first-child span { border-radius: 5px 5px 0 0; } .activity-options label:last-child span { border-radius: 0 0 5px 5px; } .goal-options { flex-direction: column; } .goal-options label + label span { border-left: 1px solid var(--color-primary-200); border-top: 0; } .goal-options label:first-child span { border-radius: 5px 5px 0 0; } .goal-options label:first-child span { border-radius: 5px 5px 0 0; } .goal-options label:last-child span { border-radius: 0 0 5px 5px; } }

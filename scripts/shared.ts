@@ -65,6 +65,7 @@ export const Shared: SharedAPI = (() => {
             const navLinks: NavLink[] = [
                 { href: '#schedule', text: 'Grafik', icon: 'fas fa-calendar-alt' },
                 { href: '#appointments', text: 'Planowanie', icon: 'fas fa-clock' },
+                { href: '#interview', text: 'Wywiad', icon: 'fas fa-notes-medical' },
                 { href: '#stations', text: 'Stanowiska', icon: 'fas fa-clinic-medical' },
                 { href: '#massage-stations', text: 'Masaż', icon: 'fas fa-hands', id: 'navLinkMassageStations' },
                 { href: '#leaves', text: 'Urlopy', icon: 'fas fa-plane-departure' },
@@ -317,6 +318,15 @@ export const Shared: SharedAPI = (() => {
             ? employee.menuAccess
             : getDefaultNavigationAccess();
         const allowed = new Set(allowedKeys);
+
+        // Existing full-access accounts have a saved menu list created before this page existed.
+        // Make the new local interview available to them without widening deliberately limited menus.
+        const legacyStandardKeys = getDefaultNavigationAccess().filter(
+            (key) => key !== 'interview' && key !== 'massage-stations'
+        );
+        if (legacyStandardKeys.every((key) => allowed.has(key))) {
+            allowed.add('interview');
+        }
 
         document.querySelectorAll<HTMLElement>('.main-nav-list li[data-nav-access-key]').forEach((item) => {
             const key = item.dataset.navAccessKey || '';

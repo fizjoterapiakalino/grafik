@@ -9,6 +9,7 @@ export interface NavigationAccessItem {
 export const NAVIGATION_ACCESS_ITEMS: NavigationAccessItem[] = [
     { key: 'schedule', href: '#schedule', text: 'Grafik', icon: 'fas fa-calendar-alt' },
     { key: 'appointments', href: '#appointments', text: 'Planowanie', icon: 'fas fa-clock' },
+    { key: 'interview', href: '#interview', text: 'Wywiad', icon: 'fas fa-notes-medical' },
     { key: 'stations', href: '#stations', text: 'Stanowiska', icon: 'fas fa-clinic-medical' },
     { key: 'massage-stations', href: '#massage-stations', text: 'Masaż', icon: 'fas fa-hands', id: 'navLinkMassageStations' },
     { key: 'leaves', href: '#leaves', text: 'Urlopy', icon: 'fas fa-plane-departure' },
