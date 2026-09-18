@@ -35,12 +35,20 @@
 .barcode-scanner-panel { background: var(--color-white); border-radius: 8px; box-shadow: var(--shadow-xl); max-width: 680px; overflow: hidden; width: min(100%, 680px); }
 .barcode-scanner-header { align-items: center; display: flex; justify-content: space-between; padding: 14px 16px; }
 .barcode-scanner-header h2 { color: var(--color-gray-800); font-size: 1rem; letter-spacing: 0; margin: 0; }
+.barcode-scanner-header-actions { align-items: center; display: flex; gap: 8px; }
+.barcode-scanner-header-actions button[hidden] { display: none !important; }
 .barcode-scanner-header .interview-icon-button { background: var(--color-gray-100); border-color: var(--color-gray-200); color: var(--color-gray-700); }
-.barcode-camera-frame { background: #020617; min-height: 300px; overflow: hidden; position: relative; }
-.barcode-camera-frame video { display: block; height: min(55vh, 460px); object-fit: cover; width: 100%; }
+.barcode-scanner-header-actions .interview-icon-button.active { background: #fef08a; border-color: #facc15; color: #854d0e; }
+.barcode-camera-frame { background: #020617; min-height: 280px; overflow: hidden; position: relative; }
+.barcode-camera-frame video { background: #000; display: block; max-height: min(52vh, 440px); object-fit: contain; width: 100%; }
 .barcode-camera-frame::before { border: 2px solid rgba(255, 255, 255, .85); box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .24); content: ''; inset: 22% 10%; pointer-events: none; position: absolute; z-index: 1; }
+.barcode-camera-frame.scan-success { box-shadow: inset 0 0 0 5px #22c55e; }
 .barcode-scan-line { animation: scanLine 2s ease-in-out infinite; background: #14b8a6; box-shadow: 0 0 12px #14b8a6; height: 2px; left: 10%; position: absolute; right: 10%; top: 26%; z-index: 2; }
-.barcode-scanner-status { color: var(--color-gray-600); font-size: .86rem; margin: 0; padding: 13px 16px 16px; text-align: center; }
+.barcode-scanner-status { color: var(--color-gray-600); font-size: .86rem; margin: 0; padding: 12px 16px 8px; text-align: center; }
+.barcode-manual-bar { align-items: center; display: flex; gap: 8px; padding: 0 16px 16px; }
+.barcode-manual-bar input { background: var(--color-gray-50); border: 1px solid var(--color-gray-300); border-radius: 6px; box-sizing: border-box; color: var(--color-gray-800); flex: 1; font-family: monospace; font-size: .92rem; font-weight: 700; height: 38px; letter-spacing: .5px; min-width: 0; padding: 0 12px; }
+.barcode-manual-bar input:focus { border-color: var(--color-primary-500); box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), .12); outline: 0; }
+.barcode-manual-bar button { height: 38px; white-space: nowrap; }
 @keyframes scanLine { 50% { transform: translateY(200px); } }
 .interview-flags-section { padding: 0; overflow: hidden; }
 .section-toggle { align-items: center; background: var(--color-white); border: 0; color: var(--color-gray-800); cursor: pointer; display: flex; font: inherit; font-size: 1rem; font-weight: 700; justify-content: space-between; padding: 17px 20px; text-align: left; width: 100%; }
@@ -58,7 +66,9 @@
 .section-heading span { align-items: center; background: var(--color-primary-100); border-radius: 50%; color: var(--color-primary-800); display: inline-flex; font-size: .75rem; font-weight: 800; height: 26px; justify-content: center; width: 26px; }
 .section-heading h2 { font-size: 1rem; letter-spacing: 0; margin: 0; color: var(--color-gray-800); }
 .interview-patient-grid, .interview-grid { display: grid; gap: 14px; }
-.interview-patient-grid { grid-template-columns: minmax(0, 2fr) minmax(160px, 1fr); }
+.interview-patient-grid { grid-template-columns: minmax(130px, 1fr) minmax(0, 2fr) minmax(150px, 1fr); }
+#formCardBarcodeInput { font-family: monospace; font-size: .92rem; font-weight: 700; letter-spacing: 1px; }
+#formCardBarcodeInput:read-only { background: var(--color-gray-100); border-color: var(--color-gray-200); cursor: default; }
 .two-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .pain-grid { grid-template-columns: 1fr 1fr 2fr; margin: 16px 0; }
 .field-block, .interview-patient-grid > label, .before-after > label { color: var(--color-gray-600); display: flex; flex-direction: column; font-size: .82rem; font-weight: 700; gap: 6px; }

@@ -30,6 +30,7 @@
         <section class="interview-section interview-patient-section">
             <div class="section-heading"><span>01</span><h2>Dane karty</h2></div>
             <div class="interview-patient-grid">
+                <label>Kod karty<input id="formCardBarcodeInput" type="text" readonly aria-label="Kod karty pacjenta" placeholder="Kod karty"></label>
                 <label>Imię i nazwisko pacjenta<input name="patientName" data-field type="text" placeholder="Imię i nazwisko"></label>
                 <label>Data badania<input name="examDate" data-field type="date"></label>
             </div>
@@ -101,9 +102,23 @@
 
     <div id="barcodeScannerModal" class="barcode-scanner-modal" hidden role="dialog" aria-modal="true" aria-labelledby="barcodeScannerTitle">
         <div class="barcode-scanner-panel">
-            <div class="barcode-scanner-header"><h2 id="barcodeScannerTitle">Skanowanie kodu kreskowego</h2><button id="closeScannerButton" class="interview-icon-button" type="button" aria-label="Zamknij skaner"><i class="fas fa-times" aria-hidden="true"></i></button></div>
-            <div class="barcode-camera-frame"><video id="barcodeScannerVideo" autoplay playsinline muted></video><div class="barcode-scan-line" aria-hidden="true"></div></div>
+            <div class="barcode-scanner-header">
+                <h2 id="barcodeScannerTitle">Skanowanie kodu kreskowego</h2>
+                <div class="barcode-scanner-header-actions">
+                    <button id="scannerTorchButton" class="interview-icon-button" type="button" title="Włącz / wyłącz latarkę" aria-label="Latarka" hidden><i class="fas fa-bolt" aria-hidden="true"></i></button>
+                    <button id="scannerSwitchCameraButton" class="interview-icon-button" type="button" title="Przełącz aparat" aria-label="Przełącz aparat" hidden><i class="fas fa-sync-alt" aria-hidden="true"></i></button>
+                    <button id="closeScannerButton" class="interview-icon-button" type="button" aria-label="Zamknij skaner"><i class="fas fa-times" aria-hidden="true"></i></button>
+                </div>
+            </div>
+            <div class="barcode-camera-frame">
+                <video id="barcodeScannerVideo" autoplay playsinline muted></video>
+                <div class="barcode-scan-line" aria-hidden="true"></div>
+            </div>
             <p id="barcodeScannerStatus" class="barcode-scanner-status" aria-live="polite">Uruchamianie kamery...</p>
+            <div class="barcode-manual-bar">
+                <input id="scannerManualInput" type="text" placeholder="Lub wpisz kod karty ręcznie..." inputmode="numeric" aria-label="Wpisz kod karty ręcznie">
+                <button id="scannerManualSubmitButton" class="interview-button" type="button">Zatwierdź</button>
+            </div>
         </div>
     </div>
 </div>
