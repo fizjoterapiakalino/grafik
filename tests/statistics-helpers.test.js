@@ -3,6 +3,8 @@ import {
     calculateWeeklyAverages,
     createWeeklyStatsSnapshot,
     getIsoWeekInfo,
+    createDailyWorkloadSnapshot,
+    calculatePeriodWorkloadAverages,
 } from '../scripts/statistics-helpers.js';
 
 describe('statistics helpers', () => {
@@ -124,5 +126,96 @@ describe('statistics helpers', () => {
 
     test('uses ISO week year around calendar boundaries', () => {
         expect(getIsoWeekInfo(new Date('2027-01-01T12:00:00Z')).weekKey).toBe('2026-W53');
+    });
+
+    test('creates daily workload snapshot considering active treatment dates and leaves', () => {
+        const employees = {
+            empA: { displayName: 'Anna', color: '#10b981' },
+            empB: { displayName: 'Jan', color: '#3b82f6' },
+        };
+        const leaves = {
+            Anna: [{ id: 'l1', type: 'vacation', startDate: '2026-09-30', endDate: '2026-10-02' }],
+        };
+        const scheduleCells = {
+            '8:00': {
+                empA: { content: 'Pacjent A', treatmentStartDate: '2026-09-20', treatmentEndDate: '2026-10-05' },
+                empB: { content: 'Pacjent B', treatmentStartDate: '2026-09-20', treatmentEndDate: '2026-10-05' },
+            },
+            '8:30': {
+                empB: { content: 'Pacjent C' }, // bez dat leczenia - aktywny
+            },
+        };
+
+        const snapshot = createDailyWorkloadSnapshot(scheduleCells, employees, leaves, new Date('2026-09-30T10:00:00Z'));
+
+        expect(snapshot.date).toBe('2026-09-30');
+        expect(snapshot.isWorkday).toBe(true);
+        expect(snapshot.employees.empA.isOnLeave).toBe(true);
+        expect(snapshot.employees.empA.leaveType).toBe('vacation');
+        expect(snapshot.employees.empA.patientSlots).toBe(0); // na urlopie nie liczy pacjentów
+
+        expect(snapshot.employees.empB.isOnLeave).toBe(false);
+        expect(snapshot.employees.empB.patientSlots).toBe(2);
+        expect(snapshot.totalPatients).toBe(2);
+    });
+
+    test('calculates period workload averages in weekly and monthly scopes', () => {
+        const employees = {
+            empA: { displayName: 'Anna', color: '#10b981' },
+            empB: { displayName: 'Jan', color: '#3b82f6' },
+        };
+
+        const snapshots = [
+            {
+                date: '2026-09-28',
+                year: 2026,
+                month: 9,
+                dayOfWeek: 1,
+                weekKey: '2026-W40',
+                isWorkday: true,
+                updatedAt: '2026-09-28T12:00:00Z',
+                totalPatients: 16,
+                activeEmployeesCount: 2,
+                employees: {
+                    empA: { employeeId: 'empA', employeeName: 'Anna', patientSlots: 10, uniquePatients: 10, availableSlots: 15, occupancyPercent: 67, isOnLeave: false },
+                    empB: { employeeId: 'empB', employeeName: 'Jan', patientSlots: 6, uniquePatients: 6, availableSlots: 15, occupancyPercent: 40, isOnLeave: false },
+                },
+            },
+            {
+                date: '2026-09-29',
+                year: 2026,
+                month: 9,
+                dayOfWeek: 2,
+                weekKey: '2026-W40',
+                isWorkday: true,
+                updatedAt: '2026-09-29T12:00:00Z',
+                totalPatients: 8,
+                activeEmployeesCount: 2,
+                employees: {
+                    empA: { employeeId: 'empA', employeeName: 'Anna', patientSlots: 0, uniquePatients: 0, availableSlots: 15, occupancyPercent: 0, isOnLeave: true, leaveType: 'vacation' },
+                    empB: { employeeId: 'empB', employeeName: 'Jan', patientSlots: 8, uniquePatients: 8, availableSlots: 15, occupancyPercent: 53, isOnLeave: false },
+                },
+            },
+        ];
+
+        const weeklyAvg = calculatePeriodWorkloadAverages(snapshots, 'weekly', {
+            weekKey: '2026-W40',
+            year: 2026,
+            employees,
+        });
+
+        expect(weeklyAvg.workdaysCount).toBe(2);
+        expect(weeklyAvg.totalPatientCount).toBe(24);
+
+        const empA = weeklyAvg.employees.find(e => e.employeeId === 'empA');
+        expect(empA).toBeDefined();
+        expect(empA?.daysPresent).toBe(1);
+        expect(empA?.daysOnLeave).toBe(1);
+        expect(empA?.averagePatientsPerPresentDay).toBe(10); // 10 / 1 dzień obecności
+        expect(empA?.averagePatientsPerWorkday).toBe(5); // 10 / 2 dni robocze
+
+        const empB = weeklyAvg.employees.find(e => e.employeeId === 'empB');
+        expect(empB?.daysPresent).toBe(2);
+        expect(empB?.averagePatientsPerPresentDay).toBe(7); // (6 + 8) / 2 = 7
     });
 });

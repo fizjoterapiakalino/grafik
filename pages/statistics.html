@@ -3,6 +3,7 @@
         <button id="overviewViewBtn" class="tab-btn active">Przegląd</button>
         <button id="leavesStatsBtn" class="tab-btn">Statystyki Urlopów</button>
         <button id="scheduleStatsBtn" class="tab-btn">Statystyki Grafiku</button>
+        <button id="workloadStatsBtn" class="tab-btn">Średnie obciążenie</button>
         <button id="employeeStatsBtn" class="tab-btn">Pracownicy</button>
     </div>
     <div class="year-selector-container">
@@ -319,6 +320,116 @@
                 </thead>
                 <tbody id="weeklyAvailabilityBody"></tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Workload Stats View (Średnie obciążenie pracownika) -->
+    <div id="workloadStatsView" class="stats-view">
+        <div class="workload-controls-bar">
+            <div class="workload-period-tabs">
+                <button id="workloadPeriodWeeklyBtn" class="subtab-btn active" type="button" data-period="weekly">
+                    <i class="fas fa-calendar-week"></i> Tygodniowe
+                </button>
+                <button id="workloadPeriodMonthlyBtn" class="subtab-btn" type="button" data-period="monthly">
+                    <i class="fas fa-calendar-alt"></i> Miesięczne
+                </button>
+                <button id="workloadPeriodYearlyBtn" class="subtab-btn" type="button" data-period="yearly">
+                    <i class="fas fa-calendar"></i> Roczne
+                </button>
+            </div>
+
+            <div class="workload-selects-container">
+                <div id="workloadWeekSelectGroup" class="select-group">
+                    <label for="workloadWeekSelect">Tydzień:</label>
+                    <select id="workloadWeekSelect" class="styled-select"></select>
+                </div>
+                <div id="workloadMonthSelectGroup" class="select-group" style="display: none;">
+                    <label for="workloadMonthSelect">Miesiąc:</label>
+                    <select id="workloadMonthSelect" class="styled-select"></select>
+                </div>
+                <div id="workloadEmployeeSelectGroup" class="select-group">
+                    <label for="workloadEmployeeSelect">Pracownik:</label>
+                    <select id="workloadEmployeeSelect" class="styled-select">
+                        <option value="all">Wszyscy pracownicy</option>
+                    </select>
+                </div>
+                <div class="workload-snapshot-info">
+                    <span id="workloadSnapshotBadge" class="workload-snapshot-badge" title="Automatyczny codzienny snapshot grafiku">
+                        <i class="fas fa-camera"></i> <span id="workloadSnapshotDate">Snapshot: Dzisiaj</span>
+                    </span>
+                    <button id="refreshWorkloadSnapshotBtn" class="workload-refresh-btn" type="button" title="Zaktualizuj snapshot z bieżącego grafiku">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="workload-info-banner">
+            <i class="fas fa-lightbulb"></i>
+            <div>
+                <strong>Metodologia wyliczania średniego obciążenia:</strong>
+                Średnia dzienna jest liczona z <em>dni faktycznej obecności</em> (wykluczając dni urlopów i zwolnień), co zapobiega zafałszowaniu realnego obciążenia terapeuty. 
+                Wskaźnik obłożenia odnosi liczbę pacjentów do dostępnych slotów w godzinach danej zmiany.
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card primary" id="workloadAvgDailyCard">
+                <div class="stat-icon"><i class="fas fa-user-check"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="workloadAvgDailyValue">-</span>
+                    <span class="stat-label">Śr. pacjentów / dzień pracy</span>
+                </div>
+            </div>
+            <div class="stat-card success" id="workloadAvgWeeklyCard">
+                <div class="stat-icon"><i class="fas fa-calendar-week"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="workloadAvgWeeklyValue">-</span>
+                    <span class="stat-label">Śr. pacjentów / tydzień</span>
+                </div>
+            </div>
+            <div class="stat-card warning" id="workloadOccupancyCard">
+                <div class="stat-icon"><i class="fas fa-chart-pie"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="workloadOccupancyValue">-</span>
+                    <span class="stat-label">Średnie obłożenie slotów</span>
+                </div>
+            </div>
+            <div class="stat-card info" id="workloadTotalPatientsCard">
+                <div class="stat-icon"><i class="fas fa-users"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="workloadTotalPatientsValue">-</span>
+                    <span class="stat-label">Łącznie wpisów pacjentów</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-row">
+            <div class="stats-chart-container">
+                <h3><i class="fas fa-chart-bar"></i> Średnie obciążenie wg pracownika</h3>
+                <div class="chart-wrapper">
+                    <canvas id="workloadByEmployeeChart"></canvas>
+                </div>
+            </div>
+            <div class="stats-chart-container">
+                <h3 id="workloadTrendChartTitle"><i class="fas fa-chart-line"></i> Trend obciążenia w czasie</h3>
+                <div class="chart-wrapper">
+                    <canvas id="workloadTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-table-container">
+            <div class="stats-table-header">
+                <h3 id="workloadTableTitle"><i class="fas fa-table"></i> Zestawienie obciążenia pracowników</h3>
+                <span id="workloadPeriodSubtitle" class="stats-table-subtitle"></span>
+            </div>
+            <div class="table-responsive">
+                <table class="stats-table workload-table" id="workloadDetailsTable">
+                    <thead id="workloadDetailsHead"></thead>
+                    <tbody id="workloadDetailsBody"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 

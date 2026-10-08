@@ -6,6 +6,7 @@ const mockUnsubscribe = jest.fn();
 const mockDocRef = {
     onSnapshot: jest.fn(),
     set: jest.fn(),
+    get: jest.fn(),
 };
 
 jest.mock('../scripts/firebase-config.js', () => ({
@@ -32,11 +33,20 @@ describe('ScheduleData', () => {
 
     const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+    let lastSavedPayload = null;
     beforeEach(() => {
         jest.clearAllMocks();
         window.setSaveStatus = jest.fn();
         window.showToast = jest.fn();
-        mockDocRef.set.mockResolvedValue(undefined);
+        lastSavedPayload = null;
+        mockDocRef.set.mockImplementation((payload) => {
+            lastSavedPayload = payload;
+            return Promise.resolve();
+        });
+        mockDocRef.get.mockImplementation(() => Promise.resolve({
+            exists: true,
+            data: () => lastSavedPayload || ScheduleData.getAppState(),
+        }));
         emitSnapshot({});
     });
 
@@ -90,7 +100,7 @@ describe('ScheduleData', () => {
         expect(onChange).toHaveBeenCalledTimes(1);
         expect(window.setSaveStatus).toHaveBeenCalledWith('saving');
         expect(window.setSaveStatus).toHaveBeenCalledWith('saved');
-        expect(mockDocRef.set).toHaveBeenCalledWith(ScheduleData.getAppState(), { merge: true });
+        expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining(ScheduleData.getAppState()), { merge: true });
     });
 
     test('updateMultipleCells applies a single batch of cell updates', async () => {

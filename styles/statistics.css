@@ -564,3 +564,228 @@
 .no-data-message p {
     font-size: 1rem;
 }
+
+/* ======================================== */
+/* Workload Stats View Styles               */
+/* ======================================== */
+
+.workload-controls-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--stats-card-bg);
+    border: 1px solid var(--stats-card-border);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-md) var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+    box-shadow: var(--shadow-sm);
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+}
+
+.workload-period-tabs {
+    display: flex;
+    background: var(--color-gray-100);
+    padding: 4px;
+    border-radius: var(--border-radius-md);
+    gap: 4px;
+}
+
+.subtab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: none;
+    background: transparent;
+    color: var(--stats-text-muted);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.subtab-btn:hover {
+    color: var(--stats-text);
+    background: var(--color-gray-200);
+}
+
+.subtab-btn.active {
+    background: var(--color-white);
+    color: var(--stats-primary-dark);
+    box-shadow: var(--shadow-sm);
+}
+
+.workload-selects-container {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.workload-selects-container .select-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.workload-selects-container .select-group label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--stats-text-muted);
+}
+
+.styled-select {
+    padding: 6px 12px;
+    border: 1px solid var(--stats-card-border);
+    border-radius: var(--border-radius-md);
+    background-color: var(--color-white);
+    color: var(--stats-text);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color var(--transition-fast);
+}
+
+.styled-select:focus {
+    outline: none;
+    border-color: var(--stats-primary);
+    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
+}
+
+.workload-snapshot-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.workload-snapshot-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--stats-success);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    border-radius: var(--border-radius-full);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.workload-refresh-btn {
+    border: 1px solid var(--stats-card-border);
+    background: var(--color-white);
+    color: var(--stats-text-muted);
+    width: 28px;
+    height: 28px;
+    border-radius: var(--border-radius-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.workload-refresh-btn:hover {
+    color: var(--stats-primary);
+    border-color: var(--stats-primary);
+    background: var(--color-gray-50);
+}
+
+.workload-info-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: var(--border-radius-md);
+    padding: 10px 14px;
+    margin-bottom: var(--spacing-lg);
+    font-size: 0.8125rem;
+    color: #1e40af;
+    line-height: 1.45;
+}
+
+.workload-info-banner i {
+    font-size: 1.1rem;
+    color: #3b82f6;
+    margin-top: 2px;
+}
+
+.stats-table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: var(--spacing-sm);
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.stats-table-subtitle {
+    font-size: 0.8125rem;
+    color: var(--stats-text-muted);
+    font-weight: 500;
+}
+
+.workload-table td, .workload-table th {
+    text-align: center;
+}
+
+.workload-table td:first-child, .workload-table th:first-child {
+    text-align: left;
+}
+
+.workload-emp-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+}
+
+.workload-emp-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.workload-badge-leave {
+    display: inline-block;
+    padding: 3px 8px;
+    background: #fef3c7;
+    color: #b45309;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.workload-occupancy-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.workload-occupancy-badge.high {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.workload-occupancy-badge.medium {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.workload-occupancy-badge.low {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.table-responsive {
+    overflow-x: auto;
+    width: 100%;
+}
+

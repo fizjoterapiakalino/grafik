@@ -7,10 +7,16 @@ import {
     calculateScheduleMetrics,
     calculateWeeklyAverages,
     createWeeklyStatsSnapshot,
+    createDailyWorkloadSnapshot,
+    backfillWorkloadSnapshots,
+    calculatePeriodWorkloadAverages,
     getActiveEmployeeIds,
     getIsoWeekInfo,
     type ScheduleMetrics,
     type WeeklyStatsSnapshot,
+    type DailyWorkloadSnapshot,
+    type PeriodWorkloadAverages,
+    type EmployeePeriodWorkloadSummary,
 } from './statistics-helpers.js';
 import type { FirestoreDbWrapper } from './types/firebase';
 import type { CellState, LeaveEntry, ScheduleAppState, TreatmentData } from './types/index.js';
@@ -69,6 +75,8 @@ const LEAVE_TYPES: Record<string, { label: string; color: string }> = {
 };
 
 const WEEKLY_STATS_COLLECTION = 'statsWeekly';
+const DAILY_STATS_COLLECTION = 'statsDaily';
+const WORKLOAD_STORAGE_KEY = 'kalinowa.stats.dailyWorkload.v1';
 const CHART_COLOR_PALETTE = [
     '#2563eb',
     '#16a34a',
@@ -92,7 +100,14 @@ export const Statistics: StatisticsAPI = (() => {
     let leavesData: Record<string, LeaveEntry[]> = {};
     let scheduleData: ScheduleAppState | null = null;
     let weeklyStatsData: WeeklyStatsSnapshot[] = [];
+    let dailySnapshotsData: Record<string, DailyWorkloadSnapshot> = {};
+    let currentWorkloadPeriod: 'weekly' | 'monthly' | 'yearly' = 'weekly';
+    let currentWorkloadWeek = '';
+    let currentWorkloadMonth = new Date().getUTCMonth() + 1;
+    let currentWorkloadEmployeeId = 'all';
     let chartInstances: ChartInstance[] = [];
+    let workloadEmployeeChartInstance: ChartInstance | null = null;
+    let workloadTrendChartInstance: ChartInstance | null = null;
 
     // DOM Elements
     let yearSelect: HTMLSelectElement | null = null;
@@ -152,6 +167,8 @@ export const Statistics: StatisticsAPI = (() => {
             }
         });
         chartInstances = [];
+        workloadEmployeeChartInstance = null;
+        workloadTrendChartInstance = null;
     };
 
     /**
@@ -200,6 +217,7 @@ export const Statistics: StatisticsAPI = (() => {
                     overviewViewBtn: 'overviewView',
                     leavesStatsBtn: 'leavesStatsView',
                     scheduleStatsBtn: 'scheduleStatsView',
+                    workloadStatsBtn: 'workloadStatsView',
                     employeeStatsBtn: 'employeeStatsView',
                 };
                 const viewId = viewMap[target.id];
@@ -213,6 +231,61 @@ export const Statistics: StatisticsAPI = (() => {
                     refreshChartsAfterTabChange();
                 }
             });
+        });
+
+        // Workload period buttons
+        const periodBtns = document.querySelectorAll<HTMLButtonElement>('.workload-period-tabs .subtab-btn');
+        periodBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const target = e.currentTarget as HTMLButtonElement;
+                const period = target.dataset.period as 'weekly' | 'monthly' | 'yearly';
+                if (!period) return;
+
+                periodBtns.forEach(b => b.classList.remove('active'));
+                target.classList.add('active');
+                currentWorkloadPeriod = period;
+
+                const weekGroup = document.getElementById('workloadWeekSelectGroup');
+                const monthGroup = document.getElementById('workloadMonthSelectGroup');
+
+                if (weekGroup) weekGroup.style.display = period === 'weekly' ? 'flex' : 'none';
+                if (monthGroup) monthGroup.style.display = period === 'monthly' ? 'flex' : 'none';
+
+                updateWorkloadStats();
+                refreshChartsAfterTabChange();
+            });
+        });
+
+        // Workload week select
+        document.getElementById('workloadWeekSelect')?.addEventListener('change', (e) => {
+            currentWorkloadWeek = (e.target as HTMLSelectElement).value;
+            updateWorkloadStats();
+            refreshChartsAfterTabChange();
+        });
+
+        // Workload month select
+        document.getElementById('workloadMonthSelect')?.addEventListener('change', (e) => {
+            currentWorkloadMonth = parseInt((e.target as HTMLSelectElement).value, 10);
+            updateWorkloadStats();
+            refreshChartsAfterTabChange();
+        });
+
+        // Workload employee select
+        document.getElementById('workloadEmployeeSelect')?.addEventListener('change', (e) => {
+            currentWorkloadEmployeeId = (e.target as HTMLSelectElement).value;
+            updateWorkloadStats();
+            refreshChartsAfterTabChange();
+        });
+
+        // Workload snapshot manual refresh
+        document.getElementById('refreshWorkloadSnapshotBtn')?.addEventListener('click', async () => {
+            const btn = document.getElementById('refreshWorkloadSnapshotBtn');
+            if (btn) btn.classList.add('rotating');
+            await syncWorkloadSnapshots();
+            updateWorkloadStats();
+            refreshChartsAfterTabChange();
+            if (btn) btn.classList.remove('rotating');
+            window.showToast?.('Zaktualizowano snapshot obciążenia z bieżącego grafiku.', 3000);
         });
     };
 
@@ -253,6 +326,7 @@ export const Statistics: StatisticsAPI = (() => {
             }
 
             void refreshWeeklyStatsData();
+            void refreshWorkloadStatsData();
         } catch (error) {
             console.error('Error loading data:', error);
         }
@@ -273,6 +347,23 @@ export const Statistics: StatisticsAPI = (() => {
             }
         } catch (error) {
             console.warn('Unable to refresh weekly statistics in background:', error);
+        }
+    };
+
+    const refreshWorkloadStatsData = async (): Promise<void> => {
+        try {
+            await loadDailyStats();
+            await syncWorkloadSnapshots();
+            updateWorkloadSelectors();
+            updateWorkloadStats();
+
+            if (typeof Chart !== 'undefined') {
+                renderWorkloadByEmployeeChart();
+                renderWorkloadTrendChart();
+                refreshChartsAfterTabChange();
+            }
+        } catch (error) {
+            console.warn('Unable to refresh workload statistics in background:', error);
         }
     };
 
@@ -308,6 +399,186 @@ export const Statistics: StatisticsAPI = (() => {
         }
     };
 
+    const loadDailyStats = async (): Promise<void> => {
+        try {
+            const cached = localStorage.getItem(WORKLOAD_STORAGE_KEY);
+            if (cached) {
+                const parsed = JSON.parse(cached) as Record<string, DailyWorkloadSnapshot>;
+                if (parsed && typeof parsed === 'object') {
+                    dailySnapshotsData = { ...dailySnapshotsData, ...parsed };
+                }
+            }
+        } catch {}
+
+        try {
+            const snapshot = await db.collection<DailyWorkloadSnapshot>(DAILY_STATS_COLLECTION).get();
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                if (data && data.date) {
+                    dailySnapshotsData[data.date] = data;
+                }
+            });
+        } catch (error) {
+            console.warn('Unable to load from statsDaily collection:', error);
+        }
+
+        try {
+            weeklyStatsData.forEach((w: any) => {
+                if (w.dailySnapshots && typeof w.dailySnapshots === 'object') {
+                    Object.entries(w.dailySnapshots).forEach(([date, snap]) => {
+                        if (snap && !dailySnapshotsData[date]) {
+                            dailySnapshotsData[date] = snap as DailyWorkloadSnapshot;
+                        }
+                    });
+                }
+            });
+        } catch {}
+    };
+
+    const syncWorkloadSnapshots = async (): Promise<void> => {
+        if (!scheduleData?.scheduleCells) return;
+
+        const employees = EmployeeManager.getAll();
+        const now = new Date();
+        const todayIso = now.toISOString().split('T')[0];
+
+        dailySnapshotsData = backfillWorkloadSnapshots(
+            scheduleData.scheduleCells,
+            employees,
+            leavesData,
+            currentYear,
+            dailySnapshotsData,
+            now
+        );
+
+        const todaySnap = createDailyWorkloadSnapshot(scheduleData.scheduleCells, employees, leavesData, now);
+        dailySnapshotsData[todayIso] = todaySnap;
+
+        try {
+            localStorage.setItem(WORKLOAD_STORAGE_KEY, JSON.stringify(dailySnapshotsData));
+        } catch {}
+
+        const badge = document.getElementById('workloadSnapshotDate');
+        if (badge) {
+            badge.textContent = `Snapshot: ${todayIso} (${todaySnap.totalPatients} pacj.)`;
+        }
+
+        try {
+            await db.collection<DailyWorkloadSnapshot>(DAILY_STATS_COLLECTION)
+                .doc(todayIso)
+                .set(todaySnap, { merge: true });
+        } catch (err) {
+            console.warn('Unable to persist daily snapshot to Firestore statsDaily:', err);
+        }
+
+        try {
+            const weekInfo = getIsoWeekInfo(now);
+            await db.collection(WEEKLY_STATS_COLLECTION)
+                .doc(weekInfo.weekKey)
+                .set({
+                    [`dailySnapshots.${todayIso}`]: todaySnap,
+                } as any, { merge: true });
+        } catch {}
+    };
+
+    const updateWorkloadSelectors = (): void => {
+        populateWorkloadWeekSelect();
+        populateWorkloadMonthSelect();
+        populateWorkloadEmployeeSelect();
+    };
+
+    const populateWorkloadWeekSelect = (): void => {
+        const select = document.getElementById('workloadWeekSelect') as HTMLSelectElement | null;
+        if (!select) return;
+
+        const currentWeekInfo = getIsoWeekInfo(new Date());
+        if (!currentWorkloadWeek) {
+            currentWorkloadWeek = currentYear === currentWeekInfo.year
+                ? currentWeekInfo.weekKey
+                : `${currentYear}-W01`;
+        }
+
+        select.innerHTML = '';
+        const jan4 = new Date(Date.UTC(currentYear, 0, 4));
+        const day = jan4.getUTCDay() || 7;
+        const week1Start = new Date(jan4);
+        week1Start.setUTCDate(jan4.getUTCDate() - day + 1);
+
+        const weekOptions: Array<{ key: string; text: string }> = [];
+
+        for (let w = 1; w <= 53; w++) {
+            const start = new Date(week1Start);
+            start.setUTCDate(week1Start.getUTCDate() + (w - 1) * 7);
+            const end = new Date(start);
+            end.setUTCDate(start.getUTCDate() + 4);
+
+            if (start.getUTCFullYear() > currentYear && w > 50) break;
+
+            const weekKey = `${currentYear}-W${String(w).padStart(2, '0')}`;
+            const isCur = weekKey === currentWeekInfo.weekKey && currentYear === currentWeekInfo.year;
+            const startFormatted = `${String(start.getUTCDate()).padStart(2, '0')}.${String(start.getUTCMonth() + 1).padStart(2, '0')}`;
+            const endFormatted = `${String(end.getUTCDate()).padStart(2, '0')}.${String(end.getUTCMonth() + 1).padStart(2, '0')}`;
+
+            weekOptions.push({
+                key: weekKey,
+                text: `Tydzień ${w} (${startFormatted} - ${endFormatted})${isCur ? ' - Bieżący' : ''}`,
+            });
+        }
+
+        weekOptions.reverse().forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt.key;
+            option.textContent = opt.text;
+            if (opt.key === currentWorkloadWeek) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+    };
+
+    const populateWorkloadMonthSelect = (): void => {
+        const select = document.getElementById('workloadMonthSelect') as HTMLSelectElement | null;
+        if (!select) return;
+
+        const currentMonthNum = new Date().getUTCMonth() + 1;
+        const monthNames = [
+            'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
+            'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
+        ];
+
+        select.innerHTML = '';
+        monthNames.forEach((name, index) => {
+            const monthNum = index + 1;
+            const option = document.createElement('option');
+            option.value = String(monthNum);
+            const isCur = monthNum === currentMonthNum && currentYear === new Date().getUTCFullYear();
+            option.textContent = `${name}${isCur ? ' (Bieżący)' : ''}`;
+            if (monthNum === currentWorkloadMonth) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+    };
+
+    const populateWorkloadEmployeeSelect = (): void => {
+        const select = document.getElementById('workloadEmployeeSelect') as HTMLSelectElement | null;
+        if (!select) return;
+
+        const employees = EmployeeManager.getAll();
+        const activeIds = getActiveEmployeeIds(employees);
+
+        select.innerHTML = '<option value="all">Wszyscy pracownicy</option>';
+        activeIds.forEach(id => {
+            const option = document.createElement('option');
+            option.value = id;
+            option.textContent = EmployeeManager.getNameById(id);
+            if (id === currentWorkloadEmployeeId) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+    };
+
     /**
      * Aktualizuje wszystkie statystyki
      */
@@ -316,6 +587,7 @@ export const Statistics: StatisticsAPI = (() => {
             updateOverviewStats,
             updateLeavesStats,
             updateScheduleStats,
+            updateWorkloadStats,
             updateEmployeeStats,
             renderCharts,
         ];
@@ -843,6 +1115,424 @@ export const Statistics: StatisticsAPI = (() => {
         });
     };
 
+    const getShiftBadgeHtml = (shiftGroup?: 'first' | 'second' | string | null): string => {
+        if (shiftGroup === 'first') {
+            return '<span class="shift-badge first"><i class="fas fa-sun"></i> I Zmiana</span>';
+        } else if (shiftGroup === 'second') {
+            return '<span class="shift-badge second"><i class="fas fa-moon"></i> II Zmiana</span>';
+        }
+        return '<span class="shift-badge none">-</span>';
+    };
+
+    /**
+     * Renderuje tabelę ze szczegółowym obciążeniem pracowników w danym okresie
+     */
+    const renderWorkloadTable = (
+        averages: PeriodWorkloadAverages,
+        displayedEmployees: EmployeePeriodWorkloadSummary[]
+    ): void => {
+        const thead = document.getElementById('workloadDetailsHead');
+        const tbody = document.getElementById('workloadDetailsBody');
+        if (!thead || !tbody) return;
+
+        thead.innerHTML = `
+            <tr>
+                <th>Pracownik</th>
+                <th>Zmiana</th>
+                <th>Dni obecności</th>
+                <th>Dni urlopu</th>
+                <th>Wpisy pacjentów</th>
+                <th>Śr. / dzień obecności</th>
+                <th>Śr. / tydzień</th>
+                <th>Obłożenie slotów</th>
+            </tr>
+        `;
+
+        tbody.innerHTML = '';
+
+        if (displayedEmployees.length === 0) {
+            const emptyRow = document.createElement('tr');
+            emptyRow.innerHTML = '<td colspan="8" class="no-data-cell">Brak danych obciążenia dla wybranego okresu i filtrów.</td>';
+            tbody.appendChild(emptyRow);
+            return;
+        }
+
+        displayedEmployees.forEach(emp => {
+            const row = document.createElement('tr');
+
+            const leaveBadge = emp.daysOnLeave > 0
+                ? `<span class="status-badge on-leave"><i class="fas fa-plane"></i> ${emp.daysOnLeave} dni</span>`
+                : '<span class="text-muted">-</span>';
+
+            const occupancyClass = emp.occupancyPercent >= 80 ? 'good' : (emp.occupancyPercent >= 50 ? 'medium' : 'low');
+
+            row.innerHTML = `
+                <td>
+                    <div class="employee-name-cell">
+                        <span class="employee-color-dot" style="background-color: ${emp.color}"></span>
+                        <strong>${emp.employeeName}</strong>
+                    </div>
+                </td>
+                <td>${getShiftBadgeHtml(emp.shiftGroup)}</td>
+                <td><strong>${emp.daysPresent}</strong> / ${emp.workdaysInPeriod}</td>
+                <td>${leaveBadge}</td>
+                <td>${emp.totalPatients}</td>
+                <td><strong class="workload-highlight">${emp.averagePatientsPerPresentDay}</strong></td>
+                <td>${emp.averagePatientsPerWeek}</td>
+                <td>
+                    <div class="leave-progress">
+                        <span class="progress-text">${emp.occupancyPercent}%</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill ${occupancyClass}" style="width: ${Math.min(100, emp.occupancyPercent)}%"></div>
+                        </div>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        // Wiersz podsumowania zespołu, jeśli wyświetlono więcej niż jednego pracownika
+        if (displayedEmployees.length > 1) {
+            const summaryRow = document.createElement('tr');
+            summaryRow.className = 'workload-summary-row';
+            const totalLeaves = displayedEmployees.reduce((acc, e) => acc + e.daysOnLeave, 0);
+            summaryRow.innerHTML = `
+                <td><strong>Średnia / Łącznie zespołu</strong></td>
+                <td>-</td>
+                <td>-</td>
+                <td>${totalLeaves > 0 ? `<strong>${totalLeaves} dni</strong>` : '-'}</td>
+                <td><strong>${averages.totalPatientCount}</strong></td>
+                <td><strong class="workload-highlight">${averages.averageDailyPerPresentEmployee}</strong></td>
+                <td><strong>${averages.averageWeeklyPerEmployee}</strong></td>
+                <td><strong>${averages.averageOccupancyPercent}%</strong></td>
+            `;
+            tbody.appendChild(summaryRow);
+        }
+    };
+
+    /**
+     * Aktualizuje widok średniego obciążenia pracownika (KPI, tabela, wykresy)
+     */
+    const updateWorkloadStats = (): void => {
+        const employees = EmployeeManager.getAll();
+        const snapshotsList = Object.values(dailySnapshotsData);
+
+        const averages = calculatePeriodWorkloadAverages(
+            snapshotsList,
+            currentWorkloadPeriod,
+            {
+                weekKey: currentWorkloadWeek,
+                month: currentWorkloadMonth,
+                year: currentYear,
+                employees,
+            }
+        );
+
+        const displayedEmployees = currentWorkloadEmployeeId === 'all'
+            ? averages.employees
+            : averages.employees.filter(e => e.employeeId === currentWorkloadEmployeeId);
+
+        const selectedEmployee = currentWorkloadEmployeeId !== 'all'
+            ? averages.employees.find(e => e.employeeId === currentWorkloadEmployeeId) || null
+            : null;
+
+        // Karty wskaźników KPI
+        const avgDailyEl = document.getElementById('workloadAvgDailyValue');
+        if (avgDailyEl) {
+            avgDailyEl.textContent = selectedEmployee
+                ? String(selectedEmployee.averagePatientsPerPresentDay)
+                : String(averages.averageDailyPerPresentEmployee);
+        }
+
+        const avgWeeklyEl = document.getElementById('workloadAvgWeeklyValue');
+        if (avgWeeklyEl) {
+            avgWeeklyEl.textContent = selectedEmployee
+                ? String(selectedEmployee.averagePatientsPerWeek)
+                : String(averages.averageWeeklyPerEmployee);
+        }
+
+        const occupancyEl = document.getElementById('workloadOccupancyValue');
+        if (occupancyEl) {
+            occupancyEl.textContent = selectedEmployee
+                ? `${selectedEmployee.occupancyPercent}%`
+                : `${averages.averageOccupancyPercent}%`;
+        }
+
+        const totalPatientsEl = document.getElementById('workloadTotalPatientsValue');
+        if (totalPatientsEl) {
+            totalPatientsEl.textContent = selectedEmployee
+                ? String(selectedEmployee.totalPatients)
+                : String(averages.totalPatientCount);
+        }
+
+        // Podtytuł okresu
+        const subtitleEl = document.getElementById('workloadPeriodSubtitle');
+        if (subtitleEl) {
+            const empLabel = selectedEmployee ? ` | Pracownik: ${selectedEmployee.employeeName}` : ' | Wszyscy pracownicy';
+            subtitleEl.textContent = `Okres: ${averages.periodLabel} (${averages.workdaysCount} dni roboczych w okresie)${empLabel}`;
+        }
+
+        // Tabela szczegółowa
+        renderWorkloadTable(averages, displayedEmployees);
+
+        // Wykresy (jeśli Chart.js dostępny)
+        if (typeof Chart !== 'undefined') {
+            renderWorkloadByEmployeeChart();
+            renderWorkloadTrendChart();
+        }
+    };
+
+    /**
+     * Renderuje wykres średniego obciążenia wg pracownika
+     */
+    const renderWorkloadByEmployeeChart = (): void => {
+        const ctx = document.getElementById('workloadByEmployeeChart') as HTMLCanvasElement | null;
+        if (!ctx) return;
+
+        if (workloadEmployeeChartInstance) {
+            try {
+                workloadEmployeeChartInstance.destroy();
+            } catch {}
+            chartInstances = chartInstances.filter(c => c !== workloadEmployeeChartInstance);
+            workloadEmployeeChartInstance = null;
+        }
+
+        const employees = EmployeeManager.getAll();
+        const snapshotsList = Object.values(dailySnapshotsData);
+        const averages = calculatePeriodWorkloadAverages(
+            snapshotsList,
+            currentWorkloadPeriod,
+            {
+                weekKey: currentWorkloadWeek,
+                month: currentWorkloadMonth,
+                year: currentYear,
+                employees,
+            }
+        );
+
+        const displayedEmployees = currentWorkloadEmployeeId === 'all'
+            ? averages.employees
+            : averages.employees.filter(e => e.employeeId === currentWorkloadEmployeeId);
+
+        let labels: string[] = [];
+        let data: number[] = [];
+        let backgroundColors: string[] = [];
+        let borderColors: string[] = [];
+
+        if (currentWorkloadEmployeeId === 'all') {
+            labels = displayedEmployees.map(e => e.employeeName);
+            data = displayedEmployees.map(e => e.averagePatientsPerPresentDay);
+            backgroundColors = displayedEmployees.map(e => `${e.color}CC`);
+            borderColors = displayedEmployees.map(e => e.color);
+        } else {
+            const selected = displayedEmployees[0];
+            if (selected) {
+                labels = [selected.employeeName, 'Średnia zespołu'];
+                data = [selected.averagePatientsPerPresentDay, averages.averageDailyPerPresentEmployee];
+                backgroundColors = [`${selected.color}CC`, 'rgba(99, 102, 241, 0.7)'];
+                borderColors = [selected.color, '#6366f1'];
+            }
+        }
+
+        const chart = new Chart(ctx.getContext('2d')!, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Śr. pacjentów / dzień obecności',
+                    data,
+                    backgroundColor: backgroundColors,
+                    borderColor: borderColors,
+                    borderWidth: 1,
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: currentWorkloadEmployeeId === 'all' ? 'y' : 'x',
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grid: { color: '#f1f5f9' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+
+        workloadEmployeeChartInstance = chart;
+        chartInstances.push(chart);
+    };
+
+    /**
+     * Renderuje wykres trendu obciążenia w czasie (tydzień/miesiąc/rok)
+     */
+    const renderWorkloadTrendChart = (): void => {
+        const ctx = document.getElementById('workloadTrendChart') as HTMLCanvasElement | null;
+        if (!ctx) return;
+
+        if (workloadTrendChartInstance) {
+            try {
+                workloadTrendChartInstance.destroy();
+            } catch {}
+            chartInstances = chartInstances.filter(c => c !== workloadTrendChartInstance);
+            workloadTrendChartInstance = null;
+        }
+
+        const titleEl = document.getElementById('workloadTrendChartTitle');
+        const employees = EmployeeManager.getAll();
+        const snapshotsList = Object.values(dailySnapshotsData);
+        const averages = calculatePeriodWorkloadAverages(
+            snapshotsList,
+            currentWorkloadPeriod,
+            {
+                weekKey: currentWorkloadWeek,
+                month: currentWorkloadMonth,
+                year: currentYear,
+                employees,
+            }
+        );
+
+        let labels: string[] = [];
+        let datasetValues: number[] = [];
+        let chartLabel = 'Pacjenci';
+
+        if (currentWorkloadPeriod === 'weekly') {
+            if (titleEl) {
+                titleEl.innerHTML = `<i class="fas fa-chart-line"></i> Dzienny rozkład w tygodniu (${averages.periodKey})`;
+            }
+            const weekSnapshots = snapshotsList
+                .filter(s => s.isWorkday && s.weekKey === averages.periodKey)
+                .sort((a, b) => a.date.localeCompare(b.date));
+
+            const dayNames = ['Ndz', 'Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob'];
+            labels = weekSnapshots.map(s => {
+                const parts = s.date.split('-');
+                const d = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
+                return `${dayNames[d.getUTCDay()]} (${parts[2]}.${parts[1]})`;
+            });
+
+            if (currentWorkloadEmployeeId === 'all') {
+                datasetValues = weekSnapshots.map(s => s.totalPatients);
+                chartLabel = 'Wszyscy pacjenci w klinice';
+            } else {
+                const emp = employees[currentWorkloadEmployeeId];
+                const empName = emp ? (emp.name || currentWorkloadEmployeeId) : currentWorkloadEmployeeId;
+                chartLabel = `Pacjenci (${empName})`;
+                datasetValues = weekSnapshots.map(s => s.employees[currentWorkloadEmployeeId]?.patientSlots || 0);
+            }
+        } else if (currentWorkloadPeriod === 'monthly') {
+            if (titleEl) {
+                titleEl.innerHTML = `<i class="fas fa-chart-line"></i> Dni robocze w miesiącu (${averages.periodLabel})`;
+            }
+            const monthSnapshots = snapshotsList
+                .filter(s => s.isWorkday && s.year === currentYear && s.month === currentWorkloadMonth)
+                .sort((a, b) => a.date.localeCompare(b.date));
+
+            labels = monthSnapshots.map(s => s.date.split('-')[2]);
+
+            if (currentWorkloadEmployeeId === 'all') {
+                datasetValues = monthSnapshots.map(s => s.totalPatients);
+                chartLabel = 'Pacjenci w klinice';
+            } else {
+                const emp = employees[currentWorkloadEmployeeId];
+                const empName = emp ? (emp.name || currentWorkloadEmployeeId) : currentWorkloadEmployeeId;
+                chartLabel = `Pacjenci (${empName})`;
+                datasetValues = monthSnapshots.map(s => s.employees[currentWorkloadEmployeeId]?.patientSlots || 0);
+            }
+        } else {
+            // Yearly
+            if (titleEl) {
+                titleEl.innerHTML = `<i class="fas fa-chart-line"></i> Średnie dzienne obciążenie w miesiącach (${currentYear})`;
+            }
+            const monthNames = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'];
+            labels = monthNames;
+
+            datasetValues = monthNames.map((_, idx) => {
+                const m = idx + 1;
+                const mSnapshots = snapshotsList.filter(s => s.isWorkday && s.year === currentYear && s.month === m);
+                if (mSnapshots.length === 0) return 0;
+
+                if (currentWorkloadEmployeeId === 'all') {
+                    let totalPatients = 0;
+                    let totalPresent = 0;
+                    mSnapshots.forEach(s => {
+                        Object.values(s.employees).forEach(emp => {
+                            if (!emp.isOnLeave) {
+                                totalPresent++;
+                                totalPatients += emp.patientSlots;
+                            }
+                        });
+                    });
+                    return totalPresent > 0 ? Math.round((totalPatients / totalPresent) * 10) / 10 : 0;
+                } else {
+                    let totalPatients = 0;
+                    let totalPresent = 0;
+                    mSnapshots.forEach(s => {
+                        const emp = s.employees[currentWorkloadEmployeeId];
+                        if (emp && !emp.isOnLeave) {
+                            totalPresent++;
+                            totalPatients += emp.patientSlots;
+                        }
+                    });
+                    return totalPresent > 0 ? Math.round((totalPatients / totalPresent) * 10) / 10 : 0;
+                }
+            });
+
+            chartLabel = currentWorkloadEmployeeId === 'all'
+                ? 'Śr. pacjentów / dzień obecności pracownika'
+                : 'Śr. pacjentów / dzień obecności';
+        }
+
+        const chart = new Chart(ctx.getContext('2d')!, {
+            type: currentWorkloadPeriod === 'yearly' ? 'line' : 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: chartLabel,
+                    data: datasetValues,
+                    backgroundColor: currentWorkloadPeriod === 'yearly'
+                        ? 'rgba(16, 185, 129, 0.15)'
+                        : 'rgba(59, 130, 246, 0.65)',
+                    borderColor: currentWorkloadPeriod === 'yearly' ? '#10b981' : '#3b82f6',
+                    borderWidth: 2,
+                    borderRadius: currentWorkloadPeriod === 'yearly' ? 0 : 6,
+                    tension: currentWorkloadPeriod === 'yearly' ? 0.3 : 0,
+                    fill: currentWorkloadPeriod === 'yearly',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { font: { size: 11 }, usePointStyle: true }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#f1f5f9' }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+
+        workloadTrendChartInstance = chart;
+        chartInstances.push(chart);
+    };
+
     /**
      * Aktualizuje statystyki pracowników
      */
@@ -909,14 +1599,7 @@ export const Statistics: StatisticsAPI = (() => {
             const remaining = totalEntitlement - usedDays;
             const remainingPercent = Math.max(0, Math.min(100, (remaining / totalEntitlement) * 100));
 
-            let shiftBadge = '';
-            if (employee.shiftGroup === 'first') {
-                shiftBadge = '<span class="shift-badge first"><i class="fas fa-sun"></i> I Zmiana</span>';
-            } else if (employee.shiftGroup === 'second') {
-                shiftBadge = '<span class="shift-badge second"><i class="fas fa-moon"></i> II Zmiana</span>';
-            } else {
-                shiftBadge = '<span class="shift-badge none">-</span>';
-            }
+            const shiftBadge = getShiftBadgeHtml(employee.shiftGroup);
 
             let statusBadge = '';
             if (isOnLeave) {
@@ -982,6 +1665,8 @@ export const Statistics: StatisticsAPI = (() => {
         renderPatientsByEmployeeChart();
         renderPatientsByTimeChart();
         renderWeeklyTrendChart();
+        renderWorkloadByEmployeeChart();
+        renderWorkloadTrendChart();
     };
 
     /**

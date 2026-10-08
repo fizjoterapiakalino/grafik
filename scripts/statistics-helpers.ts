@@ -409,3 +409,318 @@ export const calculateWeeklyAverages = (
         trendPercent,
     };
 };
+
+export interface DailyEmployeeWorkload {
+    employeeId: string;
+    employeeName: string;
+    patientSlots: number;
+    uniquePatients: number;
+    availableSlots: number;
+    occupancyPercent: number;
+    isOnLeave: boolean;
+    leaveType?: string | null;
+}
+
+export interface DailyWorkloadSnapshot {
+    date: string; // YYYY-MM-DD
+    year: number;
+    month: number; // 1-12
+    dayOfWeek: number; // 1 (Mon) - 7 (Sun)
+    weekKey: string; // YYYY-Www
+    isWorkday: boolean;
+    updatedAt: string;
+    employees: Record<string, DailyEmployeeWorkload>;
+    totalPatients: number;
+    activeEmployeesCount: number;
+}
+
+export interface EmployeePeriodWorkloadSummary {
+    employeeId: string;
+    employeeName: string;
+    color: string;
+    shiftGroup?: string | null;
+    workdaysInPeriod: number;
+    daysPresent: number;
+    daysOnLeave: number;
+    totalPatients: number;
+    totalUniquePatients: number;
+    totalAvailableSlots: number;
+    averagePatientsPerPresentDay: number;
+    averagePatientsPerWorkday: number;
+    averagePatientsPerWeek: number;
+    occupancyPercent: number;
+    dailyBreakdown: Record<string, DailyEmployeeWorkload>;
+}
+
+export interface PeriodWorkloadAverages {
+    periodType: 'weekly' | 'monthly' | 'yearly';
+    periodKey: string;
+    periodLabel: string;
+    workdaysCount: number;
+    totalPatientCount: number;
+    averageDailyPerPresentEmployee: number;
+    averageDailyPerWorkday: number;
+    averageWeeklyPerEmployee: number;
+    averageOccupancyPercent: number;
+    employees: EmployeePeriodWorkloadSummary[];
+    trendPercent: number | null;
+}
+
+const addDaysToIso = (dateIso: string, days: number): string => {
+    if (!days || days <= 0) return dateIso;
+    const date = createUtcDate(dateIso);
+    date.setUTCDate(date.getUTCDate() + days);
+    return formatDate(date);
+};
+
+export const createDailyWorkloadSnapshot = (
+    scheduleCells: ScheduleCellsMap | null | undefined,
+    employees: EmployeesMap,
+    leavesData: LeavesMap,
+    targetDate: Date = new Date()
+): DailyWorkloadSnapshot => {
+    const dateIso = formatDate(targetDate);
+    const dayOfWeek = targetDate.getUTCDay() || 7;
+    const isWorkday = dayOfWeek >= 1 && dayOfWeek <= 5;
+    const weekInfo = getIsoWeekInfo(targetDate);
+    const month = targetDate.getUTCMonth() + 1;
+    const year = targetDate.getUTCFullYear();
+    const activeEmployeeIds = getActiveEmployeeIds(employees);
+    const timeSlots = generateScheduleTimeSlots();
+
+    const employeesWorkload: Record<string, DailyEmployeeWorkload> = {};
+    let totalPatientsInDay = 0;
+
+    activeEmployeeIds.forEach(employeeId => {
+        const employee = employees[employeeId];
+        const displayName = getEmployeeDisplayName(employeeId, employee);
+        const employeeLeaves = leavesData[displayName] || [];
+        const activeLeave = employeeLeaves.find(leave => overlapsDate(leave, dateIso));
+        const isOnLeave = Boolean(activeLeave);
+
+        let patientSlots = 0;
+        const uniquePatientNames = new Set<string>();
+        let availableSlots = 0;
+
+        if (scheduleCells) {
+            timeSlots.forEach(time => {
+                const cell = scheduleCells[time]?.[employeeId];
+                if (!cell) {
+                    availableSlots++;
+                    return;
+                }
+
+                if (cell.isBreak) return;
+                if (cell.isHydrotherapy) return;
+
+                availableSlots++;
+
+                if (isOnLeave) return;
+
+                const checkPatientActive = (
+                    name: string | null | undefined,
+                    startDate?: string | null,
+                    endDate?: string | null,
+                    extDays?: number | null
+                ): boolean => {
+                    if (!isFilled(name)) return false;
+                    if (!startDate || !endDate) return true; // Domyślnie aktywny jeśli brak dat
+                    const effectiveEnd = addDaysToIso(endDate, getNumber(extDays));
+                    return dateIso >= startDate && dateIso <= effectiveEnd;
+                };
+
+                if (cell.isSplit) {
+                    if (!cell.isHydrotherapy1 && checkPatientActive(cell.content1, cell.treatmentData1?.startDate, cell.treatmentData1?.endDate, cell.treatmentData1?.extensionDays)) {
+                        patientSlots++;
+                        uniquePatientNames.add(cell.content1!.trim().toLowerCase());
+                    }
+                    if (!cell.isHydrotherapy2 && checkPatientActive(cell.content2, cell.treatmentData2?.startDate, cell.treatmentData2?.endDate, cell.treatmentData2?.extensionDays)) {
+                        patientSlots++;
+                        uniquePatientNames.add(cell.content2!.trim().toLowerCase());
+                    }
+                } else if (checkPatientActive(cell.content, cell.treatmentStartDate, cell.treatmentEndDate, cell.treatmentExtensionDays)) {
+                    patientSlots++;
+                    uniquePatientNames.add(cell.content!.trim().toLowerCase());
+                }
+            });
+        }
+
+        const occupancyPercent = availableSlots > 0 ? Math.round((patientSlots / availableSlots) * 100) : 0;
+        if (!isOnLeave) {
+            totalPatientsInDay += patientSlots;
+        }
+
+        employeesWorkload[employeeId] = {
+            employeeId,
+            employeeName: displayName,
+            patientSlots,
+            uniquePatients: uniquePatientNames.size,
+            availableSlots,
+            occupancyPercent,
+            isOnLeave,
+            leaveType: activeLeave ? activeLeave.type : null,
+        };
+    });
+
+    return {
+        date: dateIso,
+        year,
+        month,
+        dayOfWeek,
+        weekKey: weekInfo.weekKey,
+        isWorkday,
+        updatedAt: new Date().toISOString(),
+        employees: employeesWorkload,
+        totalPatients: totalPatientsInDay,
+        activeEmployeesCount: activeEmployeeIds.length,
+    };
+};
+
+export const backfillWorkloadSnapshots = (
+    scheduleCells: ScheduleCellsMap | null | undefined,
+    employees: EmployeesMap,
+    leavesData: LeavesMap,
+    year: number,
+    existingSnapshots: Record<string, DailyWorkloadSnapshot> = {},
+    referenceDate: Date = new Date()
+): Record<string, DailyWorkloadSnapshot> => {
+    const updated = { ...existingSnapshots };
+    const todayIso = formatDate(referenceDate);
+    const startOfYear = new Date(Date.UTC(year, 0, 1));
+    const endLimit = year === referenceDate.getUTCFullYear()
+        ? referenceDate
+        : new Date(Date.UTC(year, 11, 31));
+
+    for (const cursor = new Date(startOfYear); cursor <= endLimit; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+        const day = cursor.getUTCDay();
+        if (day === 0 || day === 6) continue; // tylko dni robocze
+
+        const dateIso = formatDate(cursor);
+        // Jeśli snapshot nie istnieje lub jest to dzień dzisiejszy, wygeneruj
+        if (!updated[dateIso] || dateIso === todayIso) {
+            updated[dateIso] = createDailyWorkloadSnapshot(scheduleCells, employees, leavesData, cursor);
+        }
+    }
+
+    return updated;
+};
+
+export const calculatePeriodWorkloadAverages = (
+    snapshots: DailyWorkloadSnapshot[],
+    periodType: 'weekly' | 'monthly' | 'yearly',
+    options: {
+        weekKey?: string;
+        month?: number;
+        year: number;
+        employees: EmployeesMap;
+    }
+): PeriodWorkloadAverages => {
+    const { weekKey, month, year, employees } = options;
+    const activeEmployeeIds = getActiveEmployeeIds(employees);
+
+    // Filtrujemy tylko dni robocze należące do okresu
+    let filteredSnapshots = snapshots.filter(s => s.isWorkday && s.year === year);
+    let periodKey = String(year);
+    let periodLabel = `Rok ${year}`;
+
+    if (periodType === 'weekly') {
+        const targetWeek = weekKey || getIsoWeekInfo().weekKey;
+        filteredSnapshots = filteredSnapshots.filter(s => s.weekKey === targetWeek);
+        periodKey = targetWeek;
+        const first = filteredSnapshots[0];
+        periodLabel = `Tydzień ${targetWeek}${first ? ` (${first.weekKey})` : ''}`;
+    } else if (periodType === 'monthly') {
+        const targetMonth = month || (new Date().getUTCMonth() + 1);
+        filteredSnapshots = filteredSnapshots.filter(s => s.month === targetMonth);
+        periodKey = `${year}-${String(targetMonth).padStart(2, '0')}`;
+        const monthNames = [
+            'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
+            'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
+        ];
+        periodLabel = `${monthNames[targetMonth - 1]} ${year}`;
+    }
+
+    // Sortuj chronologicznie
+    filteredSnapshots.sort((a, b) => a.date.localeCompare(b.date));
+    const workdaysCount = filteredSnapshots.length;
+
+    let grandTotalPatients = 0;
+    const employeeSummaries: EmployeePeriodWorkloadSummary[] = [];
+
+    activeEmployeeIds.forEach(employeeId => {
+        const employee = employees[employeeId];
+        const employeeName = getEmployeeDisplayName(employeeId, employee);
+        let daysPresent = 0;
+        let daysOnLeave = 0;
+        let totalPatients = 0;
+        let totalAvailableSlots = 0;
+        const uniqueNames = new Set<string>();
+        const dailyBreakdown: Record<string, DailyEmployeeWorkload> = {};
+
+        filteredSnapshots.forEach(snap => {
+            const empData = snap.employees[employeeId];
+            if (empData) {
+                dailyBreakdown[snap.date] = empData;
+                if (empData.isOnLeave) {
+                    daysOnLeave++;
+                } else {
+                    daysPresent++;
+                    totalPatients += empData.patientSlots;
+                    totalAvailableSlots += empData.availableSlots;
+                }
+            }
+        });
+
+        grandTotalPatients += totalPatients;
+        const avgPresent = daysPresent > 0 ? roundToOne(totalPatients / daysPresent) : 0;
+        const avgWorkday = workdaysCount > 0 ? roundToOne(totalPatients / workdaysCount) : 0;
+        const avgWeekly = roundToOne(avgPresent * 5);
+        const occupancy = totalAvailableSlots > 0 ? Math.round((totalPatients / totalAvailableSlots) * 100) : 0;
+
+        employeeSummaries.push({
+            employeeId,
+            employeeName,
+            color: employee.color || '#94a3b8',
+            shiftGroup: employee.shiftGroup,
+            workdaysInPeriod: workdaysCount,
+            daysPresent,
+            daysOnLeave,
+            totalPatients,
+            totalUniquePatients: uniqueNames.size,
+            totalAvailableSlots,
+            averagePatientsPerPresentDay: avgPresent,
+            averagePatientsPerWorkday: avgWorkday,
+            averagePatientsPerWeek: avgWeekly,
+            occupancyPercent: occupancy,
+            dailyBreakdown,
+        });
+    });
+
+    const activeCount = employeeSummaries.length || 1;
+    const totalPresentDaysAll = employeeSummaries.reduce((acc, e) => acc + e.daysPresent, 0);
+    const avgDailyPerPresent = totalPresentDaysAll > 0
+        ? roundToOne(grandTotalPatients / totalPresentDaysAll)
+        : 0;
+    const avgDailyPerWorkday = (workdaysCount * activeCount) > 0
+        ? roundToOne(grandTotalPatients / (workdaysCount * activeCount))
+        : 0;
+    const avgWeeklyPerEmployee = roundToOne(avgDailyPerPresent * 5);
+    const avgOccupancy = Math.round(
+        employeeSummaries.reduce((acc, e) => acc + e.occupancyPercent, 0) / activeCount
+    );
+
+    return {
+        periodType,
+        periodKey,
+        periodLabel,
+        workdaysCount,
+        totalPatientCount: grandTotalPatients,
+        averageDailyPerPresentEmployee: avgDailyPerPresent,
+        averageDailyPerWorkday: avgDailyPerWorkday,
+        averageWeeklyPerEmployee: avgWeeklyPerEmployee,
+        averageOccupancyPercent: avgOccupancy,
+        employees: employeeSummaries,
+        trendPercent: null,
+    };
+};
+
