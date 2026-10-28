@@ -8,7 +8,6 @@ import {
     calculateWeeklyAverages,
     createWeeklyStatsSnapshot,
     createDailyWorkloadSnapshot,
-    backfillWorkloadSnapshots,
     calculatePeriodWorkloadAverages,
     getActiveEmployeeIds,
     getIsoWeekInfo,
@@ -76,7 +75,9 @@ const LEAVE_TYPES: Record<string, { label: string; color: string }> = {
 
 const WEEKLY_STATS_COLLECTION = 'statsWeekly';
 const DAILY_STATS_COLLECTION = 'statsDaily';
-const WORKLOAD_STORAGE_KEY = 'kalinowa.stats.dailyWorkload.v1';
+// v1 zawierał rekonstruowane historyczne dni na podstawie bieżącego grafiku.
+// Nie mieszamy ich z trwałymi snapshotami v2.
+const WORKLOAD_STORAGE_KEY = 'kalinowa.stats.dailyWorkload.v2';
 const CHART_COLOR_PALETTE = [
     '#2563eb',
     '#16a34a',
@@ -425,8 +426,8 @@ export const Statistics: StatisticsAPI = (() => {
         try {
             weeklyStatsData.forEach((w: any) => {
                 if (w.dailySnapshots && typeof w.dailySnapshots === 'object') {
-                    Object.entries(w.dailySnapshots).forEach(([date, snap]) => {
-                        if (snap && !dailySnapshotsData[date]) {
+                    Object.entries(w.dailySnapshots).forEach(([date, snap]: [string, any]) => {
+                        if (snap && snap.version === 2 && !dailySnapshotsData[date]) {
                             dailySnapshotsData[date] = snap as DailyWorkloadSnapshot;
                         }
                     });
@@ -440,19 +441,13 @@ export const Statistics: StatisticsAPI = (() => {
 
         const employees = EmployeeManager.getAll();
         const now = new Date();
-        const todayIso = now.toISOString().split('T')[0];
-
-        dailySnapshotsData = backfillWorkloadSnapshots(
-            scheduleData.scheduleCells,
-            employees,
-            leavesData,
-            currentYear,
-            dailySnapshotsData,
-            now
-        );
-
         const todaySnap = createDailyWorkloadSnapshot(scheduleData.scheduleCells, employees, leavesData, now);
-        dailySnapshotsData[todayIso] = todaySnap;
+        const todayIso = todaySnap.date;
+        if (todaySnap.isWorkday) {
+            // Tylko bieżący dzień może być odświeżony z żywego grafiku.
+            // Przeszłych dat nigdy nie rekonstruujemy po późniejszych przeniesieniach.
+            dailySnapshotsData[todayIso] = todaySnap;
+        }
 
         try {
             localStorage.setItem(WORKLOAD_STORAGE_KEY, JSON.stringify(dailySnapshotsData));
@@ -464,20 +459,24 @@ export const Statistics: StatisticsAPI = (() => {
         }
 
         try {
-            await db.collection<DailyWorkloadSnapshot>(DAILY_STATS_COLLECTION)
-                .doc(todayIso)
-                .set(todaySnap, { merge: true });
+            if (todaySnap.isWorkday) {
+                await db.collection<DailyWorkloadSnapshot>(DAILY_STATS_COLLECTION)
+                    .doc(todayIso)
+                    .set(todaySnap, { merge: true });
+            }
         } catch (err) {
             console.warn('Unable to persist daily snapshot to Firestore statsDaily:', err);
         }
 
         try {
             const weekInfo = getIsoWeekInfo(now);
-            await db.collection(WEEKLY_STATS_COLLECTION)
-                .doc(weekInfo.weekKey)
-                .set({
-                    [`dailySnapshots.${todayIso}`]: todaySnap,
-                } as any, { merge: true });
+            if (todaySnap.isWorkday) {
+                await db.collection(WEEKLY_STATS_COLLECTION)
+                    .doc(weekInfo.weekKey)
+                    .set({
+                        [`dailySnapshots.${todayIso}`]: todaySnap,
+                    } as any, { merge: true });
+            }
         } catch {}
     };
 
@@ -1269,7 +1268,7 @@ export const Statistics: StatisticsAPI = (() => {
         const subtitleEl = document.getElementById('workloadPeriodSubtitle');
         if (subtitleEl) {
             const empLabel = selectedEmployee ? ` | Pracownik: ${selectedEmployee.employeeName}` : ' | Wszyscy pracownicy';
-            subtitleEl.textContent = `Okres: ${averages.periodLabel} (${averages.workdaysCount} dni roboczych w okresie)${empLabel}`;
+            subtitleEl.textContent = `Okres: ${averages.periodLabel} (${averages.workdaysCount} zapisanych dni roboczych)${empLabel}`;
         }
 
         // Tabela szczegółowa

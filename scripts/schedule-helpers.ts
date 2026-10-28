@@ -9,6 +9,45 @@ import { ScheduleLogic } from './schedule-logic.js';
 import type { CellState, TreatmentData } from './types/index.js';
 
 /**
+ * Tworzy nieosobowy, stabilny identyfikator wpisu pacjenta. Nazwa pacjenta
+ * pozostaje wyłącznie etykietą w grafiku i nie jest używana do agregacji.
+ */
+export const createPatientId = (): string => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    return `patient-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+};
+
+const ensurePatientId = (state: CellState, part: number | null): void => {
+    const contentKey = part ? `content${part}` : 'content';
+    const patientIdKey = part ? `patientId${part}` : 'patientId';
+    const content = state[contentKey];
+    if (typeof content === 'string' && content.trim() !== '' && !state[patientIdKey]) {
+        state[patientIdKey] = createPatientId();
+    }
+};
+
+/** Uzupełnia ID dla wpisów utworzonych przed migracją i porządkuje zmianę split/normal. */
+export const ensureCellPatientIds = (state: CellState): void => {
+    if (state.isHydrotherapy) return;
+
+    if (state.isSplit) {
+        if (!state.patientId1 && state.patientId && typeof state.content1 === 'string' && state.content1.trim() !== '') {
+            state.patientId1 = state.patientId;
+        }
+        delete state.patientId;
+        ensurePatientId(state, 1);
+        ensurePatientId(state, 2);
+        return;
+    }
+
+    delete state.patientId1;
+    delete state.patientId2;
+    ensurePatientId(state, null);
+};
+
+/**
  * Określa numer części podzielonej komórki (1 lub 2) na podstawie elementu DOM
  */
 export const getTargetPart = (element: HTMLElement): number | null => {
@@ -81,7 +120,7 @@ export const copyTreatmentToTarget = (treatmentData: TreatmentData, target: Cell
  */
 export const clearSplitFields = (state: CellState): void => {
     const splitFields = [
-        'content1', 'content2', 'isMassage1', 'isMassage2',
+        'content1', 'content2', 'patientId1', 'patientId2', 'isMassage1', 'isMassage2',
         'isPnf1', 'isPnf2', 'isEveryOtherDay1', 'isEveryOtherDay2',
         'isSharedPatient1', 'isSharedPatient2',
         'treatmentData1', 'treatmentData2',
@@ -100,6 +139,9 @@ export const createTargetUpdateFn = (oldCellState: CellState, sourcePart: number
             );
 
             copyFlags(oldCellState, cellState, sourcePart, targetPart);
+            cellState[`patientId${targetPart}`] = safeCopy(
+                sourcePart ? oldCellState[`patientId${sourcePart}`] : oldCellState.patientId
+            );
 
             const treatmentData = getTreatmentData(oldCellState, sourcePart);
             copyTreatmentToTarget(treatmentData, cellState, targetPart);
@@ -108,6 +150,7 @@ export const createTargetUpdateFn = (oldCellState: CellState, sourcePart: number
             cellState.isSplit = false;
 
             copyFlags(oldCellState, cellState, sourcePart, null);
+            cellState.patientId = safeCopy(oldCellState[`patientId${sourcePart}`] as string | undefined);
 
             const treatmentData = getTreatmentData(oldCellState, sourcePart);
             copyTreatmentToTarget(treatmentData, cellState, null);
@@ -124,9 +167,12 @@ export const createTargetUpdateFn = (oldCellState: CellState, sourcePart: number
  */
 export const copyFullCellState = (source: CellState, target: CellState): void => {
     target.content = safeCopy(source.content) as string | undefined;
+    target.patientId = safeCopy(source.patientId) as string | undefined;
     target.isSplit = safeBool(source.isSplit);
     target.content1 = safeCopy(source.content1) as string | undefined;
     target.content2 = safeCopy(source.content2) as string | undefined;
+    target.patientId1 = safeCopy(source.patientId1) as string | undefined;
+    target.patientId2 = safeCopy(source.patientId2) as string | undefined;
 
     ['isMassage', 'isPnf', 'isEveryOtherDay', 'isSharedPatient'].forEach((flag) => {
         target[flag] = safeBool(source[flag] as boolean);
@@ -154,6 +200,7 @@ export const createSourceClearFn = (sourcePart: number | null): ((state: CellSta
     return (state: CellState) => {
         if (sourcePart) {
             state[`content${sourcePart}`] = '';
+            delete state[`patientId${sourcePart}`];
             delete state[`isMassage${sourcePart}`];
             delete state[`isPnf${sourcePart}`];
             delete state[`isEveryOtherDay${sourcePart}`];
@@ -203,10 +250,18 @@ export const updateCellContent = (
     parentCell: HTMLElement
 ): void => {
     if (newText.includes('/')) {
+        const previousContent = (cellState.content || '').trim().toLocaleLowerCase('pl-PL');
+        const previousPatientId = cellState.patientId;
         const parts = newText.split('/', 2);
         cellState.isSplit = true;
         cellState.content1 = parts[0];
         cellState.content2 = parts[1];
+        if (parts[0].trim().toLocaleLowerCase('pl-PL') === previousContent && previousPatientId) {
+            cellState.patientId1 = previousPatientId;
+        }
+        cellState.patientId = null;
+        ensurePatientId(cellState, 1);
+        ensurePatientId(cellState, 2);
     } else if (cellState.isSplit) {
         updateSplitCellPart(cellState, newText, targetPart, element, parentCell);
     } else {
@@ -243,6 +298,7 @@ const updateSplitCellPart = (
     let treatmentData = cellState[treatmentKey] as TreatmentData | undefined;
 
     if (newContent === '') {
+        delete cellState[`patientId${part}`];
         delete cellState[treatmentKey];
         delete cellState[`isMassage${part}`];
         delete cellState[`isPnf${part}`];
@@ -260,6 +316,7 @@ const updateSplitCellPart = (
             endDate: ScheduleLogic.calculateEndDate(getTodayDate(), 0),
         };
         cellState[treatmentKey] = treatmentData;
+        cellState[`patientId${part}`] = createPatientId();
     } else if (treatmentData?.startDate) {
         // Ten sam pacjent - przelicz tylko datę końcową
         treatmentData.endDate = ScheduleLogic.calculateEndDate(treatmentData.startDate, treatmentData.extensionDays ?? undefined);
@@ -272,6 +329,8 @@ const updateSplitCellPart = (
         };
         cellState[treatmentKey] = treatmentData;
     }
+
+    ensurePatientId(cellState, part);
 };
 
 /**
@@ -283,6 +342,7 @@ const updateNormalCell = (cellState: CellState, newText: string): void => {
 
     if (newContent === '') {
         cellState.content = '';
+        cellState.patientId = null;
         cellState.treatmentStartDate = null;
         cellState.treatmentExtensionDays = null;
         cellState.treatmentEndDate = null;
@@ -305,6 +365,7 @@ const updateNormalCell = (cellState: CellState, newText: string): void => {
         cellState.treatmentExtensionDays = 0;
         cellState.additionalInfo = null;
         cellState.treatmentEndDate = ScheduleLogic.calculateEndDate(cellState.treatmentStartDate, 0);
+        cellState.patientId = createPatientId();
     } else if (contentChanged) {
         // Pierwszy wpis w pustej komórce
         if (!cellState.treatmentStartDate) {
@@ -319,6 +380,7 @@ const updateNormalCell = (cellState: CellState, newText: string): void => {
     }
 
     cellState.content = newText;
+    ensurePatientId(cellState, null);
 };
 
 /**

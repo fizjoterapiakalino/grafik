@@ -65,6 +65,19 @@ describe('schedule-helpers', () => {
         });
     });
 
+    test('assigns a stable patient ID to a newly entered patient and replaces it for another patient', () => {
+        const state = {};
+        const cell = document.createElement('td');
+
+        updateCellContent(state, 'Kowalski', null, cell, cell);
+        expect(typeof state.patientId).toBe('string');
+        const firstId = state.patientId;
+
+        updateCellContent(state, 'Nowak', null, cell, cell);
+        expect(typeof state.patientId).toBe('string');
+        expect(state.patientId).not.toBe(firstId);
+    });
+
     describe('getSourcePart', () => {
         test('returns null for non-split cell', () => {
             const cellState = { content: 'Test' };

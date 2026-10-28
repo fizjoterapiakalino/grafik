@@ -561,6 +561,9 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                     _dependencies.updateCellState(cell, (state) => {
                         state.content1 = safeCopy(state.content || '') as string;
                         state.content2 = '';
+                        state.patientId1 = safeCopy(state.patientId) as string | null;
+                        state.patientId2 = null;
+                        state.patientId = null;
                         state.content = null;
 
                         if (state.isMassage) {
@@ -652,6 +655,9 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 _dependencies.updateCellState(activeCell, (state) => {
                     state.content1 = state.content || '';
                     state.content2 = '';
+                    state.patientId1 = state.patientId || null;
+                    state.patientId2 = null;
+                    state.patientId = null;
                     delete state.content;
 
                     if (state.isMassage) {

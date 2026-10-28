@@ -247,11 +247,17 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
                         state.isSplit = true;
                         state.content1 = parts[0];
                         state.content2 = parts[1];
+                        delete state.patientId;
+                        delete state.patientId1;
+                        delete state.patientId2;
                         delete state.content;
                     } else {
                         delete state.isSplit;
                         delete state.content1;
                         delete state.content2;
+                        delete state.patientId;
+                        delete state.patientId1;
+                        delete state.patientId2;
                         state.content = valueToRevert;
                     }
                 });

@@ -30,8 +30,11 @@ export const deepClone = <T>(obj: T): T =>
  */
 export const CELL_CONTENT_KEYS = [
     'content',
+    'patientId',
     'content1',
     'content2',
+    'patientId1',
+    'patientId2',
     'isSplit',
     'isMassage',
     'isMassage1',

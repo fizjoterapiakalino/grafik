@@ -218,4 +218,96 @@ describe('statistics helpers', () => {
         expect(empB?.daysPresent).toBe(2);
         expect(empB?.averagePatientsPerPresentDay).toBe(7); // (6 + 8) / 2 = 7
     });
+
+    test('excludes Polish holidays, does not extend an already calculated end date and respects every-other-day visits', () => {
+        const employees = { empA: { displayName: 'Anna', color: '#10b981' } };
+        const scheduleCells = {
+            '8:00': {
+                empA: {
+                    content: 'Pacjent A',
+                    patientId: 'patient-a',
+                    treatmentStartDate: '2026-06-01',
+                    // Ta data już zawiera przedłużenie; nie wolno dodawać go ponownie.
+                    treatmentEndDate: '2026-06-03',
+                    treatmentExtensionDays: 10,
+                },
+            },
+            '8:30': {
+                empA: {
+                    content: 'Pacjent B',
+                    patientId: 'patient-b',
+                    treatmentStartDate: '2026-10-05',
+                    treatmentEndDate: '2026-10-30',
+                    isEveryOtherDay: true,
+                },
+            },
+        };
+
+        const holiday = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-06-04T12:00:00Z'));
+        expect(holiday.isWorkday).toBe(false); // Boże Ciało
+        expect(holiday.employees.empA.patientSlots).toBe(0);
+
+        const firstVisit = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-05T12:00:00Z'));
+        const secondWorkday = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-06T12:00:00Z'));
+        const thirdWorkday = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-07T12:00:00Z'));
+        expect(firstVisit.employees.empA.patientSlots).toBe(1);
+        expect(secondWorkday.employees.empA.patientSlots).toBe(0);
+        expect(thirdWorkday.employees.empA.patientSlots).toBe(1);
+    });
+
+    test('aggregates unique patients by stable patient ID, not by displayed name', () => {
+        const employees = { empA: { displayName: 'Anna', color: '#10b981' } };
+        const snapshots = [
+            {
+                date: '2026-10-05', year: 2026, month: 10, dayOfWeek: 1, weekKey: '2026-W41', isWorkday: true,
+                updatedAt: '2026-10-05T12:00:00Z', totalPatients: 1, activeEmployeesCount: 1,
+                employees: {
+                    empA: { employeeId: 'empA', employeeName: 'Anna', patientSlots: 1, uniquePatients: 1, patientIds: ['patient-1'], availableSlots: 15, occupancyPercent: 7, isOnLeave: false },
+                },
+            },
+            {
+                date: '2026-10-06', year: 2026, month: 10, dayOfWeek: 2, weekKey: '2026-W41', isWorkday: true,
+                updatedAt: '2026-10-06T12:00:00Z', totalPatients: 1, activeEmployeesCount: 1,
+                employees: {
+                    empA: { employeeId: 'empA', employeeName: 'Anna', patientSlots: 1, uniquePatients: 1, patientIds: ['patient-1'], availableSlots: 15, occupancyPercent: 7, isOnLeave: false },
+                },
+            },
+        ];
+
+        const result = calculatePeriodWorkloadAverages(snapshots, 'weekly', {
+            weekKey: '2026-W41', year: 2026, employees,
+        });
+        expect(result.employees[0].totalPatients).toBe(2);
+        expect(result.employees[0].totalUniquePatients).toBe(1);
+        // Średnia tygodniowa normalizowana do 5 dni roboczych: (2 pacjentów / 2 dni) * 5 = 5
+        expect(result.employees[0].averagePatientsPerWeek).toBe(5);
+    });
+
+    test('supports unique patients aggregation for legacy snapshots without UUIDs', () => {
+        const employees = { empA: { displayName: 'Anna', color: '#10b981' } };
+        const snapshots = [
+            {
+                date: '2026-10-05', year: 2026, month: 10, dayOfWeek: 1, weekKey: '2026-W41', isWorkday: true,
+                updatedAt: '2026-10-05T12:00:00Z', totalPatients: 2, activeEmployeesCount: 1,
+                employees: {
+                    empA: { employeeId: 'empA', employeeName: 'Anna', patientSlots: 2, uniquePatients: 2, patientIds: ['legacy:kowalski jan', 'legacy:nowak anna'], availableSlots: 15, occupancyPercent: 13, isOnLeave: false },
+                },
+            },
+            {
+                date: '2026-10-06', year: 2026, month: 10, dayOfWeek: 2, weekKey: '2026-W41', isWorkday: true,
+                updatedAt: '2026-10-06T12:00:00Z', totalPatients: 1, activeEmployeesCount: 1,
+                employees: {
+                    empA: { employeeId: 'empA', employeeName: 'Anna', patientSlots: 1, uniquePatients: 1, patientIds: ['legacy:kowalski jan'], availableSlots: 15, occupancyPercent: 7, isOnLeave: false },
+                },
+            },
+        ];
+
+        const result = calculatePeriodWorkloadAverages(snapshots, 'weekly', {
+            weekKey: '2026-W41', year: 2026, employees,
+        });
+        expect(result.employees[0].totalPatients).toBe(3);
+        expect(result.employees[0].totalUniquePatients).toBe(2); // Kowalski (2 dni) + Nowak (1 dzień)
+        expect(result.employees[0].averagePatientsPerPresentDay).toBe(1.5);
+        expect(result.employees[0].averagePatientsPerWeek).toBe(7.5);
+    });
 });

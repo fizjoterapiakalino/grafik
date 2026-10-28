@@ -35,8 +35,11 @@ export interface TreatmentDataForValidation {
  */
 export interface CellStateForValidation {
     content?: string | null;
+    patientId?: string | null;
     content1?: string | null;
     content2?: string | null;
+    patientId1?: string | null;
+    patientId2?: string | null;
     isSplit?: boolean | null;
     isBreak?: boolean | null;
     isMassage?: boolean | null;
@@ -69,8 +72,11 @@ export interface CellStateForValidation {
  */
 export const ALLOWED_CELL_KEYS = [
     'content',
+    'patientId',
     'content1',
     'content2',
+    'patientId1',
+    'patientId2',
     'isSplit',
     'isBreak',
     'isMassage',
@@ -221,6 +227,13 @@ export const validateCellState = (cellState: unknown): ValidationResultMultiple 
 
     const content2Validation = validateCellContent(state.content2);
     if (!content2Validation.valid) errors.push(`content2: ${content2Validation.error}`);
+
+    for (const field of ['patientId', 'patientId1', 'patientId2'] as const) {
+        const value = state[field];
+        if (value !== undefined && value !== null && (typeof value !== 'string' || value.length > 100)) {
+            errors.push(`${field} musi być identyfikatorem tekstowym o długości do 100 znaków`);
+        }
+    }
 
     const booleanFields = [
         'isSplit', 'isBreak', 'isMassage', 'isMassage1', 'isMassage2',

@@ -158,10 +158,15 @@ export interface ScheduleHistoryEntry {
 export interface CellState {
     /** Zawartość komórki (dla normalnej komórki) */
     content?: string | null;
+    /** Stabilny, nieosobowy identyfikator pacjenta w normalnej komórce */
+    patientId?: string | null;
     /** Zawartość górnej części (dla split cell) */
     content1?: string | null;
     /** Zawartość dolnej części (dla split cell) */
     content2?: string | null;
+    /** Stabilne identyfikatory pacjentów w częściach podzielonej komórki */
+    patientId1?: string | null;
+    patientId2?: string | null;
     /** Czy komórka jest podzielona */
     isSplit?: boolean | null;
     /** Czy komórka jest przerwą */

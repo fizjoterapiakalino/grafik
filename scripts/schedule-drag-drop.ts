@@ -38,7 +38,7 @@ export interface DragDropAPI {
  * Klucze zawartości komórki używane przy kopiowaniu/czyszczeniu
  */
 const CONTENT_KEYS = [
-    'content', 'content1', 'content2', 'isSplit', 'isMassage', 'isPnf', 'isEveryOtherDay', 'isSharedPatient',
+    'content', 'content1', 'content2', 'patientId', 'patientId1', 'patientId2', 'isSplit', 'isMassage', 'isPnf', 'isEveryOtherDay', 'isSharedPatient',
     'treatmentStartDate', 'treatmentExtensionDays', 'treatmentEndDate', 'additionalInfo',
     'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2',
     'isEveryOtherDay1', 'isEveryOtherDay2', 'isSharedPatient1', 'isSharedPatient2', 'isHydrotherapy',
@@ -181,6 +181,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
         if (sourcePart && sourceState.isSplit) {
             return {
                 content: sourceState[`content${sourcePart}`] as string | null | undefined,
+                patientId: sourceState[`patientId${sourcePart}`] as string | null | undefined,
                 isMassage: sourceState[`isMassage${sourcePart}`] as boolean | null | undefined,
                 isPnf: sourceState[`isPnf${sourcePart}`] as boolean | null | undefined,
                 isEveryOtherDay: sourceState[`isEveryOtherDay${sourcePart}`] as boolean | null | undefined,
@@ -190,6 +191,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
         }
         return {
             content: sourceState.content,
+            patientId: sourceState.patientId,
             isMassage: sourceState.isMassage,
             isPnf: sourceState.isPnf,
             isEveryOtherDay: sourceState.isEveryOtherDay,
@@ -205,6 +207,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
 
     const applyTargetAutoSplit = (targetState: CellState, dataToMove: ReturnType<typeof extractDataToMove>) => {
         targetState.content1 = safeCopy(targetState.content);
+        targetState.patientId1 = safeCopy(targetState.patientId);
         targetState.isMassage1 = safeBool(targetState.isMassage);
         targetState.isPnf1 = safeBool(targetState.isPnf);
         targetState.isEveryOtherDay1 = safeBool(targetState.isEveryOtherDay);
@@ -217,6 +220,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
         };
 
         targetState.content2 = safeCopy(dataToMove.content);
+        targetState.patientId2 = safeCopy(dataToMove.patientId);
         targetState.isMassage2 = safeBool(dataToMove.isMassage);
         targetState.isPnf2 = safeBool(dataToMove.isPnf);
         targetState.isEveryOtherDay2 = safeBool(dataToMove.isEveryOtherDay);
@@ -230,6 +234,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
 
         targetState.isSplit = true;
         targetState.content = null;
+        targetState.patientId = null;
         targetState.isMassage = null;
         targetState.isPnf = null;
         targetState.isEveryOtherDay = null;
@@ -242,6 +247,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
 
     const applyTargetPartUpdate = (targetState: CellState, targetPart: number, dataToMove: ReturnType<typeof extractDataToMove>) => {
         targetState[`content${targetPart}`] = safeCopy(dataToMove.content);
+        targetState[`patientId${targetPart}`] = safeCopy(dataToMove.patientId);
         targetState[`isMassage${targetPart}`] = safeBool(dataToMove.isMassage);
         targetState[`isPnf${targetPart}`] = safeBool(dataToMove.isPnf);
         targetState[`isEveryOtherDay${targetPart}`] = safeBool(dataToMove.isEveryOtherDay);
@@ -259,6 +265,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
             delete (targetState as Record<string, unknown>)[key];
         }
         targetState.content = safeCopy(dataToMove.content);
+        targetState.patientId = safeCopy(dataToMove.patientId);
         targetState.isMassage = safeBool(dataToMove.isMassage);
         targetState.isPnf = safeBool(dataToMove.isPnf);
         targetState.isEveryOtherDay = safeBool(dataToMove.isEveryOtherDay);
@@ -272,6 +279,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
     const applySourceClear = (sourceState: CellState, sourcePart: number | null) => {
         if (sourcePart && sourceState.isSplit) {
             sourceState[`content${sourcePart}`] = null;
+            sourceState[`patientId${sourcePart}`] = null;
             sourceState[`isMassage${sourcePart}`] = null;
             sourceState[`isPnf${sourcePart}`] = null;
             sourceState[`isEveryOtherDay${sourcePart}`] = null;
@@ -290,6 +298,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
                 const otherTreatmentData = sourceState[`treatmentData${otherPart}`] as { startDate?: string | null; extensionDays?: number | null; endDate?: string | null; additionalInfo?: string | null } | null | undefined;
 
                 sourceState.content = safeCopy(otherContent as string | null | undefined);
+                sourceState.patientId = safeCopy(sourceState[`patientId${otherPart}`] as string | null | undefined);
                 sourceState.isMassage = safeBool(otherMassage as any);
                 sourceState.isPnf = safeBool(otherPnf as any);
                 sourceState.isEveryOtherDay = safeBool(otherEveryOtherDay as any);
@@ -305,6 +314,8 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
             sourceState.isSplit = null;
             sourceState.content1 = null;
             sourceState.content2 = null;
+            sourceState.patientId1 = null;
+            sourceState.patientId2 = null;
             sourceState.isMassage1 = null;
             sourceState.isMassage2 = null;
             sourceState.isPnf1 = null;

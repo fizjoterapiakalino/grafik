@@ -18,6 +18,7 @@
         "scripts/schedule-helpers.ts",
         "scripts/schedule-logic.ts",
         "scripts/statistics-helpers.ts",
+        "scripts/workload-snapshot.ts",
         "scripts/scrapped-pdfs.ts",
         "scripts/shared.ts",
         "scripts/utils.ts",

@@ -2,6 +2,8 @@
 import { db as dbRaw } from './firebase-config.js';
 import { AppConfig, UndoManager } from './common.js';
 import { validateCellState, sanitizeCellState } from './data-validation.js';
+import { ensureCellPatientIds } from './schedule-helpers.js';
+import { persistTodayWorkloadSnapshot } from './workload-snapshot.js';
 import type { FirestoreDbWrapper } from './types/firebase';
 import type { CellState, ScheduleHistoryEntry, ScheduleAppState } from './types/index.js';
 
@@ -229,6 +231,10 @@ export const ScheduleData: ScheduleDataAPI = (() => {
                 }
 
                 notifyChange();
+                // Otworzenie grafiku aktualizuje tylko dzisiejszy snapshot.
+                // Nie odtwarzamy historycznych dni z bieżącego układu komórek.
+                void persistTodayWorkloadSnapshot(appState.scheduleCells)
+                    .catch(error => console.warn('Nie udało się odświeżyć dzisiejszego snapshotu obciążenia:', error));
             },
             (error) => {
                 console.error('Error listening to schedule changes:', error);
@@ -279,6 +285,8 @@ export const ScheduleData: ScheduleDataAPI = (() => {
             );
             clearPendingSave(saveToken);
             window.setSaveStatus('saved');
+            void persistTodayWorkloadSnapshot(appState.scheduleCells)
+                .catch(snapshotError => console.warn('Nie udało się zapisać dzisiejszego snapshotu obciążenia:', snapshotError));
             isSaving = false;
 
             if (saveQueued) {
@@ -305,6 +313,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
         _updateCellHistory(cellState, oldContent ?? undefined);
 
         updateFn(cellState);
+        ensureCellPatientIds(cellState);
 
         const validation = validateCellState(cellState);
         if (!validation.valid && AppConfig.debug) {
@@ -330,6 +339,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
             _updateCellHistory(cellState, oldContent ?? undefined);
 
             updateFn(cellState);
+            ensureCellPatientIds(cellState);
 
             const validation = validateCellState(cellState);
             if (!validation.valid && AppConfig.debug) {

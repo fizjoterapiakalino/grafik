@@ -531,6 +531,7 @@ export const Schedule: ScheduleAPI = (() => {
             const activePart = content1.trim() === '' ? 2 : 1;
 
             updateCellState(cell, (state) => {
+                state.patientId = safeCopy(state[`patientId${activePart}`] as string | null | undefined);
                 state.isMassage = safeCopy(state[`isMassage${activePart}`]);
                 state.isPnf = safeCopy(state[`isPnf${activePart}`]);
                 state.isEveryOtherDay = safeCopy(state[`isEveryOtherDay${activePart}`]);
@@ -546,6 +547,8 @@ export const Schedule: ScheduleAPI = (() => {
                 state.isSplit = null;
                 state.content1 = null;
                 state.content2 = null;
+                state.patientId1 = null;
+                state.patientId2 = null;
                 state.isMassage1 = null;
                 state.isMassage2 = null;
                 state.isPnf1 = null;
