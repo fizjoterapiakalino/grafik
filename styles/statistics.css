@@ -3,20 +3,6 @@
 
 /* Statistics-specific aliases to main design system variables */
 :root {
-    /* Map statistics colors to main design system */
-    --stats-primary: var(--color-primary-500);
-    --stats-primary-dark: var(--color-primary-600);
-    --stats-secondary: var(--color-secondary-500);
-    --stats-success: var(--color-success);
-    --stats-warning: var(--color-warning);
-    --stats-danger: var(--color-danger);
-    --stats-info: var(--color-info);
-    --stats-bg: var(--color-gray-50);
-    --stats-card-bg: var(--color-white);
-    --stats-card-border: var(--color-gray-200);
-    --stats-text: var(--color-gray-800);
-    --stats-text-muted: var(--color-gray-500);
-
     /* Gradients using main colors */
     --stats-gradient-1: linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%);
     --stats-gradient-2: linear-gradient(135deg, var(--color-secondary-500) 0%, var(--color-secondary-600) 100%);
@@ -31,7 +17,7 @@
     justify-content: space-between;
     align-items: center;
     padding: var(--spacing-md) var(--spacing-lg);
-    background: var(--stats-card-bg);
+    background: var(--color-white);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-md);
     margin-bottom: var(--spacing-lg);
@@ -49,7 +35,7 @@
     padding: 10px 20px;
     border: none;
     background: var(--color-gray-100);
-    color: var(--stats-text-muted);
+    color: var(--color-gray-500);
     border-radius: var(--border-radius-md);
     cursor: pointer;
     font-weight: 500;
@@ -59,7 +45,7 @@
 
 .statistics-header-controls .tab-btn:hover {
     background: var(--color-gray-200);
-    color: var(--stats-text);
+    color: var(--color-gray-800);
 }
 
 .statistics-header-controls .tab-btn.active {
@@ -76,12 +62,12 @@
 
 .statistics-header-controls .year-selector-container label {
     font-weight: 500;
-    color: var(--stats-text-muted);
+    color: var(--color-gray-500);
 }
 
 .statistics-header-controls .year-select {
     padding: var(--spacing-sm) var(--spacing-md);
-    border: 2px solid var(--stats-card-border);
+    border: 2px solid var(--color-gray-200);
     border-radius: var(--border-radius-md);
     font-size: 0.875rem;
     background: var(--color-white);
@@ -91,7 +77,7 @@
 
 .statistics-header-controls .year-select:focus {
     outline: none;
-    border-color: var(--stats-primary);
+    border-color: var(--color-primary-500);
 }
 
 /* Main Content */
@@ -134,7 +120,7 @@
 
 /* Stat Cards */
 .stat-card {
-    background: var(--stats-card-bg);
+    background: var(--color-white);
     border-radius: var(--border-radius-lg);
     padding: var(--spacing-lg);
     display: flex;
@@ -230,13 +216,13 @@
 .stat-value {
     font-size: 2rem;
     font-weight: 700;
-    color: var(--stats-text);
+    color: var(--color-gray-800);
     line-height: 1.1;
 }
 
 .stat-label {
     font-size: 0.875rem;
-    color: var(--stats-text-muted);
+    color: var(--color-gray-500);
     font-weight: 500;
 }
 
@@ -260,26 +246,26 @@
 .stats-section-header h3 {
     margin: 0;
     font-size: 1.05rem;
-    color: var(--stats-text);
+    color: var(--color-gray-800);
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
 
 .stats-section-header h3 i {
-    color: var(--stats-primary);
+    color: var(--color-primary-500);
     font-size: 0.95rem;
 }
 
 .stats-section-subtitle {
-    color: var(--stats-text-muted);
+    color: var(--color-gray-500);
     font-size: 0.8rem;
     line-height: 1.4;
 }
 
 /* Chart Container */
 .stats-chart-container {
-    background: var(--stats-card-bg);
+    background: var(--color-white);
     border-radius: 16px;
     padding: 1.5rem;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
@@ -293,14 +279,14 @@
     margin: 0 0 1rem 0;
     font-size: 1rem;
     font-weight: 600;
-    color: var(--stats-text);
+    color: var(--color-gray-800);
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
 
 .stats-chart-container h3 i {
-    color: var(--stats-primary);
+    color: var(--color-primary-500);
     font-size: 0.9rem;
 }
 
@@ -315,7 +301,7 @@
 
 /* Stats Table Container */
 .stats-table-container {
-    background: var(--stats-card-bg);
+    background: var(--color-white);
     border-radius: 16px;
     padding: 1.5rem;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
@@ -326,14 +312,14 @@
     margin: 0 0 1rem 0;
     font-size: 1rem;
     font-weight: 600;
-    color: var(--stats-text);
+    color: var(--color-gray-800);
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
 
 .stats-table-container h3 i {
-    color: var(--stats-primary);
+    color: var(--color-primary-500);
     font-size: 0.9rem;
 }
 
@@ -346,18 +332,18 @@
 
 .stats-table thead th {
     background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-    color: var(--stats-text);
+    color: var(--color-gray-800);
     font-weight: 600;
     text-align: left;
     padding: 0.875rem 1rem;
-    border-bottom: 2px solid var(--stats-card-border);
+    border-bottom: 2px solid var(--color-gray-200);
     white-space: nowrap;
 }
 
 .stats-table tbody td {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #f1f5f9;
-    color: var(--stats-text);
+    color: var(--color-gray-800);
 }
 
 .stats-table tbody tr {
@@ -374,7 +360,7 @@
 
 .stats-table .no-data-cell {
     text-align: center;
-    color: var(--stats-text-muted);
+    color: var(--color-gray-500);
     padding: 1.5rem;
 }
 
@@ -464,20 +450,20 @@
 }
 
 .progress-fill.good {
-    background: var(--stats-success);
+    background: var(--color-success);
 }
 
 .progress-fill.medium {
-    background: var(--stats-warning);
+    background: var(--color-warning);
 }
 
 .progress-fill.low {
-    background: var(--stats-danger);
+    background: var(--color-danger);
 }
 
 .progress-text {
     font-size: 0.75rem;
-    color: var(--stats-text-muted);
+    color: var(--color-gray-500);
 }
 
 /* Responsive */
@@ -529,7 +515,7 @@
     align-items: center;
     justify-content: center;
     min-height: 200px;
-    color: var(--stats-text-muted);
+    color: var(--color-gray-500);
     font-size: 0.875rem;
 }
 
@@ -552,7 +538,7 @@
 .no-data-message {
     text-align: center;
     padding: 2rem;
-    color: var(--stats-text-muted);
+    color: var(--color-gray-500);
 }
 
 .no-data-message i {
@@ -573,8 +559,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: var(--stats-card-bg);
-    border: 1px solid var(--stats-card-border);
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
     border-radius: var(--border-radius-lg);
     padding: var(--spacing-md) var(--spacing-lg);
     margin-bottom: var(--spacing-md);
@@ -598,7 +584,7 @@
     padding: 6px 14px;
     border: none;
     background: transparent;
-    color: var(--stats-text-muted);
+    color: var(--color-gray-500);
     font-size: 0.8125rem;
     font-weight: 600;
     border-radius: var(--border-radius-sm);
@@ -607,13 +593,13 @@
 }
 
 .subtab-btn:hover {
-    color: var(--stats-text);
+    color: var(--color-gray-800);
     background: var(--color-gray-200);
 }
 
 .subtab-btn.active {
     background: var(--color-white);
-    color: var(--stats-primary-dark);
+    color: var(--color-primary-600);
     box-shadow: var(--shadow-sm);
 }
 
@@ -633,15 +619,15 @@
 .workload-selects-container .select-group label {
     font-size: 0.8125rem;
     font-weight: 600;
-    color: var(--stats-text-muted);
+    color: var(--color-gray-500);
 }
 
 .styled-select {
     padding: 6px 12px;
-    border: 1px solid var(--stats-card-border);
+    border: 1px solid var(--color-gray-200);
     border-radius: var(--border-radius-md);
     background-color: var(--color-white);
-    color: var(--stats-text);
+    color: var(--color-gray-800);
     font-size: 0.8125rem;
     font-weight: 500;
     cursor: pointer;
@@ -650,7 +636,7 @@
 
 .styled-select:focus {
     outline: none;
-    border-color: var(--stats-primary);
+    border-color: var(--color-primary-500);
     box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
 }
 
@@ -666,7 +652,7 @@
     gap: 5px;
     padding: 4px 10px;
     background: rgba(16, 185, 129, 0.1);
-    color: var(--stats-success);
+    color: var(--color-success);
     border: 1px solid rgba(16, 185, 129, 0.25);
     border-radius: var(--border-radius-full);
     font-size: 0.75rem;
@@ -674,9 +660,9 @@
 }
 
 .workload-refresh-btn {
-    border: 1px solid var(--stats-card-border);
+    border: 1px solid var(--color-gray-200);
     background: var(--color-white);
-    color: var(--stats-text-muted);
+    color: var(--color-gray-500);
     width: 28px;
     height: 28px;
     border-radius: var(--border-radius-sm);
@@ -688,8 +674,8 @@
 }
 
 .workload-refresh-btn:hover {
-    color: var(--stats-primary);
-    border-color: var(--stats-primary);
+    color: var(--color-primary-500);
+    border-color: var(--color-primary-500);
     background: var(--color-gray-50);
 }
 
@@ -724,7 +710,7 @@
 
 .stats-table-subtitle {
     font-size: 0.8125rem;
-    color: var(--stats-text-muted);
+    color: var(--color-gray-500);
     font-weight: 500;
 }
 

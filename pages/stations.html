@@ -38,8 +38,6 @@
             </button>
         </div>
     </div>
-    <div id="stationsAttentionBar" class="stations-attention-bar" aria-live="polite" style="display: none !important;"></div>
-
     <div class="stations-radio-widget-panel" aria-label="Radio online">
         <div class="stations-radio-player" id="stationsRadioPlayer">
             <div class="stations-radio-top">
@@ -75,40 +73,5 @@
     <!-- Desktop View (Grid) -->
     <div class="stations-desktop-view" id="stationsDesktopView">
         <!-- Will be populated by JavaScript -->
-    </div>
-
-    <!-- Treatment Selection Modal -->
-    <div id="treatmentModal" class="treatment-modal">
-        <div class="treatment-modal-content">
-            <div class="treatment-modal-header">
-                <h3 id="treatmentModalTitle">Wybierz zabieg</h3>
-                <button class="treatment-modal-close" id="closeTreatmentModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="treatment-modal-body" id="treatmentModalBody">
-                <!-- Treatment options will be populated here -->
-            </div>
-            <div class="treatment-modal-footer">
-                <button class="btn-cancel" id="cancelTreatmentBtn">Anuluj</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Confirmation Modal -->
-    <div id="confirmModal" class="confirm-modal">
-        <div class="confirm-modal-content">
-            <div class="confirm-modal-header">
-                <i class="fas fa-check-circle"></i>
-                <h3>Potwierdź zakończenie</h3>
-            </div>
-            <div class="confirm-modal-body">
-                <p id="confirmModalText">Czy na pewno chcesz zwolnić to stanowisko?</p>
-            </div>
-            <div class="confirm-modal-footer">
-                <button class="btn-cancel" id="cancelConfirmBtn">Anuluj</button>
-                <button class="btn-confirm" id="confirmReleaseBtn">Zwolnij</button>
-            </div>
-        </div>
     </div>
 </div>

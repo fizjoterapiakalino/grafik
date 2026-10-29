@@ -22,10 +22,6 @@ export default defineConfig({
                     dest: 'pages',
                 },
                 {
-                    src: 'styles/*',
-                    dest: 'styles',
-                },
-                {
                     src: 'logo.png',
                     dest: '.',
                 },

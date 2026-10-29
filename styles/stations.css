@@ -5,23 +5,7 @@
    Maps to main design system colors
    ============================================ */
 :root {
-    /* Free: Success/Emerald */
-    --station-free: var(--color-success);
-    --station-free-bg: var(--color-success-light);
-    --station-free-border: var(--color-primary-400);
-
-    /* Occupied: Warning/Amber */
-    --station-occupied: var(--color-warning);
-    --station-occupied-bg: var(--color-warning-light);
-    --station-occupied-border: var(--color-warning);
-
-    /* Finished: Danger/Red */
-    --station-finished: var(--color-danger);
-    --station-finished-bg: var(--color-danger-light);
     --station-finished-border: #f87171;
-
-    /* Ending: Critical Danger */
-    --station-ending: var(--color-danger-dark);
     --station-ending-bg: #fecaca;
     --station-ending-border: #f87171;
 }
@@ -80,73 +64,6 @@
     gap: var(--spacing-md);
 }
 
-.stations-attention-bar {
-    display: none;
-    margin-bottom: 6px;
-    padding: 8px 10px;
-    border-radius: var(--border-radius);
-    border: 1px solid #f59e0b;
-    background: linear-gradient(135deg, #fffbeb, #fef3c7);
-    color: #92400e;
-    box-shadow: var(--shadow-sm);
-}
-
-.stations-attention-bar.active {
-    display: block;
-}
-
-.attention-title {
-    font-size: 0.8rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    margin-bottom: 4px;
-}
-
-.attention-items {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.attention-item {
-    font-size: 0.85rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.attention-item i {
-    width: 14px;
-    text-align: center;
-}
-
-@media (min-width: 1025px) {
-    .stations-attention-bar.active {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-    }
-
-    .attention-title {
-        margin-bottom: 0;
-        white-space: nowrap;
-    }
-
-    .attention-items {
-        flex-direction: row;
-        align-items: center;
-        gap: 14px;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        min-width: 0;
-    }
-
-    .attention-item {
-        white-space: nowrap;
-    }
-}
 
 .stations-radio-widget-panel {
     display: none;
@@ -281,15 +198,15 @@
 }
 
 .legend-dot.free {
-    background: var(--station-free);
+    background: var(--color-success);
 }
 
 .legend-dot.occupied {
-    background: var(--station-occupied);
+    background: var(--color-warning);
 }
 
 .legend-dot.finished {
-    background: var(--station-finished);
+    background: var(--color-danger);
     animation: pulse-dot 1s ease-in-out infinite;
 }
 
@@ -745,12 +662,12 @@
 }
 
 .station-card.station-simple.free {
-    background: var(--station-free-bg);
-    border: 1px solid var(--station-free-border);
+    background: var(--color-success-light);
+    border: 1px solid var(--color-primary-400);
 }
 
 .station-card.station-simple.free:hover {
-    background: var(--station-free);
+    background: var(--color-success);
     color: white;
     transform: scale(1.02);
 }
@@ -768,7 +685,7 @@
 }
 
 .station-card.station-simple.finished {
-    background: var(--station-finished-bg);
+    background: var(--color-danger-light);
     border: 1px solid var(--station-finished-border);
     animation: pulse-card 1.5s ease-in-out infinite;
 }
@@ -781,7 +698,7 @@
 }
 
 .station-card.ending .station-timer {
-    color: var(--station-ending) !important;
+    color: var(--color-danger-dark) !important;
     font-weight: 800;
 }
 
@@ -864,7 +781,7 @@
 
 .station-release-hint {
     font-size: 0.65rem;
-    color: var(--station-finished);
+    color: var(--color-danger);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -911,12 +828,12 @@
 }
 
 .station-card.station-multi.occupied {
-    background: var(--station-occupied-bg);
-    border-color: var(--station-occupied-border);
+    background: var(--color-warning-light);
+    border-color: var(--color-warning);
 }
 
 .station-card.station-multi.finished {
-    background: var(--station-finished-bg);
+    background: var(--color-danger-light);
     border-color: var(--station-finished-border);
     cursor: pointer;
     animation: pulse-card 1.5s ease-in-out infinite;
@@ -1029,7 +946,7 @@
     padding: 6px 8px;
     border: none;
     border-radius: 4px;
-    background: var(--station-free);
+    background: var(--color-success);
     color: white;
     cursor: pointer;
     display: flex;
@@ -1233,15 +1150,15 @@
 }
 
 .status-dot.free {
-    background: var(--station-free);
+    background: var(--color-success);
 }
 
 .status-dot.occupied {
-    background: var(--station-occupied);
+    background: var(--color-warning);
 }
 
 .status-dot.finished {
-    background: var(--station-finished);
+    background: var(--color-danger);
     animation: pulse-dot 1s ease-in-out infinite;
 }
 

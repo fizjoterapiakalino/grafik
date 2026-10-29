@@ -1,28 +1,25 @@
-const globals = require('globals');
-const pluginJs = require('@eslint/js');
-const eslintPluginPrettier = require('eslint-plugin-prettier/recommended');
+import globals from 'globals';
+import pluginJs from '@eslint/js';
 
-module.exports = [
+export default [
+    {
+        ignores: ['dist/**', 'node_modules/**', 'WebScrapper/**', 'tests/__build__/**'],
+    },
+    pluginJs.configs.recommended,
     {
         languageOptions: {
             globals: {
                 ...globals.browser,
                 ...globals.node,
                 ...globals.jest,
-                // pdfMake (ładowane przez script tags)
                 pdfMake: 'readonly',
             },
             sourceType: 'module',
             ecmaVersion: 2021,
         },
-    },
-    pluginJs.configs.recommended,
-    eslintPluginPrettier,
-    {
         rules: {
             'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
             'no-console': 'off',
-            // Włączamy no-undef - wymusza deklarowanie wszystkich zmiennych
             'no-undef': 'error',
         },
     },
