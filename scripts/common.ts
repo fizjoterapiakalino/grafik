@@ -178,8 +178,12 @@ export const months: readonly string[] = [
  * Wyświetla powiadomienie toast
  */
 export function showToast(message: string, duration: number = 3000): void {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        document.body.appendChild(container);
+    }
 
     const toast = document.createElement('div');
     toast.className = 'toast';
@@ -193,7 +197,7 @@ export function showToast(message: string, duration: number = 3000): void {
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => {
-            if (container.contains(toast)) {
+            if (container && container.contains(toast)) {
                 container.removeChild(toast);
             }
         }, 500);
@@ -253,6 +257,8 @@ interface UndoManagerOptions<T> {
     onUpdate?: (manager: UndoManager<T>) => void;
 }
 
+const cloneState = typeof structuredClone === 'function' ? structuredClone : <T>(val: T): T => JSON.parse(JSON.stringify(val));
+
 /**
  * Manager cofania zmian
  */
@@ -270,7 +276,7 @@ export class UndoManager<T = unknown> {
     }
 
     initialize(initialState: T): void {
-        this.stack = [JSON.parse(JSON.stringify(initialState))];
+        this.stack = [cloneState(initialState)];
         this.currentIndex = 0;
         this.onUpdate(this);
     }
@@ -279,7 +285,7 @@ export class UndoManager<T = unknown> {
         if (this.currentIndex < this.stack.length - 1) {
             this.stack = this.stack.slice(0, this.currentIndex + 1);
         }
-        this.stack.push(JSON.parse(JSON.stringify(state)));
+        this.stack.push(cloneState(state));
         if (this.stack.length > this.maxStates) {
             this.stack.shift();
         }
@@ -291,7 +297,7 @@ export class UndoManager<T = unknown> {
         if (this.canUndo()) {
             this.currentIndex--;
             this.onUpdate(this);
-            return JSON.parse(JSON.stringify(this.stack[this.currentIndex]));
+            return cloneState(this.stack[this.currentIndex]);
         }
         return null;
     }
@@ -339,12 +345,12 @@ export function isHoliday(date: Date): boolean {
         '7-15',  // Wniebowzięcie NMP (Sierpień 15)
         '10-1',  // Wszystkich Świętych (Listopad 1)
         '10-11', // Święto Niepodległości (Listopad 11)
-        '11-24', // Wigilia (Grudzień 24)
         '11-25', // Boże Narodzenie (Grudzień 25)
         '11-26', // Drugi dzień świąt (Grudzień 26)
     ];
 
     if (fixedHolidays.includes(`${month}-${day}`)) return true;
+    if (year >= 2025 && month === 11 && day === 24) return true; // Wigilia wolna ustawowo od 2025 r.
 
     // Wielkanoc (Ruchome)
     const easter = getEasterDate(year);
@@ -391,26 +397,8 @@ export function countWorkdays(startDate: string, endDate: string): number {
 // Backward compatibility - przypisanie do window
 declare global {
     interface Window {
-        AppConfig: AppConfigType;
-        months: readonly string[];
         showToast: typeof showToast;
-        hideLoadingOverlay: typeof hideLoadingOverlay;
-        capitalizeFirstLetter: typeof capitalizeFirstLetter;
-        searchAndHighlight: typeof searchAndHighlight;
-        isHoliday: typeof isHoliday;
-        getEasterDate: typeof getEasterDate;
-        UndoManager: typeof UndoManager;
-        countWorkdays: typeof countWorkdays;
     }
 }
 
-window.AppConfig = AppConfig;
-window.months = months;
 window.showToast = showToast;
-window.hideLoadingOverlay = hideLoadingOverlay;
-window.capitalizeFirstLetter = capitalizeFirstLetter;
-window.searchAndHighlight = searchAndHighlight;
-window.isHoliday = isHoliday;
-window.getEasterDate = getEasterDate;
-window.UndoManager = UndoManager;
-window.countWorkdays = countWorkdays;

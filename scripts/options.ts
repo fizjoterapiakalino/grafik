@@ -1,6 +1,6 @@
 // scripts/options.ts
 import { debugLog } from './common.js';
-import { db as dbRaw, auth as authRaw, FieldValue } from './firebase-config.js';
+import { db as dbRaw, auth as authRaw } from './firebase-config.js';
 import { EmployeeManager } from './employee-manager.js';
 import { BackupService } from './backup-service.js';
 import { ColorPreferences } from './color-preferences.js';
@@ -50,6 +50,7 @@ export const Options: OptionsAPI = (() => {
     let selectedEmployeeIndex: number | null = null;
     let currentEmployeeId: string | null = null;
     let currentUserIsMassageAccess = false;
+    let isCurrentUserAdmin = false;
     let isApplyingEmployeeFormState = false;
 
     let createBackupBtn: HTMLElement | null;
@@ -59,6 +60,23 @@ export const Options: OptionsAPI = (() => {
     let installAppBtn: HTMLElement | null;
     let mobileZenModeToggle: HTMLInputElement | null;
     const MASSAGE_ACCESS_CONFIRMATION = 'PEŁNY DOSTĘP';
+
+    /**
+     * Synchronizuje dokument w kolekcji admins/{uid} z Firestore Rules
+     */
+    const syncAdminRoleDoc = async (uid: string | undefined, shouldBeAdmin: boolean): Promise<void> => {
+        if (!isCurrentUserAdmin || !uid) return;
+        try {
+            const adminDocRef = db.collection('admins').doc(uid);
+            if (shouldBeAdmin) {
+                await adminDocRef.set({ role: 'admin', updatedAt: new Date().toISOString() });
+            } else {
+                await adminDocRef.delete();
+            }
+        } catch (err) {
+            console.warn(`Błąd synchronizacji kolekcji admins dla uid ${uid}:`, err);
+        }
+    };
 
     const displayLastBackupDate = async (): Promise<void> => {
         try {
@@ -79,13 +97,19 @@ export const Options: OptionsAPI = (() => {
     };
 
     const createBackup = async (): Promise<void> => {
+        if (!isCurrentUserAdmin) {
+            (globalThis as any).showToast?.('Brak uprawnień administratora.', 3000);
+            return;
+        }
         if (!globalThis.confirm('Czy na pewno chcesz utworzyć nową kopię zapasową? Spowoduje to nadpisanie poprzedniej kopii.')) {
             return;
         }
         showLoading(true);
         try {
             await BackupService.performBackup(false);
-            await displayLastBackupDate();
+            if (isCurrentUserAdmin) {
+                await displayLastBackupDate();
+            }
         } catch (error) {
             console.error('Błąd w options.createBackup', error);
         } finally {
@@ -94,14 +118,18 @@ export const Options: OptionsAPI = (() => {
     };
 
     const handleRestoreBackup = async (): Promise<void> => {
+        if (!isCurrentUserAdmin) {
+            (globalThis as any).showToast?.('Brak uprawnień administratora.', 3000);
+            return;
+        }
         try {
             const date = await BackupService.getLastBackupDate();
             if (!date) {
-                (globalThis as any).showToast('Brak kopii zapasowej do przywrócenia.', 3000);
+                (globalThis as any).showToast?.('Brak kopii zapasowej do przywrócenia.', 3000);
                 return;
             }
         } catch {
-            (globalThis as any).showToast('Błąd sprawdzania kopii.', 3000);
+            (globalThis as any).showToast?.('Błąd sprawdzania kopii.', 3000);
             return;
         }
 
@@ -118,19 +146,12 @@ export const Options: OptionsAPI = (() => {
             closeModal();
             showLoading(true);
             try {
-                const backupData = await BackupService.restoreBackup();
-                const scheduleDocWrapper = db.collection('schedules').doc('mainSchedule');
-                const leavesDocWrapper = db.collection('leaves').doc('mainLeaves');
+                await BackupService.applyRestore();
 
-                const batch = db.batch();
-                batch.set(scheduleDocWrapper, backupData.scheduleData || {});
-                batch.set(leavesDocWrapper, backupData.leavesData || {});
-                await batch.commit();
-
-                (globalThis as any).showToast('Dane przywrócone pomyślnie! Odśwież stronę, aby zobaczyć zmiany.', 5000);
+                (globalThis as any).showToast?.('Dane przywrócone pomyślnie! Odśwież stronę, aby zobaczyć zmiany.', 5000);
             } catch (error) {
                 console.error('Błąd podczas przywracania danych:', error);
-                (globalThis as any).showToast('Wystąpił błąd podczas przywracania danych.', 5000);
+                (globalThis as any).showToast?.('Wystąpił błąd podczas przywracania danych.', 5000);
             } finally {
                 showLoading(false);
             }
@@ -155,21 +176,32 @@ export const Options: OptionsAPI = (() => {
     };
 
     const handleAssignUid = (): void => {
+        if (!isCurrentUserAdmin) {
+            (globalThis as any).showToast?.('Brak uprawnień administratora.', 3000);
+            return;
+        }
         const currentUser = auth.currentUser;
         if (currentUser && employeeUidInput) {
             const allEmployees = EmployeeManager.getAll();
-            const existingEmployee = Object.values(allEmployees).find((emp) => emp.uid === currentUser.uid);
-            if (existingEmployee && (existingEmployee as Employee & { id?: number }).id !== selectedEmployeeIndex) {
-                (globalThis as any).showToast(`Ten użytkownik jest już przypisany do: ${existingEmployee.displayName}.`, 4000);
+            const existingEntry = Object.entries(allEmployees).find(([, emp]) => emp.uid === currentUser.uid);
+            if (existingEntry && existingEntry[0] !== String(selectedEmployeeIndex)) {
+                (globalThis as any).showToast?.(
+                    `Ten użytkownik jest już przypisany do: ${existingEntry[1].displayName || existingEntry[1].name}.`,
+                    4000
+                );
                 return;
             }
             employeeUidInput.value = currentUser.uid;
         } else {
-            (globalThis as any).showToast('Nie jesteś zalogowany.', 3000);
+            (globalThis as any).showToast?.('Nie jesteś zalogowany.', 3000);
         }
     };
 
     const handleClearUid = (): void => {
+        if (!isCurrentUserAdmin) {
+            (globalThis as any).showToast?.('Brak uprawnień administratora.', 3000);
+            return;
+        }
         if (employeeUidInput) employeeUidInput.value = '';
     };
 
@@ -216,6 +248,23 @@ export const Options: OptionsAPI = (() => {
                 item.style.display = 'none';
             }
         });
+    };
+
+    /**
+     * Tryb zwykłego pracownika (gdy admin nadał mu dostęp do #options w menuAccess)
+     * Ukrywa sekcje administracyjne i kartę backupu, zostawiając personalizację (PWA, Zen, Kolory).
+     */
+    const applyNonAdminOptionsMode = (): void => {
+        document.querySelectorAll<HTMLElement>(
+            '.employee-list-card, .employee-details-card'
+        ).forEach((element) => {
+            element.style.display = 'none';
+        });
+
+        const backupCard = createBackupBtn?.closest('.options-card') as HTMLElement | null;
+        if (backupCard) {
+            backupCard.style.display = 'none';
+        }
     };
 
     const renderMenuAccessControls = (allowedKeys: string[] = getDefaultNavigationAccess()): void => {
@@ -299,23 +348,13 @@ export const Options: OptionsAPI = (() => {
             const initials = getInitials(nameToDisplay);
 
             // Generuj badge'e statusu
-            let badgesHtml = '';
-            if (isAdmin || isHidden || isScheduleOnly || isMassageAccess) {
-                badgesHtml = '<div class="employee-badges">';
-                if (isAdmin) {
-                    badgesHtml += '<span class="employee-badge admin" title="Administrator"><i class="fas fa-key"></i></span>';
-                }
-                if (isHidden) {
-                    badgesHtml += '<span class="employee-badge hidden" title="Ukryty w grafiku"><i class="fas fa-eye-slash"></i></span>';
-                }
-                if (isScheduleOnly) {
-                    badgesHtml += '<span class="employee-badge schedule-only" title="Tylko w grafiku"><i class="fas fa-running"></i></span>';
-                }
-                if (isMassageAccess) {
-                    badgesHtml += '<span class="employee-badge massage" title="Tryb masażu"><i class="fas fa-hands"></i></span>';
-                }
-                badgesHtml += '</div>';
-            }
+            const badges = [
+                isAdmin && '<span class="employee-badge admin" title="Administrator"><i class="fas fa-key"></i></span>',
+                isHidden && '<span class="employee-badge hidden" title="Ukryty w grafiku"><i class="fas fa-eye-slash"></i></span>',
+                isScheduleOnly && '<span class="employee-badge schedule-only" title="Tylko w grafiku"><i class="fas fa-running"></i></span>',
+                isMassageAccess && '<span class="employee-badge massage" title="Tryb masażu"><i class="fas fa-hands"></i></span>',
+            ].filter(Boolean).join('');
+            const badgesHtml = badges ? `<div class="employee-badges">${badges}</div>` : '';
 
             const item = document.createElement('div');
             item.className = 'employee-list-item';
@@ -391,14 +430,18 @@ export const Options: OptionsAPI = (() => {
     };
 
     const handleAddEmployee = async (): Promise<void> => {
+        if (!isCurrentUserAdmin) {
+            (globalThis as any).showToast?.('Brak uprawnień administratora.', 3000);
+            return;
+        }
         const displayName = globalThis.prompt('Wpisz nazwę wyświetlaną nowego pracownika:');
         if (!displayName || displayName.trim() === '') {
-            (globalThis as any).showToast('Anulowano. Nazwa wyświetlana nie może być pusta.', 3000);
+            (globalThis as any).showToast?.('Anulowano. Nazwa wyświetlana nie może być pusta.', 3000);
             return;
         }
         const entitlement = Number.parseInt(globalThis.prompt('Podaj wymiar urlopu (np. 26):', '26') || '', 10);
         if (Number.isNaN(entitlement)) {
-            (globalThis as any).showToast('Anulowano. Wymiar urlopu musi być liczbą.', 3000);
+            (globalThis as any).showToast?.('Anulowano. Wymiar urlopu musi być liczbą.', 3000);
             return;
         }
 
@@ -426,10 +469,10 @@ export const Options: OptionsAPI = (() => {
 
             await EmployeeManager.load();
             renderEmployeeList();
-            (globalThis as any).showToast('Pracownik dodany pomyślnie!', 2000);
+            (globalThis as any).showToast?.('Pracownik dodany pomyślnie!', 2000);
         } catch (error) {
             console.error('Błąd podczas dodawania pracownika:', error);
-            (globalThis as any).showToast('Wystąpił błąd podczas dodawania pracownika. Spróbuj ponownie.', 5000);
+            (globalThis as any).showToast?.('Wystąpił błąd podczas dodawania pracownika. Spróbuj ponownie.', 5000);
         } finally {
             showLoading(false);
         }
@@ -437,12 +480,55 @@ export const Options: OptionsAPI = (() => {
 
     const handleSaveEmployee = async (): Promise<void> => {
         if (selectedEmployeeIndex === null) {
-            (globalThis as any).showToast('Nie wybrano pracownika.', 3000);
+            (globalThis as any).showToast?.('Nie wybrano pracownika.', 3000);
             return;
         }
 
         const oldEmployee = EmployeeManager.getById(String(selectedEmployeeIndex));
         if (!oldEmployee) return;
+
+        // Tryb użytkownika z ograniczonym dostępem do masażu (Luka C1)
+        if (currentUserIsMassageAccess && !isCurrentUserAdmin) {
+            if (String(selectedEmployeeIndex) !== String(currentEmployeeId)) {
+                (globalThis as any).showToast?.('Możesz edytować wyłącznie własne konto.', 3000);
+                return;
+            }
+
+            const newAccessMode = employeeAccessMassage?.checked ? 'massage' : 'full';
+            showLoading(true);
+            try {
+                await db.collection('schedules').doc('mainSchedule').update({
+                    [`employees.${selectedEmployeeIndex}.accessMode`]: newAccessMode,
+                    lastSelfUpdatedIndex: String(selectedEmployeeIndex),
+                });
+                await EmployeeManager.load();
+
+                const updatedCurrentEmployee = auth.currentUser
+                    ? EmployeeManager.getEmployeeByUid(auth.currentUser.uid)
+                    : null;
+                currentUserIsMassageAccess = updatedCurrentEmployee?.accessMode === 'massage';
+                currentEmployeeId = updatedCurrentEmployee?.id || currentEmployeeId;
+
+                (globalThis as any).showToast?.('Zaktualizowano tryb dostępu.', 2000);
+                if (!currentUserIsMassageAccess && oldEmployee.accessMode === 'massage') {
+                    window.location.hash = 'schedule';
+                } else {
+                    document.dispatchEvent(new CustomEvent('app:access-mode-updated'));
+                }
+            } catch (error) {
+                console.error('Błąd podczas zapisywania trybu dostępu:', error);
+                (globalThis as any).showToast?.('Wystąpił błąd podczas zapisu. Spróbuj ponownie.', 5000);
+            } finally {
+                showLoading(false);
+            }
+            return;
+        }
+
+        // Blokada dla nie-administratora
+        if (!isCurrentUserAdmin) {
+            (globalThis as any).showToast?.('Brak uprawnień do edycji danych pracowników.', 3000);
+            return;
+        }
 
         const newFirstName = employeeFirstNameInput?.value.trim() || '';
         const newLastName = employeeLastNameInput?.value.trim() || '';
@@ -457,12 +543,24 @@ export const Options: OptionsAPI = (() => {
         const newUid = employeeUidInput?.value.trim() || '';
 
         if (newDisplayName === '') {
-            (globalThis as any).showToast('Nazwa wyświetlana nie może być pusta.', 3000);
+            (globalThis as any).showToast?.('Nazwa wyświetlana nie może być pusta.', 3000);
             return;
         }
         if (Number.isNaN(newEntitlement)) {
-            (globalThis as any).showToast('Wartości urlopu muszą być poprawnymi liczbami.', 3000);
+            (globalThis as any).showToast?.('Wartości urlopu muszą być poprawnymi liczbami.', 3000);
             return;
+        }
+
+        const oldNameKey = oldEmployee.displayName || oldEmployee.name || '';
+        if (oldNameKey && oldNameKey !== newDisplayName) {
+            const allEmployees = EmployeeManager.getAll();
+            const isDuplicateName = Object.entries(allEmployees).some(
+                ([id, emp]) => id !== String(selectedEmployeeIndex) && (emp.displayName || emp.name) === newDisplayName
+            );
+            if (isDuplicateName) {
+                (globalThis as any).showToast?.(`Pracownik o nazwie "${newDisplayName}" już istnieje. Wybierz inną nazwę.`, 4000);
+                return;
+            }
         }
 
         const updatedData: Partial<Employee> & { employeeNumber?: string } = {
@@ -484,17 +582,26 @@ export const Options: OptionsAPI = (() => {
         try {
             await EmployeeManager.updateEmployee(String(selectedEmployeeIndex), updatedData);
 
-            const oldNameKey = oldEmployee.displayName || oldEmployee.name;
             if (oldNameKey && oldNameKey !== newDisplayName) {
-                const leavesRef = db.collection('leaves').doc('mainLeaves');
-                const leavesDoc = await leavesRef.get();
-                const leavesData = leavesDoc.data() as Record<string, unknown> | undefined;
-                if (leavesDoc.exists && leavesData && leavesData[oldNameKey]) {
-                    const employeeLeaveData = leavesData[oldNameKey];
-                    delete leavesData[oldNameKey];
-                    leavesData[newDisplayName] = employeeLeaveData;
-                    await leavesRef.set(leavesData);
-                }
+                await db.runTransaction(async (transaction) => {
+                    const leavesRef = db.collection('leaves').doc('mainLeaves');
+                    const leavesDoc = await transaction.get(leavesRef);
+                    const leavesData = (leavesDoc.exists ? leavesDoc.data() : {}) as Record<string, unknown> || {};
+                    if (leavesData[oldNameKey] !== undefined) {
+                        const nextLeaves = { ...leavesData };
+                        nextLeaves[newDisplayName] = nextLeaves[oldNameKey];
+                        delete nextLeaves[oldNameKey];
+                        transaction.set(leavesRef, nextLeaves);
+                    }
+                });
+            }
+
+            // Synchronizacja kolekcji admins/{uid} dla Firestore Rules (Luka C2)
+            if (oldEmployee.uid && oldEmployee.uid !== newUid) {
+                await syncAdminRoleDoc(oldEmployee.uid, false);
+            }
+            if (newUid) {
+                await syncAdminRoleDoc(newUid, isAdmin);
             }
 
             await EmployeeManager.load();
@@ -512,7 +619,7 @@ export const Options: OptionsAPI = (() => {
                 const span = listItem.querySelector('span');
                 if (span) span.textContent = nameToDisplay;
             }
-            (globalThis as any).showToast('Dane pracownika zaktualizowane.', 2000);
+            (globalThis as any).showToast?.('Dane pracownika zaktualizowane.', 2000);
             if (selectedEmployeeIsCurrentUser && !currentUserIsMassageAccess && oldEmployee.accessMode === 'massage') {
                 window.location.hash = 'schedule';
             } else if (selectedEmployeeIsCurrentUser) {
@@ -520,13 +627,17 @@ export const Options: OptionsAPI = (() => {
             }
         } catch (error) {
             console.error('Błąd podczas zapisywania zmian pracownika:', error);
-            (globalThis as any).showToast('Wystąpił błąd podczas zapisu. Spróbuj ponownie.', 5000);
+            (globalThis as any).showToast?.('Wystąpił błąd podczas zapisu. Spróbuj ponownie.', 5000);
         } finally {
             showLoading(false);
         }
     };
 
     const handleDeleteEmployee = async (): Promise<void> => {
+        if (!isCurrentUserAdmin) {
+            (globalThis as any).showToast?.('Brak uprawnień administratora.', 3000);
+            return;
+        }
         if (selectedEmployeeIndex === null) return;
 
         const employee = EmployeeManager.getById(String(selectedEmployeeIndex));
@@ -555,35 +666,49 @@ export const Options: OptionsAPI = (() => {
                     const scheduleDoc = await transaction.get(scheduleDocWrapper);
                     const leavesDoc = await transaction.get(leavesDocWrapper);
 
-                    transaction.update(scheduleDocWrapper, {
-                        [`employees.${selectedEmployeeIndex}`]: FieldValue.delete(),
-                    });
+                    const scheduleData = (scheduleDoc.exists ? scheduleDoc.data() : {}) as Record<string, unknown> || {};
+                    const nextScheduleData = { ...scheduleData };
 
-                    const scheduleData = scheduleDoc.data() as Record<string, unknown> | undefined;
-                    const scheduleCells = scheduleData?.scheduleCells as Record<string, Record<string, unknown>> | undefined;
-                    if (scheduleCells) {
-                        for (const time of Object.keys(scheduleCells)) {
-                            if (scheduleCells[time]?.[String(selectedEmployeeIndex)]) {
-                                transaction.update(scheduleDocWrapper, {
-                                    [`scheduleCells.${time}.${selectedEmployeeIndex}`]: FieldValue.delete(),
-                                });
+                    const nextEmployees = { ...((nextScheduleData.employees as Record<string, unknown>) || {}) };
+                    delete nextEmployees[String(selectedEmployeeIndex)];
+                    nextScheduleData.employees = nextEmployees;
+
+                    if (nextScheduleData.scheduleCells && typeof nextScheduleData.scheduleCells === 'object') {
+                        const rawCells = nextScheduleData.scheduleCells as Record<string, Record<string, unknown>>;
+                        const nextCells: Record<string, Record<string, unknown>> = {};
+                        for (const [time, timeData] of Object.entries(rawCells)) {
+                            if (timeData && typeof timeData === 'object') {
+                                const nextTimeData = { ...timeData };
+                                delete nextTimeData[String(selectedEmployeeIndex)];
+                                nextCells[time] = nextTimeData;
+                            } else {
+                                nextCells[time] = timeData;
                             }
                         }
+                        nextScheduleData.scheduleCells = nextCells;
                     }
 
-                    const leavesData = leavesDoc.data() as Record<string, unknown> | undefined;
-                    if (leavesDoc.exists && leavesData && leavesData[employeeName]) {
-                        transaction.update(leavesDocWrapper, { [employeeName]: FieldValue.delete() });
+                    transaction.set(scheduleDocWrapper, nextScheduleData);
+
+                    const leavesData = (leavesDoc.exists ? leavesDoc.data() : {}) as Record<string, unknown> || {};
+                    if (employeeName && leavesData[employeeName] !== undefined) {
+                        const nextLeaves = { ...leavesData };
+                        delete nextLeaves[employeeName];
+                        transaction.set(leavesDocWrapper, nextLeaves);
                     }
                 });
+
+                if (employee.uid) {
+                    await syncAdminRoleDoc(employee.uid, false);
+                }
 
                 await EmployeeManager.load();
                 renderEmployeeList();
                 resetDetailsPanel();
-                (globalThis as any).showToast('Pracownik usunięty pomyślnie.', 2000);
+                (globalThis as any).showToast?.('Pracownik usunięty pomyślnie.', 2000);
             } catch (error) {
                 console.error('Błąd podczas usuwania pracownika:', error);
-                (globalThis as any).showToast('Wystąpił błąd. Spróbuj ponownie.', 5000);
+                (globalThis as any).showToast?.('Wystąpił błąd. Spróbuj ponownie.', 5000);
             } finally {
                 showLoading(false);
             }
@@ -640,21 +765,41 @@ export const Options: OptionsAPI = (() => {
         showLoading(true);
         try {
             await EmployeeManager.load();
+            isCurrentUserAdmin = auth.currentUser ? EmployeeManager.isUserAdmin(auth.currentUser.uid) : false;
             const currentEmployee = auth.currentUser ? EmployeeManager.getEmployeeByUid(auth.currentUser.uid) : null;
             currentEmployeeId = currentEmployee?.id || null;
             currentUserIsMassageAccess = currentEmployee?.accessMode === 'massage';
-            renderEmployeeList();
-            applyMassageAccessOptionsMode();
-            if (currentUserIsMassageAccess && currentEmployeeId) {
-                const ownEmployeeIndex = Number.parseInt(currentEmployeeId, 10);
-                if (!Number.isNaN(ownEmployeeIndex)) {
-                    handleEmployeeSelect(ownEmployeeIndex);
+
+            // Automatyczny bootstrap kolekcji admins/{uid} dla aktualnych adminów (Luka C2)
+            if (isCurrentUserAdmin) {
+                const allEmployees = EmployeeManager.getAll();
+                for (const emp of Object.values(allEmployees)) {
+                    if (emp.role === 'admin' && emp.uid) {
+                        await syncAdminRoleDoc(emp.uid, true);
+                    }
                 }
             }
-            await displayLastBackupDate();
+
+            renderEmployeeList();
+
+            if (currentUserIsMassageAccess) {
+                applyMassageAccessOptionsMode();
+                if (currentEmployeeId) {
+                    const ownEmployeeIndex = Number.parseInt(currentEmployeeId, 10);
+                    if (!Number.isNaN(ownEmployeeIndex)) {
+                        handleEmployeeSelect(ownEmployeeIndex);
+                    }
+                }
+            } else if (!isCurrentUserAdmin) {
+                applyNonAdminOptionsMode();
+            }
+
+            if (isCurrentUserAdmin) {
+                await displayLastBackupDate();
+            }
         } catch (error) {
             console.error('Błąd inicjalizacji strony opcji:', error);
-            (globalThis as any).showToast('Wystąpił krytyczny błąd inicjalizacji. Odśwież stronę.', 5000);
+            (globalThis as any).showToast?.('Wystąpił krytyczny błąd inicjalizacji. Odśwież stronę.', 5000);
         } finally {
             showLoading(false);
         }
@@ -699,80 +844,38 @@ export const Options: OptionsAPI = (() => {
      * Inicjalizuje UI dla personalizacji kolorów
      */
     const initColorPreferencesUI = (): void => {
-        const colorMassageInput = document.getElementById('colorMassage') as HTMLInputElement | null;
-        const colorPnfInput = document.getElementById('colorPnf') as HTMLInputElement | null;
-        const colorEveryOtherDayInput = document.getElementById('colorEveryOtherDay') as HTMLInputElement | null;
-        const colorBreakInput = document.getElementById('colorBreak') as HTMLInputElement | null;
-        const resetColorsBtn = document.getElementById('resetColorsBtn');
+        const colorConfigs: { key: keyof ReturnType<typeof ColorPreferences.getColors>; inputId: string; previewId: string }[] = [
+            { key: 'massage', inputId: 'colorMassage', previewId: 'colorMassagePreview' },
+            { key: 'pnf', inputId: 'colorPnf', previewId: 'colorPnfPreview' },
+            { key: 'everyOtherDay', inputId: 'colorEveryOtherDay', previewId: 'colorEveryOtherDayPreview' },
+            { key: 'break', inputId: 'colorBreak', previewId: 'colorBreakPreview' },
+        ];
 
-        // Wczytaj aktualne kolory
         const currentColors = ColorPreferences.getColors();
 
-        // Ustaw wartości inputów
-        if (colorMassageInput) {
-            colorMassageInput.value = currentColors.massage;
-            updateColorPreview('colorMassagePreview', currentColors.massage);
-        }
-        if (colorPnfInput) {
-            colorPnfInput.value = currentColors.pnf;
-            updateColorPreview('colorPnfPreview', currentColors.pnf);
-        }
-        if (colorEveryOtherDayInput) {
-            colorEveryOtherDayInput.value = currentColors.everyOtherDay;
-            updateColorPreview('colorEveryOtherDayPreview', currentColors.everyOtherDay);
-        }
-        if (colorBreakInput) {
-            colorBreakInput.value = currentColors.break;
-            updateColorPreview('colorBreakPreview', currentColors.break);
-        }
-
-        // Dodaj nasłuchiwacze zmiany kolorów
-        colorMassageInput?.addEventListener('input', (e) => {
-            const color = (e.target as HTMLInputElement).value;
-            ColorPreferences.setColor('massage', color);
-            updateColorPreview('colorMassagePreview', color);
+        colorConfigs.forEach(({ key, inputId, previewId }) => {
+            const input = document.getElementById(inputId) as HTMLInputElement | null;
+            if (input) {
+                input.value = currentColors[key];
+                updateColorPreview(previewId, currentColors[key]);
+                input.addEventListener('input', (e) => {
+                    const color = (e.target as HTMLInputElement).value;
+                    ColorPreferences.setColor(key, color);
+                    updateColorPreview(previewId, color);
+                });
+            }
         });
 
-        colorPnfInput?.addEventListener('input', (e) => {
-            const color = (e.target as HTMLInputElement).value;
-            ColorPreferences.setColor('pnf', color);
-            updateColorPreview('colorPnfPreview', color);
-        });
-
-        colorEveryOtherDayInput?.addEventListener('input', (e) => {
-            const color = (e.target as HTMLInputElement).value;
-            ColorPreferences.setColor('everyOtherDay', color);
-            updateColorPreview('colorEveryOtherDayPreview', color);
-        });
-
-        colorBreakInput?.addEventListener('input', (e) => {
-            const color = (e.target as HTMLInputElement).value;
-            ColorPreferences.setColor('break', color);
-            updateColorPreview('colorBreakPreview', color);
-        });
-
-        // Przycisk resetu kolorów
-        resetColorsBtn?.addEventListener('click', () => {
+        document.getElementById('resetColorsBtn')?.addEventListener('click', () => {
             ColorPreferences.resetToDefaults();
             const defaults = ColorPreferences.getColors();
-
-            if (colorMassageInput) {
-                colorMassageInput.value = defaults.massage;
-                updateColorPreview('colorMassagePreview', defaults.massage);
-            }
-            if (colorPnfInput) {
-                colorPnfInput.value = defaults.pnf;
-                updateColorPreview('colorPnfPreview', defaults.pnf);
-            }
-            if (colorEveryOtherDayInput) {
-                colorEveryOtherDayInput.value = defaults.everyOtherDay;
-                updateColorPreview('colorEveryOtherDayPreview', defaults.everyOtherDay);
-            }
-            if (colorBreakInput) {
-                colorBreakInput.value = defaults.break;
-                updateColorPreview('colorBreakPreview', defaults.break);
-            }
-
+            colorConfigs.forEach(({ key, inputId, previewId }) => {
+                const input = document.getElementById(inputId) as HTMLInputElement | null;
+                if (input) {
+                    input.value = defaults[key];
+                    updateColorPreview(previewId, defaults[key]);
+                }
+            });
             window.showToast('Przywrócono domyślne kolory', 2000);
         });
     };
@@ -825,17 +928,12 @@ export const Options: OptionsAPI = (() => {
         window.removeEventListener('pwa-installable', updatePWAUI);
         window.removeEventListener('pwa-installed', updatePWAUI);
         document.body.classList.remove('massage-access-options');
+        selectedEmployeeIndex = null;
+        currentEmployeeId = null;
+        currentUserIsMassageAccess = false;
+        isCurrentUserAdmin = false;
         debugLog('Options module destroyed');
     };
 
     return { init, destroy };
 })();
-
-// Backward compatibility
-declare global {
-    interface Window {
-        Options: OptionsAPI;
-    }
-}
-
-window.Options = Options;

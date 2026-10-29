@@ -247,14 +247,3 @@ export const destroyContextMenu = (menuId: string): void => {
         debugLog(`Context menu ${menuId} destroyed.`);
     }
 };
-
-// Backward compatibility
-declare global {
-    interface Window {
-        initializeContextMenu: typeof initializeContextMenu;
-        destroyContextMenu: typeof destroyContextMenu;
-    }
-}
-
-window.initializeContextMenu = initializeContextMenu;
-window.destroyContextMenu = destroyContextMenu;

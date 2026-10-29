@@ -19,11 +19,12 @@ export const safeCopy = <T>(val: T | undefined): T | null =>
 export const safeBool = (val: unknown): boolean =>
     (val === undefined ? false : !!val);
 
+const clone = typeof structuredClone === 'function' ? structuredClone : <T>(obj: T): T => JSON.parse(JSON.stringify(obj));
+
 /**
  * Tworzy głęboką kopię obiektu lub tablicy.
  */
-export const deepClone = <T>(obj: T): T =>
-    JSON.parse(JSON.stringify(obj));
+export const deepClone = <T>(obj: T): T => clone(obj);
 
 /**
  * Lista kluczy zawartości komórki używanych do czyszczenia/kopiowania.
@@ -48,6 +49,9 @@ export const CELL_CONTENT_KEYS = [
     'isSharedPatient',
     'isSharedPatient1',
     'isSharedPatient2',
+    'isHydrotherapy',
+    'isHydrotherapy1',
+    'isHydrotherapy2',
     'treatmentStartDate',
     'treatmentExtensionDays',
     'treatmentEndDate',
@@ -152,6 +156,33 @@ export const toUTCDate = (dateString: string): Date => {
  */
 export const toDateString = (date: Date): string => {
     return date.toISOString().split('T')[0];
+};
+
+/**
+ * Konwertuje obiekt Date na lokalny string YYYY-MM-DD (bez przesunięcia UTC o północy).
+ */
+export const formatLocalIsoDate = (date: Date = new Date()): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+/**
+ * Sprawdza czy URL używa bezpiecznego protokołu HTTP/HTTPS (blokuje javascript:, data:, vbscript:).
+ */
+export const isSafeHttpUrl = (rawUrl: string): boolean => {
+    if (!rawUrl || /^\s*(javascript|data|vbscript):/i.test(rawUrl)) return false;
+    try {
+        const base =
+            typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null'
+                ? window.location.origin
+                : 'https://localhost';
+        const parsed = new URL(rawUrl, base);
+        return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+    } catch {
+        return false;
+    }
 };
 
 /**

@@ -1,17 +1,7 @@
 // scripts/shared.ts
-import { debounce } from './common.js';
-import { getDefaultNavigationAccess } from './navigation-access.js';
+import { debounce, showToast } from './common.js';
+import { NAVIGATION_ACCESS_ITEMS, resolveAllowedNavigationKeys } from './navigation-access.js';
 import type { Employee } from './types';
-
-/**
- * Link nawigacyjny
- */
-interface NavLink {
-    href: string;
-    text: string;
-    icon: string;
-    id?: string;
-}
 
 /**
  * Status zapisu
@@ -62,19 +52,6 @@ export const Shared: SharedAPI = (() => {
                 appHeader.appendChild(headerRightMenu);
             }
 
-            const navLinks: NavLink[] = [
-                { href: '#schedule', text: 'Grafik', icon: 'fas fa-calendar-alt' },
-                { href: '#appointments', text: 'Planowanie', icon: 'fas fa-clock' },
-                { href: '#interview', text: 'Wywiad', icon: 'fas fa-notes-medical' },
-                { href: '#stations', text: 'Stanowiska', icon: 'fas fa-clinic-medical' },
-                { href: '#massage-stations', text: 'Masaż', icon: 'fas fa-hands', id: 'navLinkMassageStations' },
-                { href: '#leaves', text: 'Urlopy', icon: 'fas fa-plane-departure' },
-                { href: '#changes', text: 'Harmonogram zmian', icon: 'fas fa-exchange-alt' },
-                { href: '#statistics', text: 'Statystyki', icon: 'fas fa-chart-bar' },
-                { href: '#scrapped-pdfs', text: 'ISO', icon: 'fas fa-file-pdf', id: 'navLinkIso' },
-                { href: '#options', text: 'Opcje', icon: 'fas fa-cogs' },
-            ];
-
             const hamburger = document.createElement('div');
             hamburger.className = 'hamburger-menu';
             hamburger.innerHTML = '<i class="fas fa-bars"></i>';
@@ -90,7 +67,7 @@ export const Shared: SharedAPI = (() => {
 
             const ul = document.createElement('ul');
             ul.className = 'main-nav-list';
-            navLinks.forEach((link) => {
+            NAVIGATION_ACCESS_ITEMS.forEach((link) => {
                 const li = document.createElement('li');
                 li.dataset.navAccessKey = link.href.replace(/^#/, '');
                 const a = document.createElement('a');
@@ -193,28 +170,7 @@ export const Shared: SharedAPI = (() => {
             updateActiveLink();
         };
 
-        window.showToast = (message: string, duration: number = 3000): void => {
-            let toastContainer = document.getElementById('toast-container');
-            if (!toastContainer) {
-                toastContainer = document.createElement('div');
-                toastContainer.id = 'toast-container';
-                document.body.appendChild(toastContainer);
-            }
-
-            const toast = document.createElement('div');
-            toast.className = 'toast show';
-            toast.textContent = message;
-            toastContainer.appendChild(toast);
-
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => {
-                    if (toast.parentNode === toastContainer) {
-                        toastContainer!.removeChild(toast);
-                    }
-                }, 500);
-            }, duration);
-        };
+        window.showToast = showToast;
 
         const setupGlobalEventListeners = (): void => {
             const searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
@@ -314,19 +270,7 @@ export const Shared: SharedAPI = (() => {
     };
 
     const applyNavigationAccess = (employee: (Employee & { id?: string }) | null): void => {
-        const allowedKeys = Array.isArray(employee?.menuAccess)
-            ? employee.menuAccess
-            : getDefaultNavigationAccess();
-        const allowed = new Set(allowedKeys);
-
-        // Existing full-access accounts have a saved menu list created before this page existed.
-        // Make the new local interview available to them without widening deliberately limited menus.
-        const legacyStandardKeys = getDefaultNavigationAccess().filter(
-            (key) => key !== 'interview' && key !== 'massage-stations'
-        );
-        if (legacyStandardKeys.every((key) => allowed.has(key))) {
-            allowed.add('interview');
-        }
+        const allowed = resolveAllowedNavigationKeys(employee);
 
         document.querySelectorAll<HTMLElement>('.main-nav-list li[data-nav-access-key]').forEach((item) => {
             const key = item.dataset.navAccessKey || '';
@@ -384,10 +328,8 @@ export const setSaveStatus = (status: SaveStatus): void => {
 // Backward compatibility
 declare global {
     interface Window {
-        Shared: SharedAPI;
         setSaveStatus: typeof setSaveStatus;
     }
 }
 
-window.Shared = Shared;
 window.setSaveStatus = setSaveStatus;

@@ -109,11 +109,3 @@ export const PdfHeaderColors = {
     dataColumns: PdfColors.emerald600, // Zielony dla kolumn danych
     text: PdfColors.white,
 } as const;
-
-/**
- * Kolory bloków urlopowych w PDF
- */
-export const PdfLeaveBlockColors = {
-    background: PdfColors.slate200,
-    text: PdfColors.slate800,
-} as const;

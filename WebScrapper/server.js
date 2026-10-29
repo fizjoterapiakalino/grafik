@@ -6,6 +6,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const { normalizeDocuments } = require('./documentNormalizer');
+const parseDocumentsInBrowser = require('./domParser');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -35,26 +36,6 @@ let isScrapingInProgress = false;
 let lastScrapingTime = null;
 let scrapingError = null;
 let lastManualScrapeTime = 0;
-
-// SSE clients for real-time updates
-const sseClients = new Set();
-
-/**
- * Wysyła wydarzenie do wszystkich połączonych klientów SSE
- * @param {string} eventName - Nazwa wydarzenia
- * @param {object} data - Dane do wysłania
- */
-const broadcastSSE = (eventName, data) => {
-    const message = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
-    sseClients.forEach((client) => {
-        try {
-            client.write(message);
-        } catch (err) {
-            console.warn('Błąd wysyłania SSE do klienta:', err.message);
-            sseClients.delete(client);
-        }
-    });
-};
 
 /**
  * Ładuje dane z pliku przy uruchomieniu serwera
@@ -86,24 +67,12 @@ const saveDataToFile = () => {
 };
 
 const isAuthorizedScrapeRequest = (req) => {
-    if (!SCRAPER_API_TOKEN) return true;
+    if (!SCRAPER_API_TOKEN) {
+        console.warn('Odrzucono żądanie POST /api/scrape: brak skonfigurowanego SCRAPER_API_TOKEN.');
+        return false;
+    }
     return req.get('x-scraper-token') === SCRAPER_API_TOKEN;
 };
-
-const getAllowedSseOrigin = (origin) => {
-    if (!origin) return allowedOrigins[0] || '*';
-    return allowedOrigins.includes(origin) ? origin : allowedOrigins[0] || '*';
-};
-
-// Read the parser logic from file to inject into browser
-const parserLogicPath = path.join(__dirname, 'domParser.js');
-let parserFunctionString = '';
-try {
-    parserFunctionString = fs.readFileSync(parserLogicPath, 'utf8');
-    parserFunctionString = parserFunctionString.replace(/module\.exports\s*=\s*parseDocumentsInBrowser;/, '');
-} catch (err) {
-    console.error('Błąd odczytu pliku parsera:', err);
-}
 
 /**
  * Główna funkcja scrapująca
@@ -147,9 +116,7 @@ async function scrapePdfLinks() {
 
         await page.goto(process.env.TARGET_URL, { waitUntil: 'networkidle2' });
 
-        const documents = await page.evaluate(
-            new Function(`${parserFunctionString}; return parseDocumentsInBrowser();`),
-        );
+        const documents = await page.evaluate(parseDocumentsInBrowser);
 
         if (Array.isArray(documents)) {
             const scrapedAt = new Date().toISOString();
@@ -168,12 +135,6 @@ async function scrapePdfLinks() {
 
             saveDataToFile();
 
-            // Powiadom klientów SSE
-            broadcastSSE('scrapingComplete', {
-                count: scrapedData.length,
-                timestamp: lastScrapingTime,
-            });
-
             if (documents.length === 0) {
                 console.warn('Scraping zakończony sukcesem, ale nie znaleziono żadnych dokumentów.');
             }
@@ -188,7 +149,11 @@ async function scrapePdfLinks() {
         return false;
     } finally {
         if (browser !== null) {
-            await browser.close();
+            try {
+                await browser.close();
+            } catch (closeErr) {
+                console.error('Błąd zamykania przeglądarki:', closeErr);
+            }
         }
         isScrapingInProgress = false;
     }
@@ -252,33 +217,6 @@ app.post('/api/scrape', async (req, res) => {
 });
 
 /**
- * GET /api/events - Server-Sent Events dla aktualizacji w czasie rzeczywistym
- */
-app.get('/api/events', (req, res) => {
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('Access-Control-Allow-Origin', getAllowedSseOrigin(req.get('origin')));
-
-    // Wyślij początkowe wydarzenie
-    res.write(`event: connected\ndata: ${JSON.stringify({ timestamp: new Date().toISOString() })}\n\n`);
-
-    sseClients.add(res);
-    console.log(`Nowy klient SSE połączony. Aktywnych klientów: ${sseClients.size}`);
-
-    // Heartbeat co 30 sekund, żeby utrzymać połączenie
-    const heartbeat = setInterval(() => {
-        res.write(': heartbeat\n\n');
-    }, 30000);
-
-    req.on('close', () => {
-        clearInterval(heartbeat);
-        sseClients.delete(res);
-        console.log(`Klient SSE rozłączony. Aktywnych klientów: ${sseClients.size}`);
-    });
-});
-
-/**
  * GET /health - Health check endpoint
  */
 app.get('/health', (req, res) => {
@@ -301,11 +239,6 @@ setInterval(scrapePdfLinks, SCRAPING_INTERVAL_MS);
 // Graceful shutdown
 const shutdown = () => {
     console.log('Zamykanie serwera...');
-    // Zamknij wszystkie połączenia SSE
-    sseClients.forEach((client) => {
-        client.end();
-    });
-    sseClients.clear();
     process.exit(0);
 };
 

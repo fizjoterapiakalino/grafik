@@ -213,11 +213,3 @@ export const MobileZen: MobileZenAPI = (() => {
         bindZenButton,
     };
 })();
-
-declare global {
-    interface Window {
-        MobileZen: MobileZenAPI;
-    }
-}
-
-window.MobileZen = MobileZen;
