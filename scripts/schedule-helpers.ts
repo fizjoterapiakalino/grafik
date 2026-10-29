@@ -4,7 +4,7 @@
  * Wydzielone z schedule.js dla lepszej czytelności i testowalności.
  */
 
-import { safeCopy, safeBool } from './utils.js';
+import { safeCopy, safeBool, formatLocalIsoDate } from './utils.js';
 import { ScheduleLogic } from './schedule-logic.js';
 import type { CellState, TreatmentData } from './types/index.js';
 
@@ -87,7 +87,7 @@ export const getTreatmentData = (cellState: CellState, part: number | null): Tre
  * Kopiuje flagi specjalne z komórki źródłowej do docelowej
  */
 export const copyFlags = (source: CellState, target: CellState, sourcePart: number | null, targetPart: number | null): void => {
-    const flags = ['isMassage', 'isPnf', 'isEveryOtherDay', 'isSharedPatient'];
+    const flags = ['isMassage', 'isPnf', 'isEveryOtherDay', 'isSharedPatient', 'isHydrotherapy'];
 
     flags.forEach((flag) => {
         const sourceKey = sourcePart ? `${flag}${sourcePart}` : flag;
@@ -123,6 +123,7 @@ export const clearSplitFields = (state: CellState): void => {
         'content1', 'content2', 'patientId1', 'patientId2', 'isMassage1', 'isMassage2',
         'isPnf1', 'isPnf2', 'isEveryOtherDay1', 'isEveryOtherDay2',
         'isSharedPatient1', 'isSharedPatient2',
+        'isHydrotherapy1', 'isHydrotherapy2',
         'treatmentData1', 'treatmentData2',
     ];
     splitFields.forEach((field) => delete state[field]);
@@ -231,13 +232,7 @@ export const clearAllProperties = (state: CellState): void => {
 /**
  * Tworzy datę dzisiejszą w formacie YYYY-MM-DD
  */
-export const getTodayDate = (): string => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-};
+export const getTodayDate = (): string => formatLocalIsoDate();
 
 /**
  * Aktualizuje stan komórki przy standardowej edycji (nie przenoszeniu)
@@ -250,15 +245,76 @@ export const updateCellContent = (
     parentCell: HTMLElement
 ): void => {
     if (newText.includes('/')) {
+        const parts = newText.split('/', 2);
         const previousContent = (cellState.content || '').trim().toLocaleLowerCase('pl-PL');
         const previousPatientId = cellState.patientId;
-        const parts = newText.split('/', 2);
+
+        if (!cellState.isSplit) {
+            const hasSingleData =
+                cellState.treatmentStartDate != null ||
+                cellState.isMassage != null ||
+                cellState.isPnf != null ||
+                cellState.isEveryOtherDay != null ||
+                cellState.isSharedPatient != null ||
+                cellState.isHydrotherapy != null ||
+                cellState.patientId != null;
+
+            if (hasSingleData) {
+                if (cellState.treatmentStartDate != null) {
+                    cellState.treatmentData1 = {
+                        startDate: cellState.treatmentStartDate,
+                        extensionDays: cellState.treatmentExtensionDays ?? 0,
+                        endDate: cellState.treatmentEndDate ?? ScheduleLogic.calculateEndDate(cellState.treatmentStartDate, cellState.treatmentExtensionDays ?? 0),
+                        additionalInfo: cellState.additionalInfo,
+                    };
+                }
+                if (cellState.isMassage != null) cellState.isMassage1 = cellState.isMassage;
+                if (cellState.isPnf != null) cellState.isPnf1 = cellState.isPnf;
+                if (cellState.isEveryOtherDay != null) cellState.isEveryOtherDay1 = cellState.isEveryOtherDay;
+                if (cellState.isSharedPatient != null) cellState.isSharedPatient1 = cellState.isSharedPatient;
+                if (cellState.isHydrotherapy != null) cellState.isHydrotherapy1 = cellState.isHydrotherapy;
+                if (cellState.patientId != null) cellState.patientId1 = cellState.patientId;
+            }
+
+            delete cellState.content;
+            delete cellState.patientId;
+            delete cellState.treatmentStartDate;
+            delete cellState.treatmentExtensionDays;
+            delete cellState.treatmentEndDate;
+            delete cellState.additionalInfo;
+            delete cellState.isMassage;
+            delete cellState.isPnf;
+            delete cellState.isEveryOtherDay;
+            delete cellState.isSharedPatient;
+            delete cellState.isHydrotherapy;
+        }
+
         cellState.isSplit = true;
         cellState.content1 = parts[0];
         cellState.content2 = parts[1];
-        if (parts[0].trim().toLocaleLowerCase('pl-PL') === previousContent && previousPatientId) {
+
+        if (parts[0].trim().toLocaleLowerCase('pl-PL') === previousContent && previousPatientId && !cellState.patientId1) {
             cellState.patientId1 = previousPatientId;
         }
+
+        if (parts[0].trim() !== '' && !cellState.treatmentData1?.startDate) {
+            const today = getTodayDate();
+            cellState.treatmentData1 = {
+                startDate: today,
+                extensionDays: 0,
+                endDate: ScheduleLogic.calculateEndDate(today, 0),
+            };
+        }
+
+        if (parts[1].trim() !== '' && !cellState.treatmentData2?.startDate) {
+            const today = getTodayDate();
+            cellState.treatmentData2 = {
+                startDate: today,
+                extensionDays: 0,
+                endDate: ScheduleLogic.calculateEndDate(today, 0),
+            };
+        }
+
         cellState.patientId = null;
         ensurePatientId(cellState, 1);
         ensurePatientId(cellState, 2);

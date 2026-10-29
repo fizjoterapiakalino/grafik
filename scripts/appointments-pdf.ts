@@ -1,8 +1,9 @@
-﻿// scripts/appointments-pdf.ts
+// scripts/appointments-pdf.ts
 import {
     PdfColors,
     PdfDefaultStyle,
 } from './pdf-config.js';
+import { formatLocalIsoDate } from './utils.js';
 
 interface AppointmentCell {
     patientName: string;
@@ -104,10 +105,10 @@ export const printAppointmentsToPdf = (data: AppointmentData): void => {
         }
     };
 
-    pdfMake.createPdf(docDefinition).download(`planowanie-${new Date().toISOString().split('T')[0]}.pdf`);
+    pdfMake.createPdf(docDefinition).download(`planowanie-${formatLocalIsoDate()}.pdf`);
 };
 
-function generateTimeSlots(): string[] {
+export function generateTimeSlots(): string[] {
     const slots: string[] = [];
     let curHour = 7;
     let curMin = 20;
@@ -118,5 +119,3 @@ function generateTimeSlots(): string[] {
     }
     return slots;
 }
-
-(window as any).printAppointmentsToPdf = printAppointmentsToPdf;

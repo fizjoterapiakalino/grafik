@@ -2,6 +2,7 @@
 import { db as dbRaw, auth as authRaw, FieldValue } from './firebase-config.js';
 import { EmployeeManager } from './employee-manager.js';
 import { MobileZen } from './mobile-zen.js';
+import { escapeHTML } from './utils.js';
 import Hls from 'hls.js';
 
 // Type for Firebase db wrapper (compatible with existing codebase)
@@ -715,6 +716,11 @@ export const Stations: StationsAPI = (() => {
             eventAbortController = null;
         }
 
+        const player = document.getElementById('stationsRadioPlayer') as HTMLElement | null;
+        if (player) {
+            delete player.dataset.bound;
+        }
+
         // Remove visibilitychange handler
         document.removeEventListener('visibilitychange', handleVisibilityChange);
 
@@ -897,17 +903,21 @@ export const Stations: StationsAPI = (() => {
     const checkForNewlyFinished = (previousStates: Map<string, StationState>): void => {
         for (const [stationId, state] of stationStates) {
             if (!isStationInRuntimeScope(stationId)) continue;
-            if (state.status === 'FINISHED') {
-                const prevState = previousStates.get(stationId);
-                if (!prevState || prevState.status !== 'FINISHED') {
-                    playNotificationSound();
-                    const nextInQueue = state.queue?.[0];
-                    if (nextInQueue) {
-                        const nextName = EmployeeManager.getNameById(nextInQueue.employeeId);
-                        window.showToast?.(`Stanowisko gotowe. Następny: ${nextName}`, 3500);
-                    }
-                    break;
+            const prevState = previousStates.get(stationId);
+            const wasOccupied = prevState?.status === 'OCCUPIED';
+            const isNewlyFinished = state.status === 'FINISHED' && (!prevState || prevState.status !== 'FINISHED');
+            const isNewlyFreeWithQueue = wasOccupied && state.status === 'FREE' && Array.isArray(state.queue) && state.queue.length > 0;
+
+            if (isNewlyFinished || isNewlyFreeWithQueue) {
+                playNotificationSound();
+                const nextInQueue = state.queue?.[0];
+                if (nextInQueue) {
+                    const nextName = EmployeeManager.getNameById(nextInQueue.employeeId);
+                    window.showToast?.(`Stanowisko gotowe. Następny: ${nextName}`, 3500);
+                } else if (isNewlyFinished) {
+                    window.showToast?.('Zabieg zakończony', 2500);
                 }
+                break;
             }
         }
     };
@@ -963,8 +973,8 @@ export const Stations: StationsAPI = (() => {
                     const name = emp.displayName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim();
                     const isCurrent = id === currentEmployeeId;
                     return `
-                        <button class="emp-picker-btn ${isCurrent ? 'current' : ''}" data-emp-id="${id}">
-                            <span class="emp-picker-name">${name}</span>
+                        <button class="emp-picker-btn ${isCurrent ? 'current' : ''}" data-emp-id="${escapeHTML(id)}">
+                            <span class="emp-picker-name">${escapeHTML(name)}</span>
                         </button>
                     `;
                 }).join('');
@@ -975,7 +985,7 @@ export const Stations: StationsAPI = (() => {
             modal.innerHTML = `
                 <div class="emp-picker-modal">
                     <div class="emp-picker-header">
-                        <span>${title}</span>
+                        <span>${escapeHTML(title)}</span>
                         <button class="emp-picker-close"><i class="fas fa-times"></i></button>
                     </div>
                     <div class="emp-picker-list">
@@ -1104,63 +1114,96 @@ export const Stations: StationsAPI = (() => {
         }
     };
 
+    const isTreatmentActiveInSnapshot = (allData: StationsDocData, treatmentId: string, excludedStationId?: string): boolean => {
+        const normalizedTarget = normalizeTreatmentId(treatmentId);
+        for (const [key, value] of Object.entries(allData)) {
+            if (key.startsWith('_') || (excludedStationId && key === excludedStationId)) continue;
+            const state = normalizeStationState(value as StationState);
+            if ((state.status === 'OCCUPIED' || state.status === 'FINISHED') && normalizeTreatmentId(state.treatmentId) === normalizedTarget) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    const hasActiveTherapyMassageInSnapshot = (allData: StationsDocData, employeeId: string, excludedStationId?: string): boolean => {
+        for (const [key, value] of Object.entries(allData)) {
+            if (key.startsWith('_') || (excludedStationId && key === excludedStationId)) continue;
+            const state = normalizeStationState(value as StationState);
+            if (state.employeeId === employeeId && (state.status === 'OCCUPIED' || state.status === 'FINISHED')) {
+                if (isTherapyMassageTreatment(state.treatmentId)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
     const mutateStationState = async <T = void>(
         stationId: string,
-        mutate: (current: StationState) => { next: StationState; result?: T } | null
-    ): Promise<{ applied: boolean; next: StationState | null; result?: T }> => {
+        mutate: (current: StationState, allStationsData: StationsDocData) => { next: StationState; result?: T; rejectReason?: string } | null
+    ): Promise<{ applied: boolean; next: StationState | null; result?: T; rejectReason?: string }> => {
         const docRef = db.collection('stations').doc(STATIONS_DOC_ID);
 
-        if (typeof db.runTransaction !== 'function') {
-            const snapshot = await docRef.get();
-            const rawData = (snapshot.data?.() || {}) as StationsDocData;
-            const current = normalizeStationState(rawData[stationId]);
-            const mutation = mutate(current);
-            if (!mutation) {
-                return { applied: false, next: current };
+        try {
+            if (typeof db.runTransaction !== 'function') {
+                const snapshot = await docRef.get();
+                const rawData = (snapshot.data?.() || {}) as StationsDocData;
+                const current = normalizeStationState(rawData[stationId]);
+                const mutation = mutate(current, rawData);
+                if (!mutation || mutation.rejectReason) {
+                    return { applied: false, next: current, rejectReason: mutation?.rejectReason };
+                }
+
+                const nextRevision = (typeof rawData._revision === 'number' ? rawData._revision : lastKnownRevision) + 1;
+                const payload: Record<string, unknown> = {
+                    _lastUpdated: FieldValue.serverTimestamp(),
+                    _revision: nextRevision,
+                    [stationId]: serializeStationState(mutation.next)
+                };
+
+                await docRef.set(payload, { merge: true });
+                lastKnownRevision = nextRevision;
+                updateServerOffset({ _lastUpdated: Date.now(), _revision: nextRevision });
+                return { applied: true, next: mutation.next, result: mutation.result };
             }
 
-            const nextRevision = (typeof rawData._revision === 'number' ? rawData._revision : lastKnownRevision) + 1;
-            const payload: Record<string, unknown> = {
-                _lastUpdated: FieldValue.serverTimestamp(),
-                _revision: nextRevision,
-                [stationId]: serializeStationState(mutation.next)
-            };
+            let applied = false;
+            let nextState: StationState | null = null;
+            let mutationResult: T | undefined;
+            let rejectReason: string | undefined;
 
-            await docRef.set(payload, { merge: true });
-            lastKnownRevision = nextRevision;
-            updateServerOffset({ _lastUpdated: Date.now(), _revision: nextRevision });
-            return { applied: true, next: mutation.next, result: mutation.result };
+            await db.runTransaction(async (tx) => {
+                const snapshot = await tx.get(docRef);
+                const rawData = (snapshot.data?.() || {}) as StationsDocData;
+                const current = normalizeStationState(rawData[stationId]);
+                const mutation = mutate(current, rawData);
+                if (!mutation || mutation.rejectReason) {
+                    nextState = current;
+                    rejectReason = mutation?.rejectReason;
+                    return;
+                }
+
+                const nextRevision = (typeof rawData._revision === 'number' ? rawData._revision : lastKnownRevision) + 1;
+                const payload: Record<string, unknown> = {
+                    _lastUpdated: FieldValue.serverTimestamp(),
+                    _revision: nextRevision,
+                    [stationId]: serializeStationState(mutation.next)
+                };
+
+                tx.set(docRef, payload, { merge: true });
+                applied = true;
+                nextState = mutation.next;
+                mutationResult = mutation.result;
+                lastKnownRevision = nextRevision;
+            });
+
+            return { applied, next: nextState, result: mutationResult, rejectReason };
+        } catch (error) {
+            console.error('Błąd mutateStationState:', error);
+            window.showToast?.('Błąd połączenia – nie udało się zapisać zmiany stanowiska.', 3000);
+            return { applied: false, next: null };
         }
-
-        let applied = false;
-        let nextState: StationState | null = null;
-        let mutationResult: T | undefined;
-
-        await db.runTransaction(async (tx) => {
-            const snapshot = await tx.get(docRef);
-            const rawData = (snapshot.data?.() || {}) as StationsDocData;
-            const current = normalizeStationState(rawData[stationId]);
-            const mutation = mutate(current);
-            if (!mutation) {
-                nextState = current;
-                return;
-            }
-
-            const nextRevision = (typeof rawData._revision === 'number' ? rawData._revision : lastKnownRevision) + 1;
-            const payload: Record<string, unknown> = {
-                _lastUpdated: FieldValue.serverTimestamp(),
-                _revision: nextRevision,
-                [stationId]: serializeStationState(mutation.next)
-            };
-
-            tx.set(docRef, payload, { merge: true });
-            applied = true;
-            nextState = mutation.next;
-            mutationResult = mutation.result;
-            lastKnownRevision = nextRevision;
-        });
-
-        return { applied, next: nextState, result: mutationResult };
     };
 
     const syncLocalState = (): void => {
@@ -1198,8 +1241,17 @@ export const Stations: StationsAPI = (() => {
             return;
         }
         const startedAt = getNowMs();
-        const mutation = await mutateStationState(station.id, (current) => {
+        const isTherapyMassage = isTherapyMassageTreatment(station.id);
+        const normTreatmentId = normalizeTreatmentId(station.id) || station.id;
+
+        const mutation = await mutateStationState(station.id, (current, allData) => {
             if (current.status !== 'FREE') return null;
+            if (GLOBAL_SINGLE_DEVICE_TREATMENTS.has(normTreatmentId) && isTreatmentActiveInSnapshot(allData, normTreatmentId, station.id)) {
+                return { next: current, rejectReason: 'Urządzenie jest już używane na innym stanowisku.' };
+            }
+            if (isTherapyMassage && hasActiveTherapyMassageInSnapshot(allData, empId, station.id)) {
+                return { next: current, rejectReason: 'Masz już aktywną Terapię/Masaż. Możesz tylko dodać się do kolejki.' };
+            }
             return {
                 next: {
                     status: 'OCCUPIED',
@@ -1212,6 +1264,11 @@ export const Stations: StationsAPI = (() => {
                 }
             };
         });
+
+        if (mutation.rejectReason) {
+            window.showToast?.(mutation.rejectReason, 3000);
+            return;
+        }
 
         if (!mutation.applied || !mutation.next) {
             window.showToast?.('Stanowisko jest już zajęte', 2000);
@@ -1247,12 +1304,19 @@ export const Stations: StationsAPI = (() => {
         }
 
         const startedAt = getNowMs();
-        const mutation = await mutateStationState(station.id, (current) => {
+        const normTreatmentId = normalizeTreatmentId(treatment.id) || treatment.id;
+        const mutation = await mutateStationState(station.id, (current, allData) => {
             if (current.status !== 'FREE') return null;
+            if (GLOBAL_SINGLE_DEVICE_TREATMENTS.has(normTreatmentId) && isTreatmentActiveInSnapshot(allData, normTreatmentId, station.id)) {
+                return { next: current, rejectReason: 'Urządzenie jest już używane na innym stanowisku.' };
+            }
+            if (isTherapyMassage && hasActiveTherapyMassageInSnapshot(allData, empId, station.id)) {
+                return { next: current, rejectReason: 'Masz już aktywną Terapię/Masaż. Możesz tylko dodać się do kolejki.' };
+            }
             return {
                 next: {
                     status: 'OCCUPIED',
-                    treatmentId: normalizeTreatmentId(treatment.id),
+                    treatmentId: normTreatmentId,
                     startTime: startedAt,
                     startTimeServer: FieldValue.serverTimestamp(),
                     duration: treatment.duration,
@@ -1261,6 +1325,11 @@ export const Stations: StationsAPI = (() => {
                 }
             };
         });
+
+        if (mutation.rejectReason) {
+            window.showToast?.(mutation.rejectReason, 3000);
+            return;
+        }
 
         if (!mutation.applied || !mutation.next) {
             window.showToast?.('Stanowisko jest już zajęte', 2000);
@@ -1277,14 +1346,14 @@ export const Stations: StationsAPI = (() => {
      */
     const releaseStation = async (station: Station): Promise<void> => {
         // Check if user is allowed to release (owner or admin)
-        if (!isCurrentUserAdmin && station.employeeId && station.employeeId !== currentEmployeeId) {
+        if (station.status === 'OCCUPIED' && !isCurrentUserAdmin && station.employeeId && station.employeeId !== currentEmployeeId) {
             window.showToast?.('Nie masz uprawnień do zwolnienia tego stanowiska', 3000);
             return;
         }
         const now = getNowMs();
         const mutation = await mutateStationState<{ startedNext: boolean; nextEmployeeId?: string }>(station.id, (current) => {
             if (current.status !== 'OCCUPIED' && current.status !== 'FINISHED') return null;
-            if (!isCurrentUserAdmin && current.employeeId && current.employeeId !== currentEmployeeId) return null;
+            if (current.status === 'OCCUPIED' && !isCurrentUserAdmin && current.employeeId && current.employeeId !== currentEmployeeId) return null;
 
             const queue = normalizeQueueEntries(current.queue);
             const nextInQueue = queue[0];
@@ -1320,7 +1389,7 @@ export const Stations: StationsAPI = (() => {
             };
         });
 
-        if (!mutation.next) return;
+        if (!mutation.applied || !mutation.next) return;
         applyStationStateToModel(station.id, mutation.next);
 
         if (mutation.result?.startedNext && mutation.result.nextEmployeeId) {
@@ -2039,52 +2108,6 @@ export const Stations: StationsAPI = (() => {
     };
 
 
-    /**
-     * Update operational attention bar (what needs action now).
-     */
-    const updateAttentionBar = (): void => {
-        const bar = document.getElementById('stationsAttentionBar');
-        if (!bar) return;
-
-        const visibleRooms = getScopedRooms().filter(room => isRoomVisible(room.id));
-        const scopeRooms = visibleRooms.length > 0 ? visibleRooms : getScopedRooms();
-        const allStations = scopeRooms.flatMap(room => room.stations);
-
-        const occupiedNow = allStations.filter(station => station.status === 'OCCUPIED').length;
-        const queuedPeople = allStations.reduce((sum, station) => sum + (station.queue?.length || 0), 0);
-        const toRelease = allStations.filter(station => station.status === 'FINISHED').length;
-        const awaitingStart = allStations.filter(station => isAwaitingTherapyStartStation(station)).length;
-        const fullQueues = allStations.filter(station => (station.queue?.length || 0) >= 5).length;
-
-        const items: string[] = [];
-        if (occupiedNow > 0) {
-            items.push(`<div class="attention-item"><i class="fas fa-hourglass-half"></i> ${occupiedNow} zabiegi w toku</div>`);
-        }
-        if (queuedPeople > 0) {
-            items.push(`<div class="attention-item"><i class="fas fa-user-friends"></i> ${queuedPeople} osoby w kolejce</div>`);
-        }
-        if (toRelease > 0) {
-            items.push(`<div class="attention-item"><i class="fas fa-flag"></i> ${toRelease} stanowiska do zwolnienia</div>`);
-        }
-        if (awaitingStart > 0) {
-            items.push(`<div class="attention-item"><i class="fas fa-play-circle"></i> ${awaitingStart} stanowiska czekają na rozpoczęcie</div>`);
-        }
-        if (fullQueues > 0) {
-            items.push(`<div class="attention-item"><i class="fas fa-users"></i> ${fullQueues} stanowiska mają pełną kolejkę</div>`);
-        }
-
-        if (items.length === 0) {
-            bar.classList.remove('active');
-            bar.innerHTML = '';
-            return;
-        }
-
-        bar.innerHTML = `
-            <div class="attention-title">Co wymaga uwagi teraz</div>
-            <div class="attention-items">${items.join('')}</div>
-        `;
-        bar.classList.add('active');
-    };
 
     /**
      * Apply predefined UI preset in settings modal.
@@ -2456,19 +2479,19 @@ export const Stations: StationsAPI = (() => {
         const nextName = EmployeeManager.getNameById(nextEntry.employeeId);
         const addQueueAction = room.type === 'simple' ? 'add-to-queue' : 'show-queue-treatments';
         return `
-            <div class="station-card ${room.type === 'simple' ? 'station-simple' : 'station-multi'} awaiting-start" data-station-id="${station.id}">
+            <div class="station-card ${room.type === 'simple' ? 'station-simple' : 'station-multi'} awaiting-start" data-station-id="${escapeHTML(station.id)}">
                 <div class="station-awaiting-content">
-                    <span class="station-name">${station.name}</span>
+                    <span class="station-name">${escapeHTML(station.name)}</span>
                     <span class="station-reserved-badge">Zarezerwowane, odliczanie nieaktywne</span>
                     <div class="queue-next-action">
                         <div class="queue-next-info">
-                            <i class="fas fa-user-clock"></i> Czeka: ${nextName}
+                            <i class="fas fa-user-clock"></i> Czeka: ${escapeHTML(nextName)}
                         </div>
                         <div class="awaiting-actions-row">
-                            <button class="btn-start-queue" data-action="start-queue" data-station="${station.id}" data-room="${room.id}">
+                            <button class="btn-start-queue" data-action="start-queue" data-station="${escapeHTML(station.id)}" data-room="${escapeHTML(room.id)}">
                                 <i class="fas fa-play"></i> Rozpocznij
                             </button>
-                            <button class="btn-awaiting-queue" data-action="${addQueueAction}" data-station="${station.id}" data-room="${room.id}">
+                            <button class="btn-awaiting-queue" data-action="${addQueueAction}" data-station="${escapeHTML(station.id)}" data-room="${escapeHTML(room.id)}">
                                 <i class="fas fa-plus"></i> Zakolejkuj się
                             </button>
                         </div>
@@ -2494,8 +2517,8 @@ export const Stations: StationsAPI = (() => {
                 .filter(t => !station.excludeTreatments?.includes(t.id))
                 .map(t => `
                             <button class="queue-picker-tile" data-action="queue-treatment"
-                                    data-station="${station.id}" data-room="${room.id}" data-treatment="${t.id}">
-                                <span>${t.shortName}</span>
+                                    data-station="${escapeHTML(station.id)}" data-room="${escapeHTML(room.id)}" data-treatment="${escapeHTML(t.id)}">
+                                <span>${escapeHTML(t.shortName)}</span>
                                 <span class="queue-picker-time">${t.duration}'</span>
                             </button>
                         `).join('')}
@@ -2509,7 +2532,7 @@ export const Stations: StationsAPI = (() => {
                 if (room.type === 'simple') {
                     return `
                         <div class="station-queue-container">
-                            <button class="btn-add-queue" data-action="add-to-queue" data-station="${station.id}" data-room="${room.id}">
+                            <button class="btn-add-queue" data-action="add-to-queue" data-station="${escapeHTML(station.id)}" data-room="${escapeHTML(room.id)}">
                                 <i class="fas fa-plus"></i> Zakolejkuj się
                             </button>
                         </div>
@@ -2517,7 +2540,7 @@ export const Stations: StationsAPI = (() => {
                 } else {
                     return `
                         <div class="station-queue-container">
-                            <button class="btn-add-queue" data-action="show-queue-treatments" data-station="${station.id}" data-room="${room.id}">
+                            <button class="btn-add-queue" data-action="show-queue-treatments" data-station="${escapeHTML(station.id)}" data-room="${escapeHTML(room.id)}">
                                 <i class="fas fa-plus"></i> Zakolejkuj się
                             </button>
                             ${pickerHtml}
@@ -2550,37 +2573,37 @@ export const Stations: StationsAPI = (() => {
             return `
                 <div class="queue-item ${isOwn ? 'own' : ''}${moveAnimClass}">
                     <span class="queue-index">${index + 1}.</span>
-                    <span class="queue-emp">${empName}</span>
-                    <span class="queue-treat">${treatmentName}</span>
+                    <span class="queue-emp">${escapeHTML(empName)}</span>
+                    <span class="queue-treat">${escapeHTML(treatmentName)}</span>
                     <div class="queue-item-actions">
                         ${canMoveUp ? `
                             <button class="btn-move-queue" data-action="move-queue-up" 
-                                    data-station="${station.id}" data-room="${room.id}" data-employee="${q.employeeId}" title="Przesuń w górę">
+                                    data-station="${escapeHTML(station.id)}" data-room="${escapeHTML(room.id)}" data-employee="${escapeHTML(q.employeeId)}" title="Przesuń w górę">
                                 <i class="fas fa-arrow-up"></i>
                             </button>
                         ` : ''}
                         ${canMoveDown ? `
                             <button class="btn-move-queue" data-action="move-queue-down" 
-                                    data-station="${station.id}" data-room="${room.id}" data-employee="${q.employeeId}" title="Przesuń w dół">
+                                    data-station="${escapeHTML(station.id)}" data-room="${escapeHTML(room.id)}" data-employee="${escapeHTML(q.employeeId)}" title="Przesuń w dół">
                                 <i class="fas fa-arrow-down"></i>
                             </button>
                         ` : ''}
                         ${canRemove ? `
                             <button class="btn-remove-queue" data-action="remove-from-queue" 
-                                    data-station="${station.id}" data-room="${room.id}" data-employee="${q.employeeId}">
+                                    data-station="${escapeHTML(station.id)}" data-room="${escapeHTML(room.id)}" data-employee="${escapeHTML(q.employeeId)}">
                                 <i class="fas fa-times"></i>
                             </button>
                         ` : ''}
                     </div>
-                    <span class="queue-eta" data-queue-index="${index}">${queueEta}</span>
+                    <span class="queue-eta" data-queue-index="${index}">${escapeHTML(queueEta)}</span>
                 </div>
             `;
         }).join('');
 
         const addButtonHtml = (station.status !== 'FREE' && station.queue.length < 5) ? (
             room.type === 'simple'
-                ? `<button class="btn-add-queue queue-tail" data-action="add-to-queue" data-station="${station.id}" data-room="${room.id}"><i class="fas fa-plus"></i> Zakolejkuj się</button>`
-                : `<button class="btn-add-queue queue-tail" data-action="show-queue-treatments" data-station="${station.id}" data-room="${room.id}"><i class="fas fa-plus"></i> Zakolejkuj się</button>`
+                ? `<button class="btn-add-queue queue-tail" data-action="add-to-queue" data-station="${escapeHTML(station.id)}" data-room="${escapeHTML(room.id)}"><i class="fas fa-plus"></i> Zakolejkuj się</button>`
+                : `<button class="btn-add-queue queue-tail" data-action="show-queue-treatments" data-station="${escapeHTML(station.id)}" data-room="${escapeHTML(room.id)}"><i class="fas fa-plus"></i> Zakolejkuj się</button>`
         ) : '';
 
         const nextEntry = station.queue[0];
@@ -2588,7 +2611,7 @@ export const Stations: StationsAPI = (() => {
         if (station.status === 'FINISHED' && nextEntry) {
             nextPreviewHtml = `
                 <div class="queue-next">
-                    <i class="fas fa-forward"></i> Następny: ${EmployeeManager.getNameById(nextEntry.employeeId)}
+                    <i class="fas fa-forward"></i> Następny: ${escapeHTML(EmployeeManager.getNameById(nextEntry.employeeId))}
                 </div>
             `;
         }
@@ -2615,25 +2638,30 @@ export const Stations: StationsAPI = (() => {
     `;
 
     /**
-     * Render simple station card (single click to start)
+     * Shared renderer for occupied and finished station cards (simple and multi)
      */
-    const renderSimpleStationCard = (room: Room, station: Station, statusClass: string, remaining: number, employeeName: string, queueHtml: string): string => {
-        if (station.status === 'FREE') {
+    const renderActiveStationCard = (
+        room: Room,
+        station: Station,
+        cardType: 'simple' | 'multi',
+        statusClass: string,
+        remaining: number,
+        employeeName: string,
+        queueHtml: string,
+        treatment?: Treatment,
+    ): string => {
+        const isMulti = cardType === 'multi';
+        const treatmentHtml = isMulti && treatment?.shortName ? `<span class="station-treatment-name">${escapeHTML(treatment.shortName)}</span>` : '';
+
+        if (station.status === 'OCCUPIED') {
+            const contentClass = isMulti ? 'station-occupied-content' : 'station-timer-content';
             return `
-                <div class="station-card station-simple ${statusClass}" data-station-id="${station.id}">
-                    <div class="station-simple-content" data-action="start-simple" data-station="${station.id}" data-room="${room.id}">
-                        <span class="station-name">${station.name}</span>
-                        <span class="station-duration">${room.defaultDuration} min</span>
-                    </div>
-                </div>
-            `;
-        } else if (station.status === 'OCCUPIED') {
-            return `
-                <div class="station-card station-simple ${statusClass}" data-station-id="${station.id}">
-                    <div class="station-timer-content">
+                <div class="station-card station-${cardType} ${statusClass}" data-station-id="${escapeHTML(station.id)}">
+                    <div class="${contentClass}">
                         <div class="station-info">
-                            <span class="station-name">${station.name}</span>
-                            <span class="station-emp-name">${employeeName}</span>
+                            <span class="station-name">${escapeHTML(station.name)}</span>
+                            <span class="station-emp-name">${escapeHTML(employeeName)}</span>
+                            ${treatmentHtml}
                         </div>
                         <span class="station-timer">${formatTime(remaining)}</span>
                     </div>
@@ -2641,19 +2669,45 @@ export const Stations: StationsAPI = (() => {
                     ${queueHtml}
                 </div>
             `;
-        } else {
+        }
+
+        // FINISHED
+        const infoHtml = isMulti
+            ? `<div class="station-info">
+                   <span class="station-name">${escapeHTML(station.name)}</span>
+                   <span class="station-emp-name">${escapeHTML(employeeName)}</span>
+                   ${treatmentHtml}
+               </div>`
+            : `<span class="station-name">${escapeHTML(station.name)}</span>
+               <span class="station-emp-name">${escapeHTML(employeeName)}</span>`;
+
+        return `
+            <div class="station-card station-${cardType} ${statusClass}" data-station-id="${escapeHTML(station.id)}">
+                <div class="station-finished-content" data-action="release" data-station="${escapeHTML(station.id)}" data-room="${escapeHTML(room.id)}">
+                    ${infoHtml}
+                    <span class="station-timer">00:00</span>
+                    <span class="station-release-hint">Kliknij aby zwolnić</span>
+                </div>
+                ${queueHtml}
+            </div>
+        `;
+    };
+
+    /**
+     * Render simple station card (single click to start)
+     */
+    const renderSimpleStationCard = (room: Room, station: Station, statusClass: string, remaining: number, employeeName: string, queueHtml: string): string => {
+        if (station.status === 'FREE') {
             return `
-                <div class="station-card station-simple ${statusClass}" data-station-id="${station.id}">
-                    <div class="station-finished-content" data-action="release" data-station="${station.id}" data-room="${room.id}">
-                        <span class="station-name">${station.name}</span>
-                        <span class="station-emp-name">${employeeName}</span>
-                        <span class="station-timer">00:00</span>
-                        <span class="station-release-hint">Kliknij aby zwolnić</span>
+                <div class="station-card station-simple ${statusClass}" data-station-id="${escapeHTML(station.id)}">
+                    <div class="station-simple-content" data-action="start-simple" data-station="${escapeHTML(station.id)}" data-room="${escapeHTML(room.id)}">
+                        <span class="station-name">${escapeHTML(station.name)}</span>
+                        <span class="station-duration">${room.defaultDuration} min</span>
                     </div>
-                    ${queueHtml}
                 </div>
             `;
         }
+        return renderActiveStationCard(room, station, 'simple', statusClass, remaining, employeeName, queueHtml);
     };
 
     /**
@@ -2687,20 +2741,20 @@ export const Stations: StationsAPI = (() => {
                         <div class="treatment-tile-group">
                             <button class="treatment-tile ${disabledClass}" 
                                     data-action="start-treatment" 
-                                    data-station="${station.id}" 
-                                    data-room="${room.id}"
-                                    data-treatment="${t.id}"
+                                    data-station="${escapeHTML(station.id)}" 
+                                    data-room="${escapeHTML(room.id)}"
+                                    data-treatment="${escapeHTML(t.id)}"
                                     title="${disabledTitle}"
                                     ${available ? '' : 'disabled'}>
-                                <span class="treatment-tile-name">${t.shortName}</span>
+                                <span class="treatment-tile-name">${escapeHTML(t.shortName)}</span>
                                 <span class="treatment-tile-time">${t.duration}'</span>
                                 ${usageInfo ? `<span class="treatment-tile-limit">${usageInfo}</span>` : ''}
                             </button>
                             <button class="therapy-queue-btn"
                                     data-action="reserve-therapy-slot"
-                                    data-station="${station.id}"
-                                    data-room="${room.id}"
-                                    data-treatment="${t.id}"
+                                    data-station="${escapeHTML(station.id)}"
+                                    data-room="${escapeHTML(room.id)}"
+                                    data-treatment="${escapeHTML(t.id)}"
                                     title="Zakolejkuj się (rezerwacja stanowiska)">
                                 <i class="fas fa-user-plus"></i>
                             </button>
@@ -2711,12 +2765,12 @@ export const Stations: StationsAPI = (() => {
                 return `
                     <button class="treatment-tile ${disabledClass}" 
                             data-action="start-treatment" 
-                            data-station="${station.id}" 
-                            data-room="${room.id}"
-                            data-treatment="${t.id}"
+                            data-station="${escapeHTML(station.id)}" 
+                            data-room="${escapeHTML(room.id)}"
+                            data-treatment="${escapeHTML(t.id)}"
                             title="${disabledTitle}"
                             ${available ? '' : 'disabled'}>
-                        <span class="treatment-tile-name">${t.shortName}</span>
+                        <span class="treatment-tile-name">${escapeHTML(t.shortName)}</span>
                         <span class="treatment-tile-time">${t.duration}'</span>
                         ${usageInfo ? `<span class="treatment-tile-limit">${usageInfo}</span>` : ''}
                     </button>
@@ -2724,47 +2778,17 @@ export const Stations: StationsAPI = (() => {
             }).join('');
 
             return `
-                <div class="station-card station-multi ${statusClass}" data-station-id="${station.id}">
+                <div class="station-card station-multi ${statusClass}" data-station-id="${escapeHTML(station.id)}">
                     <div class="station-header">
-                        <span class="station-name">${station.name}</span>
+                        <span class="station-name">${escapeHTML(station.name)}</span>
                     </div>
                     <div class="treatment-tiles">
                         ${treatmentTiles}
                     </div>
                 </div>
             `;
-        } else if (station.status === 'OCCUPIED') {
-            return `
-                <div class="station-card station-multi ${statusClass}" data-station-id="${station.id}">
-                    <div class="station-occupied-content">
-                        <div class="station-info">
-                            <span class="station-name">${station.name}</span>
-                            <span class="station-emp-name">${employeeName}</span>
-                            <span class="station-treatment-name">${treatment?.shortName || ''}</span>
-                        </div>
-                        <span class="station-timer">${formatTime(remaining)}</span>
-                    </div>
-                    ${renderEndTreatmentButton(room, station)}
-                    ${queueHtml}
-                </div>
-            `;
-        } else {
-            // FINISHED
-            return `
-                <div class="station-card station-multi ${statusClass}" data-station-id="${station.id}">
-                    <div class="station-finished-content" data-action="release" data-station="${station.id}" data-room="${room.id}">
-                        <div class="station-info">
-                            <span class="station-name">${station.name}</span>
-                            <span class="station-emp-name">${employeeName}</span>
-                            <span class="station-treatment-name">${treatment?.shortName || ''}</span>
-                        </div>
-                        <span class="station-timer">00:00</span>
-                        <span class="station-release-hint">Kliknij aby zwolnić</span>
-                    </div>
-                    ${queueHtml}
-                </div>
-            `;
         }
+        return renderActiveStationCard(room, station, 'multi', statusClass, remaining, employeeName, queueHtml, treatment);
     };
 
     /**
@@ -2809,8 +2833,6 @@ export const Stations: StationsAPI = (() => {
                 }
             }
         }
-
-        updateAttentionBar();
     };
 
     /**
@@ -3278,12 +3300,3 @@ export const Stations: StationsAPI = (() => {
         destroy,
     };
 })();
-
-// Backward compatibility
-declare global {
-    interface Window {
-        Stations: StationsAPI;
-    }
-}
-
-window.Stations = Stations;

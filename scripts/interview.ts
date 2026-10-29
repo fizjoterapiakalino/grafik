@@ -33,6 +33,8 @@ export const Interview: InterviewAPI = (() => {
     let availableVideoDevices: MediaDeviceInfo[] = [];
     let torchActive = false;
     let isHandlingResult = false;
+    let scannerSessionId = 0;
+    let isModuleActive = false;
 
     const createBarcode = (): string => `${new Date().toISOString().slice(2, 10).replace(/-/g, '')}${Math.floor(100000 + Math.random() * 900000)}`;
 
@@ -226,7 +228,7 @@ export const Interview: InterviewAPI = (() => {
     };
 
     const stopScanner = (): void => {
-        isHandlingResult = false;
+        scannerSessionId++;
         if (scanFrameId !== null) { cancelAnimationFrame(scanFrameId); scanFrameId = null; }
         if (codeReader) {
             try { codeReader.reset(); } catch {}
@@ -303,6 +305,7 @@ export const Interview: InterviewAPI = (() => {
         const video = document.getElementById('barcodeScannerVideo') as HTMLVideoElement | null;
         if (!modal || !video) return;
 
+        const sessionId = ++scannerSessionId;
         isHandlingResult = false;
         modal.removeAttribute('hidden');
         const manualInput = document.getElementById('scannerManualInput') as HTMLInputElement | null;
@@ -312,6 +315,10 @@ export const Interview: InterviewAPI = (() => {
 
         try {
             const devices = await navigator.mediaDevices?.enumerateDevices?.();
+            if (!isModuleActive || sessionId !== scannerSessionId) {
+                stopScanner();
+                return;
+            }
             if (devices) {
                 availableVideoDevices = devices.filter((d) => d.kind === 'videoinput');
                 const switchBtn = document.getElementById('scannerSwitchCameraButton');
@@ -319,6 +326,11 @@ export const Interview: InterviewAPI = (() => {
             }
         } catch {
             availableVideoDevices = [];
+        }
+
+        if (!isModuleActive || sessionId !== scannerSessionId) {
+            stopScanner();
+            return;
         }
 
         try {
@@ -335,9 +347,22 @@ export const Interview: InterviewAPI = (() => {
                 audio: false,
             };
 
-            cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            if (!isModuleActive || sessionId !== scannerSessionId) {
+                stream?.getTracks().forEach((track) => track.stop());
+                stopScanner();
+                return;
+            }
+
+            cameraStream = stream;
             video.srcObject = cameraStream;
             await video.play().catch(() => {});
+
+            if (!isModuleActive || sessionId !== scannerSessionId) {
+                cameraStream?.getTracks().forEach((track) => track.stop());
+                stopScanner();
+                return;
+            }
 
             const track = cameraStream.getVideoTracks()[0];
             if (track) {
@@ -352,6 +377,11 @@ export const Interview: InterviewAPI = (() => {
                     await track.applyConstraints({
                         advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet],
                     }).catch(() => {});
+                    if (!isModuleActive || sessionId !== scannerSessionId) {
+                        cameraStream?.getTracks().forEach((t) => t.stop());
+                        stopScanner();
+                        return;
+                    }
                 }
                 const torchBtn = document.getElementById('scannerTorchButton');
                 if (torchBtn) {
@@ -377,7 +407,7 @@ export const Interview: InterviewAPI = (() => {
             }
 
             await codeReader.decodeFromStream(cameraStream, video, (result) => {
-                if (result && !isHandlingResult) {
+                if (result && !isHandlingResult && isModuleActive && sessionId === scannerSessionId) {
                     const text = result.getText();
                     if (text) {
                         isHandlingResult = true;
@@ -386,17 +416,29 @@ export const Interview: InterviewAPI = (() => {
                 }
             });
 
+            if (!isModuleActive || sessionId !== scannerSessionId) {
+                cameraStream?.getTracks().forEach((t) => t.stop());
+                stopScanner();
+                return;
+            }
+
             try {
                 const Detector = (window as unknown as { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector;
                 if (Detector && typeof (Detector as unknown as { getSupportedFormats?: () => Promise<string[]> }).getSupportedFormats === 'function') {
                     const supported: string[] = await (Detector as unknown as { getSupportedFormats: () => Promise<string[]> }).getSupportedFormats().catch(() => [] as string[]);
+                    if (!isModuleActive || sessionId !== scannerSessionId) {
+                        cameraStream?.getTracks().forEach((t) => t.stop());
+                        stopScanner();
+                        return;
+                    }
                     const validFormats = ['code_39', 'code_128', 'qr_code'].filter((f) => supported.includes(f));
                     if (validFormats.length > 0) {
                         const nativeDetector = new Detector({ formats: validFormats });
                         const nativeScan = async (): Promise<void> => {
-                            if (!cameraStream || isHandlingResult) return;
+                            if (!cameraStream || isHandlingResult || !isModuleActive || sessionId !== scannerSessionId) return;
                             try {
                                 const codes = await nativeDetector.detect(video);
+                                if (!isModuleActive || sessionId !== scannerSessionId) return;
                                 const raw = codes[0]?.rawValue;
                                 if (raw && !isHandlingResult) {
                                     isHandlingResult = true;
@@ -404,7 +446,7 @@ export const Interview: InterviewAPI = (() => {
                                     return;
                                 }
                             } catch {}
-                            if (cameraStream && !isHandlingResult) {
+                            if (cameraStream && !isHandlingResult && isModuleActive && sessionId === scannerSessionId) {
                                 scanFrameId = requestAnimationFrame(() => { void nativeScan(); });
                             }
                         };
@@ -414,6 +456,9 @@ export const Interview: InterviewAPI = (() => {
             } catch {}
 
         } catch (error) {
+            if (!isModuleActive || sessionId !== scannerSessionId) {
+                return;
+            }
             console.error('Camera scanner error:', error);
             setScannerStatus('Nie udało się uzyskać obrazu z kamery. Wpisz kod ręcznie poniżej.');
         }
@@ -448,6 +493,8 @@ export const Interview: InterviewAPI = (() => {
     };
 
     const init = (): void => {
+        isModuleActive = true;
+        isHandlingResult = false;
         renderScales(); setupCollapsibleSections(); records = readStorage(); writeStorage(); renderRecordList(); listeners = new AbortController(); const options = { signal: listeners.signal };
         getForm()?.addEventListener('input', scheduleSave, options); getForm()?.addEventListener('change', scheduleSave, options);
         document.getElementById('newInterviewButton')?.addEventListener('click', () => createRecord(), options);
@@ -491,6 +538,8 @@ export const Interview: InterviewAPI = (() => {
     };
 
     const destroy = (): void => {
+        isModuleActive = false;
+        scannerSessionId++;
         if (saveTimer !== null) { globalThis.clearTimeout(saveTimer); saveTimer = null; }
         saveCurrent();
         stopScanner();

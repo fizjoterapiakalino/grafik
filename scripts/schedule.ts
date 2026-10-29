@@ -8,7 +8,6 @@ import { ScheduleEvents } from './schedule-events.js';
 import { ScheduleData } from './schedule-data.js';
 import { ScheduleModals } from './schedule-modals.js';
 import { UXEnhancements } from './ux-enhancements.js';
-import { TestDataGenerator } from './test-data-generator.js';
 import { safeCopy } from './utils.js';
 import {
     getTargetPart,
@@ -46,6 +45,7 @@ export const Schedule: ScheduleAPI = (() => {
     let undoButton: HTMLButtonElement | null = null;
     let splitViewActive = false;
     let splitViewHandler: (() => void) | null = null;
+    let unsubscribeAuth: (() => void) | null = null;
 
     const render = (): void => {
         ScheduleUI.render();
@@ -285,13 +285,23 @@ export const Schedule: ScheduleAPI = (() => {
             if (duplicate) {
                 ScheduleModals.showDuplicateConfirmationDialog(
                     duplicate,
-                    () => updateSchedule(true),
-                    () => updateSchedule(false),
-                    () => ScheduleUI.render(),
+                    () => {
+                        updateSchedule(true);
+                        ScheduleUI.flushPendingRenderIfIdle();
+                    },
+                    () => {
+                        updateSchedule(false);
+                        ScheduleUI.flushPendingRenderIfIdle();
+                    },
+                    () => {
+                        ScheduleUI.render();
+                        ScheduleUI.flushPendingRenderIfIdle();
+                    },
                     createSharedPatient
                 );
             } else {
                 updateSchedule(false);
+                ScheduleUI.flushPendingRenderIfIdle();
             }
         },
 
@@ -303,6 +313,7 @@ export const Schedule: ScheduleAPI = (() => {
                 window.showToast('Wprowadzony tekst jest za długi (maks. 35 znaków).', 3000);
                 element.setAttribute('contenteditable', 'false');
                 ScheduleUI.render();
+                ScheduleUI.flushPendingRenderIfIdle();
                 return;
             }
 
@@ -315,6 +326,7 @@ export const Schedule: ScheduleAPI = (() => {
                     () => {
                         element.setAttribute('contenteditable', 'false');
                         ScheduleUI.render();
+                        ScheduleUI.flushPendingRenderIfIdle();
                     }
                 );
                 return;
@@ -493,10 +505,6 @@ export const Schedule: ScheduleAPI = (() => {
             });
         },
 
-        openEmployeeSelectionModal(_cell: HTMLElement): void {
-            ScheduleModals.openEmployeeSelectionModal();
-        },
-
         toggleSpecialStyle(cell: HTMLElement, dataAttribute: string): void {
             updateCellState(cell, (state) => {
                 if (state.isSplit) {
@@ -559,7 +567,6 @@ export const Schedule: ScheduleAPI = (() => {
                 state.isSharedPatient2 = null;
                 state.isHydrotherapy1 = null;
                 state.isHydrotherapy2 = null;
-                state.isHydrotherapy = null;
                 state.treatmentData1 = null;
                 state.treatmentData2 = null;
 
@@ -696,7 +703,12 @@ export const Schedule: ScheduleAPI = (() => {
                 clearCell: mainController.clearCell.bind(mainController),
             });
 
-            auth.onAuthStateChanged((user: FirebaseUser | null) => {
+            if (unsubscribeAuth) {
+                unsubscribeAuth();
+                unsubscribeAuth = null;
+            }
+
+            unsubscribeAuth = auth.onAuthStateChanged((user: FirebaseUser | null) => {
                 if (user) {
                     ScheduleData.setCurrentUserId(user.uid);
                 } else {
@@ -710,7 +722,6 @@ export const Schedule: ScheduleAPI = (() => {
         } finally {
             if (loadingOverlay) hideLoadingOverlay(loadingOverlay);
             UXEnhancements.initScheduleEnhancements();
-            TestDataGenerator.init();
         }
 
         // Setup split-view toggle button
@@ -727,6 +738,11 @@ export const Schedule: ScheduleAPI = (() => {
     };
 
     const destroy = (): void => {
+        if (unsubscribeAuth) {
+            unsubscribeAuth();
+            unsubscribeAuth = null;
+        }
+
         // Clean up split-view
         const btnSplitView = document.getElementById('btnSplitView');
         if (btnSplitView && splitViewHandler) {
@@ -741,7 +757,7 @@ export const Schedule: ScheduleAPI = (() => {
         ScheduleEvents.destroy();
         ScheduleData.destroy();
         ScheduleUI.destroy();
-        TestDataGenerator.destroy();
+        UXEnhancements.destroy();
         debugLog('Schedule module destroyed');
     };
 

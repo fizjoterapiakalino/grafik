@@ -2,8 +2,9 @@
 import { debugLog } from './common.js';
 import { AppConfig } from './common.js';
 import { initializeContextMenu, destroyContextMenu } from './context-menu.js';
-import { safeCopy } from './utils.js';
+import { safeCopy, clearCellContentKeys } from './utils.js';
 import { ScheduleDragDrop } from './schedule-drag-drop.js';
+import { ScheduleUI } from './schedule-ui.js';
 import type { CellState } from './types/index.js';
 
 interface AppState {
@@ -83,12 +84,14 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 }
 
                 _dependencies.exitEditMode(activeCell);
+                ScheduleUI.flushPendingRenderIfIdle();
             }
 
             setActiveCell(target);
         } else {
             if (activeCell && activeCell.getAttribute('contenteditable') === 'true') {
                 _dependencies.exitEditMode(activeCell);
+                ScheduleUI.flushPendingRenderIfIdle();
             }
             setActiveCell(null);
         }
@@ -104,12 +107,25 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
             return;
         }
 
-        if (!(event.target as HTMLElement).closest('.active-cell') && !(event.target as HTMLElement).closest('#contextMenu')) {
-            if (activeCell && activeCell.getAttribute('contenteditable') === 'true') {
-                _dependencies.exitEditMode(activeCell);
-            }
-            setActiveCell(null);
+        const target = event.target as HTMLElement;
+        if (
+            target.closest('.active-cell') ||
+            target.closest('#contextMenu') ||
+            target.closest('.context-menu') ||
+            target.closest('#scheduleActionButtons') ||
+            target.closest('#undoButton') ||
+            target.closest('.action-icon-btn') ||
+            target.closest('.modal-overlay') ||
+            target.closest('.compact-legend')
+        ) {
+            return;
         }
+
+        if (activeCell && activeCell.getAttribute('contenteditable') === 'true') {
+            _dependencies.exitEditMode(activeCell);
+            ScheduleUI.flushPendingRenderIfIdle();
+        }
+        setActiveCell(null);
     };
 
     const _handleAppSearch = (e: Event): void => {
@@ -204,6 +220,7 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
             }
             if (activeCell.getAttribute('contenteditable') === 'true') {
                 _dependencies.exitEditMode(activeCell);
+                ScheduleUI.flushPendingRenderIfIdle();
             }
             clearDuplicateHighlights();
         }
@@ -393,8 +410,15 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
             }
 
             _dependencies.updateCellState(activeCell, (state) => {
-                // Kopiuj wszystkie właściwości ze skopiowanego stanu
-                Object.assign(state, JSON.parse(JSON.stringify(copiedCellState)));
+                const existingHistory = state.history ? [...state.history] : [];
+                clearCellContentKeys(state);
+                const source = JSON.parse(JSON.stringify(copiedCellState)) as Record<string, unknown>;
+                delete source.history;
+                delete source.patientId;
+                delete source.patientId1;
+                delete source.patientId2;
+                Object.assign(state, source);
+                state.history = existingHistory;
                 window.showToast('Wklejono komórkę');
             });
             return;
@@ -404,10 +428,14 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
         const isEditing = target?.getAttribute('contenteditable') === 'true';
 
         if (isEditing) {
-            if (event.key === 'Escape') _dependencies.exitEditMode(target);
+            if (event.key === 'Escape') {
+                _dependencies.exitEditMode(target);
+                ScheduleUI.flushPendingRenderIfIdle();
+            }
             if (event.key === 'Enter') {
                 event.preventDefault();
                 _dependencies.exitEditMode(target);
+                ScheduleUI.flushPendingRenderIfIdle();
                 const parentCell = target.closest('td') as HTMLTableCellElement | null;
                 if (parentCell) {
                     const nextRow = parentCell.closest('tr')?.nextElementSibling as HTMLTableRowElement | null;
@@ -490,8 +518,52 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
             console.error('ScheduleEvents.initialize: app-root not found.');
         }
 
+        document.addEventListener('click', _handleDocumentClick as EventListener);
         document.addEventListener('keydown', _handleKeyDown);
         document.addEventListener('app:search', _handleAppSearch);
+
+        const splitTargetCell = (cell: HTMLElement): void => {
+            _dependencies.updateCellState(cell, (state) => {
+                state.content1 = safeCopy(state.content || '') as string;
+                state.content2 = '';
+                state.patientId1 = safeCopy(state.patientId) as string | null;
+                state.patientId2 = null;
+                state.patientId = null;
+                state.content = null;
+
+                if (state.isMassage) {
+                    state.isMassage1 = true;
+                    state.isMassage = null;
+                }
+                if (state.isPnf) {
+                    state.isPnf1 = true;
+                    state.isPnf = null;
+                }
+                if (state.isEveryOtherDay) {
+                    state.isEveryOtherDay1 = true;
+                    state.isEveryOtherDay = null;
+                }
+                if (state.isSharedPatient) {
+                    state.isSharedPatient1 = true;
+                    state.isSharedPatient = null;
+                }
+
+                state.treatmentData1 = {
+                    startDate: safeCopy(state.treatmentStartDate),
+                    extensionDays: safeCopy(state.treatmentExtensionDays),
+                    endDate: safeCopy(state.treatmentEndDate),
+                    additionalInfo: safeCopy(state.additionalInfo),
+                };
+
+                state.treatmentStartDate = null;
+                state.treatmentExtensionDays = null;
+                state.treatmentEndDate = null;
+                state.additionalInfo = null;
+
+                state.isSplit = true;
+                window.showToast('Podzielono komórkę');
+            });
+        };
 
         const contextMenuItems = [
             {
@@ -557,47 +629,7 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
             { id: 'contextClear', class: 'danger', action: (cell: HTMLElement) => _dependencies.clearCell(cell) },
             {
                 id: 'contextSplitCell',
-                action: (cell: HTMLElement) =>
-                    _dependencies.updateCellState(cell, (state) => {
-                        state.content1 = safeCopy(state.content || '') as string;
-                        state.content2 = '';
-                        state.patientId1 = safeCopy(state.patientId) as string | null;
-                        state.patientId2 = null;
-                        state.patientId = null;
-                        state.content = null;
-
-                        if (state.isMassage) {
-                            state.isMassage1 = true;
-                            state.isMassage = null;
-                        }
-                        if (state.isPnf) {
-                            state.isPnf1 = true;
-                            state.isPnf = null;
-                        }
-                        if (state.isEveryOtherDay) {
-                            state.isEveryOtherDay1 = true;
-                            state.isEveryOtherDay = null;
-                        }
-                        if (state.isSharedPatient) {
-                            state.isSharedPatient1 = true;
-                            state.isSharedPatient = null;
-                        }
-
-                        state.treatmentData1 = {
-                            startDate: safeCopy(state.treatmentStartDate),
-                            extensionDays: safeCopy(state.treatmentExtensionDays),
-                            endDate: safeCopy(state.treatmentEndDate),
-                            additionalInfo: safeCopy(state.additionalInfo),
-                        };
-
-                        state.treatmentStartDate = null;
-                        state.treatmentExtensionDays = null;
-                        state.treatmentEndDate = null;
-                        state.additionalInfo = null;
-
-                        state.isSplit = true;
-                        window.showToast('Podzielono komórkę');
-                    }),
+                action: (cell: HTMLElement) => splitTargetCell(cell),
                 condition: (cell: HTMLElement) => !cell.classList.contains('split-cell') && !cell.classList.contains('break-cell'),
             },
             {
@@ -652,46 +684,7 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
 
         document.getElementById('btnSplitCell')?.addEventListener('click', () => {
             if (activeCell) {
-                _dependencies.updateCellState(activeCell, (state) => {
-                    state.content1 = state.content || '';
-                    state.content2 = '';
-                    state.patientId1 = state.patientId || null;
-                    state.patientId2 = null;
-                    state.patientId = null;
-                    delete state.content;
-
-                    if (state.isMassage) {
-                        state.isMassage1 = true;
-                        delete state.isMassage;
-                    }
-                    if (state.isPnf) {
-                        state.isPnf1 = true;
-                        delete state.isPnf;
-                    }
-                    if (state.isEveryOtherDay) {
-                        state.isEveryOtherDay1 = true;
-                        delete state.isEveryOtherDay;
-                    }
-                    if (state.isSharedPatient) {
-                        state.isSharedPatient1 = true;
-                        delete state.isSharedPatient;
-                    }
-
-                    state.treatmentData1 = {
-                        startDate: state.treatmentStartDate,
-                        extensionDays: state.treatmentExtensionDays,
-                        endDate: state.treatmentEndDate,
-                        additionalInfo: state.additionalInfo,
-                    };
-
-                    delete state.treatmentStartDate;
-                    delete state.treatmentExtensionDays;
-                    delete state.treatmentEndDate;
-                    delete state.additionalInfo;
-
-                    state.isSplit = true;
-                    window.showToast('Podzielono komórkę');
-                });
+                splitTargetCell(activeCell);
             } else {
                 window.showToast('Wybierz komórkę do podzielenia.', 3000);
             }
@@ -845,12 +838,3 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
         destroy,
     };
 })();
-
-// Backward compatibility
-declare global {
-    interface Window {
-        ScheduleEvents: ScheduleEventsAPI;
-    }
-}
-
-window.ScheduleEvents = ScheduleEvents;

@@ -2,6 +2,7 @@
 import { EmployeeManager } from './employee-manager.js';
 import { ScheduleUI } from './schedule-ui.js';
 import { ScheduleLogic } from './schedule-logic.js';
+import { escapeHTML } from './utils.js';
 import type { CellState } from './types/index.js';
 
 /**
@@ -38,7 +39,6 @@ interface ScheduleModalsAPI {
         cellState: CellState,
         updateCellStateCallback: (updateFn: (state: CellState) => void) => void
     ): void;
-    openEmployeeSelectionModal(): void;
 }
 
 /**
@@ -223,16 +223,21 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
             modalBody.innerHTML = `
                 <ul class="history-list">
                     ${cellState.history
-                    .map((entry) => `
+                    .map((entry, idx) => {
+                        const employeeName = EmployeeManager.getEmployeeByUid(entry.userId ?? '')?.name || 'Nieznany';
+                        const safeValue = escapeHTML(entry.oldValue || '(pusty)');
+                        const safeEmployee = escapeHTML(employeeName);
+                        return `
                         <li class="history-item">
-                            <div class="history-value">${entry.oldValue || '(pusty)'}</div>
+                            <div class="history-value">${safeValue}</div>
                             <div class="history-meta">
                                 <span>${new Date(entry.timestamp).toLocaleString('pl-PL')}</span>
-                                <span>przez: ${EmployeeManager.getEmployeeByUid(entry.userId ?? '')?.name || 'Nieznany'}</span>
+                                <span>przez: ${safeEmployee}</span>
                             </div>
-                            <button class="action-btn outline revert-btn" data-value="${entry.oldValue}" title="Przywróć tę wartość"><i class="fas fa-undo"></i> Przywróć</button>
+                            <button class="action-btn outline revert-btn" data-history-index="${idx}" title="Przywróć tę wartość"><i class="fas fa-undo"></i> Przywróć</button>
                         </li>
-                    `)
+                        `;
+                    })
                     .join('')}
                 </ul>
             `;
@@ -240,7 +245,9 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
 
         modalBody.querySelectorAll<HTMLButtonElement>('.revert-btn').forEach((btn) => {
             btn.addEventListener('click', () => {
-                const valueToRevert = btn.dataset.value || '';
+                const historyIdx = Number.parseInt(btn.dataset.historyIndex || '-1', 10);
+                const historyEntry = historyIdx >= 0 ? cellState.history?.[historyIdx] : null;
+                const valueToRevert = historyEntry ? (historyEntry.oldValue || '') : (btn.dataset.value || '');
                 updateCellStateCallback((state) => {
                     if (valueToRevert.includes('/')) {
                         const parts = valueToRevert.split('/', 2);
@@ -281,24 +288,10 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
         modal.style.display = 'flex';
     };
 
-    const openEmployeeSelectionModal = (): void => {
-        window.showToast('Funkcja wyboru pracownika nie jest jeszcze zaimplementowana.');
-    };
-
     return {
         showDuplicateConfirmationDialog,
         showNumericConfirmationDialog,
         openPatientInfoModal,
         showHistoryModal,
-        openEmployeeSelectionModal,
     };
 })();
-
-// Backward compatibility
-declare global {
-    interface Window {
-        ScheduleModals: ScheduleModalsAPI;
-    }
-}
-
-window.ScheduleModals = ScheduleModals;

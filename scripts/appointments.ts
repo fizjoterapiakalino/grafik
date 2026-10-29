@@ -1,12 +1,15 @@
 // scripts/appointments.ts - Appointment Scheduler Module
-import { db as dbRaw } from './firebase-config.js';
+import { db as dbRaw, FieldValue } from './firebase-config.js';
 import { capitalizeFirstLetter, isHoliday } from './common.js';
+import { printAppointmentsToPdf, generateTimeSlots } from './appointments-pdf.js';
+import { formatLocalIsoDate } from './utils.js';
 
 interface DbWrapper {
     collection(name: string): {
         doc(id: string): {
             get(): Promise<{ exists: boolean; data(): Record<string, unknown> | undefined }>;
             set(data: Record<string, unknown>, options?: { merge?: boolean }): Promise<void>;
+            update(data: Record<string, unknown>): Promise<void>;
             onSnapshot(
                 callback: (snapshot: { exists: boolean; data(): Record<string, unknown> | undefined }) => void,
                 errorCallback?: (error: Error) => void
@@ -44,15 +47,9 @@ interface AppointmentsAPI {
 
 export const Appointments: AppointmentsAPI = (() => {
     const SAVE_DEBOUNCE_MS = 450;
-    const APPOINTMENTS_FEATURES = {
-        treatmentBell: false,
-        dateUnderPatientName: false,
-        patientInfoModal: false
-    } as const;
 
     let unsubscribe: (() => void) | null = null;
     let appointmentData: AppointmentData = {};
-    let currentEditingCell: { time: string, station: StationKey } | null = null;
     let draggedData: { time: string, station: StationKey } | null = null;
     let pendingDeleteCell: { time: string, station: StationKey } | null = null;
     let listenersAbortController: AbortController | null = null;
@@ -76,9 +73,36 @@ export const Appointments: AppointmentsAPI = (() => {
             listenersAbortController.abort();
             listenersAbortController = null;
         }
-        saveDebounceTimers.forEach(timer => globalThis.clearTimeout(timer));
-        saveDebounceTimers.clear();
-        pendingCellUpdates.clear();
+
+        if (pendingCellUpdates.size > 0) {
+            const updates = new Map(pendingCellUpdates);
+            saveDebounceTimers.forEach(timer => globalThis.clearTimeout(timer));
+            saveDebounceTimers.clear();
+            pendingCellUpdates.clear();
+
+            const docRef = db.collection('appointments').doc('current');
+            const batchUpdate: Record<string, unknown> = {};
+            for (const [key, data] of updates.entries()) {
+                const [time, station] = key.split('__') as [string, StationKey];
+                if (time && station) {
+                    batchUpdate[`${time}.${station}`] = data ? data : (FieldValue as { delete(): unknown }).delete();
+                }
+            }
+            if (Object.keys(batchUpdate).length > 0) {
+                void docRef.update(batchUpdate).catch(async (err: unknown) => {
+                    const error = err as { code?: string; message?: string };
+                    if (error?.code === 'not-found' || error?.message?.includes('No document to update') || error?.message?.includes('NOT_FOUND')) {
+                        // ignore if doc missing
+                    } else {
+                        console.error('Błąd zapisu oczekujących wizyt przy zamykaniu:', err);
+                    }
+                });
+            }
+        } else {
+            saveDebounceTimers.forEach(timer => globalThis.clearTimeout(timer));
+            saveDebounceTimers.clear();
+            pendingCellUpdates.clear();
+        }
     };
 
     const calculateEndDate = (startDate: string | undefined, extensionDays?: number): string => {
@@ -96,24 +120,6 @@ export const Appointments: AppointmentsAPI = (() => {
             }
         }
         return endDate.toISOString().split('T')[0];
-    };
-
-    const generateTimeSlots = (): string[] => {
-        const slots: string[] = [];
-        let curHour = 7;
-        let curMin = 20;
-
-        while (curHour < 17 || (curHour === 17 && curMin <= 40)) {
-            const timeString = `${curHour.toString().padStart(2, '0')}:${curMin.toString().padStart(2, '0')}`;
-            slots.push(timeString);
-
-            curMin += 20;
-            if (curMin >= 60) {
-                curHour += 1;
-                curMin = 0;
-            }
-        }
-        return slots;
     };
 
     const getCellKey = (time: string, station: StationKey): string => `${time}__${station}`;
@@ -151,10 +157,10 @@ export const Appointments: AppointmentsAPI = (() => {
         const rows = document.querySelectorAll('#appointmentsTableBody tr[data-time]');
 
         const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
+        const todayStr = formatLocalIsoDate(today);
         const tomorrow = new Date(today);
         tomorrow.setDate(today.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+        const tomorrowStr = formatLocalIsoDate(tomorrow);
 
         rows.forEach(row => {
             const htmlRow = row as HTMLElement;
@@ -169,24 +175,6 @@ export const Appointments: AppointmentsAPI = (() => {
         });
     };
 
-    /* Tymczasowo wyłączone - funkcja nieużywana przy wyłączonym sprawdzaniu duplikatów
-    const findPatientConflictStation = (time: string, station: StationKey, patientName: string): StationKey | null => {
-        const normalized = normalizePatientName(patientName);
-        if (!normalized) return null;
-
-        const rowData = appointmentData[time];
-        if (!rowData) return null;
-
-        const stations: StationKey[] = ['station1', 'station1b', 'station2', 'station2b'];
-        for (const s of stations) {
-            if (s === station) continue;
-            const otherName = normalizePatientName(rowData[s]?.patientName);
-            if (otherName === normalized) return s;
-        }
-        return null;
-    };
-    */
-
     const buildUpdatedCellFromText = (time: string, station: StationKey, rawValue: string): AppointmentCell | null => {
         const currentCellData = appointmentData[time]?.[station] || { patientName: '' };
         const newName = capitalizeFirstLetter(rawValue.trim());
@@ -195,7 +183,7 @@ export const Appointments: AppointmentsAPI = (() => {
 
         let newStartDate = currentCellData.startDate;
         if (!currentCellData.patientName && !newStartDate) {
-            newStartDate = new Date().toISOString().split('T')[0];
+            newStartDate = formatLocalIsoDate();
         }
 
         return {
@@ -237,23 +225,6 @@ export const Appointments: AppointmentsAPI = (() => {
         if (!row.station1 && !row.station1b && !row.station2 && !row.station2b) {
             delete appointmentData[time];
         }
-    };
-
-    const compactAppointmentData = (): AppointmentData => {
-        const compact: AppointmentData = {};
-        for (const [time, row] of Object.entries(appointmentData)) {
-            const hasAny = row.station1 || row.station1b || row.station2 || row.station2b;
-            if (hasAny) {
-                compact[time] = {
-                    ...(row.station1 ? { station1: row.station1 } : {}),
-                    ...(row.station1b ? { station1b: row.station1b } : {}),
-                    ...(row.station2 ? { station2: row.station2 } : {}),
-                    ...(row.station2b ? { station2b: row.station2b } : {}),
-                };
-            }
-        }
-        appointmentData = compact;
-        return compact;
     };
 
     const flushCellSave = async (time: string, station: StationKey): Promise<void> => {
@@ -320,18 +291,6 @@ export const Appointments: AppointmentsAPI = (() => {
         infoEl.className = 'cell-info-indicator';
     };
 
-    const updateCellIndicator = (infoEl: HTMLElement, endDate: string): void => {
-        infoEl.innerText = `Koniec: ${endDate}`;
-        if (!APPOINTMENTS_FEATURES.treatmentBell) {
-            infoEl.className = 'cell-info-indicator';
-            return;
-        }
-        
-        const todayStr = new Date().toISOString().split('T')[0];
-        const isFinished = endDate <= todayStr;
-        infoEl.className = `cell-info-indicator ${isFinished ? 'treatment-end-marker' : ''}`;
-    };
-
     const updateUIContent = (): void => {
         const targets = document.querySelectorAll('.cell-target');
 
@@ -351,12 +310,8 @@ export const Appointments: AppointmentsAPI = (() => {
 
             if (cellData?.patientName) {
                 deleteIcon.style.display = 'block';
-                if (APPOINTMENTS_FEATURES.dateUnderPatientName && cellData.endDate) {
-                    updateCellIndicator(infoEl, cellData.endDate);
-                } else {
-                    infoEl.innerText = '';
-                    infoEl.className = 'cell-info-indicator';
-                }
+                infoEl.innerText = '';
+                infoEl.className = 'cell-info-indicator';
             } else {
                 clearCellInfo(deleteIcon, infoEl);
             }
@@ -365,69 +320,8 @@ export const Appointments: AppointmentsAPI = (() => {
         applyRowFilterVisibility();
     };
 
-    const openModal = (time: string, station: StationKey): void => {
-        if (!APPOINTMENTS_FEATURES.patientInfoModal) return;
-
-        currentEditingCell = { time, station };
-        const cellData = appointmentData[time]?.[station] || { patientName: '' };
-
-        const modal = document.getElementById('appointmentPatientInfoModal');
-        const nameInput = document.getElementById('modalPatientName') as HTMLInputElement;
-        const startInput = document.getElementById('appointmentStartDate') as HTMLInputElement;
-        const extInput = document.getElementById('appointmentExtensionDays') as HTMLInputElement;
-        const endInput = document.getElementById('appointmentEndDate') as HTMLInputElement;
-        const infoInput = document.getElementById('appointmentAdditionalInfo') as HTMLTextAreaElement;
-
-        if (!modal || !nameInput || !startInput || !extInput || !endInput || !infoInput) return;
-
-        const today = new Date().toISOString().split('T')[0];
-        nameInput.value = cellData.patientName;
-        startInput.value = cellData.startDate || today;
-        extInput.value = String(cellData.extensionDays || 0);
-        infoInput.value = cellData.additionalInfo || '';
-
-        nameInput.oninput = () => {
-            nameInput.value = capitalizeFirstLetter(nameInput.value);
-        };
-
-        const updateEndDateDisplay = (): void => {
-            endInput.value = calculateEndDate(startInput.value, Number.parseInt(extInput.value || '0', 10));
-        };
-
-        updateEndDateDisplay();
-
-        startInput.onchange = updateEndDateDisplay;
-        extInput.oninput = updateEndDateDisplay;
-
-        modal.style.display = 'flex';
-    };
-
-    // Keeps the modal implementation available without triggering TS6133 or no-void.
-    (globalThis as any)._openModal = openModal;
-
-    const closeModal = (): void => {
-        const modal = document.getElementById('appointmentPatientInfoModal');
-        if (modal) modal.style.display = 'none';
-        currentEditingCell = null;
-    };
-
-    const persistAllAppointments = async (): Promise<void> => {
-        const docRef = db.collection('appointments').doc('current');
-        const payload = compactAppointmentData();
-        await docRef.set(payload);
-    };
-
     const saveAppointment = async (time: string, station: StationKey, data: AppointmentCell | null): Promise<boolean> => {
         try {
-            /* Tymczasowo wyłączone sprawdzanie duplikatów
-            const conflictStation = data?.patientName ? findPatientConflictStation(time, station, data.patientName) : null;
-            if (conflictStation) {
-                window.showToast?.('Pacjent jest już wpisany w tym samym czasie na drugim stanowisku.', 3000);
-                if (window.setSaveStatus) window.setSaveStatus('error');
-                return false;
-            }
-            */
-
             if (!appointmentData[time]) appointmentData[time] = {};
             if (data) {
                 appointmentData[time][station] = data;
@@ -438,7 +332,25 @@ export const Appointments: AppointmentsAPI = (() => {
             updateUIContent();
 
             if ((globalThis as any).setSaveStatus) (globalThis as any).setSaveStatus('saving');
-            await persistAllAppointments();
+
+            const docRef = db.collection('appointments').doc('current');
+            const fieldPath = `${time}.${station}`;
+            try {
+                if (data) {
+                    await docRef.update({ [fieldPath]: data });
+                } else {
+                    await docRef.update({ [fieldPath]: (FieldValue as { delete(): unknown }).delete() });
+                }
+            } catch (err: unknown) {
+                const error = err as { code?: string; message?: string };
+                if (error?.code === 'not-found' || error?.message?.includes('No document to update') || error?.message?.includes('NOT_FOUND')) {
+                    if (data) {
+                        await docRef.set({ [time]: { [station]: data } }, { merge: true });
+                    }
+                } else {
+                    throw err;
+                }
+            }
 
             if ((globalThis as any).setSaveStatus) (globalThis as any).setSaveStatus('saved');
             return true;
@@ -446,43 +358,6 @@ export const Appointments: AppointmentsAPI = (() => {
             console.error('Error saving appointment:', err);
             if ((globalThis as any).setSaveStatus) (globalThis as any).setSaveStatus('error');
             return false;
-        }
-    };
-
-    const saveModalData = async (): Promise<void> => {
-        if (!APPOINTMENTS_FEATURES.patientInfoModal) return;
-
-        if (!currentEditingCell) return;
-
-        const { time, station } = currentEditingCell;
-        const nameInput = document.getElementById('modalPatientName') as HTMLInputElement;
-        const startInput = document.getElementById('appointmentStartDate') as HTMLInputElement;
-        const extInput = document.getElementById('appointmentExtensionDays') as HTMLInputElement;
-        const infoInput = document.getElementById('appointmentAdditionalInfo') as HTMLTextAreaElement;
-
-        const patientName = capitalizeFirstLetter(nameInput.value.trim());
-        const startDate = startInput.value;
-        const extensionDays = Number.parseInt(extInput.value || '0', 10);
-        const additionalInfo = infoInput.value.trim();
-        const endDate = calculateEndDate(startDate, extensionDays);
-
-        if (!patientName) {
-            await saveAppointment(time, station, null);
-            closeModal();
-            return;
-        }
-
-        const cellUpdate: AppointmentCell = {
-            patientName,
-            startDate,
-            extensionDays,
-            endDate,
-            additionalInfo
-        };
-
-        const didSave = await saveAppointment(time, station, cellUpdate);
-        if (didSave) {
-            closeModal();
         }
     };
 
@@ -580,18 +455,6 @@ export const Appointments: AppointmentsAPI = (() => {
             scheduleCellSave(time, station, updatedCell);
             void flushCellSave(time, station);
         }, { signal });
-
-        /* Czasowo wyłączone otwieranie modalu prawym przyciskiem
-        body.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            const target = (e.target as HTMLElement).closest('.cell-target') as HTMLElement | null;
-            if (!target) return;
-
-            const time = target.dataset.time || '';
-            const station = target.dataset.station as StationKey;
-            openModal(time, station);
-        }, { signal });
-        */
 
         const handleDeleteIconClick = (deleteIcon: Element): void => {
             const target = deleteIcon.closest<HTMLElement>('.cell-target');
@@ -696,17 +559,9 @@ export const Appointments: AppointmentsAPI = (() => {
 
             const destinationData = appointmentData[targetTime]?.[targetStation];
             if (destinationData?.patientName) {
-            if ((globalThis as any).showToast) (globalThis as any).showToast('To pole jest już zajęte. Najpierw je wyczyść.', 2500);
+                if ((globalThis as any).showToast) (globalThis as any).showToast('To pole jest już zajęte. Najpierw je wyczyść.', 2500);
                 return;
             }
-
-            /* Tymczasowo wyłączone sprawdzanie duplikatów przy dropie
-            const conflictStation = findPatientConflictStation(targetTime, targetStation, sourceData.patientName);
-            if (conflictStation) {
-                window.showToast?.('Pacjent jest już wpisany w tym samym czasie na drugim stanowisku.', 3000);
-                return;
-            }
-            */
 
             if (!appointmentData[targetTime]) appointmentData[targetTime] = {};
             if (!appointmentData[sourceTime]) appointmentData[sourceTime] = {};
@@ -726,7 +581,23 @@ export const Appointments: AppointmentsAPI = (() => {
 
             try {
                 if ((globalThis as any).setSaveStatus) (globalThis as any).setSaveStatus('saving');
-                await persistAllAppointments();
+                const docRef = db.collection('appointments').doc('current');
+                const updatePayload: Record<string, unknown> = {
+                    [`${targetTime}.${targetStation}`]: { ...sourceData },
+                };
+                if (!isCopying) {
+                    updatePayload[`${sourceTime}.${sourceStation}`] = (FieldValue as { delete(): unknown }).delete();
+                }
+                try {
+                    await docRef.update(updatePayload);
+                } catch (updateErr: unknown) {
+                    const error = updateErr as { code?: string; message?: string };
+                    if (error?.code === 'not-found' || error?.message?.includes('No document to update') || error?.message?.includes('NOT_FOUND')) {
+                        await docRef.set({ [targetTime]: { [targetStation]: { ...sourceData } } }, { merge: true });
+                    } else {
+                        throw updateErr;
+                    }
+                }
                 if ((globalThis as any).setSaveStatus) (globalThis as any).setSaveStatus('saved');
                 if ((globalThis as any).showToast) (globalThis as any).showToast(isCopying ? 'Skopiowano pacjenta' : 'Przeniesiono pacjenta');
             } catch (error) {
@@ -743,31 +614,13 @@ export const Appointments: AppointmentsAPI = (() => {
             draggedData = null;
         }, { signal });
 
-        const saveBtn = document.getElementById('savePatientInfoBtn');
-        const closeBtn = document.getElementById('closePatientInfoBtn');
-        const modal = document.getElementById('appointmentPatientInfoModal');
         const printBtn = document.getElementById('printAppointmentsBtn');
         const clearBtn = document.getElementById('clearAppointmentsBtn');
         const filterSelect = document.getElementById('appointmentsFilter') as HTMLSelectElement | null;
 
-        if (APPOINTMENTS_FEATURES.patientInfoModal) {
-            if (saveBtn) saveBtn.addEventListener('click', () => { void saveModalData(); }, { signal });
-            if (closeBtn) closeBtn.addEventListener('click', closeModal, { signal });
-
-            if (modal) {
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) closeModal();
-                }, { signal });
-            }
-        }
-
         if (printBtn) {
             printBtn.addEventListener('click', () => {
-                if (typeof (globalThis as any).printAppointmentsToPdf === 'function') {
-                    (globalThis as any).printAppointmentsToPdf(appointmentData);
-                } else {
-                    globalThis.print();
-                }
+                printAppointmentsToPdf(appointmentData);
             }, { signal });
         }
 

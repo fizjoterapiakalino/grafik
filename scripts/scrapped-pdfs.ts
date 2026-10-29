@@ -1,5 +1,6 @@
 // scripts/scrapped-pdfs.ts
-import { PdfService, PdfDocument } from './pdf-service.js';
+import { PdfService, type PdfDocument } from './pdf-service.js';
+import { escapeHTML, isSafeHttpUrl } from './utils.js';
 
 /**
  * Mapowanie typów dokumentów na klasy CSS
@@ -54,42 +55,20 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
 
     const createTableRow = (linkData: PdfDocument): HTMLTableRowElement => {
         const row = document.createElement('tr');
-
-        const dateCell = document.createElement('td');
-        dateCell.textContent = linkData.date || '';
-        row.appendChild(dateCell);
-
-        const typeCell = document.createElement('td');
-        const badge = document.createElement('span');
-        badge.className = 'doc-type-badge';
-
         const typeClass = getTypeClass(linkData.type);
-        if (typeClass) {
-            badge.classList.add(typeClass);
-        }
+        const badgeClass = typeClass ? `doc-type-badge ${typeClass}` : 'doc-type-badge';
+        const safeUrl = isSafeHttpUrl(linkData.url) ? linkData.url : '#';
 
-        badge.textContent = linkData.type || '';
-        typeCell.appendChild(badge);
-        row.appendChild(typeCell);
+        row.innerHTML = `
+            <td>${escapeHTML(linkData.date || '')}</td>
+            <td><span class="${badgeClass}">${escapeHTML(linkData.type || '')}</span></td>
+            <td><a href="${escapeHTML(safeUrl)}" class="pdf-link"><i class="fas fa-file-pdf"></i> ${escapeHTML(linkData.title)}</a></td>
+        `;
 
-        const linkCell = document.createElement('td');
-        const anchor = document.createElement('a');
-        anchor.href = linkData.url;
-        anchor.className = 'pdf-link';
-
-        anchor.addEventListener('click', (e: MouseEvent) => {
+        row.querySelector('a')?.addEventListener('click', (e: MouseEvent) => {
             e.preventDefault();
             openPdf(linkData.url, linkData.title);
         });
-
-        const icon = document.createElement('i');
-        icon.className = 'fas fa-file-pdf';
-        anchor.appendChild(icon);
-
-        anchor.appendChild(document.createTextNode(` ${linkData.title}`));
-
-        linkCell.appendChild(anchor);
-        row.appendChild(linkCell);
 
         return row;
     };
@@ -232,8 +211,8 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
         refreshBtn.addEventListener('click', handleRefresh);
     };
 
-    const handleGlobalSearch = (e: CustomEvent<{ searchTerm: string }>): void => {
-        const searchTerm = (e.detail.searchTerm || '').toLowerCase();
+    const handleGlobalSearch = (e: CustomEvent<{ searchTerm?: string }>): void => {
+        const searchTerm = (e?.detail?.searchTerm || '').toLowerCase();
 
         const filteredLinks = allLinksData.filter(
             (link) =>
@@ -245,47 +224,19 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
         displayLinks(filteredLinks);
     };
 
-    // Modal Functions
-    let pendingUrl: string | null = null;
-    let pendingTitle: string | null = null;
-    let isIsoAuthenticated = false;
-
     const closeModal = (): void => {
         const modal = document.getElementById('pdfModal');
         const iframe = document.getElementById('pdfIframe') as HTMLIFrameElement | null;
         if (modal) modal.style.display = 'none';
-        if (iframe) iframe.src = '';
-    };
-
-    const closeLoginModal = (): void => {
-        const loginModal = document.getElementById('isoLoginModal');
-        if (loginModal) {
-            loginModal.style.display = 'none';
-            const l = document.getElementById('isoLogin') as HTMLInputElement | null;
-            const p = document.getElementById('isoPassword') as HTMLInputElement | null;
-            if (l) l.value = '';
-            if (p) p.value = '';
-        }
-        pendingUrl = null;
-        pendingTitle = null;
-    };
-
-    const openPdf = (url: string, docTitle: string): void => {
-        if (isIsoAuthenticated) {
-            actualOpenPdf(url, docTitle);
-        } else {
-            pendingUrl = url;
-            pendingTitle = docTitle;
-            const loginModal = document.getElementById('isoLoginModal');
-            if (loginModal) {
-                loginModal.style.display = 'flex';
-            } else {
-                actualOpenPdf(url, docTitle);
-            }
-        }
+        if (iframe) iframe.removeAttribute('src');
     };
 
     const actualOpenPdf = (url: string, docTitle: string): void => {
+        if (!isSafeHttpUrl(url)) {
+            window.showToast?.('Zablokowano nieprawidłowy adres dokumentu.', 3000);
+            return;
+        }
+
         const modal = document.getElementById('pdfModal');
         const openNewTabBtn = document.getElementById('pdfOpenNewTabBtn') as HTMLAnchorElement | null;
         const iframe = document.getElementById('pdfIframe') as HTMLIFrameElement | null;
@@ -303,14 +254,22 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
         modal.style.display = 'flex';
     };
 
+    const openPdf = (url: string, docTitle: string): void => {
+        actualOpenPdf(url, docTitle);
+    };
+
+    const handleModalKeydown = (e: KeyboardEvent): void => {
+        const modal = document.getElementById('pdfModal');
+        if (e.key === 'Escape' && modal && modal.style.display === 'flex') {
+            closeModal();
+        }
+    };
+
     const initModal = (): void => {
         if (isModalInitialized) return;
 
         const modal = document.getElementById('pdfModal');
         const closeBtn = document.getElementById('pdfCloseBtn');
-        const loginModal = document.getElementById('isoLoginModal');
-        const loginConfirmBtn = document.getElementById('isoLoginConfirmBtn');
-        const loginCancelBtn = document.getElementById('isoLoginCancelBtn');
 
         if (!modal) return;
 
@@ -322,32 +281,7 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
             if (e.target === modal) closeModal();
         });
 
-        if (loginConfirmBtn) {
-            loginConfirmBtn.addEventListener('click', () => {
-                const urlToOpen = pendingUrl;
-                const titleToOpen = pendingTitle || '';
-                isIsoAuthenticated = true;
-                closeLoginModal();
-                if (urlToOpen) {
-                    actualOpenPdf(urlToOpen, titleToOpen);
-                }
-            });
-        }
-
-        if (loginCancelBtn) {
-            loginCancelBtn.addEventListener('click', closeLoginModal);
-        }
-
-        document.addEventListener('keydown', (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                if (modal.style.display === 'flex') {
-                    closeModal();
-                }
-                if (loginModal && loginModal.style.display === 'flex') {
-                    closeLoginModal();
-                }
-            }
-        });
+        document.addEventListener('keydown', handleModalKeydown);
 
         isModalInitialized = true;
     };
@@ -361,10 +295,9 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
 
     const destroy = (): void => {
         allLinksData = [];
-        pendingUrl = null;
-        pendingTitle = null;
-        isIsoAuthenticated = false;
+        closeModal();
         isModalInitialized = false;
+        document.removeEventListener('keydown', handleModalKeydown);
         document.removeEventListener('app:search', handleGlobalSearch as EventListener);
     };
 
@@ -375,12 +308,3 @@ export const ScrappedPdfs: ScrappedPdfsAPI = (() => {
         actualOpenPdf,
     };
 })();
-
-// Backward compatibility
-declare global {
-    interface Window {
-        ScrappedPdfs: ScrappedPdfsAPI;
-    }
-}
-
-window.ScrappedPdfs = ScrappedPdfs;
