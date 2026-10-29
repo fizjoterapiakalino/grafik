@@ -31,6 +31,12 @@ export const printLeavesTableToPdf = (options: LeavesPdfOptions): void => {
         return;
     }
 
+    const rows = Array.from(table.querySelectorAll('tbody tr'));
+    if (rows.length === 0) {
+        console.warn('LeavesPdf: Tabela urlopów jest pusta');
+        return;
+    }
+
     // Generuj nagłówki
     const headers = Array.from(table.querySelectorAll('thead th')).map((th, index) => {
         return {
@@ -118,12 +124,3 @@ export const printLeavesTableToPdf = (options: LeavesPdfOptions): void => {
 export const LeavesPdf = {
     print: printLeavesTableToPdf,
 };
-
-// Backward compatibility
-declare global {
-    interface Window {
-        LeavesPdf: typeof LeavesPdf;
-    }
-}
-
-window.LeavesPdf = LeavesPdf;

@@ -18,7 +18,6 @@ describe('ScrappedPdfs', () => {
     let container;
     let tableBody;
     let tableContainer;
-    let searchInput;
 
     beforeEach(() => {
         // Setup DOM
@@ -39,17 +38,10 @@ describe('ScrappedPdfs', () => {
                 <div id="pdfModalTitle"></div>
                 <iframe id="pdfIframe"></iframe>
             </div>
-            <div id="isoLoginModal" style="display: none;">
-                <input id="isoLogin">
-                <input id="isoPassword">
-                <button id="isoLoginConfirmBtn"></button>
-                <button id="isoLoginCancelBtn"></button>
-            </div>
         `;
         container = document.getElementById('pdf-links-container');
         tableBody = document.getElementById('pdf-table-body');
         tableContainer = document.getElementById('pdf-table-container');
-        searchInput = document.getElementById('pdfSearchInput');
 
         // Reset mocks
         jest.clearAllMocks();
@@ -172,7 +164,7 @@ describe('ScrappedPdfs', () => {
         expect(titleLink.textContent).toContain('<b>Bold</b>');
     });
 
-    test('should require ISO login and open pending PDF after confirmation', async () => {
+    test('should open PDF directly in modal', async () => {
         PdfService.fetchAndCachePdfLinks.mockResolvedValue([
             { date: '2023-10-25', type: 'ISO', title: 'Plan.pdf', url: 'http://example.com/doc.pdf' },
         ]);
@@ -180,13 +172,49 @@ describe('ScrappedPdfs', () => {
         await ScrappedPdfs.init();
 
         ScrappedPdfs.openPdf('http://example.com/doc.pdf', 'Plan.pdf');
-        expect(document.getElementById('isoLoginModal').style.display).toBe('flex');
-
-        document.getElementById('isoLoginConfirmBtn').click();
 
         expect(document.getElementById('pdfModal').style.display).toBe('flex');
         expect(document.getElementById('pdfOpenNewTabBtn').href).toBe('http://example.com/doc.pdf');
         expect(document.getElementById('pdfIframe').src).toContain('http://example.com/doc.pdf#navpanes=0&toolbar=0&view=Fit');
         expect(document.getElementById('pdfModalTitle').textContent).toBe('Plan.pdf');
+    });
+
+    test('should block unsafe URL javascript:alert(1) from opening in modal and show toast', async () => {
+        window.showToast = jest.fn();
+        await ScrappedPdfs.init();
+
+        ScrappedPdfs.openPdf('javascript:alert(1)', 'Danger.pdf');
+
+        expect(window.showToast).toHaveBeenCalledWith('Zablokowano nieprawidłowy adres dokumentu.', 3000);
+        expect(document.getElementById('pdfModal').style.display).not.toBe('flex');
+        expect(document.getElementById('pdfIframe').src).toBe('');
+    });
+
+    test('should render href="#" in table row when URL is unsafe', async () => {
+        PdfService.fetchAndCachePdfLinks.mockResolvedValue([
+            { date: '2023-10-25', type: 'ISO', title: 'Złośliwy link', url: 'javascript:alert(1)' },
+        ]);
+
+        await ScrappedPdfs.init();
+
+        const rowLink = tableBody.querySelector('a');
+        expect(rowLink.getAttribute('href')).toBe('#');
+    });
+
+    test('should clear iframe.src and close modal in destroy', async () => {
+        PdfService.fetchAndCachePdfLinks.mockResolvedValue([
+            { date: '2023-10-25', type: 'ISO', title: 'Plan.pdf', url: 'http://example.com/doc.pdf' },
+        ]);
+
+        await ScrappedPdfs.init();
+        ScrappedPdfs.openPdf('http://example.com/doc.pdf', 'Plan.pdf');
+
+        expect(document.getElementById('pdfModal').style.display).toBe('flex');
+        expect(document.getElementById('pdfIframe').src).toContain('http://example.com/doc.pdf');
+
+        ScrappedPdfs.destroy();
+
+        expect(document.getElementById('pdfModal').style.display).toBe('none');
+        expect(document.getElementById('pdfIframe').src).toBe('');
     });
 });

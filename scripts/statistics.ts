@@ -1,8 +1,9 @@
 // scripts/statistics.ts
 import { debugLog } from './common.js';
 import { db as dbRaw } from './firebase-config.js';
-import { AppConfig } from './common.js';
+import { AppConfig, months } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
+import { escapeHTML } from './utils.js';
 import {
     calculateScheduleMetrics,
     calculateWeeklyAverages,
@@ -10,7 +11,9 @@ import {
     createDailyWorkloadSnapshot,
     calculatePeriodWorkloadAverages,
     getActiveEmployeeIds,
+    getDateDiffInDays,
     getIsoWeekInfo,
+    normalizeLeavesData,
     type ScheduleMetrics,
     type WeeklyStatsSnapshot,
     type DailyWorkloadSnapshot,
@@ -113,23 +116,70 @@ export const Statistics: StatisticsAPI = (() => {
     // DOM Elements
     let yearSelect: HTMLSelectElement | null = null;
 
-    const normalizeLeavesData = (rawData: unknown): Record<string, LeaveEntry[]> => {
-        if (!rawData || typeof rawData !== 'object') return {};
+    const setElementsText = (updates: Record<string, string | number>): void => {
+        Object.entries(updates).forEach(([id, value]) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = String(value);
+        });
+    };
 
-        const normalized: Record<string, LeaveEntry[]> = {};
-        Object.entries(rawData as Record<string, unknown>).forEach(([employeeName, value]) => {
-            if (!Array.isArray(value)) return;
+    interface ChartConfig {
+        type: string;
+        data: any;
+        options?: any;
+    }
 
-            const leaves = value.filter((leave): leave is LeaveEntry => {
-                if (!leave || typeof leave !== 'object') return false;
-                const candidate = leave as Partial<LeaveEntry>;
-                return typeof candidate.startDate === 'string' && typeof candidate.endDate === 'string';
-            });
+    const renderChart = (
+        canvasId: string,
+        config: ChartConfig,
+        existingInstance?: ChartInstance | null
+    ): ChartInstance | null => {
+        const canvas = document.getElementById(canvasId) as HTMLCanvasElement | null;
+        if (!canvas) return null;
 
-            normalized[employeeName] = leaves;
+        if (existingInstance) {
+            existingInstance.destroy();
+            const index = chartInstances.indexOf(existingInstance);
+            if (index !== -1) chartInstances.splice(index, 1);
+        }
+
+        const isCircular = config.type === 'pie' || config.type === 'doughnut';
+        const defaultScales = isCircular
+            ? undefined
+            : {
+                x: { grid: { display: false } },
+                y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+            };
+
+        const finalOptions: any = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                ...config.options?.plugins,
+            },
+            ...(isCircular
+                ? {}
+                : {
+                    scales: {
+                        ...defaultScales,
+                        ...config.options?.scales,
+                    },
+                }),
+            ...config.options,
+        };
+        if (isCircular) {
+            delete finalOptions.scales;
+        }
+
+        const chart = new Chart(canvas.getContext('2d')!, {
+            type: config.type,
+            data: config.data,
+            options: finalOptions,
         });
 
-        return normalized;
+        chartInstances.push(chart);
+        return chart;
     };
 
     /**
@@ -422,18 +472,6 @@ export const Statistics: StatisticsAPI = (() => {
         } catch (error) {
             console.warn('Unable to load from statsDaily collection:', error);
         }
-
-        try {
-            weeklyStatsData.forEach((w: any) => {
-                if (w.dailySnapshots && typeof w.dailySnapshots === 'object') {
-                    Object.entries(w.dailySnapshots).forEach(([date, snap]: [string, any]) => {
-                        if (snap && snap.version === 2 && !dailySnapshotsData[date]) {
-                            dailySnapshotsData[date] = snap as DailyWorkloadSnapshot;
-                        }
-                    });
-                }
-            });
-        } catch {}
     };
 
     const syncWorkloadSnapshots = async (): Promise<void> => {
@@ -467,17 +505,6 @@ export const Statistics: StatisticsAPI = (() => {
         } catch (err) {
             console.warn('Unable to persist daily snapshot to Firestore statsDaily:', err);
         }
-
-        try {
-            const weekInfo = getIsoWeekInfo(now);
-            if (todaySnap.isWorkday) {
-                await db.collection(WEEKLY_STATS_COLLECTION)
-                    .doc(weekInfo.weekKey)
-                    .set({
-                        [`dailySnapshots.${todayIso}`]: todaySnap,
-                    } as any, { merge: true });
-            }
-        } catch {}
     };
 
     const updateWorkloadSelectors = (): void => {
@@ -540,13 +567,9 @@ export const Statistics: StatisticsAPI = (() => {
         if (!select) return;
 
         const currentMonthNum = new Date().getUTCMonth() + 1;
-        const monthNames = [
-            'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
-            'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
-        ];
 
         select.innerHTML = '';
-        monthNames.forEach((name, index) => {
+        months.forEach((name, index) => {
             const monthNum = index + 1;
             const option = document.createElement('option');
             option.value = String(monthNum);
@@ -623,13 +646,6 @@ export const Statistics: StatisticsAPI = (() => {
     const getCurrentScheduleMetrics = (): ScheduleMetrics => {
         const employees = EmployeeManager.getAll();
         return calculateScheduleMetrics(scheduleData?.scheduleCells, getActiveEmployeeIds(employees));
-    };
-
-    const getDateDiffInDays = (dateIso: string): number => {
-        const target = new Date(`${dateIso}T12:00:00Z`);
-        const now = new Date();
-        const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12));
-        return Math.round((target.getTime() - today.getTime()) / 86400000);
     };
 
     const normalizePatientName = (patientName: string): string => patientName.trim().toLocaleLowerCase('pl-PL');
@@ -857,31 +873,16 @@ export const Statistics: StatisticsAPI = (() => {
         const employees = EmployeeManager.getAll();
         const activeEmployees = Object.values(employees).filter(e => !e.isHidden);
 
-        // Total employees
-        const totalEmployeesEl = document.getElementById('totalEmployeesValue');
-        if (totalEmployeesEl) {
-            totalEmployeesEl.textContent = String(activeEmployees.length);
-        }
-
-        // Total patients today
-        const totalPatientsEl = document.getElementById('totalPatientsValue');
-        if (totalPatientsEl) {
-            totalPatientsEl.textContent = String(getCurrentScheduleMetrics().totalSlots);
-        }
-
-        // On leave today
-        const onLeaveEl = document.getElementById('onLeaveValue');
-        if (onLeaveEl) {
-            onLeaveEl.textContent = String(countOnLeaveToday());
-        }
-
         // Total leave days this year
         const leaveStats = calculateLeaveStatsByType();
         const totalLeaveDays = Object.values(leaveStats).reduce((a, b) => a + b, 0);
-        const totalLeaveDaysEl = document.getElementById('totalLeaveDaysValue');
-        if (totalLeaveDaysEl) {
-            totalLeaveDaysEl.textContent = String(totalLeaveDays);
-        }
+
+        setElementsText({
+            totalEmployeesValue: activeEmployees.length,
+            totalPatientsValue: getCurrentScheduleMetrics().totalSlots,
+            onLeaveValue: countOnLeaveToday(),
+            totalLeaveDaysValue: totalLeaveDays,
+        });
     };
 
     /**
@@ -890,18 +891,12 @@ export const Statistics: StatisticsAPI = (() => {
     const updateLeavesStats = (): void => {
         const leaveStats = calculateLeaveStatsByType();
 
-        // Update cards
-        const vacationEl = document.getElementById('vacationDaysValue');
-        if (vacationEl) vacationEl.textContent = String(leaveStats['vacation'] || 0);
-
-        const childCareEl = document.getElementById('childCareDaysValue');
-        if (childCareEl) childCareEl.textContent = String(leaveStats['child_care_art_188'] || 0);
-
-        const sickChildEl = document.getElementById('sickChildCareDaysValue');
-        if (sickChildEl) sickChildEl.textContent = String(leaveStats['sick_child_care'] || 0);
-
-        const familyCareEl = document.getElementById('familyCareDaysValue');
-        if (familyCareEl) familyCareEl.textContent = String(leaveStats['family_member_care'] || 0);
+        setElementsText({
+            vacationDaysValue: leaveStats['vacation'] || 0,
+            childCareDaysValue: leaveStats['child_care_art_188'] || 0,
+            sickChildCareDaysValue: leaveStats['sick_child_care'] || 0,
+            familyCareDaysValue: leaveStats['family_member_care'] || 0,
+        });
 
         // Update detailed table
         updateLeavesDetailsTable();
@@ -948,8 +943,8 @@ export const Statistics: StatisticsAPI = (() => {
             row.innerHTML = `
                 <td>
                     <div class="employee-name-cell">
-                        <span class="employee-color-dot" style="background-color: ${employee.color}"></span>
-                        ${employeeName}
+                        <span class="employee-color-dot" style="background-color: ${escapeHTML(employee.color)}"></span>
+                        ${escapeHTML(employeeName)}
                     </div>
                 </td>
                 <td>${daysByType['vacation']}</td>
@@ -997,19 +992,11 @@ export const Statistics: StatisticsAPI = (() => {
 
         const metrics = getCurrentScheduleMetrics();
 
-        const uniquePatientsEl = document.getElementById('uniquePatientsValue');
-        if (uniquePatientsEl) uniquePatientsEl.textContent = String(metrics.uniquePatients);
-
-        const totalSlotsEl = document.getElementById('totalSlotsValue');
-        if (totalSlotsEl) totalSlotsEl.textContent = String(metrics.totalSlots);
-
-        const breaksEl = document.getElementById('breaksValue');
-        if (breaksEl) breaksEl.textContent = String(metrics.breaks);
-
-        const treatmentTypesEl = document.getElementById('treatmentTypesValue');
-        if (treatmentTypesEl) treatmentTypesEl.textContent = String(metrics.massageOrPnf);
-
-        const operationalValues: Record<string, number> = {
+        setElementsText({
+            uniquePatientsValue: metrics.uniquePatients,
+            totalSlotsValue: metrics.totalSlots,
+            breaksValue: metrics.breaks,
+            treatmentTypesValue: metrics.massageOrPnf,
             overdueTreatmentsValue: metrics.overdue,
             endingTodayValue: metrics.endingToday,
             endingSoonValue: metrics.endingSoon,
@@ -1018,11 +1005,7 @@ export const Statistics: StatisticsAPI = (() => {
             duplicatePatientsValue: metrics.duplicatePatientEntries,
             handoverMorningValue: metrics.handoverMorning,
             handoverAfternoonValue: metrics.handoverAfternoon,
-            dataQualityScoreValue: metrics.dataQualityScore,
-        };
-        Object.entries(operationalValues).forEach(([id, value]) => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = id === 'dataQualityScoreValue' ? `${value}%` : String(value);
+            dataQualityScoreValue: `${metrics.dataQualityScore}%`,
         });
 
         updateTreatmentAlertsTable(getTreatmentAlerts());
@@ -1046,12 +1029,12 @@ export const Statistics: StatisticsAPI = (() => {
         alerts.forEach(alert => {
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td><span class="status-badge ${alert.priority <= 2 ? 'on-leave' : alert.priority === 3 ? 'hidden' : 'active'}">${alert.priorityLabel}</span></td>
-                <td>${alert.patientName}</td>
-                <td>${alert.employeeName}</td>
-                <td>${alert.time}</td>
-                <td>${alert.reason}</td>
-                <td>${alert.endDate}</td>
+                <td><span class="status-badge ${alert.priority <= 2 ? 'on-leave' : alert.priority === 3 ? 'hidden' : 'active'}">${escapeHTML(alert.priorityLabel)}</span></td>
+                <td>${escapeHTML(alert.patientName)}</td>
+                <td>${escapeHTML(alert.employeeName)}</td>
+                <td>${escapeHTML(alert.time)}</td>
+                <td>${escapeHTML(alert.reason)}</td>
+                <td>${escapeHTML(alert.endDate)}</td>
             `;
             tbody.appendChild(row);
         });
@@ -1060,21 +1043,14 @@ export const Statistics: StatisticsAPI = (() => {
     const updateWeeklyAverageStats = (): void => {
         const weeklyAverages = calculateWeeklyAverages(weeklyStatsData);
 
-        const weeklyAverageSlotsEl = document.getElementById('weeklyAverageSlotsValue');
-        if (weeklyAverageSlotsEl) weeklyAverageSlotsEl.textContent = String(weeklyAverages.averageTotalSlots);
-
-        const weeklyAveragePerEmployeeEl = document.getElementById('weeklyAveragePerEmployeeValue');
-        if (weeklyAveragePerEmployeeEl) weeklyAveragePerEmployeeEl.textContent = String(weeklyAverages.averagePatientsPerAvailableEmployee);
-
-        const weeklyAvailabilityEl = document.getElementById('weeklyAvailabilityValue');
-        if (weeklyAvailabilityEl) weeklyAvailabilityEl.textContent = String(weeklyAverages.averageAvailableEmployees);
-
-        const weeklyTrendEl = document.getElementById('weeklyTrendValue');
-        if (weeklyTrendEl) {
-            weeklyTrendEl.textContent = weeklyAverages.trendPercent === null
+        setElementsText({
+            weeklyAverageSlotsValue: weeklyAverages.averageTotalSlots,
+            weeklyAveragePerEmployeeValue: weeklyAverages.averagePatientsPerAvailableEmployee,
+            weeklyAvailabilityValue: weeklyAverages.averageAvailableEmployees,
+            weeklyTrendValue: weeklyAverages.trendPercent === null
                 ? '-'
-                : `${weeklyAverages.trendPercent > 0 ? '+' : ''}${weeklyAverages.trendPercent}%`;
-        }
+                : `${weeklyAverages.trendPercent > 0 ? '+' : ''}${weeklyAverages.trendPercent}%`,
+        });
 
         const rangeEl = document.getElementById('weeklyStatsRange');
         if (rangeEl) {
@@ -1168,8 +1144,8 @@ export const Statistics: StatisticsAPI = (() => {
             row.innerHTML = `
                 <td>
                     <div class="employee-name-cell">
-                        <span class="employee-color-dot" style="background-color: ${emp.color}"></span>
-                        <strong>${emp.employeeName}</strong>
+                        <span class="employee-color-dot" style="background-color: ${escapeHTML(emp.color)}"></span>
+                        <strong>${escapeHTML(emp.employeeName)}</strong>
                     </div>
                 </td>
                 <td>${getShiftBadgeHtml(emp.shiftGroup)}</td>
@@ -1236,33 +1212,20 @@ export const Statistics: StatisticsAPI = (() => {
             : null;
 
         // Karty wskaźników KPI
-        const avgDailyEl = document.getElementById('workloadAvgDailyValue');
-        if (avgDailyEl) {
-            avgDailyEl.textContent = selectedEmployee
+        setElementsText({
+            workloadAvgDailyValue: selectedEmployee
                 ? String(selectedEmployee.averagePatientsPerPresentDay)
-                : String(averages.averageDailyPerPresentEmployee);
-        }
-
-        const avgWeeklyEl = document.getElementById('workloadAvgWeeklyValue');
-        if (avgWeeklyEl) {
-            avgWeeklyEl.textContent = selectedEmployee
+                : String(averages.averageDailyPerPresentEmployee),
+            workloadAvgWeeklyValue: selectedEmployee
                 ? String(selectedEmployee.averagePatientsPerWeek)
-                : String(averages.averageWeeklyPerEmployee);
-        }
-
-        const occupancyEl = document.getElementById('workloadOccupancyValue');
-        if (occupancyEl) {
-            occupancyEl.textContent = selectedEmployee
+                : String(averages.averageWeeklyPerEmployee),
+            workloadOccupancyValue: selectedEmployee
                 ? `${selectedEmployee.occupancyPercent}%`
-                : `${averages.averageOccupancyPercent}%`;
-        }
-
-        const totalPatientsEl = document.getElementById('workloadTotalPatientsValue');
-        if (totalPatientsEl) {
-            totalPatientsEl.textContent = selectedEmployee
+                : `${averages.averageOccupancyPercent}%`,
+            workloadTotalPatientsValue: selectedEmployee
                 ? String(selectedEmployee.totalPatients)
-                : String(averages.totalPatientCount);
-        }
+                : String(averages.totalPatientCount),
+        });
 
         // Podtytuł okresu
         const subtitleEl = document.getElementById('workloadPeriodSubtitle');
@@ -1333,41 +1296,31 @@ export const Statistics: StatisticsAPI = (() => {
             }
         }
 
-        const chart = new Chart(ctx.getContext('2d')!, {
-            type: 'bar',
-            data: {
-                labels,
-                datasets: [{
-                    label: 'Śr. pacjentów / dzień obecności',
-                    data,
-                    backgroundColor: backgroundColors,
-                    borderColor: borderColors,
-                    borderWidth: 1,
-                    borderRadius: 6,
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                indexAxis: currentWorkloadEmployeeId === 'all' ? 'y' : 'x',
-                plugins: {
-                    legend: { display: false }
+        workloadEmployeeChartInstance = renderChart(
+            'workloadByEmployeeChart',
+            {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Śr. pacjentów / dzień obecności',
+                        data,
+                        backgroundColor: backgroundColors,
+                        borderColor: borderColors,
+                        borderWidth: 1,
+                        borderRadius: 6,
+                    }]
                 },
-                scales: {
-                    x: {
-                        beginAtZero: true,
-                        grid: { color: '#f1f5f9' }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        grid: { display: false }
+                options: {
+                    indexAxis: currentWorkloadEmployeeId === 'all' ? 'y' : 'x',
+                    scales: {
+                        x: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                        y: { beginAtZero: true, grid: { display: false } },
                     }
                 }
-            }
-        });
-
-        workloadEmployeeChartInstance = chart;
-        chartInstances.push(chart);
+            },
+            workloadEmployeeChartInstance
+        );
     };
 
     /**
@@ -1490,46 +1443,36 @@ export const Statistics: StatisticsAPI = (() => {
                 : 'Śr. pacjentów / dzień obecności';
         }
 
-        const chart = new Chart(ctx.getContext('2d')!, {
-            type: currentWorkloadPeriod === 'yearly' ? 'line' : 'bar',
-            data: {
-                labels,
-                datasets: [{
-                    label: chartLabel,
-                    data: datasetValues,
-                    backgroundColor: currentWorkloadPeriod === 'yearly'
-                        ? 'rgba(16, 185, 129, 0.15)'
-                        : 'rgba(59, 130, 246, 0.65)',
-                    borderColor: currentWorkloadPeriod === 'yearly' ? '#10b981' : '#3b82f6',
-                    borderWidth: 2,
-                    borderRadius: currentWorkloadPeriod === 'yearly' ? 0 : 6,
-                    tension: currentWorkloadPeriod === 'yearly' ? 0.3 : 0,
-                    fill: currentWorkloadPeriod === 'yearly',
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                        labels: { font: { size: 11 }, usePointStyle: true }
-                    }
+        workloadTrendChartInstance = renderChart(
+            'workloadTrendChart',
+            {
+                type: currentWorkloadPeriod === 'yearly' ? 'line' : 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: chartLabel,
+                        data: datasetValues,
+                        backgroundColor: currentWorkloadPeriod === 'yearly'
+                            ? 'rgba(16, 185, 129, 0.15)'
+                            : 'rgba(59, 130, 246, 0.65)',
+                        borderColor: currentWorkloadPeriod === 'yearly' ? '#10b981' : '#3b82f6',
+                        borderWidth: 2,
+                        borderRadius: currentWorkloadPeriod === 'yearly' ? 0 : 6,
+                        tension: currentWorkloadPeriod === 'yearly' ? 0.3 : 0,
+                        fill: currentWorkloadPeriod === 'yearly',
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: '#f1f5f9' }
-                    },
-                    x: {
-                        grid: { display: false }
+                options: {
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { font: { size: 11 }, usePointStyle: true }
+                        }
                     }
                 }
-            }
-        });
-
-        workloadTrendChartInstance = chart;
-        chartInstances.push(chart);
+            },
+            workloadTrendChartInstance
+        );
     };
 
     /**
@@ -1544,17 +1487,12 @@ export const Statistics: StatisticsAPI = (() => {
         const firstShift = allEmployees.filter(e => e.shiftGroup === 'first');
         const secondShift = allEmployees.filter(e => e.shiftGroup === 'second');
 
-        const activeEl = document.getElementById('activeEmployeesValue');
-        if (activeEl) activeEl.textContent = String(active.length);
-
-        const hiddenEl = document.getElementById('hiddenEmployeesValue');
-        if (hiddenEl) hiddenEl.textContent = String(hidden.length);
-
-        const firstShiftEl = document.getElementById('firstShiftValue');
-        if (firstShiftEl) firstShiftEl.textContent = String(firstShift.length);
-
-        const secondShiftEl = document.getElementById('secondShiftValue');
-        if (secondShiftEl) secondShiftEl.textContent = String(secondShift.length);
+        setElementsText({
+            activeEmployeesValue: active.length,
+            hiddenEmployeesValue: hidden.length,
+            firstShiftValue: firstShift.length,
+            secondShiftValue: secondShift.length,
+        });
 
         // Update employees table
         updateEmployeesTable();
@@ -1617,8 +1555,8 @@ export const Statistics: StatisticsAPI = (() => {
             row.innerHTML = `
                 <td>
                     <div class="employee-name-cell">
-                        <span class="employee-color-dot" style="background-color: ${employee.color}"></span>
-                        ${employeeName}
+                        <span class="employee-color-dot" style="background-color: ${escapeHTML(employee.color)}"></span>
+                        ${escapeHTML(employeeName)}
                     </div>
                 </td>
                 <td>${shiftBadge}</td>
@@ -1680,7 +1618,7 @@ export const Statistics: StatisticsAPI = (() => {
         const data = Object.values(leaveStats);
         const colors = Object.keys(leaveStats).map(type => LEAVE_TYPES[type]?.color || '#94a3b8');
 
-        const chart = new Chart(ctx.getContext('2d')!, {
+        renderChart('leaveTypesChart', {
             type: 'doughnut',
             data: {
                 labels,
@@ -1692,8 +1630,6 @@ export const Statistics: StatisticsAPI = (() => {
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
                 plugins: {
                     legend: {
                         position: 'right',
@@ -1706,7 +1642,6 @@ export const Statistics: StatisticsAPI = (() => {
                 }
             }
         });
-        chartInstances.push(chart);
     };
 
     /**
@@ -1719,7 +1654,7 @@ export const Statistics: StatisticsAPI = (() => {
         const monthlyData = calculateMonthlyLeaves();
         const months = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'];
 
-        const chart = new Chart(ctx.getContext('2d')!, {
+        renderChart('monthlyLeavesChart', {
             type: 'bar',
             data: {
                 labels: months,
@@ -1731,25 +1666,8 @@ export const Statistics: StatisticsAPI = (() => {
                     borderWidth: 1,
                     borderRadius: 6,
                 }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: '#f1f5f9' }
-                    },
-                    x: {
-                        grid: { display: false }
-                    }
-                }
             }
         });
-        chartInstances.push(chart);
     };
 
     /**
@@ -1766,7 +1684,7 @@ export const Statistics: StatisticsAPI = (() => {
         const data = employeeIds.map(id => metrics.byEmployee[id] || 0);
         const colors = employeeIds.map(id => employees[id].color || '#94a3b8');
 
-        const chart = new Chart(ctx.getContext('2d')!, {
+        renderChart('employeeWorkloadChart', {
             type: 'bar',
             data: {
                 labels,
@@ -1780,24 +1698,13 @@ export const Statistics: StatisticsAPI = (() => {
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
                 indexAxis: 'y',
-                plugins: {
-                    legend: { display: false }
-                },
                 scales: {
-                    x: {
-                        beginAtZero: true,
-                        grid: { color: '#f1f5f9' }
-                    },
-                    y: {
-                        grid: { display: false }
-                    }
+                    x: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                    y: { grid: { display: false } }
                 }
             }
         });
-        chartInstances.push(chart);
     };
 
     /**
@@ -1822,7 +1729,7 @@ export const Statistics: StatisticsAPI = (() => {
         });
         const colors = labels.map((_, index) => CHART_COLOR_PALETTE[index % CHART_COLOR_PALETTE.length]);
 
-        const chart = new Chart(ctx.getContext('2d')!, {
+        renderChart('patientsByEmployeeChart', {
             type: 'pie',
             data: {
                 labels,
@@ -1834,8 +1741,6 @@ export const Statistics: StatisticsAPI = (() => {
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
                 plugins: {
                     legend: {
                         position: 'right',
@@ -1848,7 +1753,6 @@ export const Statistics: StatisticsAPI = (() => {
                 }
             }
         });
-        chartInstances.push(chart);
     };
 
     /**
@@ -1870,7 +1774,7 @@ export const Statistics: StatisticsAPI = (() => {
         const labels = sortedTimes;
         const data = sortedTimes.map(t => patientsByTime[t]);
 
-        const chart = new Chart(ctx.getContext('2d')!, {
+        renderChart('patientsByTimeChart', {
             type: 'bar',
             data: {
                 labels,
@@ -1882,25 +1786,8 @@ export const Statistics: StatisticsAPI = (() => {
                     borderWidth: 1,
                     borderRadius: 6,
                 }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: '#f1f5f9' }
-                    },
-                    x: {
-                        grid: { display: false }
-                    }
-                }
             }
         });
-        chartInstances.push(chart);
     };
 
     /**
@@ -1913,7 +1800,7 @@ export const Statistics: StatisticsAPI = (() => {
         const weeklyAverages = calculateWeeklyAverages(weeklyStatsData);
         const weeks = weeklyAverages.weeks;
 
-        const chart = new Chart(ctx.getContext('2d')!, {
+        renderChart('weeklyTrendChart', {
             type: 'bar',
             data: {
                 labels: weeks.map(week => week.weekKey),
@@ -1938,7 +1825,7 @@ export const Statistics: StatisticsAPI = (() => {
                     },
                     {
                         type: 'line',
-                        label: 'Dost\u0119pni pracownicy \u015br.',
+                        label: 'Dostępni pracownicy śr.',
                         data: weeks.map(week => week.averageAvailableEmployees),
                         borderColor: '#10b981',
                         backgroundColor: 'rgba(16, 185, 129, 0.12)',
@@ -1948,8 +1835,6 @@ export const Statistics: StatisticsAPI = (() => {
                 ]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
                 plugins: {
                     legend: {
                         position: 'top',
@@ -1975,7 +1860,6 @@ export const Statistics: StatisticsAPI = (() => {
                 }
             }
         });
-        chartInstances.push(chart);
     };
 
     return {
@@ -1983,12 +1867,3 @@ export const Statistics: StatisticsAPI = (() => {
         destroy,
     };
 })();
-
-// Backward compatibility
-declare global {
-    interface Window {
-        Statistics: StatisticsAPI;
-    }
-}
-
-window.Statistics = Statistics;

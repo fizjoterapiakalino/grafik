@@ -6,6 +6,7 @@ const mockUnsubscribe = jest.fn();
 const mockDocRef = {
     onSnapshot: jest.fn(),
     set: jest.fn(),
+    update: jest.fn(),
     get: jest.fn(),
 };
 
@@ -15,14 +16,26 @@ jest.mock('../scripts/firebase-config.js', () => ({
             doc: jest.fn(() => mockDocRef),
         })),
     },
+    FieldValue: {
+        delete: jest.fn(() => '__DELETE__'),
+    },
 }));
 
 import { db } from '../scripts/firebase-config.js';
 import { ScheduleData } from '../scripts/schedule-data.js';
 
 describe('ScheduleData', () => {
+    let snapshotCallback = null;
     const emitSnapshot = (scheduleCells = {}) => {
+        if (snapshotCallback) {
+            snapshotCallback({
+                exists: true,
+                data: () => ({ scheduleCells }),
+            });
+            return mockUnsubscribe;
+        }
         mockDocRef.onSnapshot.mockImplementation((onNext) => {
+            snapshotCallback = onNext;
             onNext({
                 exists: true,
                 data: () => ({ scheduleCells }),
@@ -36,10 +49,15 @@ describe('ScheduleData', () => {
     let lastSavedPayload = null;
     beforeEach(() => {
         jest.clearAllMocks();
+        snapshotCallback = null;
         window.setSaveStatus = jest.fn();
         window.showToast = jest.fn();
         lastSavedPayload = null;
         mockDocRef.set.mockImplementation((payload) => {
+            lastSavedPayload = payload;
+            return Promise.resolve();
+        });
+        mockDocRef.update.mockImplementation((payload) => {
             lastSavedPayload = payload;
             return Promise.resolve();
         });
@@ -71,7 +89,7 @@ describe('ScheduleData', () => {
         expect(onChange).toHaveBeenCalledTimes(1);
     });
 
-    test('updateCellState stores sanitized data, history and save status', async () => {
+    test('updateCellState stores sanitized data, history and save status via atomic update', async () => {
         const onChange = jest.fn();
         emitSnapshot({
             '8:00': {
@@ -100,10 +118,15 @@ describe('ScheduleData', () => {
         expect(onChange).toHaveBeenCalledTimes(1);
         expect(window.setSaveStatus).toHaveBeenCalledWith('saving');
         expect(window.setSaveStatus).toHaveBeenCalledWith('saved');
-        expect(mockDocRef.set).toHaveBeenCalledWith(expect.objectContaining(ScheduleData.getAppState()), { merge: true });
+        expect(mockDocRef.update).toHaveBeenCalledWith(expect.objectContaining({
+            'scheduleCells.8:00.0': expect.objectContaining({
+                content: 'Nowy pacjent',
+                isEveryOtherDay: true,
+            }),
+        }));
     });
 
-    test('updateMultipleCells applies a single batch of cell updates', async () => {
+    test('updateMultipleCells applies a single batch of cell updates via atomic update', async () => {
         const onChange = jest.fn();
 
         ScheduleData.init(onChange, null);
@@ -135,7 +158,11 @@ describe('ScheduleData', () => {
             isPnf: true,
         });
         expect(onChange).toHaveBeenCalledTimes(1);
-        expect(mockDocRef.set).toHaveBeenCalledTimes(1);
+        expect(mockDocRef.update).toHaveBeenCalledTimes(1);
+        expect(mockDocRef.update).toHaveBeenCalledWith(expect.objectContaining({
+            'scheduleCells.8:00.0': expect.objectContaining({ content: 'Pacjent 1' }),
+            'scheduleCells.8:30.1': expect.objectContaining({ content: 'Pacjent 2', isPnf: true }),
+        }));
     });
 
     test('undo restores previous state and triggers save', async () => {
@@ -158,7 +185,57 @@ describe('ScheduleData', () => {
         await flushPromises();
 
         expect(ScheduleData.getCellState('8:00', '0').content).toBe('Przed zmianą');
-        expect(mockDocRef.set).toHaveBeenCalledTimes(2);
+        expect(mockDocRef.update).toHaveBeenCalledTimes(2);
+    });
+
+    test('multi-user concurrency: editing 8:00/0 sends atomic update without overwriting remote 8:30/1, and undo preserves remote 8:30/1', async () => {
+        const onChange = jest.fn();
+        emitSnapshot({
+            '8:00': {
+                0: { content: 'Pacjent Początkowy' },
+            },
+        });
+
+        ScheduleData.init(onChange, null);
+        ScheduleData.listenForScheduleChanges();
+        onChange.mockClear();
+        mockDocRef.update.mockClear();
+
+        // 1) User edits cell 8:00 / 0
+        ScheduleData.updateCellState('8:00', '0', (state) => {
+            state.content = 'Lokalna Zmiana';
+        });
+        await flushPromises();
+
+        expect(mockDocRef.update).toHaveBeenCalledTimes(1);
+        const firstUpdateCall = mockDocRef.update.mock.calls[0][0];
+        expect(firstUpdateCall['scheduleCells.8:00.0']).toEqual(expect.objectContaining({ content: 'Lokalna Zmiana' }));
+        expect(firstUpdateCall['scheduleCells.8:30.1']).toBeUndefined();
+
+        // 2) Remote snapshot arrives concurrently with another therapist's edit at 8:30 / 1
+        emitSnapshot({
+            '8:00': {
+                0: { content: 'Lokalna Zmiana' },
+            },
+            '8:30': {
+                1: { content: 'Zdalny Pacjent Innego Fizjoterapeuty' },
+            },
+        });
+
+        expect(ScheduleData.getCellState('8:30', '1')).toEqual({ content: 'Zdalny Pacjent Innego Fizjoterapeuty' });
+        mockDocRef.update.mockClear();
+
+        // 3) User hits Undo: only 8:00 / 0 is restored, and remote 8:30 / 1 remains intact
+        ScheduleData.undo();
+        await flushPromises();
+
+        expect(ScheduleData.getCellState('8:00', '0')).toEqual(expect.objectContaining({ content: 'Pacjent Początkowy' }));
+        expect(ScheduleData.getCellState('8:30', '1')).toEqual({ content: 'Zdalny Pacjent Innego Fizjoterapeuty' });
+
+        expect(mockDocRef.update).toHaveBeenCalledTimes(1);
+        const secondUpdateCall = mockDocRef.update.mock.calls[0][0];
+        expect(secondUpdateCall['scheduleCells.8:00.0']).toEqual(expect.objectContaining({ content: 'Pacjent Początkowy' }));
+        expect(secondUpdateCall['scheduleCells.8:30.1']).toBeUndefined();
     });
 
     test('destroy unsubscribes active schedule listener', () => {

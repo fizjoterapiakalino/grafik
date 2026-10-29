@@ -136,7 +136,7 @@ describe('schedule-helpers', () => {
 
     describe('copyFlags', () => {
         test('copies flags from normal to normal cell', () => {
-            const source = { isMassage: true, isPnf: false, isEveryOtherDay: true };
+            const source = { isMassage: true, isPnf: false, isEveryOtherDay: true, isHydrotherapy: true };
             const target = {};
 
             copyFlags(source, target, null, null);
@@ -144,10 +144,11 @@ describe('schedule-helpers', () => {
             expect(target.isMassage).toBe(true);
             expect(target.isPnf).toBe(false);
             expect(target.isEveryOtherDay).toBe(true);
+            expect(target.isHydrotherapy).toBe(true);
         });
 
         test('copies flags from split part to normal', () => {
-            const source = { isMassage1: true, isPnf1: false, isEveryOtherDay1: true };
+            const source = { isMassage1: true, isPnf1: false, isEveryOtherDay1: true, isHydrotherapy1: true };
             const target = {};
 
             copyFlags(source, target, 1, null);
@@ -155,16 +156,18 @@ describe('schedule-helpers', () => {
             expect(target.isMassage).toBe(true);
             expect(target.isPnf).toBe(false);
             expect(target.isEveryOtherDay).toBe(true);
+            expect(target.isHydrotherapy).toBe(true);
         });
 
         test('copies flags from normal to split part', () => {
-            const source = { isMassage: true, isPnf: true };
+            const source = { isMassage: true, isPnf: true, isHydrotherapy: true };
             const target = {};
 
             copyFlags(source, target, null, 2);
 
             expect(target.isMassage2).toBe(true);
             expect(target.isPnf2).toBe(true);
+            expect(target.isHydrotherapy2).toBe(true);
         });
     });
 
@@ -175,6 +178,8 @@ describe('schedule-helpers', () => {
                 content1: 'Part1',
                 content2: 'Part2',
                 isMassage1: true,
+                isHydrotherapy1: true,
+                isHydrotherapy2: true,
                 treatmentData1: { startDate: '2024-01-01' },
                 treatmentData2: { startDate: '2024-02-01' },
             };
@@ -185,6 +190,8 @@ describe('schedule-helpers', () => {
             expect(state.content1).toBeUndefined();
             expect(state.content2).toBeUndefined();
             expect(state.isMassage1).toBeUndefined();
+            expect(state.isHydrotherapy1).toBeUndefined();
+            expect(state.isHydrotherapy2).toBeUndefined();
             expect(state.treatmentData1).toBeUndefined();
             expect(state.treatmentData2).toBeUndefined();
         });
@@ -205,11 +212,20 @@ describe('schedule-helpers', () => {
             expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
         });
 
-        test('returns current date', () => {
+        test('returns current date using formatLocalIsoDate', () => {
             const result = getTodayDate();
-            const today = new Date();
-            const expected = today.toISOString().split('T')[0];
-            expect(result).toBe(expected);
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            expect(result).toBe(`${year}-${month}-${day}`);
+        });
+
+        test('returns local date even when UTC date is different (e.g. 00:30 local in UTC+2)', () => {
+            const localMidnightDate = new Date(2024, 4, 10, 0, 30, 0);
+            jest.useFakeTimers().setSystemTime(localMidnightDate);
+            const result = getTodayDate();
+            expect(result).toBe('2024-05-10');
         });
     });
 
@@ -482,6 +498,57 @@ describe('schedule-helpers', () => {
             expect(cellState.treatmentExtensionDays).toBe(0);
             expect(cellState.treatmentEndDate).toBe('2024-01-20');
             expect(cellState.additionalInfo).toBeNull();
+        });
+
+        test('migrates existing single cell data and flags into part 1 and creates fresh treatmentData2 when entering slash', () => {
+            jest.useFakeTimers().setSystemTime(new Date(2024, 0, 15, 12, 0, 0));
+            const cellState = {
+                content: 'Kowalski',
+                patientId: 'pid-original',
+                treatmentStartDate: '2024-01-02',
+                treatmentExtensionDays: 3,
+                treatmentEndDate: '2024-01-20',
+                additionalInfo: 'Ważna informacja',
+                isMassage: true,
+                isPnf: false,
+                isEveryOtherDay: true,
+                isSharedPatient: false,
+                isHydrotherapy: true,
+            };
+            const parentCell = document.createElement('td');
+            const element = document.createElement('div');
+
+            updateCellContent(cellState, 'Kowalski / Nowak', null, element, parentCell);
+
+            expect(cellState.isSplit).toBe(true);
+            expect(cellState.content1).toBe('Kowalski ');
+            expect(cellState.content2).toBe(' Nowak');
+            // Part 1 preserved single cell data
+            expect(cellState.patientId1).toBe('pid-original');
+            expect(cellState.treatmentData1).toEqual({
+                startDate: '2024-01-02',
+                extensionDays: 3,
+                endDate: '2024-01-20',
+                additionalInfo: 'Ważna informacja',
+            });
+            expect(cellState.isMassage1).toBe(true);
+            expect(cellState.isEveryOtherDay1).toBe(true);
+            expect(cellState.isHydrotherapy1).toBe(true);
+
+            // Part 2 got fresh treatmentData2
+            expect(cellState.treatmentData2).toEqual({
+                startDate: '2024-01-15',
+                extensionDays: 0,
+                endDate: '2024-01-25',
+            });
+            expect(cellState.patientId2).toBeDefined();
+
+            // Old single-cell fields are deleted
+            expect(cellState.content).toBeUndefined();
+            expect(cellState.patientId).toBeNull();
+            expect(cellState.treatmentStartDate).toBeUndefined();
+            expect(cellState.isMassage).toBeUndefined();
+            expect(cellState.isHydrotherapy).toBeUndefined();
         });
     });
 });

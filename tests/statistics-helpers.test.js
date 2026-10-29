@@ -5,6 +5,7 @@ import {
     getIsoWeekInfo,
     createDailyWorkloadSnapshot,
     calculatePeriodWorkloadAverages,
+    calculateLeaveDaysInWeek,
 } from '../scripts/statistics-helpers.js';
 
 describe('statistics helpers', () => {
@@ -309,5 +310,24 @@ describe('statistics helpers', () => {
         expect(result.employees[0].totalUniquePatients).toBe(2); // Kowalski (2 dni) + Nowak (1 dzień)
         expect(result.employees[0].averagePatientsPerPresentDay).toBe(1.5);
         expect(result.employees[0].averagePatientsPerWeek).toBe(7.5);
+    });
+
+    test('calculateLeaveDaysInWeek excludes Polish public holidays in the week', () => {
+        // Week containing May 1st (Święto Pracy, Friday) and May 3rd (Święto Konstytucji, Sunday)
+        // 2026-04-27 (Mon) to 2026-05-03 (Sun): Mon-Thu are 4 workdays, Fri May 1 is holiday!
+        const leavesData = {
+            'Anna Nowak': [
+                {
+                    id: 'leave-may',
+                    type: 'vacation',
+                    startDate: '2026-04-27',
+                    endDate: '2026-05-03',
+                },
+            ],
+        };
+
+        const totalLeaveDays = calculateLeaveDaysInWeek(leavesData, '2026-04-27', '2026-05-03');
+        // 4 workdays (Mon-Thu), because Fri 2026-05-01 is a public holiday
+        expect(totalLeaveDays).toBe(4);
     });
 });

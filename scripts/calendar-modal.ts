@@ -1,6 +1,6 @@
 // scripts/calendar-modal.ts
 import { debugLog, AppConfig, months, isHoliday } from './common.js';
-import { toUTCDate, toDateString } from './utils.js';
+import { toUTCDate, toDateString, formatLocalIsoDate } from './utils.js';
 
 /**
  * Granice urlopowe
@@ -36,6 +36,7 @@ interface LeaveInput {
 interface CalendarModalAPI {
     init(): void;
     destroy(): void;
+    isOpen(): boolean;
     open(
         employeeName: string,
         existingLeaves: LeaveInput[],
@@ -176,7 +177,7 @@ export const CalendarModal: CalendarModalAPI = (() => {
                 dayCell.classList.add('sunday');
             }
 
-            const todayStr = toDateString(new Date());
+            const todayStr = formatLocalIsoDate();
             if (dayCell.dataset.date === todayStr) {
                 dayCell.classList.add('today');
             }
@@ -573,7 +574,9 @@ export const CalendarModal: CalendarModalAPI = (() => {
         debugLog('CalendarModal destroyed');
     };
 
-    return { init, open, destroy };
+    const isOpen = (): boolean => modal !== null && modal.style.display !== 'none' && modal.style.display !== '';
+
+    return { init, open, destroy, isOpen };
 })();
 
 // Backward compatibility

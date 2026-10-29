@@ -74,7 +74,24 @@ const getMinutesFromTime = (time: string): number => {
     return (Number.isFinite(hour) ? hour : 0) * 60 + (Number.isFinite(minute) ? minute : 0);
 };
 
-const getDateDiffInDays = (dateIso: string, referenceDate: Date): number => {
+export const normalizeLeavesData = (rawData: unknown): LeavesMap => {
+    if (!rawData || typeof rawData !== 'object') return {};
+
+    return Object.fromEntries(
+        Object.entries(rawData as Record<string, unknown>)
+            .filter(([, value]) => Array.isArray(value))
+            .map(([employeeName, value]) => [
+                employeeName,
+                (value as unknown[]).filter((leave): leave is LeaveEntry => {
+                    if (!leave || typeof leave !== 'object') return false;
+                    const candidate = leave as Partial<LeaveEntry>;
+                    return typeof candidate.startDate === 'string' && typeof candidate.endDate === 'string';
+                }),
+            ])
+    );
+};
+
+export const getDateDiffInDays = (dateIso: string, referenceDate: Date = new Date()): number => {
     const target = createUtcDate(dateIso);
     const reference = new Date(Date.UTC(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate(), 12));
     return Math.round((target.getTime() - reference.getTime()) / 86400000);
@@ -298,7 +315,7 @@ const countWorkdaysInOverlap = (leave: LeaveEntry, rangeStartIso: string, rangeE
 
     for (const current = new Date(start); current <= end; current.setUTCDate(current.getUTCDate() + 1)) {
         const day = current.getUTCDay();
-        if (day !== 0 && day !== 6) count++;
+        if (day !== 0 && day !== 6 && !isHoliday(current)) count++;
     }
 
     return count;

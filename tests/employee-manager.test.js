@@ -149,12 +149,44 @@ describe('EmployeeManager', () => {
         ).toBeGreaterThan(0);
     });
 
-    test('load() should handle Firestore errors gracefully', async () => {
+    test('load() should preserve existing employees and set hasLoadError() on Firestore error (Luka 2.3)', async () => {
+        // Upewnij się, że dane są załadowane przed błędem
+        await EmployeeManager.load();
+        expect(Object.keys(EmployeeManager.getAll()).length).toBeGreaterThan(0);
+        expect(EmployeeManager.hasLoadError()).toBe(false);
+
+        // Symulacja błędu sieci
         db.collection().doc().get.mockRejectedValue(new Error('Network error'));
 
         await EmployeeManager.load();
 
+        // Nie zeruje cache jeśli dane były załadowane
+        expect(EmployeeManager.getAll()).toEqual(mockEmployees);
+        expect(EmployeeManager.hasLoadError()).toBe(true);
+        expect(window.showToast).toHaveBeenCalled();
+
+        // Po udanym ponownym załadowaniu flaga błędu powinna się zresetować
+        mockLoadResult();
+        await EmployeeManager.load();
+        expect(EmployeeManager.hasLoadError()).toBe(false);
+    });
+
+    test('load() should keep empty state and set hasLoadError() when load fails on empty cache', async () => {
+        // Wyczyść stan bazy
+        db.collection().doc().get.mockResolvedValue({
+            exists: false,
+            data: () => ({}),
+        });
+        await EmployeeManager.load();
         expect(EmployeeManager.getAll()).toEqual({});
+        expect(EmployeeManager.hasLoadError()).toBe(false);
+
+        // Błąd sieci na pustym stanie
+        db.collection().doc().get.mockRejectedValue(new Error('Network error'));
+        await EmployeeManager.load();
+
+        expect(EmployeeManager.getAll()).toEqual({});
+        expect(EmployeeManager.hasLoadError()).toBe(true);
         expect(window.showToast).toHaveBeenCalled();
     });
 
