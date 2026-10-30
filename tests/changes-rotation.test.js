@@ -15,6 +15,7 @@ jest.mock('../scripts/firebase-config.js', () => ({
 }));
 
 import { generateTwoWeekPeriods } from '../scripts/changes-rotation.js';
+import { findRotationPeriodForDate } from '../scripts/rotation-periods.js';
 
 describe('generateTwoWeekPeriods (ISO continuous 14-day rotation grid)', () => {
     const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -55,3 +56,25 @@ describe('generateTwoWeekPeriods (ISO continuous 14-day rotation grid)', () => {
         });
     });
 });
+
+describe('findRotationPeriodForDate', () => {
+    test('encloses a Saturday between week 1 and week 2 of a 14-day block in its period', () => {
+        const period = findRotationPeriodForDate('2026-10-24');
+        expect(period.start <= '2026-10-24').toBe(true);
+        const startMs = Date.parse(`${period.start}T00:00:00Z`);
+        const targetMs = Date.parse('2026-10-24T00:00:00Z');
+        const diffDays = (targetMs - startMs) / (24 * 60 * 60 * 1000);
+        expect(diffDays).toBeGreaterThanOrEqual(0);
+        expect(diffDays).toBeLessThanOrEqual(13);
+        expect(period.start).toBe('2026-10-19');
+        expect(period.end).toBe('2026-10-30');
+    });
+
+    test('encloses Monday start and Sunday end within the enclosing period', () => {
+        const mondayPeriod = findRotationPeriodForDate('2026-10-19');
+        const sundayPeriod = findRotationPeriodForDate('2026-11-01');
+        expect(mondayPeriod).toEqual({ start: '2026-10-19', end: '2026-10-30' });
+        expect(sundayPeriod).toEqual({ start: '2026-10-19', end: '2026-10-30' });
+    });
+});
+

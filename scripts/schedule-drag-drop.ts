@@ -2,6 +2,7 @@
 // Moduł obsługi Drag & Drop dla harmonogramu
 
 import { safeCopy, safeBool } from './utils.js';
+import { ensureActiveTreatmentDates } from './schedule-helpers.js';
 import type { CellState } from './types/index.js';
 
 /**
@@ -238,6 +239,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
         targetState.treatmentExtensionDays = null;
         targetState.treatmentEndDate = null;
         targetState.additionalInfo = null;
+        ensureActiveTreatmentDates(targetState, { resetIfExpired: false });
     };
 
     const applyTargetPartUpdate = (targetState: CellState, targetPart: number, dataToMove: ReturnType<typeof extractDataToMove>) => {
@@ -250,6 +252,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
             endDate: safeCopy(dataToMove.treatmentData.endDate),
             additionalInfo: safeCopy(dataToMove.treatmentData.additionalInfo),
         };
+        ensureActiveTreatmentDates(targetState, { resetIfExpired: false });
     };
 
     const applyTargetNormalUpdate = (targetState: CellState, dataToMove: ReturnType<typeof extractDataToMove>) => {
@@ -263,6 +266,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
         targetState.treatmentExtensionDays = safeCopy(dataToMove.treatmentData.extensionDays);
         targetState.treatmentEndDate = safeCopy(dataToMove.treatmentData.endDate);
         targetState.additionalInfo = safeCopy(dataToMove.treatmentData.additionalInfo);
+        ensureActiveTreatmentDates(targetState, { resetIfExpired: false });
     };
 
     const applySourceClear = (sourceState: CellState, sourcePart: number | null) => {

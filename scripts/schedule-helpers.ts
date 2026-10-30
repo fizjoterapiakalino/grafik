@@ -160,6 +160,7 @@ export const createTargetUpdateFn = (oldCellState: CellState, sourcePart: number
         } else {
             copyFullCellState(oldCellState, cellState);
         }
+        ensureActiveTreatmentDates(cellState, { resetIfExpired: false });
     };
 };
 
@@ -437,6 +438,85 @@ const updateNormalCell = (cellState: CellState, newText: string): void => {
 
     cellState.content = newText;
     ensurePatientId(cellState, null);
+};
+
+/**
+ * Wymusza poprawność i spójność dat leczenia na komórce (normalnej lub podzielonej).
+ */
+export const ensureActiveTreatmentDates = (
+    state: CellState,
+    options?: { resetIfExpired?: boolean; todayIso?: string }
+): void => {
+    const resetIfExpired = options?.resetIfExpired ?? false;
+    const todayIso = options?.todayIso || getTodayDate();
+
+    const processTreatmentData = (data: TreatmentData | null | undefined, hasContent: boolean): TreatmentData | undefined => {
+        if (!data && !hasContent) return undefined;
+        const current = data ? { ...data } : {};
+        const extDays = typeof current.extensionDays === 'number' ? current.extensionDays : 0;
+        const currentEnd = current.endDate || (current.startDate ? ScheduleLogic.calculateEndDate(current.startDate, extDays) : null);
+        const isExpired = !!(currentEnd && currentEnd < todayIso);
+
+        if (resetIfExpired && isExpired) {
+            current.startDate = todayIso;
+            current.extensionDays = 0;
+            current.endDate = ScheduleLogic.calculateEndDate(todayIso, 0);
+            return current;
+        }
+
+        if (!current.startDate) {
+            current.startDate = todayIso;
+            current.extensionDays = extDays;
+            current.endDate = ScheduleLogic.calculateEndDate(todayIso, extDays);
+            return current;
+        }
+
+        if (current.extensionDays === undefined || current.extensionDays === null) {
+            current.extensionDays = 0;
+        }
+
+        if (!current.endDate) {
+            current.endDate = currentEnd || ScheduleLogic.calculateEndDate(current.startDate, current.extensionDays);
+        }
+
+        return current;
+    };
+
+    if (state.isSplit) {
+        const hasContent1 = typeof state.content1 === 'string' && state.content1.trim() !== '';
+        if (state.treatmentData1 || hasContent1) {
+            state.treatmentData1 = processTreatmentData(state.treatmentData1, hasContent1);
+        }
+
+        const hasContent2 = typeof state.content2 === 'string' && state.content2.trim() !== '';
+        if (state.treatmentData2 || hasContent2) {
+            state.treatmentData2 = processTreatmentData(state.treatmentData2, hasContent2);
+        }
+        return;
+    }
+
+    const hasContent = typeof state.content === 'string' && state.content.trim() !== '';
+    if (hasContent || state.treatmentStartDate || state.treatmentEndDate) {
+        const extDays = typeof state.treatmentExtensionDays === 'number' ? state.treatmentExtensionDays : 0;
+        const currentEnd = state.treatmentEndDate || (state.treatmentStartDate ? ScheduleLogic.calculateEndDate(state.treatmentStartDate, extDays) : null);
+        const isExpired = !!(currentEnd && currentEnd < todayIso);
+
+        if (resetIfExpired && isExpired) {
+            state.treatmentStartDate = todayIso;
+            state.treatmentExtensionDays = 0;
+            state.treatmentEndDate = ScheduleLogic.calculateEndDate(todayIso, 0);
+        } else {
+            if (!state.treatmentStartDate) {
+                state.treatmentStartDate = todayIso;
+            }
+            if (state.treatmentExtensionDays === undefined || state.treatmentExtensionDays === null) {
+                state.treatmentExtensionDays = 0;
+            }
+            if (!state.treatmentEndDate) {
+                state.treatmentEndDate = currentEnd || ScheduleLogic.calculateEndDate(state.treatmentStartDate, state.treatmentExtensionDays);
+            }
+        }
+    }
 };
 
 /**

@@ -3,7 +3,8 @@ import { EmployeeManager } from './employee-manager.js';
 import { ScheduleUI } from './schedule-ui.js';
 import { ScheduleLogic } from './schedule-logic.js';
 import { escapeHTML } from './utils.js';
-import type { CellState } from './types/index.js';
+import { getTargetPart, getTodayDate } from './schedule-helpers.js';
+import type { CellState, TreatmentData } from './types/index.js';
 
 /**
  * Informacja o duplikacie
@@ -148,18 +149,28 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
 
         patientNameInput.value = patientName;
 
-        const treatmentData = {
-            startDate: cellState.treatmentStartDate,
-            extensionDays: cellState.treatmentExtensionDays,
-        };
-        const currentAdditionalInfo = cellState.additionalInfo || '';
+        const targetPart = cellState.isSplit ? (getTargetPart(element) ?? 1) : null;
+        const partData = targetPart
+            ? ((targetPart === 1 ? cellState.treatmentData1 : cellState.treatmentData2) as TreatmentData | undefined)
+            : undefined;
+        const treatmentData = targetPart
+            ? {
+                startDate: partData?.startDate,
+                extensionDays: partData?.extensionDays,
+            }
+            : {
+                startDate: cellState.treatmentStartDate,
+                extensionDays: cellState.treatmentExtensionDays,
+            };
+        const currentAdditionalInfo = (targetPart ? partData?.additionalInfo : cellState.additionalInfo) || '';
 
         startDateInput.value = treatmentData.startDate || '';
         extensionDaysInput.value = String(treatmentData.extensionDays || 0);
         additionalInfoTextarea.value = currentAdditionalInfo;
 
         const updateEndDate = (): void => {
-            endDateInput.value = ScheduleLogic.calculateEndDate(startDateInput.value, parseInt(extensionDaysInput.value || '0', 10));
+            const effectiveStart = startDateInput.value.trim() || getTodayDate();
+            endDateInput.value = ScheduleLogic.calculateEndDate(effectiveStart, parseInt(extensionDaysInput.value || '0', 10));
         };
 
         updateEndDate();
@@ -177,20 +188,28 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
         };
 
         saveModalBtn.onclick = (): void => {
-            const newTreatmentData = {
-                startDate: startDateInput.value,
-                extensionDays: parseInt(extensionDaysInput.value, 10),
-                endDate: endDateInput.value,
-                additionalInfo: additionalInfoTextarea.value,
-            };
+            const effectiveStart = startDateInput.value.trim() || getTodayDate();
+            const extDays = parseInt(extensionDaysInput.value || '0', 10);
+            const endDate = ScheduleLogic.calculateEndDate(effectiveStart, extDays);
+            const additionalInfo = additionalInfoTextarea.value;
 
             updateCellStateCallback((state) => {
-                state.treatmentStartDate = newTreatmentData.startDate;
-                state.treatmentExtensionDays = newTreatmentData.extensionDays;
-                state.treatmentEndDate = newTreatmentData.endDate;
-                state.additionalInfo = newTreatmentData.additionalInfo;
+                if (targetPart) {
+                    const key = `treatmentData${targetPart}` as 'treatmentData1' | 'treatmentData2';
+                    state[key] = {
+                        startDate: effectiveStart,
+                        extensionDays: extDays,
+                        endDate,
+                        additionalInfo,
+                    };
+                } else {
+                    state.treatmentStartDate = effectiveStart;
+                    state.treatmentExtensionDays = extDays;
+                    state.treatmentEndDate = endDate;
+                    state.additionalInfo = additionalInfo;
+                }
             });
-            window.showToast('Zapisano daty zabiegów i informacje o pacjencie.');
+            window.showToast?.('Zapisano daty zabiegów i informacje o pacjencie.');
             closeModal();
         };
 

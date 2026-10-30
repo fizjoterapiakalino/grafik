@@ -3,6 +3,7 @@ import { debugLog } from './common.js';
 import { AppConfig } from './common.js';
 import { initializeContextMenu, destroyContextMenu } from './context-menu.js';
 import { safeCopy, clearCellContentKeys } from './utils.js';
+import { ensureCellPatientIds, ensureActiveTreatmentDates } from './schedule-helpers.js';
 import { ScheduleDragDrop } from './schedule-drag-drop.js';
 import { ScheduleUI } from './schedule-ui.js';
 import type { CellState } from './types/index.js';
@@ -419,6 +420,8 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 delete source.patientId2;
                 Object.assign(state, source);
                 state.history = existingHistory;
+                ensureCellPatientIds(state);
+                ensureActiveTreatmentDates(state, { resetIfExpired: true });
                 window.showToast('Wklejono komórkę');
             });
             return;

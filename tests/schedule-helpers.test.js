@@ -17,7 +17,19 @@ import {
     getTodayDate,
     initTreatmentData,
     updateCellContent,
+    ensureActiveTreatmentDates,
 } from '../scripts/schedule-helpers.js';
+jest.mock('../scripts/firebase-config.js', () => ({
+    db: {
+        collection: jest.fn().mockReturnThis(),
+        doc: jest.fn().mockReturnThis(),
+        get: jest.fn(),
+        update: jest.fn(),
+    },
+    auth: {},
+}));
+
+import { ScheduleModals } from '../scripts/schedule-modals.js';
 
 // Mock schedule-logic.js
 jest.mock('../scripts/schedule-logic.js', () => ({
@@ -27,6 +39,15 @@ jest.mock('../scripts/schedule-logic.js', () => ({
             const date = new Date(startDate);
             date.setDate(date.getDate() + 10 + (extensionDays || 0));
             return date.toISOString().split('T')[0];
+        }),
+    },
+}));
+
+jest.mock('../scripts/schedule-ui.js', () => ({
+    ScheduleUI: {
+        getElementText: jest.fn((element) => {
+            if (!element) return '';
+            return element.textContent ? element.textContent.trim() : '';
         }),
     },
 }));
@@ -339,6 +360,19 @@ describe('schedule-helpers', () => {
             expect(target.isMassage).toBe(true);
         });
 
+        test('populates treatmentStartDate and treatmentEndDate on target for a legacy undated source cell', () => {
+            const sourceCell = { content: 'Kowalski' };
+            const target = {};
+            const updateFn = createTargetUpdateFn(sourceCell, null, null);
+            updateFn(target);
+
+            expect(target.content).toBe('Kowalski');
+            expect(typeof target.treatmentStartDate).toBe('string');
+            expect(target.treatmentStartDate.length).toBeGreaterThan(0);
+            expect(typeof target.treatmentEndDate).toBe('string');
+            expect(target.treatmentEndDate.length).toBeGreaterThan(0);
+        });
+
         test('moves split part into normal cell and clears split-only fields', () => {
             const oldCellState = {
                 isSplit: true,
@@ -549,6 +583,157 @@ describe('schedule-helpers', () => {
             expect(cellState.treatmentStartDate).toBeUndefined();
             expect(cellState.isMassage).toBeUndefined();
             expect(cellState.isHydrotherapy).toBeUndefined();
+        });
+    });
+
+    describe('ensureActiveTreatmentDates', () => {
+        test('fills missing treatmentStartDate/treatmentEndDate on normal and split cells while keeping existing dates when resetIfExpired is false', () => {
+            const normalMissing = { content: 'Kowalski' };
+            ensureActiveTreatmentDates(normalMissing, { resetIfExpired: false, todayIso: '2026-10-30' });
+            expect(normalMissing.treatmentStartDate).toBe('2026-10-30');
+            expect(normalMissing.treatmentEndDate).toBe('2026-11-09');
+
+            const normalExpired = {
+                content: 'Nowak',
+                treatmentStartDate: '2026-09-01',
+                treatmentEndDate: '2026-09-19',
+                treatmentExtensionDays: 3,
+            };
+            ensureActiveTreatmentDates(normalExpired, { resetIfExpired: false, todayIso: '2026-10-30' });
+            expect(normalExpired.treatmentStartDate).toBe('2026-09-01');
+            expect(normalExpired.treatmentEndDate).toBe('2026-09-19');
+            expect(normalExpired.treatmentExtensionDays).toBe(3);
+
+            const normalMissingEnd = {
+                content: 'Wiśniewski',
+                treatmentStartDate: '2026-10-20',
+            };
+            ensureActiveTreatmentDates(normalMissingEnd, { resetIfExpired: false, todayIso: '2026-10-30' });
+            expect(normalMissingEnd.treatmentStartDate).toBe('2026-10-20');
+            expect(normalMissingEnd.treatmentEndDate).toBe('2026-10-30');
+
+            const splitMissing = {
+                isSplit: true,
+                content1: 'A',
+                content2: 'B',
+            };
+            ensureActiveTreatmentDates(splitMissing, { resetIfExpired: false, todayIso: '2026-10-30' });
+            expect(splitMissing.treatmentData1.startDate).toBe('2026-10-30');
+            expect(splitMissing.treatmentData1.endDate).toBe('2026-11-09');
+            expect(splitMissing.treatmentData2.startDate).toBe('2026-10-30');
+            expect(splitMissing.treatmentData2.endDate).toBe('2026-11-09');
+
+            const splitCell = {
+                isSplit: true,
+                content1: 'A',
+                treatmentData1: { startDate: '2026-09-01', endDate: '2026-09-19' },
+                content2: 'B',
+                treatmentData2: { startDate: '2026-10-20' },
+            };
+            ensureActiveTreatmentDates(splitCell, { resetIfExpired: false, todayIso: '2026-10-30' });
+            expect(splitCell.treatmentData1.startDate).toBe('2026-09-01');
+            expect(splitCell.treatmentData1.endDate).toBe('2026-09-19');
+            expect(splitCell.treatmentData2.startDate).toBe('2026-10-20');
+            expect(splitCell.treatmentData2.endDate).toBe('2026-10-30');
+        });
+
+        test('resets expired part and preserves active part on split cell when resetIfExpired is true', () => {
+            const splitCell = {
+                isSplit: true,
+                content1: 'Pacjent 1',
+                content2: 'Pacjent 2',
+                treatmentData1: {
+                    startDate: '2026-09-01',
+                    endDate: '2026-09-19',
+                    extensionDays: 5,
+                },
+                treatmentData2: {
+                    startDate: '2026-10-26',
+                    endDate: '2026-11-16',
+                    extensionDays: 2,
+                },
+            };
+
+            ensureActiveTreatmentDates(splitCell, { resetIfExpired: true, todayIso: '2026-10-30' });
+
+            expect(splitCell.treatmentData1.startDate).toBe('2026-10-30');
+            expect(splitCell.treatmentData1.extensionDays).toBe(0);
+            expect(splitCell.treatmentData1.endDate).toBe('2026-11-09');
+            expect(splitCell.treatmentData2.startDate).toBe('2026-10-26');
+            expect(splitCell.treatmentData2.endDate).toBe('2026-11-16');
+            expect(splitCell.treatmentData2.extensionDays).toBe(2);
+        });
+    });
+
+    describe('ScheduleModals.openPatientInfoModal', () => {
+        test('opened on 2nd child of split-cell-wrapper reads treatmentData2 and saves to treatmentData2 without writing root treatmentStartDate', () => {
+            window.showToast = jest.fn();
+
+            document.body.innerHTML = `
+                <div id="patientInfoModal" style="display: none;">
+                    <input id="patientName" />
+                    <input id="treatmentStartDate" />
+                    <input id="treatmentExtensionDays" />
+                    <input id="treatmentEndDate" />
+                    <textarea id="additionalInfo"></textarea>
+                    <button id="savePatientInfoModal"></button>
+                    <button id="closePatientInfoModal"></button>
+                </div>
+                <div class="split-cell-wrapper">
+                    <div id="part1">Pacjent Pierwszy</div>
+                    <div id="part2">Pacjent Drugi</div>
+                </div>
+            `;
+
+            const part2El = document.getElementById('part2');
+            const startDateInput = document.getElementById('treatmentStartDate');
+            const extensionDaysInput = document.getElementById('treatmentExtensionDays');
+            const saveBtn = document.getElementById('savePatientInfoModal');
+
+            const cellState = {
+                isSplit: true,
+                content1: 'Pacjent Pierwszy',
+                content2: 'Pacjent Drugi',
+                treatmentData1: {
+                    startDate: '2026-10-01',
+                    extensionDays: 1,
+                    endDate: '2026-10-15',
+                    additionalInfo: 'Info 1',
+                },
+                treatmentData2: {
+                    startDate: '2026-10-20',
+                    extensionDays: 4,
+                    endDate: '2026-11-05',
+                    additionalInfo: 'Info 2',
+                },
+            };
+
+            let updatedState = null;
+            const updateCallback = (fn) => {
+                const stateCopy = JSON.parse(JSON.stringify(cellState));
+                fn(stateCopy);
+                updatedState = stateCopy;
+            };
+
+            ScheduleModals.openPatientInfoModal(part2El, cellState, updateCallback);
+
+            expect(startDateInput.value).toBe('2026-10-20');
+            expect(extensionDaysInput.value).toBe('4');
+
+            saveBtn.click();
+
+            expect(updatedState).not.toBeNull();
+            expect(updatedState.treatmentData2).toBeDefined();
+            expect(updatedState.treatmentData2.startDate).toBe('2026-10-20');
+            expect(updatedState.treatmentData2.extensionDays).toBe(4);
+            expect(updatedState.treatmentStartDate).toBeUndefined();
+
+            // Defaulting blank startDateInput to today
+            ScheduleModals.openPatientInfoModal(part2El, cellState, updateCallback);
+            startDateInput.value = '   ';
+            saveBtn.click();
+            expect(updatedState.treatmentData2.startDate).toBe(getTodayDate());
+            expect(updatedState.treatmentStartDate).toBeUndefined();
         });
     });
 });

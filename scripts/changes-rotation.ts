@@ -29,49 +29,15 @@ interface RotationStation {
     role: StationRole;
 }
 
-export interface RotationPeriod {
-    start: string;
-    end: string;
-}
-
-export const isWeekend = (date: Date): boolean => {
-    const day = date.getUTCDay();
-    return day === 0 || day === 6;
-};
+import { isWeekend, generateTwoWeekPeriods } from './rotation-periods.js';
+import type { RotationPeriod } from './rotation-periods.js';
+export { isWeekend, generateTwoWeekPeriods };
+export type { RotationPeriod };
 
 export const formatDate = (date: Date): string => {
     const day = date.getUTCDate().toString().padStart(2, '0');
     const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
     return `${day}.${month}`;
-};
-
-const EPOCH_MONDAY = Date.UTC(2024, 0, 1);
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-const ONE_PERIOD_MS = 14 * ONE_DAY_MS;
-
-export const generateTwoWeekPeriods = (year: number): RotationPeriod[] => {
-    const periods: RotationPeriod[] = [];
-    let k = Math.floor((Date.UTC(year, 0, 1) - EPOCH_MONDAY) / ONE_PERIOD_MS) - 2;
-
-    while (true) {
-        const startMs = EPOCH_MONDAY + k * ONE_PERIOD_MS;
-        const thursday = new Date(startMs + 3 * ONE_DAY_MS);
-        const thursdayYear = thursday.getUTCFullYear();
-
-        if (thursdayYear === year) {
-            const startDate = new Date(startMs);
-            const endDate = new Date(startMs + 11 * ONE_DAY_MS);
-            periods.push({
-                start: startDate.toISOString().split('T')[0],
-                end: endDate.toISOString().split('T')[0],
-            });
-        } else if (thursdayYear > year) {
-            break;
-        }
-        k++;
-    }
-
-    return periods;
 };
 
 interface RotationPlanRow {
