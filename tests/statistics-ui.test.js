@@ -410,4 +410,60 @@ describe('Statistics UI & Controller (Wariant A: Obciążenie i Sumienność)', 
 
         jest.useRealTimers();
     });
+
+    test('manual refresh button re-fetches schedules/mainSchedule, updates badge, and shows toast', async () => {
+        jest.useFakeTimers();
+        jest.setSystemTime(new Date('2026-10-21T10:00:00Z'));
+
+        window.showToast = jest.fn();
+
+        // Initial HTML has 'Sprawdzanie...'
+        const badge = document.getElementById('workloadSnapshotDate');
+        expect(badge.textContent.trim()).toBe('Sprawdzanie...');
+
+        await Statistics.init();
+        expect(badge.textContent.trim()).toBe('Snapshot: Dzisiaj');
+
+        // Clear mock calls to verify subsequent manual refresh
+        mockScheduleDoc.get.mockClear();
+        window.showToast.mockClear();
+
+        const refreshBtn = document.getElementById('refreshWorkloadSnapshotBtn');
+        expect(refreshBtn).not.toBeNull();
+
+        refreshBtn.click();
+        for (let i = 0; i < 20; i++) {
+            await Promise.resolve();
+        }
+
+        // Verifies schedules/mainSchedule was re-fetched
+        expect(mockScheduleDoc.get).toHaveBeenCalledTimes(1);
+
+        // Verifies toast notification was invoked
+        expect(window.showToast).toHaveBeenCalledWith(
+            'Zaktualizowano snapshot obciążenia z bieżącego grafiku.',
+            3000
+        );
+        expect(badge.textContent.trim()).toBe('Snapshot: Dzisiaj');
+
+        // Non-workday refresh scenario
+        jest.setSystemTime(new Date('2026-10-25T10:00:00Z')); // Sunday
+        window.showToast.mockClear();
+        mockScheduleDoc.get.mockClear();
+
+        refreshBtn.click();
+        for (let i = 0; i < 20; i++) {
+            await Promise.resolve();
+        }
+
+        expect(mockScheduleDoc.get).toHaveBeenCalledTimes(1);
+        expect(window.showToast).toHaveBeenCalledWith(
+            'Dzisiaj jest dzień wolny — snapshot roboczy nie jest zapisywany.',
+            3000
+        );
+        // On Sunday with no Sunday snapshot, badge shows the latest recorded snapshot date
+        expect(badge.textContent.trim()).toBe('Ostatni snapshot: 21.10.2026');
+
+        jest.useRealTimers();
+    });
 });

@@ -132,8 +132,16 @@ export const normalizeLeavesData = (rawData: unknown): LeavesMap => {
     );
 };
 
-export const getEmployeeDisplayName = (employeeId: string, employee: Employee): string =>
-    employee.displayName || employee.name || `${employee.firstName || ''} ${employee.lastName || ''}`.trim() || `Pracownik ${Number.parseInt(employeeId, 10) + 1}`;
+export const getEmployeeDisplayName = (employeeId: string, employee: Employee): string => {
+    const directName =
+        employee.displayName ||
+        employee.name ||
+        `${employee.firstName || ''} ${employee.lastName || ''}`.trim();
+    if (directName) return directName;
+
+    const parsed = Number.parseInt(employeeId, 10);
+    return !Number.isNaN(parsed) ? `Pracownik ${parsed + 1}` : `Pracownik ${employeeId}`;
+};
 
 export const getActiveEmployeeIds = (employees: EmployeesMap): string[] =>
     Object.keys(employees).filter(id => !employees[id]?.isHidden);

@@ -1,5 +1,6 @@
 import {
     getActiveEmployeeIds,
+    getEmployeeDisplayName,
     isClinicalWorkday,
     countClinicalWorkdaysInRange,
     getIsoWeeksForYear,
@@ -457,6 +458,22 @@ describe('statistics-helpers', () => {
             const normalized = normalizeLeavesData(raw);
             expect(normalized['Anna Kowalska']).toHaveLength(1);
             expect(normalized['Anna Kowalska'][0].startDate).toBe('2026-10-01');
+        });
+    });
+
+    describe('getEmployeeDisplayName', () => {
+        test('falls back safely for numeric and non-numeric employee IDs without name fields', () => {
+            const emptyEmployee = {};
+            // Numeric ID (0-indexed legacy style)
+            expect(getEmployeeDisplayName('0', emptyEmployee)).toBe('Pracownik 1');
+            expect(getEmployeeDisplayName('4', emptyEmployee)).toBe('Pracownik 5');
+            // Non-numeric ID fallback avoids NaN
+            expect(getEmployeeDisplayName('emp_temp_99', emptyEmployee)).toBe('Pracownik emp_temp_99');
+            expect(getEmployeeDisplayName('doctor_ann', emptyEmployee)).toBe('Pracownik doctor_ann');
+            // Prioritizes displayName / name / firstName lastName
+            expect(getEmployeeDisplayName('emp_temp_99', { displayName: 'Katarzyna' })).toBe('Katarzyna');
+            expect(getEmployeeDisplayName('emp_temp_99', { name: 'Piotr' })).toBe('Piotr');
+            expect(getEmployeeDisplayName('emp_temp_99', { firstName: 'Jan', lastName: 'Kot' })).toBe('Jan Kot');
         });
     });
 });

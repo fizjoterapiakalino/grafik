@@ -11,7 +11,6 @@ import {
     calculateColumnHygieneMetrics,
     getIsoWeekInfo,
     getIsoWeeksForYear,
-    normalizeLeavesData,
     isClinicalWorkday,
     type WorkloadPeriodType,
     type DailyWorkloadSnapshot,
@@ -111,6 +110,24 @@ export const Statistics: StatisticsAPI = (() => {
             } catch {
                 dailySnapshotsData = [];
             }
+        }
+    };
+
+    const loadScheduleCells = async (): Promise<void> => {
+        try {
+            const scheduleDoc = await db.collection('schedules').doc('mainSchedule').get();
+            const schedData = scheduleDoc.data() as {
+                scheduleCells?: ScheduleCellsMap;
+                scheduleData?: ScheduleCellsMap;
+                employees?: Record<string, Employee>;
+            } | undefined;
+            scheduleCells = schedData?.scheduleCells || schedData?.scheduleData || {};
+            if (schedData?.employees && Object.keys(employees).length === 0) {
+                employees = schedData.employees;
+            }
+        } catch (err) {
+            console.warn('Nie udało się pobrać schedules/mainSchedule:', err);
+            scheduleCells = {};
         }
     };
 
@@ -231,8 +248,31 @@ export const Statistics: StatisticsAPI = (() => {
         }
     };
 
+    const updateSnapshotBadge = (todayIso: string): void => {
+        const dateEl = document.getElementById('workloadSnapshotDate');
+        if (!dateEl) return;
+
+        if (dailySnapshotsData.some((s) => s.date === todayIso)) {
+            dateEl.textContent = 'Snapshot: Dzisiaj';
+        } else if (dailySnapshotsData.length > 0) {
+            let maxDate = dailySnapshotsData[0].date;
+            for (let i = 1; i < dailySnapshotsData.length; i++) {
+                if (dailySnapshotsData[i].date > maxDate) {
+                    maxDate = dailySnapshotsData[i].date;
+                }
+            }
+            const parts = maxDate.split('-');
+            const formatted = parts.length === 3 ? `${parts[2]}.${parts[1]}.${parts[0]}` : maxDate;
+            dateEl.textContent = `Ostatni snapshot: ${formatted}`;
+        } else {
+            dateEl.textContent = 'Snapshot: Brak';
+        }
+    };
+
     const renderDashboard = (): void => {
         const today = new Date();
+        const todayIso = formatLocalIsoDate(today);
+        updateSnapshotBadge(todayIso);
 
         let averages: PeriodWorkloadAverages;
         if (currentPeriod === 'weekly') {
@@ -521,18 +561,20 @@ export const Statistics: StatisticsAPI = (() => {
                 'click',
                 async () => {
                     try {
+                        await loadScheduleCells();
                         const now = new Date();
                         const snap = await persistTodayWorkloadSnapshot(scheduleCells, now);
                         if (snap) {
-                            const existingIdx = dailySnapshotsData.findIndex((s) => s.date === snap.date);
-                            if (existingIdx >= 0) {
-                                dailySnapshotsData[existingIdx] = snap;
+                            if (snap.isWorkday) {
+                                const existingIdx = dailySnapshotsData.findIndex((s) => s.date === snap.date);
+                                if (existingIdx >= 0) {
+                                    dailySnapshotsData[existingIdx] = snap;
+                                } else {
+                                    dailySnapshotsData.push(snap);
+                                }
+                                window.showToast?.('Zaktualizowano snapshot obciążenia z bieżącego grafiku.', 3000);
                             } else {
-                                dailySnapshotsData.push(snap);
-                            }
-                            const dateEl = document.getElementById('workloadSnapshotDate');
-                            if (dateEl) {
-                                dateEl.textContent = 'Snapshot: Dzisiaj';
+                                window.showToast?.('Dzisiaj jest dzień wolny — snapshot roboczy nie jest zapisywany.', 3000);
                             }
                             renderDashboard();
                         }
@@ -555,28 +597,7 @@ export const Statistics: StatisticsAPI = (() => {
         await EmployeeManager.load();
         employees = EmployeeManager.getAll();
 
-        try {
-            const scheduleDoc = await db.collection('schedules').doc('mainSchedule').get();
-            const schedData = scheduleDoc.data() as {
-                scheduleCells?: ScheduleCellsMap;
-                scheduleData?: ScheduleCellsMap;
-                employees?: Record<string, Employee>;
-            } | undefined;
-            scheduleCells = schedData?.scheduleCells || schedData?.scheduleData || {};
-            if (schedData?.employees && Object.keys(employees).length === 0) {
-                employees = schedData.employees;
-            }
-        } catch (err) {
-            console.warn('Nie udało się pobrać schedules/mainSchedule:', err);
-            scheduleCells = {};
-        }
-
-        try {
-            const leavesDoc = await db.collection('leaves').doc('mainLeaves').get();
-            normalizeLeavesData(leavesDoc.data());
-        } catch (err) {
-            console.warn('Nie udało się pobrać leaves/mainLeaves:', err);
-        }
+        await loadScheduleCells();
 
         await loadDailySnapshots();
 
