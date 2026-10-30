@@ -20,6 +20,7 @@ import {
 import type { FirebaseAuthWrapper, FirebaseUser } from './types/firebase';
 import type { CellState, TreatmentData } from './types/index.js';
 import { Stations } from './stations.js';
+import { TestDataGenerator } from './test-data-generator.js';
 
 const auth = authRaw as unknown as FirebaseAuthWrapper;
 
@@ -722,6 +723,7 @@ export const Schedule: ScheduleAPI = (() => {
         } finally {
             if (loadingOverlay) hideLoadingOverlay(loadingOverlay);
             UXEnhancements.initScheduleEnhancements();
+            TestDataGenerator.init();
         }
 
         // Setup split-view toggle button
@@ -758,6 +760,7 @@ export const Schedule: ScheduleAPI = (() => {
         ScheduleData.destroy();
         ScheduleUI.destroy();
         UXEnhancements.destroy();
+        TestDataGenerator.destroy();
         debugLog('Schedule module destroyed');
     };
 

@@ -23,6 +23,7 @@
         "scripts/schedule-modals.ts",
         "scripts/statistics.ts",
         "scripts/statistics-helpers.ts",
+        "scripts/test-data-generator.ts",
         "scripts/workload-snapshot.ts",
         "scripts/scrapped-pdfs.ts",
         "scripts/shared.ts",
