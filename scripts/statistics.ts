@@ -388,7 +388,7 @@ export const Statistics: StatisticsAPI = (() => {
 
         // 5. Render Horizontal Bar Chart (Chart.js)
         const canvas = document.getElementById('workloadComparisonChart') as HTMLCanvasElement | null;
-        if (canvas) {
+        if (canvas && typeof Chart !== 'undefined') {
             const ctx = (canvas.getContext?.('2d') || canvas) as unknown as CanvasRenderingContext2D;
             if (ctx) {
                 if (workloadChart) {
@@ -558,10 +558,11 @@ export const Statistics: StatisticsAPI = (() => {
         try {
             const scheduleDoc = await db.collection('schedules').doc('mainSchedule').get();
             const schedData = scheduleDoc.data() as {
+                scheduleCells?: ScheduleCellsMap;
                 scheduleData?: ScheduleCellsMap;
                 employees?: Record<string, Employee>;
             } | undefined;
-            scheduleCells = schedData?.scheduleData || {};
+            scheduleCells = schedData?.scheduleCells || schedData?.scheduleData || {};
             if (schedData?.employees && Object.keys(employees).length === 0) {
                 employees = schedData.employees;
             }

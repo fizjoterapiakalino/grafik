@@ -158,7 +158,7 @@ describe('Statistics UI & Controller (Wariant A: Obciążenie i Sumienność)', 
         mockScheduleDoc.get.mockResolvedValue({
             exists: true,
             data: () => ({
-                scheduleData: scheduleCells,
+                scheduleCells: scheduleCells,
                 employees: mockEmployees,
             }),
         });
@@ -329,7 +329,7 @@ describe('Statistics UI & Controller (Wariant A: Obciążenie i Sumienność)', 
 
         // Provide schedule cells where all cells have startDate
         const cleanCells = {
-            '08:30': {
+            '8:30': {
                 empA: {
                     content: 'Pacjent Anna',
                     treatmentStartDate: '2026-10-19',
@@ -341,7 +341,7 @@ describe('Statistics UI & Controller (Wariant A: Obciążenie i Sumienność)', 
         mockScheduleDoc.get.mockResolvedValueOnce({
             exists: true,
             data: () => ({
-                scheduleData: cleanCells,
+                scheduleCells: cleanCells,
                 employees: mockEmployees,
             }),
         });
@@ -351,6 +351,26 @@ describe('Statistics UI & Controller (Wariant A: Obciążenie i Sumienność)', 
         const undatedBanner = document.getElementById('undatedWarningBanner');
         expect(undatedBanner.style.display === 'none' || undatedBanner.hidden).toBe(true);
 
+        jest.useRealTimers();
+    });
+
+    test('renders KPIs and workload table without throwing when Chart global is undefined', async () => {
+        jest.useFakeTimers();
+        jest.setSystemTime(new Date('2026-10-21T10:00:00Z'));
+
+        const originalChart = global.Chart;
+        // @ts-expect-error test offline / CDN failure when Chart is undefined
+        delete global.Chart;
+
+        await expect(Statistics.init()).resolves.not.toThrow();
+
+        const kpiAvgDaily = document.getElementById('kpiAvgDailyValue');
+        expect(kpiAvgDaily.textContent.trim()).toBe('8');
+
+        const tbody = document.getElementById('workloadHygieneBody');
+        expect(tbody.querySelectorAll('tr').length).toBe(2);
+
+        global.Chart = originalChart;
         jest.useRealTimers();
     });
 
