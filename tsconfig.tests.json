@@ -21,6 +21,7 @@
         "scripts/schedule-helpers.ts",
         "scripts/schedule-logic.ts",
         "scripts/schedule-modals.ts",
+        "scripts/statistics.ts",
         "scripts/statistics-helpers.ts",
         "scripts/workload-snapshot.ts",
         "scripts/scrapped-pdfs.ts",
