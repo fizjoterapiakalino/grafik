@@ -1,7 +1,12 @@
 import { AppConfig } from './common.js';
 import { db as dbRaw } from './firebase-config.js';
 import { EmployeeManager } from './employee-manager.js';
-import { createDailyWorkloadSnapshot, normalizeLeavesData, type DailyWorkloadSnapshot } from './statistics-helpers.js';
+import {
+    createDailyWorkloadSnapshot,
+    normalizeLeavesData,
+    isClinicalWorkday,
+    type DailyWorkloadSnapshot,
+} from './statistics-helpers.js';
 import { formatLocalIsoDate } from './utils.js';
 import type { ScheduleCellsMap } from './types/index.js';
 import type { FirestoreDbWrapper } from './types/firebase';
@@ -78,4 +83,31 @@ export const persistTodayWorkloadSnapshot = async (
     })();
 
     return inFlightPromise;
+};
+
+/**
+ * Upewnia się, że dla dzisiejszego dnia roboczego istnieje snapshot obciążenia.
+ * Jeśli dokument w statsDaily/{todayIso} już istnieje, zwraca jego zawartość bez zapisu.
+ * W przeciwnym razie deleguje utworzenie i zapis do persistTodayWorkloadSnapshot.
+ * W dni wolne od pracy (weekendy i święta) nie wykonuje operacji zapisu i zwraca null.
+ */
+export const ensureTodayWorkloadSnapshot = async (
+    scheduleCells: ScheduleCellsMap,
+    referenceDate: Date = new Date()
+): Promise<DailyWorkloadSnapshot | null> => {
+    const todayIso = formatLocalIsoDate(referenceDate);
+    if (!isClinicalWorkday(todayIso)) {
+        return null;
+    }
+
+    const docSnap = await db
+        .collection<DailyWorkloadSnapshot>(DAILY_STATS_COLLECTION)
+        .doc(todayIso)
+        .get();
+
+    if (docSnap.exists) {
+        return docSnap.data() as DailyWorkloadSnapshot;
+    }
+
+    return persistTodayWorkloadSnapshot(scheduleCells, referenceDate);
 };

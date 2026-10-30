@@ -1,53 +1,88 @@
 import { AppConfig, isHoliday } from './common.js';
+import { findRotationPeriodForDate } from './rotation-periods.js';
+import { ScheduleLogic } from './schedule-logic.js';
 import type { Employee, LeaveEntry, ScheduleCellsMap } from './types/index.js';
 
-export interface ScheduleMetrics {
-    totalSlots: number;
-    uniquePatients: number;
-    breaks: number;
-    massageOrPnf: number;
-    everyOtherDay: number;
-    hydrotherapy: number;
-    endingToday: number;
-    endingSoon: number;
-    overdue: number;
-    extendedTreatments: number;
-    longExtensions: number;
-    missingTreatmentDates: number;
-    duplicatePatientEntries: number;
-    handoverMorning: number;
-    handoverAfternoon: number;
-    dataQualityScore: number;
-    byEmployee: Record<string, number>;
-    byHour: Record<string, number>;
-    possibleSlots: number;
-    availableSlots: number;
-    occupancyPercent: number;
-}
+export type WorkloadPeriodType = 'weekly' | 'biweekly' | 'monthly' | 'yearly';
 
-export interface WeeklyStatsSnapshot {
+export interface IsoWeekOption {
     weekKey: string;
-    year: number;
     weekNumber: number;
     weekStart: string;
     weekEnd: string;
-    updatedAt: string;
-    scheduleMetrics: ScheduleMetrics;
-    activeEmployeeCount: number;
-    averageAvailableEmployees: number;
-    leaveDays: number;
-    averagePatientsPerAvailableEmployee: number;
+    label: string;
 }
 
-export interface WeeklyAverages {
-    weeks: WeeklyStatsSnapshot[];
-    averageTotalSlots: number;
-    averageUniquePatients: number;
-    averageOccupancyPercent: number;
-    averageAvailableEmployees: number;
-    averagePatientsPerAvailableEmployee: number;
-    totalLeaveDays: number;
-    trendPercent: number | null;
+export interface DailyEmployeeWorkload {
+    employeeId: string;
+    employeeName: string;
+    patientSlots: number;
+    availableSlots: number;
+    occupancyPercent: number;
+    isOnLeave: boolean;
+    leaveType?: string | null;
+    uniquePatients?: number;
+    patientIds?: string[];
+}
+
+export interface DailyWorkloadSnapshot {
+    version?: number;
+    date: string;
+    year: number;
+    month: number;
+    dayOfWeek: number;
+    weekKey: string;
+    isWorkday: boolean;
+    updatedAt: string;
+    employees: Record<string, DailyEmployeeWorkload>;
+    totalPatients: number;
+    activeEmployeesCount: number;
+}
+
+export interface EmployeePeriodWorkloadSummary {
+    employeeId: string;
+    employeeName: string;
+    color: string;
+    workdaysInPeriod: number;
+    daysPresent: number;
+    daysOnLeave: number;
+    totalActiveSlots: number;
+    averageSlotsPerPresentDay: number;
+    dailyBreakdown: Record<string, DailyEmployeeWorkload>;
+}
+
+export interface PeriodWorkloadAverages {
+    periodType: WorkloadPeriodType;
+    periodKey: string;
+    periodLabel: string;
+    rangeStart: string;
+    rangeEnd: string;
+    recordedWorkdaysCount: number;
+    expectedWorkdaysCount: number;
+    totalPersonDaysPresent: number;
+    totalActiveSlots: number;
+    employeesWithPresenceCount: number;
+    averageDailyPerPresentEmployee: number;
+    averagePeriodSumPerPresentEmployee: number;
+    previousPeriodDeltaDaily: number | null;
+    employees: EmployeePeriodWorkloadSummary[];
+}
+
+export interface EmployeeColumnHygiene {
+    employeeId: string;
+    overdueBellsCount: number;
+    overdueTimes: string[];
+    activeExtensionsCount: number;
+    activeExtensionDaysSum: number;
+    undatedCount: number;
+    lastUpdatedIso: string | null;
+    lastUpdatedDaysAgo: number | null;
+}
+
+export interface ColumnHygieneReport {
+    totalOverdueBells: number;
+    undatedEntries: Array<{ employeeId: string; employeeName: string; time: string }>;
+    byEmployee: Record<string, EmployeeColumnHygiene>;
 }
 
 type EmployeesMap = Record<string, Employee>;
@@ -67,12 +102,18 @@ const formatDate = (date: Date): string => {
 
 const createUtcDate = (isoDate: string): Date => new Date(`${isoDate}T12:00:00Z`);
 
-const getMinutesFromTime = (time: string): number => {
-    const [hourRaw, minuteRaw] = time.split(':');
-    const hour = Number.parseInt(hourRaw || '0', 10);
-    const minute = Number.parseInt(minuteRaw || '0', 10);
-    return (Number.isFinite(hour) ? hour : 0) * 60 + (Number.isFinite(minute) ? minute : 0);
+const formatDayMonth = (iso: string): string => {
+    const parts = iso.split('-');
+    return `${parts[2]}.${parts[1]}`;
 };
+
+const getNumber = (value: unknown): number => {
+    const parsed = Number.parseInt(String(value ?? 0), 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const overlapsDate = (leave: LeaveEntry, dateIso: string): boolean =>
+    leave.startDate <= dateIso && leave.endDate >= dateIso;
 
 export const normalizeLeavesData = (rawData: unknown): LeavesMap => {
     if (!rawData || typeof rawData !== 'object') return {};
@@ -91,19 +132,11 @@ export const normalizeLeavesData = (rawData: unknown): LeavesMap => {
     );
 };
 
-export const getDateDiffInDays = (dateIso: string, referenceDate: Date = new Date()): number => {
-    const target = createUtcDate(dateIso);
-    const reference = new Date(Date.UTC(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate(), 12));
-    return Math.round((target.getTime() - reference.getTime()) / 86400000);
-};
-
-const getNumber = (value: unknown): number => {
-    const parsed = Number.parseInt(String(value ?? 0), 10);
-    return Number.isFinite(parsed) ? parsed : 0;
-};
+export const getEmployeeDisplayName = (employeeId: string, employee: Employee): string =>
+    employee.displayName || employee.name || `${employee.firstName || ''} ${employee.lastName || ''}`.trim() || `Pracownik ${Number.parseInt(employeeId, 10) + 1}`;
 
 export const getActiveEmployeeIds = (employees: EmployeesMap): string[] =>
-    Object.keys(employees).filter(id => !employees[id].isHidden && !employees[id].isScheduleOnly);
+    Object.keys(employees).filter(id => !employees[id]?.isHidden);
 
 export const generateScheduleTimeSlots = (): string[] => {
     const slots: string[] = [];
@@ -116,12 +149,33 @@ export const generateScheduleTimeSlots = (): string[] => {
     return slots;
 };
 
+export const isClinicalWorkday = (dateIso: string): boolean => {
+    const date = createUtcDate(dateIso);
+    const day = date.getUTCDay();
+    return day >= 1 && day <= 5 && !isHoliday(date);
+};
+
+export const countClinicalWorkdaysInRange = (startIso: string, endIso: string): number => {
+    if (startIso > endIso) return 0;
+    const cursor = createUtcDate(startIso);
+    const end = createUtcDate(endIso);
+    let count = 0;
+    while (cursor <= end) {
+        const iso = cursor.toISOString().split('T')[0];
+        if (isClinicalWorkday(iso)) {
+            count++;
+        }
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    return count;
+};
+
 export const getIsoWeekInfo = (dateInput: Date = new Date()): { year: number; weekNumber: number; weekKey: string; weekStart: string; weekEnd: string } => {
-    const date = new Date(Date.UTC(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate()));
+    const date = new Date(Date.UTC(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate(), 12));
     const day = date.getUTCDay() || 7;
     date.setUTCDate(date.getUTCDate() + 4 - day);
 
-    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1, 12));
     const weekNumber = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
     const year = date.getUTCFullYear();
 
@@ -140,362 +194,28 @@ export const getIsoWeekInfo = (dateInput: Date = new Date()): { year: number; we
     };
 };
 
-export const getRecentIsoWeekKeys = (referenceDate: Date = new Date(), count = 4): string[] => {
-    const keys: string[] = [];
-    const cursor = new Date(Date.UTC(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate()));
+export const getIsoWeeksForYear = (year: number): IsoWeekOption[] => {
+    const weeks: IsoWeekOption[] = [];
+    const jan4 = new Date(Date.UTC(year, 0, 4, 12));
+    const day = jan4.getUTCDay() || 7;
+    const cursor = new Date(Date.UTC(year, 0, 4 - day + 1, 12));
 
-    for (let i = 0; i < count; i++) {
-        keys.push(getIsoWeekInfo(cursor).weekKey);
-        cursor.setUTCDate(cursor.getUTCDate() - 7);
-    }
-
-    return keys.reverse();
-};
-
-export const calculateScheduleMetrics = (
-    scheduleCells: ScheduleCellsMap | null | undefined,
-    activeEmployeeIds: string[],
-    referenceDate: Date = new Date()
-): ScheduleMetrics => {
-    const metrics: ScheduleMetrics = {
-        totalSlots: 0,
-        uniquePatients: 0,
-        breaks: 0,
-        massageOrPnf: 0,
-        everyOtherDay: 0,
-        hydrotherapy: 0,
-        endingToday: 0,
-        endingSoon: 0,
-        overdue: 0,
-        extendedTreatments: 0,
-        longExtensions: 0,
-        missingTreatmentDates: 0,
-        duplicatePatientEntries: 0,
-        handoverMorning: 0,
-        handoverAfternoon: 0,
-        dataQualityScore: 100,
-        byEmployee: {},
-        byHour: {},
-        possibleSlots: generateScheduleTimeSlots().length * activeEmployeeIds.length,
-        availableSlots: 0,
-        occupancyPercent: 0,
-    };
-
-    const uniquePatients = new Set<string>();
-    const patientEntryCounts = new Map<string, number>();
-
-    activeEmployeeIds.forEach(id => {
-        metrics.byEmployee[id] = 0;
-    });
-
-    if (!scheduleCells) {
-        metrics.availableSlots = metrics.possibleSlots;
-        return metrics;
-    }
-
-    const registerPatient = (
-        employeeId: string,
-        time: string,
-        patientName: string,
-        treatmentStartDate?: string | null,
-        treatmentEndDate?: string | null,
-        treatmentExtensionDays?: number | null
-    ): void => {
-        metrics.totalSlots++;
-        metrics.byEmployee[employeeId] = (metrics.byEmployee[employeeId] || 0) + 1;
-        metrics.byHour[time] = (metrics.byHour[time] || 0) + 1;
-        const normalizedPatientName = patientName.trim().toLocaleLowerCase('pl-PL');
-        uniquePatients.add(normalizedPatientName);
-        patientEntryCounts.set(normalizedPatientName, (patientEntryCounts.get(normalizedPatientName) || 0) + 1);
-
-        const minutes = getMinutesFromTime(time);
-        if (minutes <= 10 * 60 + 30) metrics.handoverMorning++;
-        if (minutes >= 14 * 60 + 30) metrics.handoverAfternoon++;
-
-        const extensionDays = getNumber(treatmentExtensionDays);
-        if (extensionDays > 0) metrics.extendedTreatments++;
-        if (extensionDays >= 15) metrics.longExtensions++;
-
-        if (!treatmentStartDate || !treatmentEndDate) {
-            metrics.missingTreatmentDates++;
-            return;
-        }
-
-        const diffDays = getDateDiffInDays(treatmentEndDate, referenceDate);
-        if (diffDays < 0) {
-            metrics.overdue++;
-        } else if (diffDays === 0) {
-            metrics.endingToday++;
-        } else if (diffDays <= 3) {
-            metrics.endingSoon++;
-        }
-    };
-
-    for (const [time, row] of Object.entries(scheduleCells)) {
-        for (const employeeId of activeEmployeeIds) {
-            const cell = row?.[employeeId];
-            if (!cell) continue;
-
-            if (cell.isBreak) {
-                metrics.breaks++;
-                continue;
-            }
-
-            if (cell.isSplit) {
-                if (cell.isHydrotherapy1) metrics.hydrotherapy++;
-                if (cell.isHydrotherapy2) metrics.hydrotherapy++;
-
-                if (isFilled(cell.content1) && !cell.isHydrotherapy1) {
-                    registerPatient(
-                        employeeId,
-                        time,
-                        cell.content1,
-                        cell.treatmentData1?.startDate,
-                        cell.treatmentData1?.endDate,
-                        cell.treatmentData1?.extensionDays
-                    );
-                    if (cell.isMassage1 || cell.isPnf1) metrics.massageOrPnf++;
-                    if (cell.isEveryOtherDay1) metrics.everyOtherDay++;
-                }
-                if (isFilled(cell.content2) && !cell.isHydrotherapy2) {
-                    registerPatient(
-                        employeeId,
-                        time,
-                        cell.content2,
-                        cell.treatmentData2?.startDate,
-                        cell.treatmentData2?.endDate,
-                        cell.treatmentData2?.extensionDays
-                    );
-                    if (cell.isMassage2 || cell.isPnf2) metrics.massageOrPnf++;
-                    if (cell.isEveryOtherDay2) metrics.everyOtherDay++;
-                }
-            } else {
-                if (cell.isHydrotherapy) {
-                    metrics.hydrotherapy++;
-                    continue;
-                }
-
-                if (isFilled(cell.content)) {
-                    registerPatient(
-                        employeeId,
-                        time,
-                        cell.content,
-                        cell.treatmentStartDate,
-                        cell.treatmentEndDate,
-                        cell.treatmentExtensionDays
-                    );
-                    if (cell.isMassage || cell.isPnf) metrics.massageOrPnf++;
-                    if (cell.isEveryOtherDay) metrics.everyOtherDay++;
-                }
-            }
-        }
-    }
-
-    metrics.uniquePatients = uniquePatients.size;
-    metrics.duplicatePatientEntries = Array.from(patientEntryCounts.values())
-        .reduce((sum, count) => sum + Math.max(0, count - 1), 0);
-    metrics.availableSlots = Math.max(0, metrics.possibleSlots - metrics.breaks - metrics.hydrotherapy);
-    metrics.occupancyPercent = metrics.availableSlots > 0
-        ? Math.round((metrics.totalSlots / metrics.availableSlots) * 100)
-        : 0;
-    const qualityPenalty = (metrics.missingTreatmentDates * 8)
-        + (metrics.duplicatePatientEntries * 6)
-        + (metrics.overdue * 4);
-    metrics.dataQualityScore = Math.max(0, Math.min(100, 100 - qualityPenalty));
-
-    return metrics;
-};
-
-const overlapsDate = (leave: LeaveEntry, dateIso: string): boolean => leave.startDate <= dateIso && leave.endDate >= dateIso;
-
-const countWorkdaysInOverlap = (leave: LeaveEntry, rangeStartIso: string, rangeEndIso: string): number => {
-    const start = createUtcDate(leave.startDate > rangeStartIso ? leave.startDate : rangeStartIso);
-    const end = createUtcDate(leave.endDate < rangeEndIso ? leave.endDate : rangeEndIso);
-    let count = 0;
-
-    for (const current = new Date(start); current <= end; current.setUTCDate(current.getUTCDate() + 1)) {
-        const day = current.getUTCDay();
-        if (day !== 0 && day !== 6 && !isHoliday(current)) count++;
-    }
-
-    return count;
-};
-
-export const calculateLeaveDaysInWeek = (leavesData: LeavesMap, weekStart: string, weekEnd: string): number => {
-    let total = 0;
-
-    Object.values(leavesData).forEach(leaves => {
-        leaves.forEach(leave => {
-            if (leave.startDate <= weekEnd && leave.endDate >= weekStart) {
-                total += countWorkdaysInOverlap(leave, weekStart, weekEnd);
-            }
+    while (true) {
+        const info = getIsoWeekInfo(cursor);
+        if (info.year !== year) break;
+        const startParts = info.weekStart.split('-');
+        const endParts = info.weekEnd.split('-');
+        const label = `Tydzień ${info.weekNumber} (${startParts[2]}.${startParts[1]} – ${endParts[2]}.${endParts[1]})`;
+        weeks.push({
+            weekKey: info.weekKey,
+            weekNumber: info.weekNumber,
+            weekStart: info.weekStart,
+            weekEnd: info.weekEnd,
+            label,
         });
-    });
-
-    return total;
-};
-
-export const calculateAverageAvailableEmployees = (
-    employees: EmployeesMap,
-    leavesData: LeavesMap,
-    weekStart: string,
-    weekEnd: string
-): number => {
-    const activeEntries = Object.entries(employees).filter(([, employee]) => !employee.isHidden && !employee.isScheduleOnly);
-    if (activeEntries.length === 0) return 0;
-
-    const start = createUtcDate(weekStart);
-    const end = createUtcDate(weekEnd);
-    let workdays = 0;
-    let availableTotal = 0;
-
-    for (const current = new Date(start); current <= end; current.setUTCDate(current.getUTCDate() + 1)) {
-        const day = current.getUTCDay();
-        if (day === 0 || day === 6) continue;
-
-        workdays++;
-        const dateIso = formatDate(current);
-        const availableToday = activeEntries.filter(([employeeId]) => {
-            const displayName = getEmployeeDisplayName(employeeId, employees[employeeId]);
-            const leaves = leavesData[displayName] || [];
-            return !leaves.some(leave => overlapsDate(leave, dateIso));
-        }).length;
-        availableTotal += availableToday;
+        cursor.setUTCDate(cursor.getUTCDate() + 7);
     }
-
-    return workdays > 0 ? roundToOne(availableTotal / workdays) : activeEntries.length;
-};
-
-export const getEmployeeDisplayName = (employeeId: string, employee: Employee): string =>
-    employee.displayName || employee.name || `${employee.firstName || ''} ${employee.lastName || ''}`.trim() || `Pracownik ${Number.parseInt(employeeId, 10) + 1}`;
-
-export const createWeeklyStatsSnapshot = (
-    scheduleCells: ScheduleCellsMap | null | undefined,
-    employees: EmployeesMap,
-    leavesData: LeavesMap,
-    referenceDate: Date = new Date()
-): WeeklyStatsSnapshot => {
-    const week = getIsoWeekInfo(referenceDate);
-    const activeEmployeeIds = getActiveEmployeeIds(employees);
-    const scheduleMetrics = calculateScheduleMetrics(scheduleCells, activeEmployeeIds);
-    const averageAvailableEmployees = calculateAverageAvailableEmployees(employees, leavesData, week.weekStart, week.weekEnd);
-
-    return {
-        weekKey: week.weekKey,
-        year: week.year,
-        weekNumber: week.weekNumber,
-        weekStart: week.weekStart,
-        weekEnd: week.weekEnd,
-        updatedAt: new Date().toISOString(),
-        scheduleMetrics,
-        activeEmployeeCount: activeEmployeeIds.length,
-        averageAvailableEmployees,
-        leaveDays: calculateLeaveDaysInWeek(leavesData, week.weekStart, week.weekEnd),
-        averagePatientsPerAvailableEmployee: averageAvailableEmployees > 0
-            ? roundToOne(scheduleMetrics.totalSlots / averageAvailableEmployees)
-            : 0,
-    };
-};
-
-export const calculateWeeklyAverages = (
-    snapshots: WeeklyStatsSnapshot[],
-    referenceDate: Date = new Date(),
-    weekCount = 4
-): WeeklyAverages => {
-    const recentKeys = new Set(getRecentIsoWeekKeys(referenceDate, weekCount));
-    const weeks = snapshots
-        .filter(snapshot => recentKeys.has(snapshot.weekKey))
-        .sort((a, b) => a.weekKey.localeCompare(b.weekKey));
-
-    const divisor = weeks.length || 1;
-    const averageTotalSlots = roundToOne(weeks.reduce((sum, week) => sum + week.scheduleMetrics.totalSlots, 0) / divisor);
-    const averageUniquePatients = roundToOne(weeks.reduce((sum, week) => sum + week.scheduleMetrics.uniquePatients, 0) / divisor);
-    const averageOccupancyPercent = roundToOne(weeks.reduce((sum, week) => sum + week.scheduleMetrics.occupancyPercent, 0) / divisor);
-    const averageAvailableEmployees = roundToOne(weeks.reduce((sum, week) => sum + week.averageAvailableEmployees, 0) / divisor);
-    const averagePatientsPerAvailableEmployee = roundToOne(weeks.reduce((sum, week) => sum + week.averagePatientsPerAvailableEmployee, 0) / divisor);
-    const totalLeaveDays = roundToOne(weeks.reduce((sum, week) => sum + week.leaveDays, 0));
-
-    const previous = weeks.length > 1 ? weeks[weeks.length - 2].scheduleMetrics.totalSlots : null;
-    const current = weeks.length > 0 ? weeks[weeks.length - 1].scheduleMetrics.totalSlots : null;
-    const trendPercent = previous && current !== null
-        ? roundToOne(((current - previous) / previous) * 100)
-        : null;
-
-    return {
-        weeks,
-        averageTotalSlots,
-        averageUniquePatients,
-        averageOccupancyPercent,
-        averageAvailableEmployees,
-        averagePatientsPerAvailableEmployee,
-        totalLeaveDays,
-        trendPercent,
-    };
-};
-
-export interface DailyEmployeeWorkload {
-    employeeId: string;
-    employeeName: string;
-    patientSlots: number;
-    uniquePatients: number;
-    /** Nieosobowe ID pacjentów obecnych w danym dniu; brak w starych snapshotach. */
-    patientIds: string[];
-    availableSlots: number;
-    occupancyPercent: number;
-    isOnLeave: boolean;
-    leaveType?: string | null;
-}
-
-export interface DailyWorkloadSnapshot {
-    version?: number;
-    date: string; // YYYY-MM-DD
-    year: number;
-    month: number; // 1-12
-    dayOfWeek: number; // 1 (Mon) - 7 (Sun)
-    weekKey: string; // YYYY-Www
-    isWorkday: boolean;
-    updatedAt: string;
-    employees: Record<string, DailyEmployeeWorkload>;
-    totalPatients: number;
-    activeEmployeesCount: number;
-}
-
-export interface EmployeePeriodWorkloadSummary {
-    employeeId: string;
-    employeeName: string;
-    color: string;
-    shiftGroup?: string | null;
-    workdaysInPeriod: number;
-    daysPresent: number;
-    daysOnLeave: number;
-    totalPatients: number;
-    totalUniquePatients: number;
-    totalAvailableSlots: number;
-    averagePatientsPerPresentDay: number;
-    averagePatientsPerWorkday: number;
-    averagePatientsPerWeek: number;
-    occupancyPercent: number;
-    dailyBreakdown: Record<string, DailyEmployeeWorkload>;
-}
-
-export interface PeriodWorkloadAverages {
-    periodType: 'weekly' | 'monthly' | 'yearly';
-    periodKey: string;
-    periodLabel: string;
-    workdaysCount: number;
-    totalPatientCount: number;
-    averageDailyPerPresentEmployee: number;
-    averageDailyPerWorkday: number;
-    averageWeeklyPerEmployee: number;
-    averageOccupancyPercent: number;
-    employees: EmployeePeriodWorkloadSummary[];
-    trendPercent: number | null;
-}
-
-const isClinicalWorkday = (dateIso: string): boolean => {
-    const date = createUtcDate(dateIso);
-    const day = date.getUTCDay();
-    return day >= 1 && day <= 5 && !isHoliday(date);
+    return weeks;
 };
 
 const isEveryOtherWorkday = (startDate: string | null | undefined, dateIso: string): boolean => {
@@ -530,6 +250,29 @@ export const createDailyWorkloadSnapshot = (
     const employeesWorkload: Record<string, DailyEmployeeWorkload> = {};
     let totalPatientsInDay = 0;
 
+    const isEntryActiveOnDate = (
+        content: string | null | undefined,
+        startDate?: string | null,
+        rawEndDate?: string | null,
+        extensionDays?: number | null,
+        everyOtherDay?: boolean | null,
+        isHydroPart?: boolean | null
+    ): boolean => {
+        if (isHydroPart) return false;
+        if (!isFilled(content)) return false;
+        if (!startDate || !startDate.trim()) return false;
+
+        const effectiveStart = startDate.trim();
+        const extDays = getNumber(extensionDays);
+        const effectiveEnd = rawEndDate?.trim() || ScheduleLogic.calculateEndDate(effectiveStart, extDays);
+
+        if (dateIso < effectiveStart || dateIso > effectiveEnd) return false;
+        if (everyOtherDay) {
+            return isEveryOtherWorkday(effectiveStart, dateIso);
+        }
+        return true;
+    };
+
     activeEmployeeIds.forEach(employeeId => {
         const employee = employees[employeeId];
         const displayName = getEmployeeDisplayName(employeeId, employee);
@@ -538,11 +281,9 @@ export const createDailyWorkloadSnapshot = (
         const isOnLeave = Boolean(activeLeave);
 
         let patientSlots = 0;
-        const uniquePatientKeys = new Set<string>();
-        const patientIds = new Set<string>();
         let availableSlots = 0;
 
-        if (scheduleCells) {
+        if (scheduleCells && isWorkday) {
             timeSlots.forEach(time => {
                 const cell = scheduleCells[time]?.[employeeId];
                 if (!cell) {
@@ -557,41 +298,48 @@ export const createDailyWorkloadSnapshot = (
 
                 if (isOnLeave) return;
 
-                const checkPatientActive = (
-                    name: string | null | undefined,
-                    startDate?: string | null,
-                    endDate?: string | null,
-                    everyOtherDay?: boolean | null
-                ): boolean => {
-                    if (!isFilled(name)) return false;
-                    if (!startDate || !endDate) return true; // Domyślnie aktywny jeśli brak dat
-                    if (dateIso < startDate || dateIso > endDate) return false;
-                    return !everyOtherDay || isEveryOtherWorkday(startDate, dateIso);
-                };
-
-                const registerPatient = (name: string | null | undefined, patientId: string | null | undefined): void => {
-                    patientSlots++;
-                    const normalizedName = name!.trim().toLocaleLowerCase('pl-PL');
-                    const patientKey = patientId ? `id:${patientId}` : `legacy:${normalizedName}`;
-                    uniquePatientKeys.add(patientKey);
-                    patientIds.add(patientKey);
-                };
-
                 if (cell.isSplit) {
-                    if (!cell.isHydrotherapy1 && checkPatientActive(cell.content1, cell.treatmentData1?.startDate, cell.treatmentData1?.endDate, cell.isEveryOtherDay1)) {
-                        registerPatient(cell.content1, cell.patientId1);
+                    const part1Active = isEntryActiveOnDate(
+                        cell.content1,
+                        cell.treatmentData1?.startDate,
+                        cell.treatmentData1?.endDate,
+                        cell.treatmentData1?.extensionDays,
+                        cell.isEveryOtherDay1,
+                        cell.isHydrotherapy1
+                    );
+                    const part2Active = isEntryActiveOnDate(
+                        cell.content2,
+                        cell.treatmentData2?.startDate,
+                        cell.treatmentData2?.endDate,
+                        cell.treatmentData2?.extensionDays,
+                        cell.isEveryOtherDay2,
+                        cell.isHydrotherapy2
+                    );
+                    if (part1Active || part2Active) {
+                        patientSlots++;
                     }
-                    if (!cell.isHydrotherapy2 && checkPatientActive(cell.content2, cell.treatmentData2?.startDate, cell.treatmentData2?.endDate, cell.isEveryOtherDay2)) {
-                        registerPatient(cell.content2, cell.patientId2);
-                    }
-                } else if (checkPatientActive(cell.content, cell.treatmentStartDate, cell.treatmentEndDate, cell.isEveryOtherDay)) {
-                    registerPatient(cell.content, cell.patientId);
+                } else if (isEntryActiveOnDate(
+                    cell.content,
+                    cell.treatmentStartDate,
+                    cell.treatmentEndDate,
+                    cell.treatmentExtensionDays,
+                    cell.isEveryOtherDay,
+                    false
+                )) {
+                    patientSlots++;
+                }
+            });
+        } else if (!isWorkday && scheduleCells) {
+            timeSlots.forEach(time => {
+                const cell = scheduleCells[time]?.[employeeId];
+                if (!cell || (!cell.isBreak && !cell.isHydrotherapy)) {
+                    availableSlots++;
                 }
             });
         }
 
         const occupancyPercent = availableSlots > 0 ? Math.round((patientSlots / availableSlots) * 100) : 0;
-        if (!isOnLeave) {
+        if (!isOnLeave && isWorkday) {
             totalPatientsInDay += patientSlots;
         }
 
@@ -599,12 +347,12 @@ export const createDailyWorkloadSnapshot = (
             employeeId,
             employeeName: displayName,
             patientSlots,
-            uniquePatients: uniquePatientKeys.size,
-            patientIds: Array.from(patientIds).sort(),
             availableSlots,
             occupancyPercent,
             isOnLeave,
             leaveType: activeLeave ? activeLeave.type : null,
+            uniquePatients: patientSlots,
+            patientIds: [],
         };
     });
 
@@ -625,49 +373,88 @@ export const createDailyWorkloadSnapshot = (
 
 export const calculatePeriodWorkloadAverages = (
     snapshots: DailyWorkloadSnapshot[],
-    periodType: 'weekly' | 'monthly' | 'yearly',
+    periodType: WorkloadPeriodType,
     options: {
         weekKey?: string;
+        periodStart?: string;
+        periodEnd?: string;
         month?: number;
         year: number;
         employees: EmployeesMap;
+        referenceDate?: Date;
     }
 ): PeriodWorkloadAverages => {
-    const { weekKey, month, year, employees } = options;
+    const { weekKey, periodStart, periodEnd, month, year, employees } = options;
+    const refDate = options.referenceDate ?? new Date();
+    const refIso = formatDate(refDate);
     const activeEmployeeIds = getActiveEmployeeIds(employees);
 
-    // Snapshot jest źródłem historycznym. Brak snapshotu oznacza brak danych,
-    // nie zerowe obciążenie. Dzień roboczy wyliczamy ponownie, aby wykluczyć święta
-    // również dla zapisów utworzonych przez wcześniejszą wersję aplikacji.
-    let filteredSnapshots = snapshots.filter(s => isClinicalWorkday(s.date));
-    let periodKey = String(year);
-    let periodLabel = `Rok ${year}`;
+    let rangeStart = '';
+    let rangeEnd = '';
+    let periodKey = '';
+    let periodLabel = '';
 
     if (periodType === 'weekly') {
-        const targetWeek = weekKey || getIsoWeekInfo().weekKey;
-        filteredSnapshots = filteredSnapshots.filter(s => s.weekKey === targetWeek);
+        const targetWeek = weekKey || getIsoWeekInfo(refDate).weekKey;
         periodKey = targetWeek;
-        const first = filteredSnapshots[0];
-        periodLabel = `Tydzień ${targetWeek}${first ? ` (${first.weekKey})` : ''}`;
+        const [yStr, wStr] = targetWeek.split('-W');
+        const wNum = Number.parseInt(wStr || '1', 10);
+        const yNum = Number.parseInt(yStr || String(year), 10);
+        const jan4 = new Date(Date.UTC(yNum, 0, 4, 12));
+        const day = jan4.getUTCDay() || 7;
+        const cursor = new Date(Date.UTC(yNum, 0, 4 - day + 1 + (wNum - 1) * 7, 12));
+        rangeStart = formatDate(cursor);
+        cursor.setUTCDate(cursor.getUTCDate() + 6);
+        rangeEnd = formatDate(cursor);
+        periodLabel = `Tydzień ${wNum} (${formatDayMonth(rangeStart)} – ${formatDayMonth(rangeEnd)})`;
+    } else if (periodType === 'biweekly') {
+        if (periodStart && periodEnd) {
+            rangeStart = periodStart;
+            rangeEnd = periodEnd;
+        } else {
+            const rotation = findRotationPeriodForDate(refIso);
+            rangeStart = rotation.start;
+            rangeEnd = rotation.end;
+        }
+        periodKey = `${rangeStart}_${rangeEnd}`;
+        periodLabel = `Zmiana: ${formatDayMonth(rangeStart)} – ${formatDayMonth(rangeEnd)}`;
     } else if (periodType === 'monthly') {
-        filteredSnapshots = filteredSnapshots.filter(s => s.year === year);
-        const targetMonth = month || (new Date().getUTCMonth() + 1);
-        filteredSnapshots = filteredSnapshots.filter(s => s.month === targetMonth);
+        const targetMonth = month ?? (refDate.getMonth() + 1);
         periodKey = `${year}-${String(targetMonth).padStart(2, '0')}`;
+        rangeStart = `${year}-${String(targetMonth).padStart(2, '0')}-01`;
+        const lastDay = new Date(Date.UTC(year, targetMonth, 0)).getUTCDate();
+        rangeEnd = `${year}-${String(targetMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
         const monthNames = [
             'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
             'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
         ];
         periodLabel = `${monthNames[targetMonth - 1]} ${year}`;
     } else {
-        filteredSnapshots = filteredSnapshots.filter(s => s.year === year);
+        periodKey = String(year);
+        periodLabel = `Rok ${year}`;
+        rangeStart = `${year}-01-01`;
+        rangeEnd = `${year}-12-31`;
     }
 
-    // Sortuj chronologicznie
-    filteredSnapshots.sort((a, b) => a.date.localeCompare(b.date));
-    const workdaysCount = filteredSnapshots.length;
+    const filteredSnapshots = snapshots
+        .filter(s => s.date >= rangeStart && s.date <= rangeEnd && isClinicalWorkday(s.date))
+        .sort((a, b) => a.date.localeCompare(b.date));
 
-    let grandTotalPatients = 0;
+    const recordedDates = new Set(filteredSnapshots.map(s => s.date));
+    const recordedWorkdaysCount = recordedDates.size;
+
+    let expectedWorkdaysCount = 0;
+    if (refIso < rangeStart) {
+        expectedWorkdaysCount = 0;
+    } else if (refIso >= rangeEnd) {
+        expectedWorkdaysCount = countClinicalWorkdaysInRange(rangeStart, rangeEnd);
+    } else {
+        expectedWorkdaysCount = countClinicalWorkdaysInRange(rangeStart, refIso);
+    }
+
+    let totalActiveSlotsAll = 0;
+    let totalPersonDaysPresent = 0;
+    let employeesWithPresenceCount = 0;
     const employeeSummaries: EmployeePeriodWorkloadSummary[] = [];
 
     activeEmployeeIds.forEach(employeeId => {
@@ -675,9 +462,7 @@ export const calculatePeriodWorkloadAverages = (
         const employeeName = getEmployeeDisplayName(employeeId, employee);
         let daysPresent = 0;
         let daysOnLeave = 0;
-        let totalPatients = 0;
-        let totalAvailableSlots = 0;
-        const uniqueNames = new Set<string>();
+        let totalActiveSlots = 0;
         const dailyBreakdown: Record<string, DailyEmployeeWorkload> = {};
 
         filteredSnapshots.forEach(snap => {
@@ -688,72 +473,249 @@ export const calculatePeriodWorkloadAverages = (
                     daysOnLeave++;
                 } else {
                     daysPresent++;
-                    totalPatients += empData.patientSlots;
-                    totalAvailableSlots += empData.availableSlots;
-                    if (empData.patientIds && empData.patientIds.length > 0) {
-                        empData.patientIds.forEach(patientKey => uniqueNames.add(patientKey));
-                    } else if (empData.uniquePatients > 0) {
-                        // Fallback dla dawnych snapshotów bez tablicy patientIds
-                        for (let i = 0; i < empData.uniquePatients; i++) {
-                            uniqueNames.add(`legacy-${snap.date}-${employeeId}-${i}`);
-                        }
-                    }
+                    totalActiveSlots += (empData.patientSlots || 0);
                 }
             }
         });
 
-        grandTotalPatients += totalPatients;
-        const avgPresent = daysPresent > 0 ? roundToOne(totalPatients / daysPresent) : 0;
-        const avgWorkday = workdaysCount > 0 ? roundToOne(totalPatients / workdaysCount) : 0;
-        // Średnia tygodniowa normalizowana do standardowego 5-dniowego tygodnia pracy na bazie dni obecności.
-        // Zapobiega sztucznemu zaniżaniu średniej przy niepełnym tygodniu lub pojedynczym zapisanym dniu.
-        const avgWeekly = roundToOne(avgPresent * 5);
-        const occupancy = totalAvailableSlots > 0 ? Math.round((totalPatients / totalAvailableSlots) * 100) : 0;
+        totalActiveSlotsAll += totalActiveSlots;
+        totalPersonDaysPresent += daysPresent;
+        if (daysPresent > 0) {
+            employeesWithPresenceCount++;
+        }
+
+        const averageSlotsPerPresentDay = daysPresent > 0 ? roundToOne(totalActiveSlots / daysPresent) : 0;
 
         employeeSummaries.push({
             employeeId,
             employeeName,
-            color: employee.color || '#94a3b8',
-            shiftGroup: employee.shiftGroup,
-            workdaysInPeriod: workdaysCount,
+            color: employee?.color || '#94a3b8',
+            workdaysInPeriod: recordedWorkdaysCount,
             daysPresent,
             daysOnLeave,
-            totalPatients,
-            totalUniquePatients: uniqueNames.size,
-            totalAvailableSlots,
-            averagePatientsPerPresentDay: avgPresent,
-            averagePatientsPerWorkday: avgWorkday,
-            averagePatientsPerWeek: avgWeekly,
-            occupancyPercent: occupancy,
+            totalActiveSlots,
+            averageSlotsPerPresentDay,
             dailyBreakdown,
         });
     });
 
-    const activeCount = employeeSummaries.length || 1;
-    const totalPresentDaysAll = employeeSummaries.reduce((acc, e) => acc + e.daysPresent, 0);
-    const avgDailyPerPresent = totalPresentDaysAll > 0
-        ? roundToOne(grandTotalPatients / totalPresentDaysAll)
+    const averageDailyPerPresentEmployee = totalPersonDaysPresent > 0
+        ? roundToOne(totalActiveSlotsAll / totalPersonDaysPresent)
         : 0;
-    const avgDailyPerWorkday = (workdaysCount * activeCount) > 0
-        ? roundToOne(grandTotalPatients / (workdaysCount * activeCount))
+
+    const averagePeriodSumPerPresentEmployee = employeesWithPresenceCount > 0
+        ? roundToOne(totalActiveSlotsAll / employeesWithPresenceCount)
         : 0;
-    const avgWeeklyPerEmployee = roundToOne(avgDailyPerPresent * 5);
-    const avgOccupancy = Math.round(
-        employeeSummaries.reduce((acc, e) => acc + e.occupancyPercent, 0) / activeCount
-    );
+
+    let previousPeriodDeltaDaily: number | null = null;
+    let prevStart = '';
+    let prevEnd = '';
+
+    if (periodType === 'weekly') {
+        const cursor = createUtcDate(rangeStart);
+        cursor.setUTCDate(cursor.getUTCDate() - 7);
+        const prevWeek = getIsoWeekInfo(cursor);
+        const [pyStr, pwStr] = prevWeek.weekKey.split('-W');
+        const pwNum = Number.parseInt(pwStr, 10);
+        const pyNum = Number.parseInt(pyStr, 10);
+        const pJan4 = new Date(Date.UTC(pyNum, 0, 4, 12));
+        const pDay = pJan4.getUTCDay() || 7;
+        const pCur = new Date(Date.UTC(pyNum, 0, 4 - pDay + 1 + (pwNum - 1) * 7, 12));
+        prevStart = formatDate(pCur);
+        pCur.setUTCDate(pCur.getUTCDate() + 6);
+        prevEnd = formatDate(pCur);
+    } else if (periodType === 'biweekly') {
+        const cursor = createUtcDate(rangeStart);
+        cursor.setUTCDate(cursor.getUTCDate() - 3);
+        const prevRot = findRotationPeriodForDate(formatDate(cursor));
+        prevStart = prevRot.start;
+        prevEnd = prevRot.end;
+    } else if (periodType === 'monthly') {
+        const targetMonth = month ?? (refDate.getMonth() + 1);
+        const pMonth = targetMonth === 1 ? 12 : targetMonth - 1;
+        const pYear = targetMonth === 1 ? year - 1 : year;
+        prevStart = `${pYear}-${String(pMonth).padStart(2, '0')}-01`;
+        const pLastDay = new Date(Date.UTC(pYear, pMonth, 0)).getUTCDate();
+        prevEnd = `${pYear}-${String(pMonth).padStart(2, '0')}-${String(pLastDay).padStart(2, '0')}`;
+    } else {
+        const pYear = year - 1;
+        prevStart = `${pYear}-01-01`;
+        prevEnd = `${pYear}-12-31`;
+    }
+
+    const prevSnapshots = snapshots.filter(s => s.date >= prevStart && s.date <= prevEnd && isClinicalWorkday(s.date));
+    if (prevSnapshots.length > 0) {
+        let prevTotalSlots = 0;
+        let prevPersonDays = 0;
+        prevSnapshots.forEach(snap => {
+            activeEmployeeIds.forEach(id => {
+                const empData = snap.employees[id];
+                if (empData && !empData.isOnLeave) {
+                    prevTotalSlots += (empData.patientSlots || 0);
+                    prevPersonDays++;
+                }
+            });
+        });
+        if (prevPersonDays > 0) {
+            const prevAvgDaily = roundToOne(prevTotalSlots / prevPersonDays);
+            previousPeriodDeltaDaily = roundToOne(averageDailyPerPresentEmployee - prevAvgDaily);
+        }
+    }
 
     return {
         periodType,
         periodKey,
         periodLabel,
-        workdaysCount,
-        totalPatientCount: grandTotalPatients,
-        averageDailyPerPresentEmployee: avgDailyPerPresent,
-        averageDailyPerWorkday: avgDailyPerWorkday,
-        averageWeeklyPerEmployee: avgWeeklyPerEmployee,
-        averageOccupancyPercent: avgOccupancy,
+        rangeStart,
+        rangeEnd,
+        recordedWorkdaysCount,
+        expectedWorkdaysCount,
+        totalPersonDaysPresent,
+        totalActiveSlots: totalActiveSlotsAll,
+        employeesWithPresenceCount,
+        averageDailyPerPresentEmployee,
+        averagePeriodSumPerPresentEmployee,
+        previousPeriodDeltaDaily,
         employees: employeeSummaries,
-        trendPercent: null,
     };
 };
 
+export const calculateColumnHygieneMetrics = (
+    scheduleCells: ScheduleCellsMap | null | undefined,
+    employees: EmployeesMap,
+    referenceDate: Date = new Date()
+): ColumnHygieneReport => {
+    const todayIso = formatDate(referenceDate);
+    const activeEmployeeIds = getActiveEmployeeIds(employees);
+    const timeSlots = generateScheduleTimeSlots();
+
+    const byEmployee: Record<string, EmployeeColumnHygiene> = {};
+    const undatedEntries: Array<{ employeeId: string; employeeName: string; time: string }> = [];
+    let totalOverdueBells = 0;
+
+    activeEmployeeIds.forEach(employeeId => {
+        byEmployee[employeeId] = {
+            employeeId,
+            overdueBellsCount: 0,
+            overdueTimes: [],
+            activeExtensionsCount: 0,
+            activeExtensionDaysSum: 0,
+            undatedCount: 0,
+            lastUpdatedIso: null,
+            lastUpdatedDaysAgo: null,
+        };
+    });
+
+    if (!scheduleCells) {
+        return {
+            totalOverdueBells: 0,
+            undatedEntries: [],
+            byEmployee,
+        };
+    }
+
+    activeEmployeeIds.forEach(employeeId => {
+        const employee = employees[employeeId];
+        const displayName = getEmployeeDisplayName(employeeId, employee);
+        const hygiene = byEmployee[employeeId];
+        const candidateDates: string[] = [];
+
+        const processPart = (
+            time: string,
+            content?: string | null,
+            startDate?: string | null,
+            rawEndDate?: string | null,
+            extensionDays?: number | null,
+            isHydro?: boolean | null
+        ) => {
+            if (isHydro) return;
+            if (!isFilled(content)) return;
+
+            if (!startDate || !startDate.trim()) {
+                hygiene.undatedCount++;
+                undatedEntries.push({ employeeId, employeeName: displayName, time });
+                return;
+            }
+
+            const sDate = startDate.trim();
+            candidateDates.push(sDate);
+
+            const extDays = getNumber(extensionDays);
+            const effectiveEnd = rawEndDate?.trim() || ScheduleLogic.calculateEndDate(sDate, extDays);
+
+            if (effectiveEnd < todayIso) {
+                hygiene.overdueBellsCount++;
+                totalOverdueBells++;
+                if (!hygiene.overdueTimes.includes(time)) {
+                    hygiene.overdueTimes.push(time);
+                }
+            } else if (extDays > 0) {
+                hygiene.activeExtensionsCount++;
+                hygiene.activeExtensionDaysSum += extDays;
+            }
+        };
+
+        timeSlots.forEach(time => {
+            const cell = scheduleCells[time]?.[employeeId];
+            if (!cell) return;
+
+            if (Array.isArray(cell.history)) {
+                cell.history.forEach(entry => {
+                    if (entry && typeof entry.timestamp === 'string') {
+                        const parsed = new Date(entry.timestamp);
+                        if (!Number.isNaN(parsed.getTime())) {
+                            candidateDates.push(formatDate(parsed));
+                        }
+                    }
+                });
+            }
+
+            if (cell.isBreak) return;
+            if (cell.isHydrotherapy) return;
+
+            if (cell.isSplit) {
+                processPart(
+                    time,
+                    cell.content1,
+                    cell.treatmentData1?.startDate,
+                    cell.treatmentData1?.endDate,
+                    cell.treatmentData1?.extensionDays,
+                    cell.isHydrotherapy1
+                );
+                processPart(
+                    time,
+                    cell.content2,
+                    cell.treatmentData2?.startDate,
+                    cell.treatmentData2?.endDate,
+                    cell.treatmentData2?.extensionDays,
+                    cell.isHydrotherapy2
+                );
+            } else {
+                processPart(
+                    time,
+                    cell.content,
+                    cell.treatmentStartDate,
+                    cell.treatmentEndDate,
+                    cell.treatmentExtensionDays,
+                    false
+                );
+            }
+        });
+
+        if (candidateDates.length > 0) {
+            candidateDates.sort((a, b) => a.localeCompare(b));
+            const maxIso = candidateDates[candidateDates.length - 1];
+            hygiene.lastUpdatedIso = maxIso;
+            const targetUtc = createUtcDate(maxIso).getTime();
+            const todayUtc = createUtcDate(todayIso).getTime();
+            const diffDays = Math.round((todayUtc - targetUtc) / 86400000);
+            hygiene.lastUpdatedDaysAgo = Math.max(0, diffDays);
+        }
+    });
+
+    return {
+        totalOverdueBells,
+        undatedEntries,
+        byEmployee,
+    };
+};

@@ -3,7 +3,7 @@ import { db as dbRaw, FieldValue } from './firebase-config.js';
 import { AppConfig } from './common.js';
 import { CELL_CONTENT_KEYS } from './utils.js';
 import { ensureCellPatientIds } from './schedule-helpers.js';
-import { persistTodayWorkloadSnapshot } from './workload-snapshot.js';
+import { ensureTodayWorkloadSnapshot, persistTodayWorkloadSnapshot } from './workload-snapshot.js';
 import type { FirestoreDbWrapper } from './types/firebase';
 import type { CellState, ScheduleHistoryEntry, ScheduleAppState } from './types/index.js';
 
@@ -109,6 +109,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
     let saveQueued = false;
     let currentUserId: string | null = null;
     let isInitialLoad = true;
+    let initialSnapshotEnsured = false;
     let _onDataChange: (() => void) | null = null;
     const PENDING_SAVE_STORAGE_KEY = 'schedulePendingServerSave';
     const SAVE_CONFIRM_TIMEOUT_MS = 10000;
@@ -289,10 +290,11 @@ export const ScheduleData: ScheduleDataAPI = (() => {
                 }
 
                 notifyChange();
-                // Otworzenie grafiku aktualizuje tylko dzisiejszy snapshot.
-                // Nie odtwarzamy historycznych dni z bieżącego układu komórek.
-                void persistTodayWorkloadSnapshot(appState.scheduleCells)
-                    .catch(error => console.warn('Nie udało się odświeżyć dzisiejszego snapshotu obciążenia:', error));
+                if (!initialSnapshotEnsured && Object.keys(appState.scheduleCells).length > 0) {
+                    initialSnapshotEnsured = true;
+                    void ensureTodayWorkloadSnapshot(appState.scheduleCells)
+                        .catch(error => console.warn('Nie udało się upewnić dzisiejszego snapshotu obciążenia:', error));
+                }
             },
             (error) => {
                 console.error('Error listening to schedule changes:', error);
@@ -500,6 +502,7 @@ export const ScheduleData: ScheduleDataAPI = (() => {
             unsubscribeSchedule = null;
         }
         isInitialLoad = true;
+        initialSnapshotEnsured = false;
         cellUndoStack = [];
         updateUndoButtonUI();
         dirtyCells.clear();
