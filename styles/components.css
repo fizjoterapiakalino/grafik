@@ -97,6 +97,12 @@ button[type="submit"]:hover {
     color: white;
 }
 
+.action-btn.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    min-width: unset;
+}
+
 /* --- Modals (Reused across app) --- */
 .modal-overlay {
     position: fixed;

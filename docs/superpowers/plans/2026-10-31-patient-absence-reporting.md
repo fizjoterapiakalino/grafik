@@ -87,10 +87,10 @@
 - Modify: `scripts/schedule.ts`
 - Test: Utworzenie `tests/schedule-absence-modal.test.js`
 
-- [ ] Krok 3.1: Dodanie przycisku `#btnReportAbsence` do `#scheduleActionButtons` w `scripts/ui-shell.ts` z ikoną `fas fa-calendar-times`, etykietą i tooltipem „Zgłoś nieobecność pacjenta”.
-- [ ] Krok 3.2: Dodanie struktury HTML modala `#patientAbsenceModal` w `pages/schedule.html` (pasek nawigacji miesiąca `<` / `>`, siatka kalendarza Pn-Nd, legenda, licznik zaznaczonych dni, przyciski „Wyczyść wszystkie”, „Zapisz”, „Anuluj”) oraz opcji w menu kontekstowym `#contextReportAbsence`.
-- [ ] Krok 3.3: Dodanie stylizacji CSS w `styles/schedule.css` i `styles/components.css` dla kalendarza nieobecności (zwarty układ, podświetlenie dni w turnusie, podświetlenie zaznaczonych nieobecności na żółto z trójkątem ⚠️, dni dzisiejszego i innych miesięcy).
-- [ ] Krok 3.4: Implementacja `openPatientAbsenceModal` w `scripts/schedule-modals.ts`:
+- [x] Krok 3.1: Dodanie przycisku `#btnReportAbsence` do `#scheduleActionButtons` w `scripts/ui-shell.ts` z ikoną `fas fa-calendar-times`, etykietą i tooltipem „Zgłoś nieobecność pacjenta”.
+- [x] Krok 3.2: Dodanie struktury HTML modala `#patientAbsenceModal` w `pages/schedule.html` (pasek nawigacji miesiąca `<` / `>`, siatka kalendarza Pn-Nd, legenda, licznik zaznaczonych dni, przyciski „Wyczyść wszystkie”, „Zapisz”, „Anuluj”) oraz opcji w menu kontekstowym `#contextReportAbsence`.
+- [x] Krok 3.3: Dodanie stylizacji CSS w `styles/schedule.css` i `styles/components.css` dla kalendarza nieobecności (zwarty układ, podświetlenie dni w turnusie, podświetlenie zaznaczonych nieobecności na żółto z trójkątem ⚠️, dni dzisiejszego i innych miesięcy).
+- [x] Krok 3.4: Implementacja `openPatientAbsenceModal` w `scripts/schedule-modals.ts`:
   - Obsługa komórki zwykłej oraz zaznaczonej połówki komórki podzielonej.
   - Wyświetlanie nazwiska pacjenta oraz zakresu turnusu.
   - Nawigacja pomiędzy miesiącami (poprzedni/następny miesiąc).
@@ -99,9 +99,9 @@
   - Przycisk „Wyczyść wszystkie” czyszczący zaznaczenia.
   - Zapisanie tablicy posortowanych dat `YYYY-MM-DD` do stanu komórki przez przekazany callback i toast z potwierdzeniem.
   - Obsługa klawiszy (Esc = zamknij bez zapisu, Enter = zapisz).
-- [ ] Krok 3.5: Podpięcie stanu aktywności `#btnReportAbsence` w `setActiveCell` w `scripts/schedule-events.ts` (aktywny tylko dla komórek z pacjentem, zablokowany dla przerw/hydro/pustych) oraz zdarzeń click na `#btnReportAbsence` i `#contextReportAbsence`.
-- [ ] Krok 3.6: Połączenie metody w `Schedule` w `scripts/schedule.ts` i przekazanie zależności do `ScheduleEvents`.
-- [ ] Krok 3.7: Napisanie testów JSDOM w `tests/schedule-absence-modal.test.js` testujących aktywację przycisku, otwarcie modala, przełączanie dat, zapis do Firestore oraz wyczyszczenie nieobecności.
+- [x] Krok 3.5: Podpięcie stanu aktywności `#btnReportAbsence` w `setActiveCell` w `scripts/schedule-events.ts` (aktywny tylko dla komórek z pacjentem, zablokowany dla przerw/hydro/pustych) oraz zdarzeń click na `#btnReportAbsence` i `#contextReportAbsence`.
+- [x] Krok 3.6: Połączenie metody w `Schedule` w `scripts/schedule.ts` i przekazanie zależności do `ScheduleEvents`.
+- [x] Krok 3.7: Napisanie testów JSDOM w `tests/schedule-absence-modal.test.js` testujących aktywację przycisku, otwarcie modala, przełączanie dat, zapis do Firestore oraz wyczyszczenie nieobecności.
 
 ---
 

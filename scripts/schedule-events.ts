@@ -30,6 +30,7 @@ interface Dependencies {
     undoLastAction(): void;
     clearCell(cell: HTMLElement): void;
     openPatientInfoModal(element: HTMLElement): void;
+    openPatientAbsenceModal(element: HTMLElement): void;
     showHistoryModal(cell: HTMLElement): void;
     mergeSplitCell(cell: HTMLElement): void;
     toggleSpecialStyle(cell: HTMLElement, attribute: string): void;
@@ -254,6 +255,16 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                     _dependencies.ui.getElementText(activeCell).trim() !== '';
                 patientInfoBtn.classList.toggle('active', hasPatientInfo);
                 patientInfoBtn.disabled = !hasPatientInfo;
+            }
+
+            const reportAbsenceBtn = document.getElementById('btnReportAbsence') as HTMLButtonElement | null;
+            if (reportAbsenceBtn) {
+                const hasPatient =
+                    !activeCell.classList.contains('break-cell') &&
+                    !activeCell.classList.contains('hydrotherapy-cell') &&
+                    _dependencies.ui.getElementText(activeCell).trim() !== '';
+                reportAbsenceBtn.classList.toggle('active', hasPatient);
+                reportAbsenceBtn.disabled = !hasPatient;
             }
 
             const addBreakBtn = document.getElementById('btnAddBreak') as HTMLButtonElement | null;
@@ -583,6 +594,19 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                     ),
             },
             {
+                id: 'contextReportAbsence',
+                class: 'warning',
+                condition: (cell: HTMLElement) =>
+                    !cell.classList.contains('break-cell') &&
+                    !cell.classList.contains('hydrotherapy-cell') &&
+                    _dependencies.ui.getElementText(cell).trim() !== '',
+                action: (_cell: HTMLElement, event?: MouseEvent) =>
+                    _dependencies.openPatientAbsenceModal(
+                        (event?.target as HTMLElement)?.closest('div[tabindex="0"]') as HTMLElement ||
+                        (event?.target as HTMLElement)?.closest('td.editable-cell') as HTMLElement
+                    ),
+            },
+            {
                 id: 'contextAddBreak',
                 action: (cell: HTMLElement) => {
                     if (_dependencies.ui.getElementText(cell).trim() !== '') {
@@ -682,6 +706,19 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 _dependencies.openPatientInfoModal(activeCell);
             } else {
                 window.showToast('Wybierz komórkę z pacjentem, aby wyświetlić informacje.', 3000);
+            }
+        });
+
+        document.getElementById('btnReportAbsence')?.addEventListener('click', () => {
+            if (
+                activeCell &&
+                !activeCell.classList.contains('break-cell') &&
+                !activeCell.classList.contains('hydrotherapy-cell') &&
+                _dependencies.ui.getElementText(activeCell).trim() !== ''
+            ) {
+                _dependencies.openPatientAbsenceModal(activeCell);
+            } else {
+                window.showToast('Wybierz komórkę z pacjentem, aby zgłosić nieobecność.', 3000);
             }
         });
 

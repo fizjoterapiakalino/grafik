@@ -720,6 +720,10 @@ td.split-cell>div.hydrotherapy-text>span {
     color: var(--color-secondary);
 }
 
+#btnReportAbsence.active:hover i {
+    color: #f59e0b;
+}
+
 #btnMassage.active:hover i {
     color: var(--bg-massage);
 }
@@ -2476,3 +2480,223 @@ td.current-time-highlight {
     transform: translateY(-50%) scale(0.9);
     transform-origin: right top;
 }
+
+/* ==========================================================================
+   Patient Absence Modal & Calendar (Zgłaszanie nieobecności pacjenta)
+   ========================================================================== */
+
+.context-menu li.warning {
+    color: #d97706;
+}
+
+.context-menu li.warning i {
+    color: #d97706;
+}
+
+.context-menu li.warning:hover {
+    background-color: rgba(245, 158, 11, 0.1);
+    color: #b45309;
+}
+
+.absence-modal-content {
+    max-width: 420px;
+    width: 100%;
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-lg) var(--spacing-xl);
+    box-shadow: var(--shadow-xl);
+}
+
+.absence-modal-header {
+    margin-bottom: var(--spacing-md);
+    border-bottom: 2px solid var(--color-primary-50);
+    padding-bottom: var(--spacing-sm);
+}
+
+.absence-modal-header .modal-title {
+    font-size: 1.25rem;
+    margin: 0;
+    padding: 0;
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-gray-800);
+}
+
+.absence-modal-header .modal-title i {
+    color: #f59e0b;
+}
+
+.absence-patient-subhead {
+    font-size: 0.875rem;
+    color: var(--color-gray-600);
+    margin-top: 6px;
+    font-weight: 500;
+}
+
+.absence-calendar-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+    padding: 0 4px;
+}
+
+.absence-month-label {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--color-gray-800);
+    text-align: center;
+}
+
+.btn-sm {
+    padding: 4px 10px;
+    font-size: 0.85rem;
+    border-radius: var(--border-radius-sm);
+}
+
+.absence-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    user-select: none;
+}
+
+.absence-weekday {
+    font-weight: 700;
+    font-size: 0.75rem;
+    color: var(--color-gray-500);
+    text-align: center;
+    padding: 4px 0;
+    text-transform: uppercase;
+}
+
+.absence-day-btn {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border: 1px solid var(--color-gray-200);
+    background: var(--color-white);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--color-gray-800);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    padding: 2px;
+    min-height: 38px;
+}
+
+.absence-day-btn:hover {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary-50);
+}
+
+.absence-day-btn.in-turnus {
+    background-color: #ecfdf5;
+    border-color: #a7f3d0;
+    color: #065f46;
+    font-weight: 600;
+}
+
+.absence-day-btn.in-turnus:hover {
+    background-color: #d1fae5;
+    border-color: #6ee7b7;
+}
+
+.absence-day-btn.is-weekend {
+    color: #ef4444;
+}
+
+.absence-day-btn.other-month {
+    opacity: 0.35;
+    background-color: var(--color-gray-50);
+    color: var(--color-gray-400);
+    border-color: var(--color-gray-100);
+}
+
+.absence-day-btn.is-today {
+    box-shadow: 0 0 0 2px var(--color-primary);
+    font-weight: 700;
+}
+
+.absence-day-btn.is-absent {
+    background-color: #fef3c7 !important;
+    border: 2px solid #f59e0b !important;
+    color: #92400e !important;
+    font-weight: 700 !important;
+}
+
+.absence-day-btn .absence-day-warning {
+    font-size: 0.65rem;
+    color: #d97706;
+    margin-top: 1px;
+    line-height: 1;
+}
+
+.absence-legend {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+    font-size: 0.8rem;
+    color: var(--color-gray-600);
+    flex-wrap: wrap;
+}
+
+.absence-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.absence-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.absence-dot.turnus-dot {
+    background-color: #10b981;
+    border: 1px solid #059669;
+}
+
+.absence-dot.absent-dot {
+    background-color: #f59e0b;
+    border: 1px solid #d97706;
+}
+
+.absence-dot.today-dot {
+    background-color: var(--color-primary);
+    border: 1px solid var(--color-primary-700);
+}
+
+.absence-selected-summary {
+    margin-top: var(--spacing-md);
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--color-gray-700);
+    background: var(--color-gray-50);
+    padding: 8px 12px;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--color-gray-200);
+}
+
+@media (max-width: 640px) {
+    .absence-modal-content {
+        max-width: 95vw;
+        padding: var(--spacing-md);
+    }
+    .absence-calendar-grid {
+        gap: 3px;
+    }
+    .absence-day-btn {
+        min-height: 34px;
+        font-size: 0.8rem;
+    }
+}
+
