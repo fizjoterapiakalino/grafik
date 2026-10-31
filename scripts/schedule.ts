@@ -55,9 +55,11 @@ export const Schedule: ScheduleAPI = (() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateCellState = (cell: HTMLElement | null, updateFn: (state: any) => void): void => {
         if (!cell) return;
-        const cellData = cell as HTMLElement & { dataset: { time?: string; employeeIndex?: string } };
-        const time = cellData.dataset.time;
-        const employeeIndex = cellData.dataset.employeeIndex;
+        const targetElement = (cell.dataset?.time && cell.dataset?.employeeIndex)
+            ? cell
+            : (cell.closest?.('[data-time][data-employee-index]') as HTMLElement | null) || cell;
+        const time = targetElement.dataset?.time;
+        const employeeIndex = targetElement.dataset?.employeeIndex;
         if (time && employeeIndex) {
             ScheduleData.updateCellState(time, employeeIndex, updateFn);
         }
@@ -519,14 +521,23 @@ export const Schedule: ScheduleAPI = (() => {
         },
 
         toggleSpecialStyle(cell: HTMLElement, dataAttribute: string): void {
+            const targetPart = getTargetPart(cell);
             updateCellState(cell, (state) => {
-                if (state.isSplit) {
+                if (targetPart) {
+                    state[`${dataAttribute}${targetPart}`] = !state[`${dataAttribute}${targetPart}`];
+                } else if (state.isSplit) {
                     state[`${dataAttribute}1`] = !state[`${dataAttribute}1`];
                     state[`${dataAttribute}2`] = !state[`${dataAttribute}2`];
                 } else {
                     state[dataAttribute] = !state[dataAttribute];
                 }
-                window.showToast('Zmieniono styl');
+                const isNowSet = Boolean(
+                    targetPart
+                        ? state[`${dataAttribute}${targetPart}`]
+                        : (state.isSplit ? state[`${dataAttribute}1`] : state[dataAttribute])
+                );
+                const label = dataAttribute === 'isEveryOtherDay' ? 'Co drugi dzień' : 'styl';
+                window.showToast(isNowSet ? `Oznaczono: ${label}` : `Usunięto oznaczenie: ${label}`);
             });
         },
 

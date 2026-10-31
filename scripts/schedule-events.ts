@@ -672,29 +672,16 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 },
                 action: (cell: HTMLElement) => _dependencies.mergeSplitCell(cell),
             },
-            { id: 'contextMassage', action: (cell: HTMLElement) => _dependencies.toggleSpecialStyle(cell, 'isMassage') },
-            { id: 'contextPnf', action: (cell: HTMLElement) => _dependencies.toggleSpecialStyle(cell, 'isPnf') },
-            { id: 'contextEveryOtherDay', action: (cell: HTMLElement) => _dependencies.toggleSpecialStyle(cell, 'isEveryOtherDay') },
             {
-                id: 'contextClearFormatting',
-                action: (cell: HTMLElement) => {
-                    _dependencies.updateCellState(cell, (state) => {
-                        state.isMassage = false;
-                        state.isPnf = false;
-                        state.isEveryOtherDay = false;
-                        state.isSharedPatient = false;
-                        if (state.isSplit) {
-                            state.isMassage1 = false;
-                            state.isMassage2 = false;
-                            state.isPnf1 = false;
-                            state.isPnf2 = false;
-                            state.isEveryOtherDay1 = false;
-                            state.isEveryOtherDay2 = false;
-                            state.isSharedPatient1 = false;
-                            state.isSharedPatient2 = false;
-                        }
-                        window.showToast('Wyczyszczono formatowanie');
-                    });
+                id: 'contextEveryOtherDay',
+                condition: (cell: HTMLElement) =>
+                    !cell.classList.contains('break-cell') &&
+                    !cell.classList.contains('hydrotherapy-cell') &&
+                    cell.dataset.isHydrotherapy !== 'true' &&
+                    _dependencies.ui.getElementText(cell).trim() !== '',
+                action: (cell: HTMLElement, event?: MouseEvent) => {
+                    const target = (event?.target as HTMLElement)?.closest('div[tabindex="0"]') as HTMLElement || cell;
+                    _dependencies.toggleSpecialStyle(target, 'isEveryOtherDay');
                 },
             },
         ];
@@ -787,22 +774,6 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                 });
             } else {
                 window.showToast('Wybierz komórkę, aby dodać Hydroterapię.', 3000);
-            }
-        });
-
-        document.getElementById('btnMassage')?.addEventListener('click', () => {
-            if (activeCell) {
-                _dependencies.toggleSpecialStyle(activeCell, 'isMassage');
-            } else {
-                window.showToast('Wybierz komórkę, aby oznaczyć jako Masaż.', 3000);
-            }
-        });
-
-        document.getElementById('btnPnf')?.addEventListener('click', () => {
-            if (activeCell) {
-                _dependencies.toggleSpecialStyle(activeCell, 'isPnf');
-            } else {
-                window.showToast('Wybierz komórkę, aby oznaczyć jako PNF.', 3000);
             }
         });
 
