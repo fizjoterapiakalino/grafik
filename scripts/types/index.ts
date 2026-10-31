@@ -79,6 +79,8 @@ export interface TreatmentData {
     endDate?: string | null;
     /** Dodatkowe informacje */
     additionalInfo?: string | null;
+    /** Daty zgłoszonych nieobecności pacjenta (YYYY-MM-DD) */
+    absenceDates?: string[] | null;
 }
 
 /**
@@ -141,6 +143,10 @@ export interface CellState {
     treatmentExtensionDays?: number | null;
     treatmentEndDate?: string | null;
     additionalInfo?: string | null;
+    /** Daty zgłoszonych nieobecności pacjenta (YYYY-MM-DD) */
+    absenceDates?: string[] | null;
+    absenceDates1?: string[] | null;
+    absenceDates2?: string[] | null;
     /** Dane leczenia dla części split */
     treatmentData1?: TreatmentData | null;
     treatmentData2?: TreatmentData | null;

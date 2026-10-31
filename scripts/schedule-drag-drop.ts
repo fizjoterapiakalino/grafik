@@ -45,7 +45,8 @@ const CONTENT_KEYS = [
     'treatmentStartDate', 'treatmentExtensionDays', 'treatmentEndDate', 'additionalInfo',
     'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2',
     'isEveryOtherDay1', 'isEveryOtherDay2', 'isSharedPatient1', 'isSharedPatient2', 'isHydrotherapy',
-    'isHydrotherapy1', 'isHydrotherapy2'
+    'isHydrotherapy1', 'isHydrotherapy2',
+    'absenceDates', 'absenceDates1', 'absenceDates2'
 ] as const;
 
 /**
@@ -182,6 +183,12 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
 
     const extractDataToMove = (sourceState: CellState, sourcePart: number | null) => {
         if (sourcePart && sourceState.isSplit) {
+            const td = (sourceState[`treatmentData${sourcePart}`] as { startDate?: string | null; extensionDays?: number | null; endDate?: string | null; additionalInfo?: string | null; absenceDates?: string[] | null } | null | undefined) || {};
+            const absence = Array.isArray(td.absenceDates)
+                ? [...td.absenceDates]
+                : (Array.isArray(sourceState[`absenceDates${sourcePart}`])
+                    ? [...(sourceState[`absenceDates${sourcePart}`] as string[])]
+                    : (td.absenceDates === null ? null : undefined));
             return {
                 content: sourceState[`content${sourcePart}`] as string | null | undefined,
                 patientId: sourceState[`patientId${sourcePart}`] as string | null | undefined,
@@ -190,9 +197,19 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
                 isEveryOtherDay: sourceState[`isEveryOtherDay${sourcePart}`] as boolean | null | undefined,
                 isSharedPatient: sourceState[`isSharedPatient${sourcePart}`] as boolean | null | undefined,
                 isHydrotherapy: sourceState[`isHydrotherapy${sourcePart}`] as boolean | null | undefined,
-                treatmentData: (sourceState[`treatmentData${sourcePart}`] as { startDate?: string | null; extensionDays?: number | null; endDate?: string | null; additionalInfo?: string | null } | null | undefined) || {}
+                treatmentData: {
+                    startDate: safeCopy(td.startDate),
+                    extensionDays: safeCopy(td.extensionDays),
+                    endDate: safeCopy(td.endDate),
+                    additionalInfo: safeCopy(td.additionalInfo),
+                    absenceDates: absence !== undefined ? absence : null,
+                },
+                absenceDates: absence !== undefined ? absence : null,
             };
         }
+        const absence = Array.isArray(sourceState.absenceDates)
+            ? [...sourceState.absenceDates]
+            : (sourceState.absenceDates === null ? null : undefined);
         return {
             content: sourceState.content,
             patientId: sourceState.patientId,
@@ -206,7 +223,9 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
                 extensionDays: sourceState.treatmentExtensionDays,
                 endDate: sourceState.treatmentEndDate,
                 additionalInfo: sourceState.additionalInfo,
-            }
+                absenceDates: absence !== undefined ? absence : null,
+            },
+            absenceDates: absence !== undefined ? absence : null,
         };
     };
 
@@ -219,6 +238,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
             extensionDays: safeCopy(targetState.treatmentExtensionDays),
             endDate: safeCopy(targetState.treatmentEndDate),
             additionalInfo: safeCopy(targetState.additionalInfo),
+            absenceDates: Array.isArray(targetState.absenceDates) ? [...targetState.absenceDates] : null,
         };
 
         targetState.content2 = safeCopy(dataToMove.content);
@@ -229,6 +249,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
             extensionDays: safeCopy(dataToMove.treatmentData.extensionDays),
             endDate: safeCopy(dataToMove.treatmentData.endDate),
             additionalInfo: safeCopy(dataToMove.treatmentData.additionalInfo),
+            absenceDates: Array.isArray(dataToMove.treatmentData.absenceDates) ? [...dataToMove.treatmentData.absenceDates] : null,
         };
 
         targetState.isSplit = true;
@@ -239,6 +260,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
         targetState.treatmentExtensionDays = null;
         targetState.treatmentEndDate = null;
         targetState.additionalInfo = null;
+        targetState.absenceDates = null;
         ensureActiveTreatmentDates(targetState, { resetIfExpired: false });
     };
 
@@ -251,6 +273,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
             extensionDays: safeCopy(dataToMove.treatmentData.extensionDays),
             endDate: safeCopy(dataToMove.treatmentData.endDate),
             additionalInfo: safeCopy(dataToMove.treatmentData.additionalInfo),
+            absenceDates: Array.isArray(dataToMove.treatmentData.absenceDates) ? [...dataToMove.treatmentData.absenceDates] : null,
         };
         ensureActiveTreatmentDates(targetState, { resetIfExpired: false });
     };
@@ -266,6 +289,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
         targetState.treatmentExtensionDays = safeCopy(dataToMove.treatmentData.extensionDays);
         targetState.treatmentEndDate = safeCopy(dataToMove.treatmentData.endDate);
         targetState.additionalInfo = safeCopy(dataToMove.treatmentData.additionalInfo);
+        targetState.absenceDates = Array.isArray(dataToMove.treatmentData.absenceDates) ? [...dataToMove.treatmentData.absenceDates] : null;
         ensureActiveTreatmentDates(targetState, { resetIfExpired: false });
     };
 
@@ -275,13 +299,14 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
             sourceState[`patientId${sourcePart}`] = null;
             STYLE_FLAGS.forEach((f) => { sourceState[`${f}${sourcePart}`] = null; });
             sourceState[`treatmentData${sourcePart}`] = null;
+            sourceState[`absenceDates${sourcePart}`] = null;
 
             const otherPart = sourcePart === 1 ? 2 : 1;
             const otherContent = sourceState[`content${otherPart}`];
             const otherHasContent = otherContent && String(otherContent).trim() !== '';
 
             if (otherHasContent) {
-                const otherTreatmentData = sourceState[`treatmentData${otherPart}`] as { startDate?: string | null; extensionDays?: number | null; endDate?: string | null; additionalInfo?: string | null } | null | undefined;
+                const otherTreatmentData = sourceState[`treatmentData${otherPart}`] as { startDate?: string | null; extensionDays?: number | null; endDate?: string | null; additionalInfo?: string | null; absenceDates?: string[] | null } | null | undefined;
 
                 sourceState.content = safeCopy(otherContent as string | null | undefined);
                 sourceState.patientId = safeCopy(sourceState[`patientId${otherPart}`] as string | null | undefined);
@@ -293,6 +318,7 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
                     sourceState.treatmentExtensionDays = safeCopy(otherTreatmentData.extensionDays);
                     sourceState.treatmentEndDate = safeCopy(otherTreatmentData.endDate);
                     sourceState.additionalInfo = safeCopy(otherTreatmentData.additionalInfo);
+                    sourceState.absenceDates = Array.isArray(otherTreatmentData.absenceDates) ? [...otherTreatmentData.absenceDates] : null;
                 }
             }
 
@@ -307,6 +333,8 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
             });
             sourceState.treatmentData1 = null;
             sourceState.treatmentData2 = null;
+            sourceState.absenceDates1 = null;
+            sourceState.absenceDates2 = null;
         } else {
             for (const key of CONTENT_KEYS) {
                 sourceState[key] = null;

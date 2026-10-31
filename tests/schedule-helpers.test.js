@@ -736,4 +736,194 @@ describe('schedule-helpers', () => {
             expect(updatedState.treatmentStartDate).toBeUndefined();
         });
     });
+
+    describe('absenceDates handling in schedule helpers', () => {
+        test('getTreatmentData returns absenceDates for normal cell and split cell parts', () => {
+            const normalCell = {
+                content: 'Pacjent Normal',
+                treatmentStartDate: '2026-10-01',
+                treatmentExtensionDays: 0,
+                treatmentEndDate: '2026-10-15',
+                additionalInfo: 'Notatka',
+                absenceDates: ['2026-10-05', '2026-10-08'],
+            };
+            const normalData = getTreatmentData(normalCell, null);
+            expect(normalData.absenceDates).toEqual(['2026-10-05', '2026-10-08']);
+
+            const splitCell = {
+                isSplit: true,
+                content1: 'Pacjent 1',
+                content2: 'Pacjent 2',
+                treatmentData1: {
+                    startDate: '2026-10-01',
+                    absenceDates: ['2026-10-03'],
+                },
+                treatmentData2: {
+                    startDate: '2026-10-05',
+                    absenceDates: ['2026-10-12', '2026-10-14'],
+                },
+            };
+            expect(getTreatmentData(splitCell, 1).absenceDates).toEqual(['2026-10-03']);
+            expect(getTreatmentData(splitCell, 2).absenceDates).toEqual(['2026-10-12', '2026-10-14']);
+        });
+
+        test('copyTreatmentToTarget copies absenceDates to normal or split target', () => {
+            const treatment = {
+                startDate: '2026-11-01',
+                extensionDays: 2,
+                endDate: '2026-11-15',
+                additionalInfo: 'Info',
+                absenceDates: ['2026-11-04', '2026-11-08'],
+            };
+
+            const normalTarget = {};
+            copyTreatmentToTarget(treatment, normalTarget, null);
+            expect(normalTarget.absenceDates).toEqual(['2026-11-04', '2026-11-08']);
+
+            const splitTarget = {};
+            copyTreatmentToTarget(treatment, splitTarget, 2);
+            expect(splitTarget.treatmentData2?.absenceDates).toEqual(['2026-11-04', '2026-11-08']);
+        });
+
+        test('copyFullCellState copies absenceDates, absenceDates1, absenceDates2 and split treatmentData', () => {
+            const source = {
+                content: 'Jan Kowalski',
+                patientId: 'pid-1',
+                isSplit: false,
+                treatmentStartDate: '2026-11-01',
+                treatmentExtensionDays: 0,
+                treatmentEndDate: '2026-11-15',
+                absenceDates: ['2026-11-05'],
+                absenceDates1: ['2026-11-06'],
+                absenceDates2: ['2026-11-07'],
+                treatmentData1: {
+                    startDate: '2026-11-01',
+                    absenceDates: ['2026-11-03'],
+                },
+                treatmentData2: {
+                    startDate: '2026-11-02',
+                    absenceDates: ['2026-11-04'],
+                },
+            };
+
+            const target = {};
+            copyFullCellState(source, target);
+
+            expect(target.absenceDates).toEqual(['2026-11-05']);
+            expect(target.absenceDates1).toEqual(['2026-11-06']);
+            expect(target.absenceDates2).toEqual(['2026-11-07']);
+            expect(target.treatmentData1?.absenceDates).toEqual(['2026-11-03']);
+            expect(target.treatmentData2?.absenceDates).toEqual(['2026-11-04']);
+        });
+
+        test('createSourceClearFn clears absenceDates for split part or entire cell', () => {
+            const splitState = {
+                isSplit: true,
+                content1: 'Pacjent 1',
+                content2: 'Pacjent 2',
+                absenceDates1: ['2026-11-02'],
+                treatmentData1: { startDate: '2026-11-01', absenceDates: ['2026-11-02'] },
+            };
+
+            const clearPart1 = createSourceClearFn(1);
+            clearPart1(splitState);
+            expect(splitState.content1).toBe('');
+            expect(splitState.absenceDates1).toBeUndefined();
+            expect(splitState.treatmentData1).toBeUndefined();
+
+            const normalState = {
+                content: 'Pacjent',
+                absenceDates: ['2026-11-02'],
+            };
+            const clearAll = createSourceClearFn(null);
+            clearAll(normalState);
+            expect(normalState.content).toBeUndefined();
+            expect(normalState.absenceDates).toBeUndefined();
+        });
+
+        test('clearSplitFields deletes absenceDates1 and absenceDates2', () => {
+            const state = {
+                content1: 'P1',
+                content2: 'P2',
+                absenceDates1: ['2026-11-01'],
+                absenceDates2: ['2026-11-02'],
+                keepMe: 'yes',
+            };
+            clearSplitFields(state);
+            expect(state.absenceDates1).toBeUndefined();
+            expect(state.absenceDates2).toBeUndefined();
+            expect(state.keepMe).toBe('yes');
+        });
+
+        test('updateCellContent resets absenceDates when normal cell patient changes or is cleared', () => {
+            const cell = document.createElement('td');
+            const state = {
+                content: 'Kowalski',
+                patientId: 'id-old',
+                treatmentStartDate: '2026-10-01',
+                treatmentEndDate: '2026-10-15',
+                absenceDates: ['2026-10-05', '2026-10-08'],
+            };
+
+            // Patient change
+            updateCellContent(state, 'Nowak', null, cell, cell);
+            expect(state.content).toBe('Nowak');
+            expect(state.absenceDates).toBeNull();
+
+            // Clearing cell
+            state.absenceDates = ['2026-10-10'];
+            updateCellContent(state, '', null, cell, cell);
+            expect(state.content).toBe('');
+            expect(state.absenceDates).toBeNull();
+        });
+
+        test('updateCellContent with split / migrates normal absenceDates to treatmentData1 and removes from root', () => {
+            const cell = document.createElement('td');
+            const state = {
+                content: 'Kowalski',
+                patientId: 'id-1',
+                treatmentStartDate: '2026-10-01',
+                treatmentEndDate: '2026-10-15',
+                absenceDates: ['2026-10-05'],
+            };
+
+            updateCellContent(state, 'Kowalski / Nowak', null, cell, cell);
+            expect(state.isSplit).toBe(true);
+            expect(state.absenceDates).toBeUndefined();
+            expect(state.treatmentData1?.absenceDates).toEqual(['2026-10-05']);
+        });
+
+        test('updateSplitCellPart resets absenceDates on part patient change or part clear', () => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'split-cell-wrapper';
+            const part1El = document.createElement('div');
+            const part2El = document.createElement('div');
+            wrapper.appendChild(part1El);
+            wrapper.appendChild(part2El);
+            const parentCell = document.createElement('td');
+            parentCell.appendChild(wrapper);
+
+            const state = {
+                isSplit: true,
+                content1: 'Kowalski',
+                treatmentData1: {
+                    startDate: '2026-10-01',
+                    extensionDays: 0,
+                    endDate: '2026-10-15',
+                    absenceDates: ['2026-10-04'],
+                },
+                absenceDates1: ['2026-10-04'],
+            };
+
+            // Change patient in part 1
+            updateCellContent(state, 'Wiśniewski', 1, part1El, parentCell);
+            expect(state.treatmentData1?.absenceDates).toBeNull();
+            expect(state.absenceDates1).toBeUndefined();
+
+            // Clear part 1
+            updateCellContent(state, '', 1, part1El, parentCell);
+            expect(state.treatmentData1).toBeUndefined();
+            expect(state.absenceDates1).toBeUndefined();
+        });
+    });
 });

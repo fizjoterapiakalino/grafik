@@ -22,7 +22,7 @@ jest.mock('../scripts/firebase-config.js', () => ({
 }));
 
 import { db } from '../scripts/firebase-config.js';
-import { ScheduleData } from '../scripts/schedule-data.js';
+import { ScheduleData, sanitizeCellState, sanitizeAbsenceDates } from '../scripts/schedule-data.js';
 
 describe('ScheduleData', () => {
     let snapshotCallback = null;
@@ -245,5 +245,67 @@ describe('ScheduleData', () => {
         ScheduleData.destroy();
 
         expect(mockUnsubscribe).toHaveBeenCalled();
+    });
+
+    describe('absenceDates sanitization and persistence', () => {
+        test('sanitizeAbsenceDates filters non-YYYY-MM-DD strings, dedupes, and sorts chronologically', () => {
+            expect(sanitizeAbsenceDates(null)).toEqual([]);
+            expect(sanitizeAbsenceDates(undefined)).toEqual([]);
+            expect(sanitizeAbsenceDates('2026-11-01')).toEqual([]);
+            expect(sanitizeAbsenceDates([
+                '2026-11-10',
+                'invalid',
+                '2026-11-02',
+                '2026-11-10',
+                123,
+                null,
+                ' 2026-11-05 ',
+            ])).toEqual(['2026-11-02', '2026-11-05', '2026-11-10']);
+        });
+
+        test('sanitizeCellState sanitizes absenceDates for normal cell and split treatmentData', () => {
+            const rawCell = {
+                content: 'Jan Kowalski',
+                absenceDates: ['2026-11-08', 'bad', '2026-11-01'],
+                treatmentData1: {
+                    startDate: '2026-10-20',
+                    absenceDates: ['2026-10-25', '2026-10-22'],
+                },
+                treatmentData2: {
+                    startDate: '2026-10-21',
+                    absenceDates: null,
+                },
+                absenceDates1: ['2026-11-12', '2026-11-04'],
+                absenceDates2: null,
+            };
+
+            const sanitized = sanitizeCellState(rawCell);
+            expect(sanitized.absenceDates).toEqual(['2026-11-01', '2026-11-08']);
+            expect(sanitized.treatmentData1?.absenceDates).toEqual(['2026-10-22', '2026-10-25']);
+            expect(sanitized.treatmentData2?.absenceDates).toBeNull();
+            expect(sanitized.absenceDates1).toEqual(['2026-11-04', '2026-11-12']);
+            expect(sanitized.absenceDates2).toBeNull();
+        });
+
+        test('updateCellState persists sanitized absenceDates to Firestore', async () => {
+            emitSnapshot({
+                '09:00': {
+                    0: { content: 'Pacjent Bez Nieobecności' },
+                },
+            });
+
+            ScheduleData.init(jest.fn(), null);
+            ScheduleData.listenForScheduleChanges();
+            mockDocRef.update.mockClear();
+
+            ScheduleData.updateCellState('09:00', '0', (state) => {
+                state.absenceDates = ['2026-11-09', 'invalid', '2026-11-03'];
+            });
+            await flushPromises();
+
+            expect(mockDocRef.update).toHaveBeenCalledTimes(1);
+            const updateCall = mockDocRef.update.mock.calls[0][0];
+            expect(updateCall['scheduleCells.09:00.0'].absenceDates).toEqual(['2026-11-03', '2026-11-09']);
+        });
     });
 });

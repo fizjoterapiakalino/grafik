@@ -552,6 +552,12 @@ export const Schedule: ScheduleAPI = (() => {
                 state.treatmentExtensionDays = safeCopy(treatmentData.extensionDays);
                 state.treatmentEndDate = safeCopy(treatmentData.endDate);
                 state.additionalInfo = safeCopy(treatmentData.additionalInfo);
+                const activeAbsence = Array.isArray(treatmentData.absenceDates)
+                    ? [...treatmentData.absenceDates]
+                    : (Array.isArray(state[`absenceDates${activePart}`])
+                        ? [...(state[`absenceDates${activePart}`] as string[])]
+                        : (treatmentData.absenceDates === null ? null : undefined));
+                state.absenceDates = activeAbsence !== undefined ? activeAbsence : null;
 
                 state.isSplit = null;
                 state.content1 = null;
@@ -570,6 +576,8 @@ export const Schedule: ScheduleAPI = (() => {
                 state.isHydrotherapy2 = null;
                 state.treatmentData1 = null;
                 state.treatmentData2 = null;
+                state.absenceDates1 = null;
+                state.absenceDates2 = null;
 
                 state.content = mergedContent;
                 window.showToast('Scalono komórkę.');
@@ -594,6 +602,7 @@ export const Schedule: ScheduleAPI = (() => {
                     'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2',
                     'isEveryOtherDay1', 'isEveryOtherDay2', 'isSharedPatient1', 'isSharedPatient2',
                     'isHydrotherapy', 'isHydrotherapy1', 'isHydrotherapy2',
+                    'absenceDates', 'absenceDates1', 'absenceDates2',
                 ];
                 for (const key of contentKeys) {
                     if (Object.prototype.hasOwnProperty.call(state, key)) {

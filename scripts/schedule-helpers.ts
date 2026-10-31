@@ -73,13 +73,20 @@ export const getSourcePart = (cellState: CellState, text: string): number | null
  */
 export const getTreatmentData = (cellState: CellState, part: number | null): TreatmentData => {
     if (part) {
-        return (cellState[`treatmentData${part}`] as TreatmentData) || {};
+        const td = (cellState[`treatmentData${part}`] as TreatmentData) || {};
+        return {
+            ...td,
+            absenceDates: Array.isArray(td.absenceDates)
+                ? [...td.absenceDates]
+                : (td.absenceDates ?? (cellState[`absenceDates${part}`] as string[] | null | undefined)),
+        };
     }
     return {
         startDate: cellState.treatmentStartDate,
         extensionDays: cellState.treatmentExtensionDays,
         endDate: cellState.treatmentEndDate,
         additionalInfo: cellState.additionalInfo,
+        absenceDates: Array.isArray(cellState.absenceDates) ? [...cellState.absenceDates] : cellState.absenceDates,
     };
 };
 
@@ -100,18 +107,24 @@ export const copyFlags = (source: CellState, target: CellState, sourcePart: numb
  * Kopiuje dane leczenia do komórki docelowej
  */
 export const copyTreatmentToTarget = (treatmentData: TreatmentData, target: CellState, targetPart: number | null): void => {
+    const copiedAbsence = Array.isArray(treatmentData.absenceDates)
+        ? [...treatmentData.absenceDates]
+        : (treatmentData.absenceDates === null ? null : undefined);
+
     if (targetPart) {
         target[`treatmentData${targetPart}`] = {
             startDate: safeCopy(treatmentData.startDate),
             extensionDays: safeCopy(treatmentData.extensionDays),
             endDate: safeCopy(treatmentData.endDate),
             additionalInfo: safeCopy(treatmentData.additionalInfo),
+            absenceDates: copiedAbsence !== undefined ? copiedAbsence : null,
         };
     } else {
         target.treatmentStartDate = safeCopy(treatmentData.startDate) as string | undefined;
         target.treatmentExtensionDays = safeCopy(treatmentData.extensionDays) as number | undefined;
         target.treatmentEndDate = safeCopy(treatmentData.endDate) as string | undefined;
         target.additionalInfo = safeCopy(treatmentData.additionalInfo) as string | null | undefined;
+        target.absenceDates = copiedAbsence !== undefined ? copiedAbsence : null;
     }
 };
 
@@ -125,6 +138,7 @@ export const clearSplitFields = (state: CellState): void => {
         'isSharedPatient1', 'isSharedPatient2',
         'isHydrotherapy1', 'isHydrotherapy2',
         'treatmentData1', 'treatmentData2',
+        'absenceDates1', 'absenceDates2',
     ];
     splitFields.forEach((field) => delete state[field]);
 };
@@ -186,6 +200,15 @@ export const copyFullCellState = (source: CellState, target: CellState): void =>
     target.treatmentExtensionDays = safeCopy(source.treatmentExtensionDays) as number | undefined;
     target.treatmentEndDate = safeCopy(source.treatmentEndDate) as string | undefined;
     target.additionalInfo = safeCopy(source.additionalInfo) as string | null | undefined;
+    target.absenceDates = Array.isArray(source.absenceDates)
+        ? [...source.absenceDates]
+        : (source.absenceDates === null ? null : undefined);
+    target.absenceDates1 = Array.isArray(source.absenceDates1)
+        ? [...source.absenceDates1]
+        : (source.absenceDates1 === null ? null : undefined);
+    target.absenceDates2 = Array.isArray(source.absenceDates2)
+        ? [...source.absenceDates2]
+        : (source.absenceDates2 === null ? null : undefined);
 
     if (source.treatmentData1) {
         target.treatmentData1 = JSON.parse(JSON.stringify(source.treatmentData1));
@@ -208,6 +231,7 @@ export const createSourceClearFn = (sourcePart: number | null): ((state: CellSta
             delete state[`isEveryOtherDay${sourcePart}`];
             delete state[`isSharedPatient${sourcePart}`];
             delete state[`treatmentData${sourcePart}`];
+            delete state[`absenceDates${sourcePart}`];
 
             const otherPart = sourcePart === 1 ? 2 : 1;
             if (!state[`content${otherPart}`]) {
@@ -262,12 +286,18 @@ export const updateCellContent = (
 
             if (hasSingleData) {
                 if (cellState.treatmentStartDate != null) {
-                    cellState.treatmentData1 = {
+                    const td1: TreatmentData = {
                         startDate: cellState.treatmentStartDate,
                         extensionDays: cellState.treatmentExtensionDays ?? 0,
                         endDate: cellState.treatmentEndDate ?? ScheduleLogic.calculateEndDate(cellState.treatmentStartDate, cellState.treatmentExtensionDays ?? 0),
                         additionalInfo: cellState.additionalInfo,
                     };
+                    if (Array.isArray(cellState.absenceDates)) {
+                        td1.absenceDates = [...cellState.absenceDates];
+                    } else if (cellState.absenceDates === null) {
+                        td1.absenceDates = null;
+                    }
+                    cellState.treatmentData1 = td1;
                 }
                 if (cellState.isMassage != null) cellState.isMassage1 = cellState.isMassage;
                 if (cellState.isPnf != null) cellState.isPnf1 = cellState.isPnf;
@@ -283,6 +313,7 @@ export const updateCellContent = (
             delete cellState.treatmentExtensionDays;
             delete cellState.treatmentEndDate;
             delete cellState.additionalInfo;
+            delete cellState.absenceDates;
             delete cellState.isMassage;
             delete cellState.isPnf;
             delete cellState.isEveryOtherDay;
@@ -362,6 +393,7 @@ const updateSplitCellPart = (
         delete cellState[`isEveryOtherDay${part}`];
         delete cellState[`isSharedPatient${part}`];
         delete cellState[`isHydrotherapy${part}`];
+        delete cellState[`absenceDates${part}`];
         return;
     }
 
@@ -371,8 +403,10 @@ const updateSplitCellPart = (
             startDate: getTodayDate(),
             extensionDays: 0,
             endDate: ScheduleLogic.calculateEndDate(getTodayDate(), 0),
+            absenceDates: null,
         };
         cellState[treatmentKey] = treatmentData;
+        delete cellState[`absenceDates${part}`];
         cellState[`patientId${part}`] = createPatientId();
     } else if (treatmentData?.startDate) {
         // Ten sam pacjent - przelicz tylko datę końcową
@@ -404,6 +438,7 @@ const updateNormalCell = (cellState: CellState, newText: string): void => {
         cellState.treatmentExtensionDays = null;
         cellState.treatmentEndDate = null;
         cellState.additionalInfo = null;
+        cellState.absenceDates = null;
         cellState.isMassage = null;
         cellState.isPnf = null;
         cellState.isEveryOtherDay = null;
@@ -421,6 +456,7 @@ const updateNormalCell = (cellState: CellState, newText: string): void => {
         cellState.treatmentStartDate = getTodayDate();
         cellState.treatmentExtensionDays = 0;
         cellState.additionalInfo = null;
+        cellState.absenceDates = null;
         cellState.treatmentEndDate = ScheduleLogic.calculateEndDate(cellState.treatmentStartDate, 0);
         cellState.patientId = createPatientId();
     } else if (contentChanged) {

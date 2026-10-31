@@ -13,16 +13,39 @@ const ALLOWED_CELL_KEYS = [
     ...CELL_CONTENT_KEYS,
     'isBreak',
     'history',
+    'absenceDates',
+    'absenceDates1',
+    'absenceDates2',
 ] as const;
 
-const ALLOWED_TREATMENT_KEYS = ['startDate', 'extensionDays', 'endDate', 'additionalInfo'] as const;
+const ALLOWED_TREATMENT_KEYS = ['startDate', 'extensionDays', 'endDate', 'additionalInfo', 'absenceDates'] as const;
+
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+export const sanitizeAbsenceDates = (dates: unknown): string[] => {
+    if (!Array.isArray(dates)) return [];
+    const validDates = dates
+        .filter((d): d is string => typeof d === 'string' && ISO_DATE_REGEX.test(d.trim()))
+        .map((d) => d.trim());
+    return Array.from(new Set(validDates)).sort();
+};
 
 const sanitizeTreatmentData = (data: unknown): Record<string, unknown> | null => {
     if (!data || typeof data !== 'object') return null;
     const typed = data as Record<string, unknown>;
     const sanitized: Record<string, unknown> = {};
     for (const key of ALLOWED_TREATMENT_KEYS) {
-        if (key in typed) sanitized[key] = typed[key];
+        if (key in typed) {
+            if (key === 'absenceDates') {
+                if (Array.isArray(typed[key])) {
+                    sanitized[key] = sanitizeAbsenceDates(typed[key]);
+                } else if (typed[key] === null) {
+                    sanitized[key] = null;
+                }
+            } else {
+                sanitized[key] = typed[key];
+            }
+        }
     }
     return Object.keys(sanitized).length > 0 ? sanitized : null;
 };
@@ -41,6 +64,12 @@ export const sanitizeCellState = (cellState: unknown): CellState => {
             } else if (key === 'history') {
                 if (Array.isArray(val)) {
                     sanitized[key] = val.slice(0, 10);
+                }
+            } else if (key === 'absenceDates' || key === 'absenceDates1' || key === 'absenceDates2') {
+                if (Array.isArray(val)) {
+                    sanitized[key] = sanitizeAbsenceDates(val);
+                } else if (val === null) {
+                    sanitized[key] = null;
                 }
             } else {
                 sanitized[key] = val;

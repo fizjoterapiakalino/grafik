@@ -58,6 +58,9 @@ export const CELL_CONTENT_KEYS = [
     'additionalInfo',
     'treatmentData1',
     'treatmentData2',
+    'absenceDates',
+    'absenceDates1',
+    'absenceDates2',
 ] as const;
 
 export type CellContentKey = typeof CELL_CONTENT_KEYS[number];
@@ -78,6 +81,7 @@ interface TreatmentSource {
     treatmentStartDate?: string | null;
     treatmentExtensionDays?: number | null;
     treatmentEndDate?: string | null;
+    absenceDates?: string[] | null;
     startDate?: string | null;
     extensionDays?: number | null;
     endDate?: string | null;
@@ -104,12 +108,18 @@ export const copyTreatmentData = (
 
     if (suffix) {
         const targetKey = `treatmentData${suffix}` as keyof CellState;
-        (target as Record<string, unknown>)[targetKey] = {
+        const treatmentObj: Record<string, unknown> = {
             startDate: safeCopy(treatmentData.startDate),
             extensionDays: safeCopy(treatmentData.extensionDays),
             endDate: safeCopy(treatmentData.endDate),
             additionalInfo: safeCopy(treatmentData.additionalInfo),
         };
+        if ('absenceDates' in treatmentData && treatmentData.absenceDates !== undefined) {
+            treatmentObj.absenceDates = Array.isArray(treatmentData.absenceDates)
+                ? [...treatmentData.absenceDates]
+                : null;
+        }
+        (target as Record<string, unknown>)[targetKey] = treatmentObj;
     } else {
         target.treatmentStartDate = safeCopy(
             (source as TreatmentSource).treatmentStartDate ?? treatmentData.startDate
@@ -121,6 +131,10 @@ export const copyTreatmentData = (
             (source as TreatmentSource).treatmentEndDate ?? treatmentData.endDate
         );
         target.additionalInfo = safeCopy(treatmentData.additionalInfo);
+        const rawAbsence = treatmentData.absenceDates ?? (source as TreatmentSource).absenceDates;
+        if (rawAbsence !== undefined) {
+            target.absenceDates = Array.isArray(rawAbsence) ? [...rawAbsence] : null;
+        }
     }
 };
 
