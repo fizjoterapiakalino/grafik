@@ -30,7 +30,7 @@ describe('Patient Absence Modal and Navbar Absence Button', () => {
         document.body.innerHTML = `
             <div id="scheduleActionButtons" class="schedule-action-buttons">
                 <button id="btnPatientInfo" class="action-icon-btn" title="Informacje o pacjencie" disabled></button>
-                <button id="btnReportAbsence" class="action-icon-btn" title="Zgłoś nieobecność pacjenta" disabled></button>
+                <button id="btnReportAbsence" class="action-icon-btn btn-absence" title="Zgłoś nieobecność pacjenta" aria-label="Zgłoś nieobecność pacjenta" disabled><i class="fas fa-calendar-times"></i><span class="absence-btn-label">Nieobecność</span></button>
                 <button id="btnAddBreak" class="action-icon-btn" title="Dodaj przerwę" disabled></button>
                 <button id="btnClearCell" class="action-icon-btn danger" title="Wyczyść komórkę" disabled></button>
             </div>

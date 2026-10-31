@@ -2497,21 +2497,21 @@ td.current-time-highlight {
 }
 
 .absence-modal-content {
-    max-width: 420px;
+    max-width: 320px;
     width: 100%;
     border-radius: var(--border-radius-lg);
-    padding: var(--spacing-lg) var(--spacing-xl);
+    padding: 12px 14px;
     box-shadow: var(--shadow-xl);
 }
 
 .absence-modal-header {
-    margin-bottom: var(--spacing-md);
+    margin-bottom: 6px;
     border-bottom: 2px solid var(--color-primary-50);
-    padding-bottom: var(--spacing-sm);
+    padding-bottom: 4px;
 }
 
 .absence-modal-header .modal-title {
-    font-size: 1.25rem;
+    font-size: 1.05rem;
     margin: 0;
     padding: 0;
     border: none;
@@ -2526,9 +2526,9 @@ td.current-time-highlight {
 }
 
 .absence-patient-subhead {
-    font-size: 0.875rem;
+    font-size: 0.76rem;
     color: var(--color-gray-600);
-    margin-top: 6px;
+    margin-top: 2px;
     font-weight: 500;
 }
 
@@ -2536,36 +2536,38 @@ td.current-time-highlight {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: var(--spacing-md);
-    padding: 0 4px;
+    margin-bottom: 6px;
+    padding: 0 2px;
 }
 
 .absence-month-label {
     font-weight: 700;
-    font-size: 1.05rem;
+    font-size: 0.92rem;
     color: var(--color-gray-800);
     text-align: center;
 }
 
+.absence-calendar-toolbar .btn-sm,
 .btn-sm {
-    padding: 4px 10px;
-    font-size: 0.85rem;
+    padding: 2px 7px;
+    font-size: 0.78rem;
+    min-height: 24px;
     border-radius: var(--border-radius-sm);
 }
 
 .absence-calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 6px;
+    gap: 3px;
     user-select: none;
 }
 
 .absence-weekday {
     font-weight: 700;
-    font-size: 0.75rem;
+    font-size: 0.68rem;
     color: var(--color-gray-500);
     text-align: center;
-    padding: 4px 0;
+    padding: 1px 0;
     text-transform: uppercase;
 }
 
@@ -2578,14 +2580,14 @@ td.current-time-highlight {
     position: relative;
     border: 1px solid var(--color-gray-200);
     background: var(--color-white);
-    border-radius: 8px;
-    font-size: 0.85rem;
+    border-radius: 5px;
+    font-size: 0.78rem;
     font-weight: 500;
     color: var(--color-gray-800);
     cursor: pointer;
     transition: all 0.15s ease;
-    padding: 2px;
-    min-height: 38px;
+    padding: 1px;
+    min-height: 28px;
 }
 
 .absence-day-btn:hover {
@@ -2629,18 +2631,18 @@ td.current-time-highlight {
 }
 
 .absence-day-btn .absence-day-warning {
-    font-size: 0.65rem;
+    font-size: 0.55rem;
     color: #d97706;
-    margin-top: 1px;
+    margin-top: 0;
     line-height: 1;
 }
 
 .absence-legend {
     display: flex;
     justify-content: center;
-    gap: var(--spacing-md);
-    margin-top: var(--spacing-md);
-    font-size: 0.8rem;
+    gap: 8px;
+    margin-top: 6px;
+    font-size: 0.72rem;
     color: var(--color-gray-600);
     flex-wrap: wrap;
 }
@@ -2652,8 +2654,8 @@ td.current-time-highlight {
 }
 
 .absence-dot {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     display: inline-block;
 }
@@ -2674,27 +2676,38 @@ td.current-time-highlight {
 }
 
 .absence-selected-summary {
-    margin-top: var(--spacing-md);
+    margin-top: 6px;
     text-align: center;
-    font-size: 0.85rem;
+    font-size: 0.74rem;
     color: var(--color-gray-700);
     background: var(--color-gray-50);
-    padding: 8px 12px;
+    padding: 4px 8px;
     border-radius: var(--border-radius-sm);
     border: 1px solid var(--color-gray-200);
 }
 
+#patientAbsenceModal .modal-actions {
+    margin-top: 8px;
+    padding-top: 8px;
+    gap: 6px;
+}
+
+#patientAbsenceModal .modal-actions .action-btn {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+}
+
 @media (max-width: 640px) {
     .absence-modal-content {
-        max-width: 95vw;
-        padding: var(--spacing-md);
+        max-width: min(320px, 95vw);
+        padding: 10px 12px;
     }
     .absence-calendar-grid {
         gap: 3px;
     }
     .absence-day-btn {
-        min-height: 34px;
-        font-size: 0.8rem;
+        min-height: 28px;
+        font-size: 0.78rem;
     }
 }
 
