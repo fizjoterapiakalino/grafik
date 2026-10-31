@@ -110,13 +110,13 @@
 **Files:**
 - Wszystkie zmodyfikowane i utworzone pliki.
 
-- [ ] Krok 4.1: Uruchomienie pełnego zestawu testów i kontrolerów jakości:
+- [x] Krok 4.1: Uruchomienie pełnego zestawu testów i kontrolerów jakości:
   - `npm run type-check`
   - `npm run lint`
   - `npm test`
-- [ ] Krok 4.2: Uruchomienie subagenta recenzenta `research` (`Model: "flash"`) do niezależnego audytu kodu pod kątem:
+- [x] Krok 4.2: Uruchomienie subagenta recenzenta `research` (`Model: "flash"`) do niezależnego audytu kodu pod kątem:
   - Odporności na błędy,
   - Braku regresji w innych funkcjach grafiku i statystyk,
   - Zgodności z wymaganiami użytkownika (tylko żółty trójkąt w grafiku, bez wpływu na statystyki).
-- [ ] Krok 4.3: Ewentualne poprawki zgłoszone przez recenzenta i ponowna weryfikacja.
-- [ ] Krok 4.4: Zbudowanie produkcyjne (`npm run build`) i weryfikacja w przeglądarce / curl.
+- [x] Krok 4.3: Ewentualne poprawki zgłoszone przez recenzenta i ponowna weryfikacja.
+- [x] Krok 4.4: Zbudowanie produkcyjne (`npm run build`) i weryfikacja w przeglądarce / curl.
