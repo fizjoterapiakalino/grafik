@@ -20,6 +20,7 @@ jest.mock('../scripts/firebase-config.js', () => ({
 }));
 
 import { ScheduleModals, openPatientAbsenceModal } from '../scripts/schedule-modals.js';
+import { ScheduleUI, applyCellDataToDom } from '../scripts/schedule-ui.js';
 
 describe('Patient Absence Modal and Navbar Absence Button', () => {
     let container;
@@ -283,6 +284,39 @@ describe('Patient Absence Modal and Navbar Absence Button', () => {
             expect(container.style.display).toBe('none');
         });
 
+        test('handles split cell part 1 correctly, updating treatmentData1.absenceDates and absenceDates1', () => {
+            const splitPart1 = document.getElementById('splitPart1');
+            const cellState = {
+                isSplit: true,
+                content1: 'Anna Nowak',
+                content2: 'Piotr Wiśniewski',
+                treatmentData1: { startDate: '2026-10-01', endDate: '2026-10-15', absenceDates: ['2026-10-05'] },
+                treatmentData2: { startDate: '2026-10-10', endDate: '2026-10-25', absenceDates: ['2026-10-12'] },
+            };
+            const callback = jest.fn();
+
+            openPatientAbsenceModal(splitPart1, cellState, callback);
+
+            const subhead = document.getElementById('absencePatientSubhead');
+            expect(subhead.textContent).toContain('Anna Nowak');
+
+            // Add date 2026-10-08
+            const day8Btn = document.querySelector('.absence-day-btn[data-date="2026-10-08"]');
+            day8Btn.click();
+
+            const saveBtn = document.getElementById('saveAbsenceModal');
+            saveBtn.click();
+
+            expect(callback).toHaveBeenCalledTimes(1);
+            const targetState = {};
+            const updateFn = callback.mock.calls[0][0];
+            updateFn(targetState);
+
+            expect(targetState.treatmentData1.absenceDates).toEqual(['2026-10-05', '2026-10-08']);
+            expect(targetState.absenceDates1).toEqual(['2026-10-05', '2026-10-08']);
+            expect(container.style.display).toBe('none');
+        });
+
         test('handles split cell part 2 correctly', () => {
             const splitPart2 = document.getElementById('splitPart2');
             const cellState = {
@@ -462,6 +496,82 @@ describe('Patient Absence Modal and Navbar Absence Button', () => {
             const btn = document.getElementById('btnReportAbsence');
             expect(btn.disabled).toBe(true);
             expect(btn.classList.contains('active')).toBe(false);
+        });
+    });
+
+    describe('applyCellDataToDom and patient absence badge', () => {
+        const getTodayStr = () => {
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        };
+
+        test('generates .patient-absence-badge with .cell-icon for single cell and ScheduleUI.getElementText strips it', () => {
+            const todayStr = getTodayStr();
+            const td = document.createElement('td');
+            const cellObj = {
+                content: 'Jan Kowalski',
+                absenceDates: [todayStr],
+            };
+
+            applyCellDataToDom(td, cellObj);
+
+            const badge = td.querySelector('.patient-absence-badge');
+            expect(badge).not.toBeNull();
+            expect(badge.classList.contains('cell-icon')).toBe(true);
+            expect(badge.getAttribute('title')).toBe('Zgłoszona nieobecność w dniu dzisiejszym');
+            expect(badge.innerHTML).toContain('fa-exclamation-triangle');
+
+            expect(ScheduleUI.getElementText(td)).toBe('Jan Kowalski');
+        });
+
+        test('generates .patient-absence-badge with .cell-icon for split cell parts and ScheduleUI.getElementText strips it', () => {
+            const todayStr = getTodayStr();
+            const td = document.createElement('td');
+            const cellObj = {
+                isSplit: true,
+                content1: 'Anna Nowak',
+                content2: 'Piotr Wiśniewski',
+                treatmentData1: { absenceDates: [todayStr] },
+                treatmentData2: { absenceDates: ['2020-01-01'] },
+            };
+
+            applyCellDataToDom(td, cellObj);
+
+            const part1 = td.querySelector('[data-split-part="1"]');
+            const part2 = td.querySelector('[data-split-part="2"]');
+
+            expect(part1).not.toBeNull();
+            expect(part2).not.toBeNull();
+
+            const badge1 = part1.querySelector('.patient-absence-badge');
+            expect(badge1).not.toBeNull();
+            expect(badge1.classList.contains('cell-icon')).toBe(true);
+            expect(badge1.getAttribute('title')).toBe('Zgłoszona nieobecność w dniu dzisiejszym');
+            expect(badge1.innerHTML).toContain('fa-exclamation-triangle');
+            expect(ScheduleUI.getElementText(part1)).toBe('Anna Nowak');
+
+            const badge2 = part2.querySelector('.patient-absence-badge');
+            expect(badge2).toBeNull();
+            expect(ScheduleUI.getElementText(part2)).toBe('Piotr Wiśniewski');
+        });
+
+        test('coexists with shared-patient-cell marker and does not collide with W', () => {
+            const todayStr = getTodayStr();
+            const td = document.createElement('td');
+            const cellObj = {
+                content: 'Maria Curie',
+                isSharedPatient: true,
+                absenceDates: [todayStr],
+            };
+
+            applyCellDataToDom(td, cellObj);
+
+            expect(td.classList.contains('shared-patient-cell')).toBe(true);
+            const badge = td.querySelector('.patient-absence-badge');
+            expect(badge).not.toBeNull();
+            expect(badge.classList.contains('cell-icon')).toBe(true);
+            expect(ScheduleUI.getElementText(td)).toBe('Maria Curie');
         });
     });
 });

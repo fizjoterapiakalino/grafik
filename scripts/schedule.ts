@@ -501,54 +501,10 @@ export const Schedule: ScheduleAPI = (() => {
             if (!parentCell) return;
             const time = parentCell.dataset.time || '';
             const employeeIndex = parentCell.dataset.employeeIndex || '';
-            const realCellState = ScheduleData.getCellState(time, employeeIndex) || {} as CellState;
+            const realCellState = ScheduleData.getCellState(time, employeeIndex) || ({} as CellState);
 
-            let cellState: CellState = realCellState;
-            let partIndex: number | null = null;
-
-            if (realCellState.isSplit) {
-                if (element.tagName === 'DIV' && element.parentElement?.classList.contains('split-cell-wrapper')) {
-                    partIndex = element === element.parentElement.children[0] ? 1 : 2;
-                } else if (element.closest('.split-cell-wrapper')) {
-                    const div = element.closest('.split-cell-wrapper > div');
-                    if (div && div.parentElement) {
-                        partIndex = div === div.parentElement.children[0] ? 1 : 2;
-                    }
-                }
-
-                if (partIndex) {
-                    const treatmentData = (realCellState[`treatmentData${partIndex}`] as TreatmentData) || {};
-                    cellState = {
-                        ...realCellState,
-                        content: realCellState[`content${partIndex}`] as string,
-                        treatmentStartDate: treatmentData.startDate,
-                        treatmentExtensionDays: treatmentData.extensionDays,
-                        treatmentEndDate: treatmentData.endDate,
-                        additionalInfo: treatmentData.additionalInfo,
-                        absenceDates: Array.isArray(treatmentData.absenceDates)
-                            ? [...treatmentData.absenceDates]
-                            : (Array.isArray(realCellState[`absenceDates${partIndex}`])
-                                ? [...(realCellState[`absenceDates${partIndex}`] as string[])]
-                                : null),
-                    };
-                }
-            }
-
-            ScheduleModals.openPatientAbsenceModal(element, cellState, (updateFn) => {
-                if (partIndex) {
-                    updateCellState(parentCell, (state) => {
-                        const tempState = { ...cellState };
-                        updateFn(tempState);
-
-                        if (!state[`treatmentData${partIndex}`]) state[`treatmentData${partIndex}`] = {};
-                        const treatmentData = state[`treatmentData${partIndex}`] as TreatmentData;
-                        const absences = tempState.absenceDates ? [...tempState.absenceDates] : null;
-                        treatmentData.absenceDates = absences;
-                        state[`absenceDates${partIndex}`] = absences;
-                    });
-                } else {
-                    updateCellState(parentCell, updateFn);
-                }
+            ScheduleModals.openPatientAbsenceModal(element, realCellState, (updateFn) => {
+                updateCellState(parentCell, updateFn);
             });
         },
 

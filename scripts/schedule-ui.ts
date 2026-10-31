@@ -44,6 +44,7 @@ interface ScheduleUIAPI {
     render(): void;
     flushPendingRenderIfIdle(): void;
     getElementText(element: HTMLElement | null): string;
+    applyCellDataToDom(cell: HTMLTableCellElement, cellObj: CellData): void;
     updatePatientCount(): void;
     destroy(): void;
 }
@@ -715,6 +716,11 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                 if (part.isAbsentToday) {
                     const absenceTooltip = '⚠️ Zgłoszona nieobecność w dniu dzisiejszym';
                     div.title = div.title ? `${div.title}\n${absenceTooltip}` : absenceTooltip;
+                    const badge = document.createElement('span');
+                    badge.className = 'cell-icon patient-absence-badge';
+                    badge.setAttribute('title', 'Zgłoszona nieobecność w dniu dzisiejszym');
+                    badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                    div.appendChild(badge);
                 }
 
                 wrapper.appendChild(div);
@@ -752,6 +758,11 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             if (displayData.isAbsentToday) {
                 const absenceTooltip = '⚠️ Zgłoszona nieobecność w dniu dzisiejszym';
                 cell.title = cell.title ? `${cell.title}\n${absenceTooltip}` : absenceTooltip;
+                const badge = document.createElement('span');
+                badge.className = 'cell-icon patient-absence-badge';
+                badge.setAttribute('title', 'Zgłoszona nieobecność w dniu dzisiejszym');
+                badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                cell.appendChild(badge);
             }
         }
     };
@@ -1296,7 +1307,10 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         render: renderTable,
         flushPendingRenderIfIdle,
         getElementText,
+        applyCellDataToDom,
         updatePatientCount,
         destroy,
     };
 })();
+
+export const applyCellDataToDom = ScheduleUI.applyCellDataToDom;
