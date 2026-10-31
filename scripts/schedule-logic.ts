@@ -9,6 +9,7 @@ interface TreatmentData {
     extensionDays?: number;
     endDate?: string;
     gender?: string;
+    absenceDates?: string[];
 }
 
 /**
@@ -40,6 +41,9 @@ interface CellData {
     treatmentEndDate?: string;
     treatmentData1?: TreatmentData;
     treatmentData2?: TreatmentData;
+    absenceDates?: string[];
+    absenceDates1?: string[];
+    absenceDates2?: string[];
 }
 
 /**
@@ -55,6 +59,8 @@ interface PartData {
     isHydrotherapy: boolean;
     treatmentEndDate?: string | null;
     daysRemaining?: number | null;
+    isAbsentToday?: boolean;
+    absenceDates?: string[];
 }
 
 /**
@@ -69,6 +75,8 @@ interface CellDisplayData {
     isBreak: boolean;
     treatmentEndDate?: string | null;
     daysRemaining?: number | null;
+    isAbsentToday?: boolean;
+    absenceDates?: string[];
 }
 
 /**
@@ -197,6 +205,15 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
                 }
             }
 
+            const absenceDates1 = cellData.treatmentData1?.absenceDates || cellData.absenceDates1;
+            if (absenceDates1) {
+                result.parts[0].absenceDates = absenceDates1;
+            }
+            if (absenceDates1 && Array.isArray(absenceDates1) && absenceDates1.includes(todayStr) && result.parts[0].text.trim() !== '') {
+                result.parts[0].classes.push('patient-absence-marker');
+                result.parts[0].isAbsentToday = true;
+            }
+
             // Part 2
             let endDate2: string | null = cellData.treatmentData2?.endDate
                 ? cellData.treatmentData2.endDate.toString().trim()
@@ -212,6 +229,15 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
                 if (endDate2 <= todayStr) {
                     result.parts[1].classes.push('treatment-end-marker');
                 }
+            }
+
+            const absenceDates2 = cellData.treatmentData2?.absenceDates || cellData.absenceDates2;
+            if (absenceDates2) {
+                result.parts[1].absenceDates = absenceDates2;
+            }
+            if (absenceDates2 && Array.isArray(absenceDates2) && absenceDates2.includes(todayStr) && result.parts[1].text.trim() !== '') {
+                result.parts[1].classes.push('patient-absence-marker');
+                result.parts[1].isAbsentToday = true;
             }
 
             return result;
@@ -254,6 +280,14 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
             if (endDateStr <= todayStr) {
                 result.classes.push('treatment-end-marker');
             }
+        }
+
+        if (cellData.absenceDates) {
+            result.absenceDates = cellData.absenceDates;
+        }
+        if (cellData.absenceDates && Array.isArray(cellData.absenceDates) && cellData.absenceDates.includes(todayStr) && result.text.trim() !== '') {
+            result.classes.push('patient-absence-marker');
+            result.isAbsentToday = true;
         }
 
         return result;

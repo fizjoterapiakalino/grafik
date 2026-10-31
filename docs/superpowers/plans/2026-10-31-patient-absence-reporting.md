@@ -66,12 +66,12 @@
 - Modify: `scripts/schedule-ui.ts`
 - Test: `tests/schedule-logic.test.js`
 
-- [ ] Krok 2.1: Rozszerzenie `CellData`, `PartData` i `CellDisplayData` w `scripts/schedule-logic.ts` o pola `absenceDates` oraz flagę `isAbsentToday?: boolean`.
-- [ ] Krok 2.2: W `ScheduleLogic.getCellDisplayData()`: porównanie dzisiejszej daty (`todayStr` = `YYYY-MM-DD`) z `absenceDates` komórki oraz połówek `treatmentData1.absenceDates` / `treatmentData2.absenceDates`. Jeśli pacjent ma dzisiaj nieobecność, dodanie klasy `patient-absence-marker` i ustawienie `isAbsentToday = true`.
-- [ ] Krok 2.3: Dodanie stylów CSS w `styles/schedule.css` dla `.patient-absence-marker` z pseudo-elementem `::before` (żółty/bursztynowy trójkąt FontAwesome `\f071` w lewym górnym rogu `top: -2px; left: -2px`, z-index 4, okrągłe tło, bez kolizji z dzwonkiem w prawym górnym rogu).
-- [ ] Krok 2.4: W `scripts/schedule-ui.ts` w `applyCellDataToDom` oraz w widoku mobilnym (`createMobileSlotPart`): dodanie tooltipa `⚠️ Zgłoszona nieobecność pacjenta w dniu dzisiejszym` oraz taga `.mobile-schedule-tag.absence` w widoku mobilnym (wewnątrz `.cell-icon`, by nie trafiał do tekstu).
-- [ ] Krok 2.5: Dodanie testów w `tests/schedule-logic.test.js` weryfikujących, że komórka z nieobecnością w dniu dzisiejszym otrzymuje klasę `patient-absence-marker`, a komórka z nieobecnością w innym dniu jej nie otrzymuje.
-- [ ] Krok 2.6: Weryfikacja, że `ScheduleUI.getElementText()` całkowicie ignoruje znaczniki nieobecności i zwraca czysty tekst pacjenta.
+- [x] Krok 2.1: Rozszerzenie `CellData`, `PartData` i `CellDisplayData` w `scripts/schedule-logic.ts` o pola `absenceDates` oraz flagę `isAbsentToday?: boolean`.
+- [x] Krok 2.2: W `ScheduleLogic.getCellDisplayData()`: porównanie dzisiejszej daty (`todayStr` = `YYYY-MM-DD`) z `absenceDates` komórki oraz połówek `treatmentData1.absenceDates` / `treatmentData2.absenceDates`. Jeśli pacjent ma dzisiaj nieobecność, dodanie klasy `patient-absence-marker` i ustawienie `isAbsentToday = true`.
+- [x] Krok 2.3: Dodanie stylów CSS w `styles/schedule.css` dla `.patient-absence-marker` z pseudo-elementem `::before` (żółty/bursztynowy trójkąt FontAwesome `\f071` w lewym górnym rogu `top: -2px; left: -2px`, z-index 4, okrągłe tło, bez kolizji z dzwonkiem w prawym górnym rogu).
+- [x] Krok 2.4: W `scripts/schedule-ui.ts` w `applyCellDataToDom` oraz w widoku mobilnym (`createMobileSlotPart`): dodanie tooltipa `⚠️ Zgłoszona nieobecność pacjenta w dniu dzisiejszym` oraz taga `.mobile-schedule-tag.absence` w widoku mobilnym (wewnątrz `.cell-icon`, by nie trafiał do tekstu).
+- [x] Krok 2.5: Dodanie testów w `tests/schedule-logic.test.js` weryfikujących, że komórka z nieobecnością w dniu dzisiejszym otrzymuje klasę `patient-absence-marker`, a komórka z nieobecnością w innym dniu jej nie otrzymuje.
+- [x] Krok 2.6: Weryfikacja, że `ScheduleUI.getElementText()` całkowicie ignoruje znaczniki nieobecności i zwraca czysty tekst pacjenta.
 
 ---
 

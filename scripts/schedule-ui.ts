@@ -712,6 +712,11 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                     div.title = tooltipText;
                 }
 
+                if (part.isAbsentToday) {
+                    const absenceTooltip = '⚠️ Zgłoszona nieobecność w dniu dzisiejszym';
+                    div.title = div.title ? `${div.title}\n${absenceTooltip}` : absenceTooltip;
+                }
+
                 wrapper.appendChild(div);
             });
             cell.appendChild(wrapper);
@@ -742,6 +747,11 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                     tooltipText = `Koniec zabiegu: ${formattedDate}`;
                 }
                 cell.title = tooltipText;
+            }
+
+            if (displayData.isAbsentToday) {
+                const absenceTooltip = '⚠️ Zgłoszona nieobecność w dniu dzisiejszym';
+                cell.title = cell.title ? `${cell.title}\n${absenceTooltip}` : absenceTooltip;
             }
         }
     };
@@ -782,6 +792,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         isSharedPatient?: boolean;
         isHydrotherapy?: boolean;
         treatmentEndDate?: string | null;
+        isAbsentToday?: boolean;
     };
 
     const appendMobileTreatmentTagsInline = (
@@ -794,6 +805,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             return;
         }
 
+        if (tagSource.isAbsentToday) appendMobileTag(container, '⚠️ Nieobecny', 'absence');
         if (tagSource.isMassage) appendMobileTag(container, 'Masaż', 'massage');
         if (tagSource.isPnf) appendMobileTag(container, 'PNF', 'pnf');
         if (tagSource.isEveryOtherDay) appendMobileTag(container, 'Co 2 dni');
@@ -813,6 +825,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         isSharedPatient: displayData.classes.includes('shared-patient-cell'),
         isHydrotherapy: displayData.classes.includes('hydrotherapy-cell'),
         treatmentEndDate: displayData.treatmentEndDate,
+        isAbsentToday: displayData.isAbsentToday,
     });
 
     const appendMobileInlineMeta = (

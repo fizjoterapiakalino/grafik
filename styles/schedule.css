@@ -884,6 +884,31 @@ td.current-time-highlight {
     position: relative;
 }
 
+.patient-absence-marker {
+    position: relative;
+}
+
+.patient-absence-marker::before {
+    content: '\f071';
+    font-family: 'Font Awesome 5 Free', sans-serif;
+    font-weight: 900;
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    color: #f59e0b;
+    font-size: 0.8rem;
+    background: var(--color-white);
+    border-radius: 50%;
+    width: 17px;
+    height: 17px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    z-index: 4;
+}
+
 .treatment-end-marker::after {
     content: '\f0f3';
     font-family: 'Font Awesome 5 Free', sans-serif;
@@ -1402,6 +1427,13 @@ td.current-time-highlight {
     .mobile-schedule-tag.break {
         background: var(--bg-break);
         color: var(--color-white);
+    }
+
+    .mobile-schedule-tag.absence {
+        background-color: #fef3c7;
+        color: #b45309;
+        border: 1px solid #fcd34d;
+        font-weight: 600;
     }
 
     /* Reuse existing text classes */
