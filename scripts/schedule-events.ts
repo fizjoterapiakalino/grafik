@@ -562,12 +562,27 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                     state.isSharedPatient = null;
                 }
 
+                const activeAbsence = Array.isArray(state.absenceDates)
+                    ? [...state.absenceDates]
+                    : (state.absenceDates ? [state.absenceDates] : null);
+
                 state.treatmentData1 = {
                     startDate: safeCopy(state.treatmentStartDate),
                     extensionDays: safeCopy(state.treatmentExtensionDays),
                     endDate: safeCopy(state.treatmentEndDate),
                     additionalInfo: safeCopy(state.additionalInfo),
+                    absenceDates: activeAbsence ? [...activeAbsence] : null,
                 };
+                state.absenceDates1 = activeAbsence ? [...activeAbsence] : null;
+                state.absenceDates2 = null;
+                state.treatmentData2 = {
+                    startDate: null,
+                    extensionDays: null,
+                    endDate: null,
+                    additionalInfo: null,
+                    absenceDates: null,
+                };
+                state.absenceDates = null;
 
                 state.treatmentStartDate = null;
                 state.treatmentExtensionDays = null;
@@ -589,8 +604,11 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                     _dependencies.ui.getElementText(cell).trim() !== '',
                 action: (_cell: HTMLElement, event?: MouseEvent) =>
                     _dependencies.openPatientInfoModal(
+                        (event?.target as HTMLElement)?.closest('.split-cell-wrapper > div') as HTMLElement ||
                         (event?.target as HTMLElement)?.closest('div[tabindex="0"]') as HTMLElement ||
-                        (event?.target as HTMLElement)?.closest('td.editable-cell') as HTMLElement
+                        activeCell ||
+                        (event?.target as HTMLElement)?.closest('td.editable-cell') as HTMLElement ||
+                        _cell
                     ),
             },
             {
@@ -602,8 +620,11 @@ export const ScheduleEvents: ScheduleEventsAPI = (() => {
                     _dependencies.ui.getElementText(cell).trim() !== '',
                 action: (_cell: HTMLElement, event?: MouseEvent) =>
                     _dependencies.openPatientAbsenceModal(
+                        (event?.target as HTMLElement)?.closest('.split-cell-wrapper > div') as HTMLElement ||
                         (event?.target as HTMLElement)?.closest('div[tabindex="0"]') as HTMLElement ||
-                        (event?.target as HTMLElement)?.closest('td.editable-cell') as HTMLElement
+                        activeCell ||
+                        (event?.target as HTMLElement)?.closest('td.editable-cell') as HTMLElement ||
+                        _cell
                     ),
             },
             {

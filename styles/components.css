@@ -91,6 +91,18 @@ button[type="submit"]:hover {
     color: var(--color-gray-800);
 }
 
+.action-btn.outline.danger {
+    color: var(--color-danger);
+    border-color: rgba(239, 68, 68, 0.4);
+    background: transparent;
+}
+
+.action-btn.outline.danger:hover {
+    background-color: rgba(239, 68, 68, 0.08);
+    border-color: var(--color-danger);
+    color: #dc2626;
+}
+
 /* Shared Patient Button */
 .action-btn.shared {
     background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
@@ -124,6 +136,7 @@ button[type="submit"]:hover {
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-xl);
     border: 1px solid rgba(255, 255, 255, 0.1);
+    box-sizing: border-box;
     animation: modalSlideUp 0.3s ease-out;
 }
 

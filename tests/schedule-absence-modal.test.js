@@ -21,6 +21,7 @@ jest.mock('../scripts/firebase-config.js', () => ({
 
 import { ScheduleModals, openPatientAbsenceModal } from '../scripts/schedule-modals.js';
 import { ScheduleUI, applyCellDataToDom } from '../scripts/schedule-ui.js';
+import { getTargetPart } from '../scripts/schedule-helpers.js';
 
 describe('Patient Absence Modal and Navbar Absence Button', () => {
     let container;
@@ -30,7 +31,7 @@ describe('Patient Absence Modal and Navbar Absence Button', () => {
         document.body.innerHTML = `
             <div id="scheduleActionButtons" class="schedule-action-buttons">
                 <button id="btnPatientInfo" class="action-icon-btn" title="Informacje o pacjencie" disabled></button>
-                <button id="btnReportAbsence" class="action-icon-btn btn-absence" title="Zgłoś nieobecność pacjenta" aria-label="Zgłoś nieobecność pacjenta" disabled><i class="fas fa-calendar-times"></i><span class="absence-btn-label">Nieobecność</span></button>
+                <button id="btnReportAbsence" class="action-icon-btn btn-absence" title="Zgłoś nieobecność pacjenta" aria-label="Zgłoś nieobecność pacjenta" disabled><i class="fas fa-calendar-times"></i></button>
                 <button id="btnAddBreak" class="action-icon-btn" title="Dodaj przerwę" disabled></button>
                 <button id="btnClearCell" class="action-icon-btn danger" title="Wyczyść komórkę" disabled></button>
             </div>
@@ -61,6 +62,20 @@ describe('Patient Absence Modal and Navbar Absence Button', () => {
                         <button type="button" id="clearAbsencesBtn" class="action-btn outline danger">Wyczyść wszystkie</button>
                         <button type="button" id="saveAbsenceModal" class="action-btn primary">Zapisz</button>
                         <button type="button" id="closeAbsenceModal" class="action-btn outline">Anuluj</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="patientInfoModal" class="modal-overlay" style="display: none">
+                <div class="modal-content">
+                    <input type="text" id="patientName" readonly />
+                    <input type="date" id="treatmentStartDate" />
+                    <input type="number" id="treatmentExtensionDays" min="0" value="0" />
+                    <input type="text" id="treatmentEndDate" readonly />
+                    <textarea id="additionalInfo" rows="3"></textarea>
+                    <div class="modal-actions">
+                        <button id="savePatientInfoModal" class="action-btn primary">Zapisz</button>
+                        <button id="closePatientInfoModal" class="action-btn outline">Anuluj</button>
                     </div>
                 </div>
             </div>
@@ -572,6 +587,95 @@ describe('Patient Absence Modal and Navbar Absence Button', () => {
             expect(badge).not.toBeNull();
             expect(badge.classList.contains('cell-icon')).toBe(true);
             expect(ScheduleUI.getElementText(td)).toBe('Maria Curie');
+        });
+    });
+
+    describe('getTargetPart helper resolution', () => {
+        test('resolves part 1 and 2 for split divs and their nested children', () => {
+            const splitPart1 = document.getElementById('splitPart1');
+            const splitPart2 = document.getElementById('splitPart2');
+
+            expect(getTargetPart(splitPart1)).toBe(1);
+            expect(getTargetPart(splitPart2)).toBe(2);
+
+            const badge = document.createElement('span');
+            badge.className = 'patient-absence-badge';
+            const icon = document.createElement('i');
+            badge.appendChild(icon);
+            splitPart1.appendChild(badge);
+
+            expect(getTargetPart(badge)).toBe(1);
+            expect(getTargetPart(icon)).toBe(1);
+
+            const nonSplit = document.getElementById('patientCell');
+            expect(getTargetPart(nonSplit)).toBeNull();
+            expect(getTargetPart(null)).toBeNull();
+        });
+    });
+
+    describe('Patient info modal preserves absences on split cells', () => {
+        test('does not wipe out absenceDates on part 1 when saving patient info', () => {
+            const splitPart1 = document.getElementById('splitPart1');
+            const state = {
+                isSplit: true,
+                content1: 'Anna Nowak',
+                content2: 'Piotr Wiśniewski',
+                treatmentData1: {
+                    startDate: '2026-10-01',
+                    extensionDays: 0,
+                    endDate: '2026-10-15',
+                    absenceDates: ['2026-10-05', '2026-10-06'],
+                },
+            };
+
+            const updateCallback = jest.fn((fn) => {
+                fn(state);
+            });
+
+            ScheduleModals.openPatientInfoModal(splitPart1, state, updateCallback);
+
+            const saveBtn = document.getElementById('savePatientInfoModal');
+            saveBtn.click();
+
+            expect(updateCallback).toHaveBeenCalled();
+            expect(state.treatmentData1.absenceDates).toEqual(['2026-10-05', '2026-10-06']);
+        });
+    });
+
+    describe('Smart month selection when opening absence calendar', () => {
+        test('defaults to current month if today falls within patient turnus', () => {
+            const now = new Date();
+            const y = now.getFullYear();
+
+            const patientCell = document.getElementById('patientCell');
+            const cellState = {
+                content: 'Jan Kowalski',
+                treatmentStartDate: '2020-01-01',
+                treatmentEndDate: '2030-12-31',
+            };
+
+            openPatientAbsenceModal(patientCell, cellState, jest.fn());
+
+            const monthNames = [
+                'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
+                'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
+            ];
+            const monthLabel = document.getElementById('absenceMonthYearLabel');
+            expect(monthLabel.textContent).toBe(`${monthNames[now.getMonth()]} ${y}`);
+        });
+
+        test('defaults to start month if today is outside turnus', () => {
+            const patientCell = document.getElementById('patientCell');
+            const cellState = {
+                content: 'Jan Kowalski',
+                treatmentStartDate: '2028-05-10',
+                treatmentEndDate: '2028-05-24',
+            };
+
+            openPatientAbsenceModal(patientCell, cellState, jest.fn());
+
+            const monthLabel = document.getElementById('absenceMonthYearLabel');
+            expect(monthLabel.textContent).toBe('Maj 2028');
         });
     });
 });

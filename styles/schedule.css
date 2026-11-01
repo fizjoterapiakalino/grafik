@@ -720,8 +720,17 @@ td.split-cell>div.hydrotherapy-text>span {
     color: var(--color-secondary);
 }
 
-#btnReportAbsence.active:hover i {
+#btnReportAbsence.active i {
     color: #f59e0b;
+}
+
+#btnReportAbsence.active:hover {
+    background: #f59e0b;
+    border-color: #f59e0b;
+}
+
+#btnReportAbsence.active:hover i {
+    color: white;
 }
 
 #btnMassage.active:hover i {
@@ -985,6 +994,7 @@ td.current-time-highlight {
     border-radius: var(--border-radius-lg);
     border: 1px solid var(--color-gray-100);
     box-shadow: var(--shadow-xl);
+    box-sizing: border-box;
     overflow: hidden;
 }
 
@@ -2485,6 +2495,9 @@ td.current-time-highlight {
 
 .context-menu li.warning {
     color: #d97706;
+    border-bottom: 1px solid var(--color-gray-100);
+    margin-bottom: 6px;
+    padding-bottom: 10px;
 }
 
 .context-menu li.warning i {
@@ -2497,21 +2510,28 @@ td.current-time-highlight {
 }
 
 .absence-modal-content {
-    max-width: 320px;
+    max-width: 420px;
     width: 100%;
+    box-sizing: border-box;
+    max-height: 90vh;
+    overflow-y: auto;
     border-radius: var(--border-radius-lg);
-    padding: 12px 14px;
+    padding: var(--spacing-lg) var(--spacing-xl);
     box-shadow: var(--shadow-xl);
 }
 
+.absence-modal-content .modal-body {
+    padding: 0;
+}
+
 .absence-modal-header {
-    margin-bottom: 6px;
+    margin-bottom: var(--spacing-md);
     border-bottom: 2px solid var(--color-primary-50);
-    padding-bottom: 4px;
+    padding-bottom: var(--spacing-sm);
 }
 
 .absence-modal-header .modal-title {
-    font-size: 1.05rem;
+    font-size: 1.25rem;
     margin: 0;
     padding: 0;
     border: none;
@@ -2526,9 +2546,9 @@ td.current-time-highlight {
 }
 
 .absence-patient-subhead {
-    font-size: 0.76rem;
+    font-size: 0.875rem;
     color: var(--color-gray-600);
-    margin-top: 2px;
+    margin-top: 6px;
     font-weight: 500;
 }
 
@@ -2536,39 +2556,49 @@ td.current-time-highlight {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 6px;
-    padding: 0 2px;
+    margin-bottom: var(--spacing-md);
+    padding: 0 4px;
 }
 
 .absence-month-label {
     font-weight: 700;
-    font-size: 0.92rem;
+    font-size: 1.05rem;
     color: var(--color-gray-800);
     text-align: center;
 }
 
-.absence-calendar-toolbar .btn-sm,
-.btn-sm {
-    padding: 2px 7px;
-    font-size: 0.78rem;
-    min-height: 24px;
+.absence-calendar-toolbar .btn-sm {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0;
+    font-size: 0.85rem;
     border-radius: var(--border-radius-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .absence-calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 3px;
+    gap: 6px;
     user-select: none;
 }
 
 .absence-weekday {
     font-weight: 700;
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     color: var(--color-gray-500);
     text-align: center;
-    padding: 1px 0;
+    padding: 4px 0;
     text-transform: uppercase;
+}
+
+.absence-weekday:nth-child(6),
+.absence-weekday:nth-child(7) {
+    color: #ef4444;
 }
 
 .absence-day-btn {
@@ -2580,14 +2610,16 @@ td.current-time-highlight {
     position: relative;
     border: 1px solid var(--color-gray-200);
     background: var(--color-white);
-    border-radius: 5px;
-    font-size: 0.78rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
     font-weight: 500;
     color: var(--color-gray-800);
     cursor: pointer;
     transition: all 0.15s ease;
-    padding: 1px;
-    min-height: 28px;
+    padding: 2px;
+    min-height: 38px;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .absence-day-btn:hover {
@@ -2618,6 +2650,10 @@ td.current-time-highlight {
     border-color: var(--color-gray-100);
 }
 
+.absence-day-btn.other-month.is-absent {
+    opacity: 1;
+}
+
 .absence-day-btn.is-today {
     box-shadow: 0 0 0 2px var(--color-primary);
     font-weight: 700;
@@ -2631,18 +2667,18 @@ td.current-time-highlight {
 }
 
 .absence-day-btn .absence-day-warning {
-    font-size: 0.55rem;
+    font-size: 0.7rem;
     color: #d97706;
-    margin-top: 0;
+    margin-top: 1px;
     line-height: 1;
 }
 
 .absence-legend {
     display: flex;
     justify-content: center;
-    gap: 8px;
-    margin-top: 6px;
-    font-size: 0.72rem;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+    font-size: 0.8rem;
     color: var(--color-gray-600);
     flex-wrap: wrap;
 }
@@ -2654,8 +2690,8 @@ td.current-time-highlight {
 }
 
 .absence-dot {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     display: inline-block;
 }
@@ -2676,38 +2712,64 @@ td.current-time-highlight {
 }
 
 .absence-selected-summary {
-    margin-top: 6px;
+    margin-top: var(--spacing-md);
     text-align: center;
-    font-size: 0.74rem;
+    font-size: 0.85rem;
     color: var(--color-gray-700);
     background: var(--color-gray-50);
-    padding: 4px 8px;
+    padding: 8px 12px;
     border-radius: var(--border-radius-sm);
     border: 1px solid var(--color-gray-200);
 }
 
 #patientAbsenceModal .modal-actions {
-    margin-top: 8px;
-    padding-top: 8px;
-    gap: 6px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--color-gray-100);
+}
+
+#patientAbsenceModal .modal-actions #clearAbsencesBtn {
+    margin-right: auto;
 }
 
 #patientAbsenceModal .modal-actions .action-btn {
-    padding: 6px 10px;
-    font-size: 0.8rem;
+    padding: 8px 16px;
+    font-size: 0.88rem;
+    box-sizing: border-box;
 }
 
 @media (max-width: 640px) {
     .absence-modal-content {
-        max-width: min(320px, 95vw);
-        padding: 10px 12px;
+        max-width: min(420px, 95vw);
+        padding: var(--spacing-md);
+        box-sizing: border-box;
     }
     .absence-calendar-grid {
-        gap: 3px;
+        gap: 4px;
     }
     .absence-day-btn {
-        min-height: 28px;
-        font-size: 0.78rem;
+        min-height: 34px;
+        font-size: 0.8rem;
+    }
+    #patientAbsenceModal .modal-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+    #patientAbsenceModal .modal-actions #saveAbsenceModal {
+        order: 1;
+        width: 100%;
+    }
+    #patientAbsenceModal .modal-actions #closeAbsenceModal {
+        order: 2;
+        width: 100%;
+    }
+    #patientAbsenceModal .modal-actions #clearAbsencesBtn {
+        order: 3;
+        width: 100%;
+        margin-right: 0;
     }
 }
-

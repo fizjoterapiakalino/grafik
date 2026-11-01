@@ -50,9 +50,13 @@ export const ensureCellPatientIds = (state: CellState): void => {
 /**
  * Określa numer części podzielonej komórki (1 lub 2) na podstawie elementu DOM
  */
-export const getTargetPart = (element: HTMLElement): number | null => {
-    if (element.tagName === 'DIV' && element.parentNode && (element.parentNode as HTMLElement).classList.contains('split-cell-wrapper')) {
-        return element === (element.parentNode as HTMLElement).children[0] ? 1 : 2;
+export const getTargetPart = (element: HTMLElement | null): number | null => {
+    if (!element) return null;
+    const splitDiv = (element.tagName === 'DIV' && (element.parentElement as HTMLElement | null)?.classList.contains('split-cell-wrapper'))
+        ? element
+        : (element.closest?.('.split-cell-wrapper > div') as HTMLElement | null);
+    if (splitDiv && splitDiv.parentElement?.classList.contains('split-cell-wrapper')) {
+        return splitDiv === splitDiv.parentElement.children[0] ? 1 : 2;
     }
     return null;
 };

@@ -201,7 +201,9 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
             updateCellStateCallback((state) => {
                 if (targetPart) {
                     const key = `treatmentData${targetPart}` as 'treatmentData1' | 'treatmentData2';
+                    const existingData = (state[key] as TreatmentData | undefined) || {};
                     state[key] = {
+                        ...existingData,
                         startDate: effectiveStart,
                         extensionDays: extDays,
                         endDate,
@@ -302,7 +304,10 @@ export const ScheduleModals: ScheduleModalsAPI = (() => {
         let currentYear: number;
         let currentMonth: number;
 
-        if (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+        if (startDate && endDate && todayIso >= startDate && todayIso <= endDate) {
+            currentYear = now.getFullYear();
+            currentMonth = now.getMonth();
+        } else if (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
             const [sy, sm] = startDate.split('-').map(Number);
             currentYear = sy;
             currentMonth = sm - 1;
