@@ -30,8 +30,8 @@ describe('Patient Absence Modal and Navbar Absence Button', () => {
     const setupDom = () => {
         document.body.innerHTML = `
             <div id="scheduleActionButtons" class="schedule-action-buttons">
+                <button id="btnReportAbsence" class="action-icon-btn btn-absence" title="Zgłoś nieobecność pacjenta" aria-label="Zgłoś nieobecność pacjenta" disabled><i class="fas fa-calendar-times"></i><span class="absence-btn-label">Nieobecność</span></button>
                 <button id="btnPatientInfo" class="action-icon-btn" title="Informacje o pacjencie" disabled></button>
-                <button id="btnReportAbsence" class="action-icon-btn btn-absence" title="Zgłoś nieobecność pacjenta" aria-label="Zgłoś nieobecność pacjenta" disabled><i class="fas fa-calendar-times"></i></button>
                 <button id="btnAddBreak" class="action-icon-btn" title="Dodaj przerwę" disabled></button>
                 <button id="btnClearCell" class="action-icon-btn danger" title="Wyczyść komórkę" disabled></button>
             </div>
@@ -44,9 +44,9 @@ describe('Patient Absence Modal and Navbar Absence Button', () => {
                     </div>
                     <div class="modal-body">
                         <div class="absence-calendar-toolbar">
-                            <button type="button" id="absencePrevMonthBtn" class="action-btn outline btn-sm" title="Poprzedni miesiąc">&lt;</button>
+                            <button type="button" id="absencePrevMonthBtn" class="action-btn outline btn-sm absence-nav-btn" title="Poprzedni miesiąc">&lt;</button>
                             <span id="absenceMonthYearLabel" class="absence-month-label"></span>
-                            <button type="button" id="absenceNextMonthBtn" class="action-btn outline btn-sm" title="Następny miesiąc">&gt;</button>
+                            <button type="button" id="absenceNextMonthBtn" class="action-btn outline btn-sm absence-nav-btn" title="Następny miesiąc">&gt;</button>
                         </div>
                         <div id="absenceCalendarGrid" class="absence-calendar-grid"></div>
                         <div class="absence-legend">
@@ -511,6 +511,15 @@ describe('Patient Absence Modal and Navbar Absence Button', () => {
             const btn = document.getElementById('btnReportAbsence');
             expect(btn.disabled).toBe(true);
             expect(btn.classList.contains('active')).toBe(false);
+        });
+
+        test('places #btnReportAbsence in the first position with visible Nieobecność label', () => {
+            const actionButtonsContainer = document.getElementById('scheduleActionButtons');
+            const firstButton = actionButtonsContainer.firstElementChild;
+            expect(firstButton.id).toBe('btnReportAbsence');
+            const label = firstButton.querySelector('.absence-btn-label');
+            expect(label).not.toBeNull();
+            expect(label.textContent).toBe('Nieobecność');
         });
     });
 
