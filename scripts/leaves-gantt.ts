@@ -1,16 +1,8 @@
 // scripts/leaves-gantt.ts - Gantt View for Leaves Module
 import type { Employee, LeaveEntry, LeavesMap } from './types';
 import { EmployeeManager } from './employee-manager';
-import { countWorkdays, isHoliday } from './common';
-import { escapeHTML } from './utils';
-
-/**
- * Helper: Parse date string to Date object in UTC
- */
-const toUTCDate = (dateStr: string): Date => {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    return new Date(Date.UTC(year, month - 1, day));
-};
+import { countWorkdays, isHoliday, months } from './common';
+import { escapeHTML, toUTCDate, toDateString, formatLocalIsoDate } from './utils';
 
 /**
  * Calculate planned vacation days for an employee in a given year
@@ -47,9 +39,7 @@ export const calculatePlannedVacationDays = (leaves: LeaveEntry[], year: number)
 /**
  * Calculate working days between two dates (excluding weekends/holidays)
  */
-export const calculateWorkingDays = (startDate: string, endDate: string): number => {
-    return countWorkdays(startDate, endDate);
-};
+export const calculateWorkingDays = countWorkdays;
 
 /**
  * Get employee leave limit info by name
@@ -82,10 +72,7 @@ const LEAVE_TYPES: Record<string, { label: string; color: string }> = {
     schedule_pickup: { label: 'Wybicie za święto', color: '#1abc9c' },
 };
 
-const MONTH_NAMES = [
-    'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
-    'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'
-];
+const MONTH_NAMES = months;
 
 /**
  * Get ISO week number
@@ -108,8 +95,8 @@ const getWeeksForMonth = (year: number, month: number): number[] => {
     // We only count a week if its Monday falls in this month, 
     // or if it's the first week of the month.
     for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(year, month, day);
-        const dayOfWeek = date.getDay(); // 0 is Sunday
+        const date = new Date(Date.UTC(year, month, day));
+        const dayOfWeek = date.getUTCDay(); // 0 is Sunday
 
         // Add week if it's the first day of month or if it's a Monday
         if (day === 1 || dayOfWeek === 1) {
@@ -194,15 +181,15 @@ export const collapseAllMonths = (): void => {
  * Get number of days in a month
  */
 const getDaysInMonth = (year: number, month: number): number => {
-    return new Date(year, month + 1, 0).getDate();
+    return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 };
 
 /**
  * Check if a date is weekend (Saturday = 6, Sunday = 0)
  */
 const isWeekend = (year: number, month: number, day: number): boolean => {
-    const date = new Date(year, month, day);
-    const dayOfWeek = date.getDay();
+    const date = new Date(Date.UTC(year, month, day));
+    const dayOfWeek = date.getUTCDay();
     return dayOfWeek === 0 || dayOfWeek === 6;
 };
 
@@ -217,28 +204,26 @@ const isGanttHoliday = (year: number, month: number, day: number): boolean => {
  * Check if a date is today
  */
 const isToday = (year: number, month: number, day: number): boolean => {
-    const today = new Date();
-    return today.getFullYear() === year &&
-        today.getMonth() === month &&
-        today.getDate() === day;
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return dateStr === formatLocalIsoDate();
 };
 
 /**
  * Get day of year (0-indexed)
  */
 const getDayOfYear = (date: Date): number => {
-    const start = new Date(date.getFullYear(), 0, 0);
-    const diff = date.getTime() - start.getTime();
-    const oneDay = 1000 * 60 * 60 * 24;
-    return Math.floor(diff / oneDay);
+    const year = date.getUTCFullYear();
+    const start = new Date(Date.UTC(year, 0, 1));
+    const current = new Date(Date.UTC(year, date.getUTCMonth(), date.getUTCDate()));
+    const diff = current.getTime() - start.getTime();
+    return Math.round(diff / 86400000);
 };
 
 /**
  * Parse date string to Date object
  */
 const parseDate = (dateStr: string): Date => {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    return new Date(year, month - 1, day);
+    return toUTCDate(dateStr);
 };
 
 /**
@@ -293,8 +278,8 @@ export const renderGanttHeader = (year: number): string => {
  */
 const getDatePixelOffset = (date: Date, year: number): number => {
     let offset = 0;
-    const targetMonth = date.getMonth();
-    const targetDay = date.getDate();
+    const targetMonth = date.getUTCMonth();
+    const targetDay = date.getUTCDate();
 
     for (let month = 0; month < 12; month++) {
         if (month < targetMonth) {
@@ -330,8 +315,8 @@ const calculateLeaveBarPosition = (
     const endDate = parseDate(leave.endDate);
 
     // Check if leave is in the current year
-    const yearStart = new Date(year, 0, 1);
-    const yearEnd = new Date(year, 11, 31);
+    const yearStart = new Date(Date.UTC(year, 0, 1));
+    const yearEnd = new Date(Date.UTC(year, 11, 31));
 
     if (endDate < yearStart || startDate > yearEnd) {
         return { left: 0, width: 0, visible: false, isInCollapsedMonth: false };
@@ -341,8 +326,8 @@ const calculateLeaveBarPosition = (
     const effectiveStart = startDate < yearStart ? yearStart : startDate;
     const effectiveEnd = endDate > yearEnd ? yearEnd : endDate;
 
-    const startMonth = effectiveStart.getMonth();
-    const endMonth = effectiveEnd.getMonth();
+    const startMonth = effectiveStart.getUTCMonth();
+    const endMonth = effectiveEnd.getUTCMonth();
 
     // Check if entirely in a collapsed month
     const isInCollapsedMonth = startMonth === endMonth && !expandedMonths.has(startMonth);
@@ -380,19 +365,19 @@ const renderLeaveBars = (leaves: LeaveEntry[], year: number, employeeName: strin
         // Calculate number of days
         const startDate = parseDate(leave.startDate);
         const endDate = parseDate(leave.endDate);
-        const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        const days = Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
 
         // Format date range for display (DD-DD or DD.MM-DD.MM if cross-month)
-        const startDay = startDate.getDate().toString().padStart(2, '0');
-        const endDay = endDate.getDate().toString().padStart(2, '0');
-        const startMonthNum = (startDate.getMonth() + 1).toString().padStart(2, '0');
-        const endMonthNum = (endDate.getMonth() + 1).toString().padStart(2, '0');
+        const startDay = startDate.getUTCDate().toString().padStart(2, '0');
+        const endDay = endDate.getUTCDate().toString().padStart(2, '0');
+        const startMonthNum = (startDate.getUTCMonth() + 1).toString().padStart(2, '0');
+        const endMonthNum = (endDate.getUTCMonth() + 1).toString().padStart(2, '0');
 
         let text = '';
         if (!isInCollapsedMonth) {
             if (width >= 80) {
                 // Full date range for wider bars
-                if (startDate.getMonth() === endDate.getMonth()) {
+                if (startDate.getUTCMonth() === endDate.getUTCMonth()) {
                     text = `${startDay}-${endDay}`;
                 } else {
                     text = `${startDay}.${startMonthNum}-${endDay}.${endMonthNum}`;
@@ -410,7 +395,7 @@ const renderLeaveBars = (leaves: LeaveEntry[], year: number, employeeName: strin
             <div class="gantt-leave-bar ${leaveType} ${collapsedClass}" 
                  style="left: ${left}px; width: ${width}px;"
                  data-leave-id="${leave.id}"
-                 data-employee="${employeeName}"
+                 data-employee="${escapeHTML(employeeName)}"
                  data-type="${leaveType}"
                  data-start="${leave.startDate}"
                  data-end="${leave.endDate}"
@@ -468,7 +453,7 @@ const renderTimelineRow = (
     year: number
 ): string => {
     return `
-        <div class="gantt-timeline-row" data-employee="${employeeName}">
+        <div class="gantt-timeline-row" data-employee="${escapeHTML(employeeName)}">
             ${renderDayCells(year)}
             ${renderLeaveBars(leaves, year, employeeName)}
         </div>
@@ -576,13 +561,13 @@ const updateLeaveBarPositions = (timelineBody: HTMLElement, year: number): void 
         const endDate = parseDate(endDateStr);
 
         // Clamp to year boundaries
-        const yearStart = new Date(year, 0, 1);
-        const yearEnd = new Date(year, 11, 31);
+        const yearStart = new Date(Date.UTC(year, 0, 1));
+        const yearEnd = new Date(Date.UTC(year, 11, 31));
         const effectiveStart = startDate < yearStart ? yearStart : startDate;
         const effectiveEnd = endDate > yearEnd ? yearEnd : endDate;
 
-        const startMonth = effectiveStart.getMonth();
-        const endMonth = effectiveEnd.getMonth();
+        const startMonth = effectiveStart.getUTCMonth();
+        const endMonth = effectiveEnd.getUTCMonth();
 
         // Check if entirely in collapsed month
         const isInCollapsedMonth = startMonth === endMonth && !expandedMonths.has(startMonth);
@@ -619,10 +604,7 @@ const updateLeaveBarPositions = (timelineBody: HTMLElement, year: number): void 
  * Format date to YYYY-MM-DD string
  */
 const formatDateString = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return toDateString(date);
 };
 
 /**
@@ -822,7 +804,7 @@ export const scrollToToday = (): void => {
         scrollWrapper.scrollLeft = Math.max(0, centeredScroll);
     } else {
         // Fallback: estimate position from day-of-year (used before DOM is fully rendered)
-        const today = new Date();
+        const today = toUTCDate(formatLocalIsoDate());
         const dayOfYear = getDayOfYear(today);
         const visibleWidth = scrollWrapper.clientWidth;
         const estimatedLeft = dayOfYear * DAY_WIDTH;
@@ -1029,38 +1011,90 @@ const removeSelectionOverlay = (): void => {
     }
 };
 
+export interface LeaveTypePopupOptions {
+    employeeName: string;
+    x: number;
+    y: number;
+    year?: number;
+    startDate?: string;
+    endDate?: string;
+    dateSubtitle?: string;
+    leaves?: LeaveEntry[];
+    employees?: Record<string, Employee>;
+    onSelectType?: (leaveType: string) => void | Promise<void>;
+    onClose?: () => void;
+}
+
+let activePopupMousedownHandler: ((e: MouseEvent) => void) | null = null;
+
 /**
- * Show leave type selection popup
+ * Remove all open Gantt popups and their global document listeners.
  */
-const showLeaveTypePopup = (employeeName: string, startDate: string, endDate: string, x: number, y: number): void => {
-    // Remove any existing popup
-    const existingPopup = document.querySelector('.gantt-leave-popup');
-    if (existingPopup) existingPopup.remove();
+export const destroyGanttPopups = (): void => {
+    if (activePopupMousedownHandler) {
+        document.removeEventListener('mousedown', activePopupMousedownHandler);
+        activePopupMousedownHandler = null;
+    }
+    document.querySelectorAll('.gantt-leave-popup').forEach((popup) => popup.remove());
+};
 
-    // Calculate working days for the selected range
-    const workingDaysInSelection = calculateWorkingDays(startDate, endDate);
+/**
+ * Show leave type selection popup.
+ * Supports both Gantt drag-select range and Monthly single-cell view.
+ */
+export function showLeaveTypePopup(
+    employeeOrOptions: string | LeaveTypePopupOptions,
+    startDate?: string,
+    endDate?: string,
+    x?: number,
+    y?: number
+): void {
+    // Remove any existing popup and listeners
+    destroyGanttPopups();
 
-    // Calculate total calendar days
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const options: LeaveTypePopupOptions = typeof employeeOrOptions === 'string'
+        ? {
+            employeeName: employeeOrOptions,
+            startDate,
+            endDate,
+            x: x ?? 0,
+            y: y ?? 0,
+            onClose: removeSelectionOverlay,
+        }
+        : employeeOrOptions;
 
-    // Get employee leave limit info
-    const employeeLeaves = currentLeaves[employeeName] || [];
-    const { totalLimit } = getEmployeeLeaveLimitByName(employeeName, currentEmployees, currentYear);
-    const plannedDays = calculatePlannedVacationDays(employeeLeaves, currentYear);
+    const { employeeName, startDate: selStart, endDate: selEnd, x: posX, y: posY } = options;
+    const year = options.year || currentYear;
+    const employees = options.employees || currentEmployees;
+    const employeeLeaves = options.leaves || currentLeaves[employeeName] || [];
+
+    const { totalLimit } = getEmployeeLeaveLimitByName(employeeName, employees, year);
+    const plannedDays = calculatePlannedVacationDays(employeeLeaves, year);
     const remainingDays = totalLimit - plannedDays;
 
-    // Check if adding this vacation would exceed the limit
-    const wouldExceedLimit = workingDaysInSelection > remainingDays;
+    let workingDaysInSelection = 0;
+    let totalDays = 0;
+    let wouldExceedLimit = false;
 
-    // Format dates for display
+    if (selStart && selEnd) {
+        workingDaysInSelection = countWorkdays(selStart, selEnd);
+        const start = toUTCDate(selStart);
+        const end = toUTCDate(selEnd);
+        totalDays = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+        wouldExceedLimit = workingDaysInSelection > remainingDays;
+    }
+
     const formatDate = (dateStr: string): string => {
-        const [year, month, day] = dateStr.split('-');
-        return `${day}.${month}.${year}`;
+        const [y, m, d] = dateStr.split('-');
+        return `${d}.${m}.${y}`;
     };
 
-    // Generate leave type buttons with conditional disabling for vacation
+    const dateSubtitle = options.dateSubtitle || (
+        selStart && selEnd
+            ? `${formatDate(selStart)} - ${formatDate(selEnd)} (${totalDays} dni, ${workingDaysInSelection} roboczych)`
+            : ''
+    );
+
     const generateTypeButtons = (): string => {
         return Object.entries(LEAVE_TYPES).map(([type, config]) => {
             const isVacation = type === 'vacation';
@@ -1080,7 +1114,6 @@ const showLeaveTypePopup = (employeeName: string, startDate: string, endDate: st
         }).join('');
     };
 
-    // Create popup
     const popup = document.createElement('div');
     popup.className = 'gantt-leave-popup';
     popup.innerHTML = `
@@ -1088,9 +1121,7 @@ const showLeaveTypePopup = (employeeName: string, startDate: string, endDate: st
             <strong>${escapeHTML(employeeName)}</strong>
             <button class="gantt-popup-close">&times;</button>
         </div>
-        <div class="gantt-popup-dates">
-            ${formatDate(startDate)} - ${formatDate(endDate)} (${totalDays} dni, ${workingDaysInSelection} roboczych)
-        </div>
+        ${dateSubtitle ? `<div class="gantt-popup-dates">${dateSubtitle}</div>` : ''}
         <div class="gantt-popup-limit-info ${wouldExceedLimit ? 'exceeded' : ''}">
             <span class="limit-label">Limit urlopu wypoczynkowego:</span>
             <span class="limit-value">${plannedDays}/${totalLimit} dni</span>
@@ -1110,50 +1141,47 @@ const showLeaveTypePopup = (employeeName: string, startDate: string, endDate: st
         </div>
     `;
 
-    // Position popup
     popup.style.position = 'fixed';
-    popup.style.left = `${Math.min(x, window.innerWidth - 320)}px`;
-    popup.style.top = `${Math.min(y, window.innerHeight - 350)}px`;
+    popup.style.left = `${Math.min(posX, window.innerWidth - 320)}px`;
+    popup.style.top = `${Math.min(posY, window.innerHeight - 350)}px`;
     popup.style.zIndex = '1000';
 
     document.body.appendChild(popup);
 
-    // Add event listeners
-    popup.querySelector('.gantt-popup-close')?.addEventListener('click', () => {
-        popup.remove();
-        removeSelectionOverlay();
-    });
+    const closePopup = (): void => {
+        destroyGanttPopups();
+        if (options.onClose) options.onClose();
+    };
 
-    popup.querySelector('.gantt-popup-cancel')?.addEventListener('click', () => {
-        popup.remove();
-        removeSelectionOverlay();
-    });
+    popup.querySelector('.gantt-popup-close')?.addEventListener('click', closePopup);
+    popup.querySelector('.gantt-popup-cancel')?.addEventListener('click', closePopup);
 
     popup.querySelectorAll('.gantt-popup-type-btn:not(.disabled)').forEach(btn => {
         btn.addEventListener('click', async () => {
             const leaveType = (btn as HTMLElement).dataset.type || 'vacation';
-            popup.remove();
-            removeSelectionOverlay();
+            destroyGanttPopups();
+            if (options.onClose) options.onClose();
 
-            if (onLeaveCreatedCallback) {
-                await onLeaveCreatedCallback(employeeName, startDate, endDate, leaveType);
+            if (options.onSelectType) {
+                await options.onSelectType(leaveType);
+            } else if (selStart && selEnd && onLeaveCreatedCallback) {
+                await onLeaveCreatedCallback(employeeName, selStart, selEnd, leaveType);
             }
         });
     });
 
-    // Close popup when clicking outside
-    const closeOnOutsideClick = (e: MouseEvent) => {
+    activePopupMousedownHandler = (e: MouseEvent): void => {
         if (!popup.contains(e.target as Node)) {
-            popup.remove();
-            removeSelectionOverlay();
-            document.removeEventListener('mousedown', closeOnOutsideClick);
+            closePopup();
         }
     };
 
     setTimeout(() => {
-        document.addEventListener('mousedown', closeOnOutsideClick);
+        if (activePopupMousedownHandler) {
+            document.addEventListener('mousedown', activePopupMousedownHandler);
+        }
     }, 100);
-};
+}
 
 /**
  * Cleanup drag event listeners
@@ -1471,14 +1499,13 @@ const showEditPopup = (
     x: number,
     y: number
 ): void => {
-    // Remove any existing popup
-    const existingPopup = document.querySelector('.gantt-leave-popup');
-    if (existingPopup) existingPopup.remove();
+    // Remove any existing popup and listeners
+    destroyGanttPopups();
 
     // Calculate days
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const start = toUTCDate(startDate);
+    const end = toUTCDate(endDate);
+    const days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
 
     // Format dates
     const formatDate = (dateStr: string): string => {
@@ -1493,7 +1520,7 @@ const showEditPopup = (
     popup.className = 'gantt-leave-popup gantt-edit-popup';
     popup.innerHTML = `
         <div class="gantt-popup-header">
-            <strong>${employeeName}</strong>
+            <strong>${escapeHTML(employeeName)}</strong>
             <button class="gantt-popup-close">&times;</button>
         </div>
         <div class="gantt-popup-dates">
@@ -1535,8 +1562,8 @@ const showEditPopup = (
     document.body.appendChild(popup);
 
     // Event listeners
-    popup.querySelector('.gantt-popup-close')?.addEventListener('click', () => popup.remove());
-    popup.querySelector('.gantt-popup-cancel')?.addEventListener('click', () => popup.remove());
+    popup.querySelector('.gantt-popup-close')?.addEventListener('click', () => destroyGanttPopups());
+    popup.querySelector('.gantt-popup-cancel')?.addEventListener('click', () => destroyGanttPopups());
 
     // Change type button
     popup.querySelector('.change-type-btn')?.addEventListener('click', () => {
@@ -1548,11 +1575,9 @@ const showEditPopup = (
     popup.querySelectorAll('.gantt-popup-type-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             const newType = (btn as HTMLElement).dataset.type || 'vacation';
+            destroyGanttPopups();
             if (newType !== currentType && onLeaveTypeChangedCallback) {
-                popup.remove();
                 await onLeaveTypeChangedCallback(employeeName, leaveId, newType);
-            } else {
-                popup.remove();
             }
         });
     });
@@ -1582,7 +1607,7 @@ const showEditPopup = (
 
                 // Confirm delete
                 actionsDiv.querySelector('.confirm-delete-btn')?.addEventListener('click', async () => {
-                    popup.remove();
+                    destroyGanttPopups();
                     if (onLeaveDeletedCallback) {
                         await onLeaveDeletedCallback(employeeName, leaveId);
                     }
@@ -1590,22 +1615,23 @@ const showEditPopup = (
 
                 // Cancel delete
                 actionsDiv.querySelector('.cancel-delete-btn')?.addEventListener('click', () => {
-                    popup.remove();
+                    destroyGanttPopups();
                 });
             }
         });
     }
 
     // Close on outside click
-    const closeOnOutsideClick = (e: MouseEvent) => {
+    activePopupMousedownHandler = (e: MouseEvent): void => {
         if (!popup.contains(e.target as Node)) {
-            popup.remove();
-            document.removeEventListener('mousedown', closeOnOutsideClick);
+            destroyGanttPopups();
         }
     };
 
     setTimeout(() => {
-        document.addEventListener('mousedown', closeOnOutsideClick);
+        if (activePopupMousedownHandler) {
+            document.addEventListener('mousedown', activePopupMousedownHandler);
+        }
     }, 100);
 };
 

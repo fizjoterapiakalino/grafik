@@ -64,63 +64,6 @@ export interface Employee {
 export type EmployeesMap = Record<string, Employee>;
 
 // ============================================
-// GRAFIK (Schedule)
-// ============================================
-
-/**
- * Dane komórki grafiku
- */
-export interface CellData {
-    /** Nazwa pacjenta */
-    name?: string;
-    /** Data rozpoczęcia leczenia */
-    treatmentStartDate?: string;
-    /** Przedłużenie leczenia (dni) */
-    treatmentExtensionDays?: number;
-    /** Dodatkowe informacje */
-    additionalInfo?: string;
-    /** Czy komórka jest przerwą */
-    isBreak?: boolean;
-    /** Typ zabiegu */
-    treatmentType?: 'massage' | 'pnf' | 'everyOtherDay' | null;
-    /** Dane dla podzielonej komórki */
-    splitData?: SplitCellData;
-}
-
-/**
- * Dane podzielonej komórki (2 części)
- */
-export interface SplitCellData {
-    top: CellData | null;
-    bottom: CellData | null;
-}
-
-/**
- * Struktura danych tygodniowego grafiku
- * Klucz: "employeeId_dayIndex_timeSlotIndex"
- */
-export type WeeklyScheduleData = Record<string, CellData>;
-
-/**
- * Pełna struktura dokumentu grafiku z Firestore
- */
-export interface ScheduleDocument {
-    employees: EmployeesMap;
-    weeklyData: Record<string, WeeklyScheduleData>;
-    scheduleSettings?: ScheduleSettings;
-}
-
-/**
- * Ustawienia grafiku
- */
-export interface ScheduleSettings {
-    startHour: number;
-    endHour: number;
-    slotDuration: number;
-    workDays: number[];
-}
-
-// ============================================
 // HARMONOGRAM - STAN KOMÓRKI (Schedule Cell State)
 // ============================================
 
@@ -136,6 +79,8 @@ export interface TreatmentData {
     endDate?: string | null;
     /** Dodatkowe informacje */
     additionalInfo?: string | null;
+    /** Daty zgłoszonych nieobecności pacjenta (YYYY-MM-DD) */
+    absenceDates?: string[] | null;
 }
 
 /**
@@ -198,6 +143,10 @@ export interface CellState {
     treatmentExtensionDays?: number | null;
     treatmentEndDate?: string | null;
     additionalInfo?: string | null;
+    /** Daty zgłoszonych nieobecności pacjenta (YYYY-MM-DD) */
+    absenceDates?: string[] | null;
+    absenceDates1?: string[] | null;
+    absenceDates2?: string[] | null;
     /** Dane leczenia dla części split */
     treatmentData1?: TreatmentData | null;
     treatmentData2?: TreatmentData | null;
@@ -256,54 +205,6 @@ export interface LeaveEntry {
  * Mapa urlopów (klucz = nazwa pracownika)
  */
 export type LeavesMap = Record<string, LeaveEntry[]>;
-
-// ============================================
-// HISTORIA ZMIAN
-// ============================================
-
-/**
- * Wpis w historii zmian
- */
-export interface HistoryEntry {
-    /** Timestamp zmiany */
-    timestamp: number;
-    /** Kto dokonał zmiany */
-    changedBy?: string;
-    /** Poprzednia wartość */
-    previousValue: CellData | null;
-    /** Nowa wartość */
-    newValue: CellData | null;
-}
-
-// ============================================
-// UI / UX
-// ============================================
-
-/**
- * Pozycja elementu menu kontekstowego
- */
-export interface ContextMenuPosition {
-    x: number;
-    y: number;
-}
-
-/**
- * Element menu kontekstowego
- */
-export interface ContextMenuItem {
-    id: string;
-    action: (cell: HTMLElement) => void;
-}
-
-/**
- * Konfiguracja modalu
- */
-export interface ModalConfig {
-    title: string;
-    content: string;
-    onConfirm?: () => void;
-    onCancel?: () => void;
-}
 
 // ============================================
 // FIREBASE

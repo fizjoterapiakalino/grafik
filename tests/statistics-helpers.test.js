@@ -1,313 +1,479 @@
 import {
-    calculateScheduleMetrics,
-    calculateWeeklyAverages,
-    createWeeklyStatsSnapshot,
+    getActiveEmployeeIds,
+    getEmployeeDisplayName,
+    isClinicalWorkday,
+    countClinicalWorkdaysInRange,
+    getIsoWeeksForYear,
     getIsoWeekInfo,
     createDailyWorkloadSnapshot,
     calculatePeriodWorkloadAverages,
+    calculateColumnHygieneMetrics,
+    normalizeLeavesData,
 } from '../scripts/statistics-helpers.js';
 
-describe('statistics helpers', () => {
-    test('calculates schedule metrics using employee ids and ignores hydrotherapy as patient entry', () => {
-        const scheduleCells = {
-            '8:00': {
-                empA: {
-                    content: 'Anna Kowalska',
-                    isMassage: true,
-                    treatmentStartDate: '2026-05-01',
-                    treatmentEndDate: '2026-05-25',
-                    treatmentExtensionDays: 3,
+describe('statistics-helpers', () => {
+    describe('getActiveEmployeeIds', () => {
+        test('includes isScheduleOnly employees and excludes isHidden', () => {
+            const employees = {
+                emp1: { displayName: 'Anna', isHidden: false },
+                emp2: { displayName: 'Jan', isHidden: true },
+                emp3: { displayName: 'Marek', isScheduleOnly: true, isHidden: false },
+                emp4: { displayName: 'Ewa' },
+            };
+            expect(getActiveEmployeeIds(employees)).toEqual(['emp1', 'emp3', 'emp4']);
+        });
+    });
+
+    describe('clinical workdays and ISO weeks', () => {
+        test('isClinicalWorkday identifies Mon-Fri workdays and excludes weekends and Polish holidays', () => {
+            // Monday 2026-10-19: standard workday
+            expect(isClinicalWorkday('2026-10-19')).toBe(true);
+            // Saturday 2026-10-24: weekend
+            expect(isClinicalWorkday('2026-10-24')).toBe(false);
+            // Sunday 2026-10-25: weekend
+            expect(isClinicalWorkday('2026-10-25')).toBe(false);
+            // Friday 2026-05-01: Święto Pracy (holiday)
+            expect(isClinicalWorkday('2026-05-01')).toBe(false);
+            // Thursday 2026-06-04: Boże Ciało (holiday)
+            expect(isClinicalWorkday('2026-06-04')).toBe(false);
+        });
+
+        test('countClinicalWorkdaysInRange counts workdays excluding holidays and handles inverted ranges', () => {
+            // Mon 2026-04-27 to Sun 2026-05-03: Mon-Thu (4 days), Fri is May 1 (holiday), Sat-Sun (weekend)
+            expect(countClinicalWorkdaysInRange('2026-04-27', '2026-05-03')).toBe(4);
+            // Inverted range returns 0
+            expect(countClinicalWorkdaysInRange('2026-05-03', '2026-04-27')).toBe(0);
+        });
+
+        test('getIsoWeeksForYear generates all ISO weeks with labels for a given year', () => {
+            const weeks2026 = getIsoWeeksForYear(2026);
+            expect(weeks2026.length).toBeGreaterThanOrEqual(52);
+            expect(weeks2026[0]).toMatchObject({
+                weekKey: '2026-W01',
+                weekNumber: 1,
+                weekStart: '2025-12-29',
+                weekEnd: '2026-01-04',
+            });
+            expect(weeks2026[0].label).toContain('Tydzień 1');
+            expect(weeks2026[weeks2026.length - 1].weekKey).toMatch(/^2026-W5[23]$/);
+        });
+
+        test('getIsoWeekInfo correctly computes week key', () => {
+            expect(getIsoWeekInfo(new Date('2026-10-21T12:00:00Z')).weekKey).toBe('2026-W43');
+        });
+    });
+
+    describe('createDailyWorkloadSnapshot', () => {
+        const employees = {
+            empA: { displayName: 'Anna Kowalska', color: '#10b981' },
+            empB: { displayName: 'Jan Nowak', color: '#3b82f6' },
+        };
+
+        test('counts day 15 (dateIso === treatmentEndDate) as 1 active slot, and day 16 (dateIso > treatmentEndDate) as 0 slots', () => {
+            // Treatment starting Mon 2026-10-05 has 15th workday on Fri 2026-10-23
+            const scheduleCells = {
+                '8:00': {
+                    empA: {
+                        content: 'Pacjent Piętnastodniowy',
+                        treatmentStartDate: '2026-10-05',
+                        treatmentEndDate: '2026-10-23',
+                    },
                 },
-                empB: { isBreak: true },
-            },
-            '8:30': {
+            };
+
+            // Day 15: Friday 2026-10-23 -> active (1 slot)
+            const snapDay15 = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-23T10:00:00Z'));
+            expect(snapDay15.employees.empA.patientSlots).toBe(1);
+
+            // Day 16: Monday 2026-10-26 (> treatmentEndDate) -> cut off (0 slots)
+            const snapDay16 = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-26T10:00:00Z'));
+            expect(snapDay16.employees.empA.patientSlots).toBe(0);
+        });
+
+        test('derives effectiveEndDate via ScheduleLogic.calculateEndDate when treatmentEndDate is missing', () => {
+            const scheduleCells = {
+                '8:00': {
+                    empA: {
+                        content: 'Pacjent Bez EndDate',
+                        treatmentStartDate: '2026-10-05',
+                        // treatmentEndDate missing
+                    },
+                },
+            };
+
+            // 15th workday from 2026-10-05 is 2026-10-23
+            const snapActive = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-23T10:00:00Z'));
+            expect(snapActive.employees.empA.patientSlots).toBe(1);
+
+            const snapExpired = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-26T10:00:00Z'));
+            expect(snapExpired.employees.empA.patientSlots).toBe(0);
+        });
+
+        test('excludes undated cells (!treatmentStartDate) yielding 0 slots', () => {
+            const scheduleCells = {
+                '8:00': {
+                    empA: {
+                        content: 'Pacjent Bez Daty',
+                    },
+                },
+            };
+
+            const snap = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-21T10:00:00Z'));
+            expect(snap.employees.empA.patientSlots).toBe(0);
+        });
+
+        test('counts split cell A / B with two simultaneously active halves as 1 slot (not 2)', () => {
+            const scheduleCells = {
+                '8:30': {
+                    empA: {
+                        isSplit: true,
+                        content1: 'Pacjent Lewy',
+                        treatmentData1: { startDate: '2026-10-19', endDate: '2026-11-06' },
+                        content2: 'Pacjent Prawy',
+                        treatmentData2: { startDate: '2026-10-19', endDate: '2026-11-06' },
+                    },
+                },
+            };
+
+            const snap = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-21T10:00:00Z'));
+            expect(snap.employees.empA.patientSlots).toBe(1);
+        });
+
+        test('counts split cell A / B as 1 slot when one half is expired and one half is active', () => {
+            const scheduleCells = {
+                '8:30': {
+                    empA: {
+                        isSplit: true,
+                        content1: 'Pacjent Wygasły',
+                        treatmentData1: { startDate: '2026-09-01', endDate: '2026-09-19' },
+                        content2: 'Pacjent Aktywny',
+                        treatmentData2: { startDate: '2026-10-19', endDate: '2026-11-06' },
+                    },
+                },
+            };
+
+            const snap = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-21T10:00:00Z'));
+            expect(snap.employees.empA.patientSlots).toBe(1);
+        });
+
+        test('does NOT write patientIds containing patient names (RODO constraint)', () => {
+            const scheduleCells = {
+                '8:00': {
+                    empA: {
+                        content: 'Jan Kowalski RODO',
+                        treatmentStartDate: '2026-10-19',
+                        treatmentEndDate: '2026-11-06',
+                    },
+                },
+            };
+
+            const snap = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-21T10:00:00Z'));
+            const pIds = snap.employees.empA.patientIds;
+            if (pIds && pIds.length > 0) {
+                pIds.forEach((id) => {
+                    expect(id).not.toContain('legacy:');
+                    expect(id.toLowerCase()).not.toContain('kowalski');
+                });
+            } else {
+                expect(pIds === undefined || pIds.length === 0).toBe(true);
+            }
+        });
+
+        test('respects Polish holidays (0 slots), leaves (0 slots), and isEveryOtherDay parity', () => {
+            const leaves = {
+                'Anna Kowalska': [
+                    { id: 'l1', type: 'vacation', startDate: '2026-10-20', endDate: '2026-10-22' },
+                ],
+            };
+            const scheduleCells = {
+                '8:00': {
+                    empA: {
+                        content: 'Pacjent A',
+                        treatmentStartDate: '2026-10-19',
+                        treatmentEndDate: '2026-11-06',
+                    },
+                    empB: {
+                        content: 'Pacjent B Co Drugi Dzień',
+                        treatmentStartDate: '2026-10-19',
+                        treatmentEndDate: '2026-11-06',
+                        isEveryOtherDay: true,
+                    },
+                },
+            };
+
+            // On holiday 2026-05-01: 0 slots
+            const snapHoliday = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-05-01T10:00:00Z'));
+            expect(snapHoliday.isWorkday).toBe(false);
+            expect(snapHoliday.employees.empA.patientSlots).toBe(0);
+
+            // On leave 2026-10-21: Anna is on vacation (0 slots, isOnLeave = true)
+            const snapLeave = createDailyWorkloadSnapshot(scheduleCells, employees, leaves, new Date('2026-10-21T10:00:00Z'));
+            expect(snapLeave.employees.empA.isOnLeave).toBe(true);
+            expect(snapLeave.employees.empA.patientSlots).toBe(0);
+
+            // empB is not on leave, checking isEveryOtherDay:
+            // Workday 1: Mon 2026-10-19 -> active (1 slot)
+            const snapDay1 = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-19T10:00:00Z'));
+            expect(snapDay1.employees.empB.patientSlots).toBe(1);
+
+            // Workday 2: Tue 2026-10-20 -> skipped (0 slots)
+            const snapDay2 = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-20T10:00:00Z'));
+            expect(snapDay2.employees.empB.patientSlots).toBe(0);
+
+            // Workday 3: Wed 2026-10-21 -> active (1 slot)
+            const snapDay3 = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-21T10:00:00Z'));
+            expect(snapDay3.employees.empB.patientSlots).toBe(1);
+        });
+    });
+
+    describe('calculatePeriodWorkloadAverages', () => {
+        const employees = {
+            empA: { displayName: 'Anna Kowalska', color: '#10b981' },
+            empB: { displayName: 'Jan Nowak', color: '#3b82f6' },
+        };
+
+        const makeSnapshot = (date, slotsA, slotsB, onLeaveB = false) => ({
+            date,
+            year: Number.parseInt(date.substring(0, 4), 10),
+            month: Number.parseInt(date.substring(5, 7), 10),
+            dayOfWeek: 1,
+            weekKey: getIsoWeekInfo(new Date(`${date}T12:00:00Z`)).weekKey,
+            isWorkday: isClinicalWorkday(date),
+            updatedAt: `${date}T12:00:00.000Z`,
+            totalPatients: slotsA + (onLeaveB ? 0 : slotsB),
+            activeEmployeesCount: 2,
+            employees: {
                 empA: {
-                    isSplit: true,
-                    content1: 'Jan Nowak',
-                    content2: 'Hydro.',
-                    treatmentData1: { startDate: '2026-05-01', endDate: '2026-05-27', extensionDays: 0 },
-                    isHydrotherapy2: true,
+                    employeeId: 'empA',
+                    employeeName: 'Anna Kowalska',
+                    patientSlots: slotsA,
+                    availableSlots: 20,
+                    occupancyPercent: Math.round((slotsA / 20) * 100),
+                    isOnLeave: false,
                 },
                 empB: {
-                    content: 'Anna Kowalska',
-                    isPnf: true,
-                    treatmentStartDate: '2026-05-01',
-                    treatmentEndDate: '2026-05-24',
-                    treatmentExtensionDays: 15,
+                    employeeId: 'empB',
+                    employeeName: 'Jan Nowak',
+                    patientSlots: onLeaveB ? 0 : slotsB,
+                    availableSlots: 20,
+                    occupancyPercent: onLeaveB ? 0 : Math.round((slotsB / 20) * 100),
+                    isOnLeave: onLeaveB,
+                    leaveType: onLeaveB ? 'vacation' : null,
                 },
             },
-            '9:00': {
-                empA: { content: 'Hydro.', isHydrotherapy: true },
-            },
-            '14:30': {
-                empA: { content: 'Bez dat' },
-            },
-        };
+        });
 
-        const metrics = calculateScheduleMetrics(scheduleCells, ['empA', 'empB'], new Date('2026-05-25T10:00:00Z'));
+        test('supports cross-year biweekly period spanning Dec 2025 and Jan 2026', () => {
+            const snapshots = [
+                makeSnapshot('2025-12-29', 10, 8),
+                makeSnapshot('2025-12-30', 10, 8),
+                makeSnapshot('2026-01-02', 10, 8),
+                makeSnapshot('2026-01-05', 12, 10),
+            ];
 
-        expect(metrics.totalSlots).toBe(4);
-        expect(metrics.uniquePatients).toBe(3);
-        expect(metrics.breaks).toBe(1);
-        expect(metrics.hydrotherapy).toBe(2);
-        expect(metrics.massageOrPnf).toBe(2);
-        expect(metrics.extendedTreatments).toBe(2);
-        expect(metrics.longExtensions).toBe(1);
-        expect(metrics.endingToday).toBe(1);
-        expect(metrics.endingSoon).toBe(1);
-        expect(metrics.overdue).toBe(1);
-        expect(metrics.missingTreatmentDates).toBe(1);
-        expect(metrics.duplicatePatientEntries).toBe(1);
-        expect(metrics.dataQualityScore).toBe(82);
-        expect(metrics.handoverMorning).toBe(3);
-        expect(metrics.handoverAfternoon).toBe(1);
-        expect(metrics.byEmployee).toEqual({ empA: 3, empB: 1 });
-        expect(metrics.byHour['8:30']).toBe(2);
-    });
-
-    test('builds current weekly snapshot with leave-adjusted team availability', () => {
-        const employees = {
-            empA: { displayName: 'Anna', color: '#fff' },
-            empB: { displayName: 'Jan', color: '#000' },
-            hidden: { displayName: 'Hidden', color: '#999', isHidden: true },
-        };
-        const leaves = {
-            Anna: [{ id: 'leave-1', type: 'vacation', startDate: '2026-05-25', endDate: '2026-05-26' }],
-        };
-        const scheduleCells = {
-            '8:00': {
-                empA: { content: 'Pacjent 1' },
-                empB: { content: 'Pacjent 2' },
-            },
-        };
-
-        const snapshot = createWeeklyStatsSnapshot(scheduleCells, employees, leaves, new Date('2026-05-25T10:00:00Z'));
-
-        expect(snapshot.weekKey).toBe('2026-W22');
-        expect(snapshot.leaveDays).toBe(2);
-        expect(snapshot.activeEmployeeCount).toBe(2);
-        expect(snapshot.averageAvailableEmployees).toBe(1.6);
-        expect(snapshot.averagePatientsPerAvailableEmployee).toBe(1.3);
-    });
-
-    test('calculates four-week averages and week-over-week trend', () => {
-        const snapshots = [10, 20, 30, 45].map((totalSlots, index) => ({
-            weekKey: `2026-W2${index + 1}`,
-            year: 2026,
-            weekNumber: 21 + index,
-            weekStart: '2026-05-01',
-            weekEnd: '2026-05-07',
-            updatedAt: '2026-05-01T00:00:00.000Z',
-            scheduleMetrics: {
-                totalSlots,
-                uniquePatients: totalSlots / 2,
-                breaks: 0,
-                massageOrPnf: 0,
-                hydrotherapy: 0,
-                byEmployee: {},
-                byHour: {},
-                possibleSlots: 100,
-                availableSlots: 100,
-                occupancyPercent: totalSlots,
-            },
-            activeEmployeeCount: 4,
-            averageAvailableEmployees: 4,
-            leaveDays: index,
-            averagePatientsPerAvailableEmployee: totalSlots / 4,
-        }));
-
-        const averages = calculateWeeklyAverages(snapshots, new Date('2026-06-08T10:00:00Z'), 4);
-
-        expect(averages.weeks.map(week => week.weekKey)).toEqual(['2026-W21', '2026-W22', '2026-W23', '2026-W24']);
-        expect(averages.averageTotalSlots).toBe(26.3);
-        expect(averages.totalLeaveDays).toBe(6);
-        expect(averages.trendPercent).toBe(50);
-    });
-
-    test('uses ISO week year around calendar boundaries', () => {
-        expect(getIsoWeekInfo(new Date('2027-01-01T12:00:00Z')).weekKey).toBe('2026-W53');
-    });
-
-    test('creates daily workload snapshot considering active treatment dates and leaves', () => {
-        const employees = {
-            empA: { displayName: 'Anna', color: '#10b981' },
-            empB: { displayName: 'Jan', color: '#3b82f6' },
-        };
-        const leaves = {
-            Anna: [{ id: 'l1', type: 'vacation', startDate: '2026-09-30', endDate: '2026-10-02' }],
-        };
-        const scheduleCells = {
-            '8:00': {
-                empA: { content: 'Pacjent A', treatmentStartDate: '2026-09-20', treatmentEndDate: '2026-10-05' },
-                empB: { content: 'Pacjent B', treatmentStartDate: '2026-09-20', treatmentEndDate: '2026-10-05' },
-            },
-            '8:30': {
-                empB: { content: 'Pacjent C' }, // bez dat leczenia - aktywny
-            },
-        };
-
-        const snapshot = createDailyWorkloadSnapshot(scheduleCells, employees, leaves, new Date('2026-09-30T10:00:00Z'));
-
-        expect(snapshot.date).toBe('2026-09-30');
-        expect(snapshot.isWorkday).toBe(true);
-        expect(snapshot.employees.empA.isOnLeave).toBe(true);
-        expect(snapshot.employees.empA.leaveType).toBe('vacation');
-        expect(snapshot.employees.empA.patientSlots).toBe(0); // na urlopie nie liczy pacjentów
-
-        expect(snapshot.employees.empB.isOnLeave).toBe(false);
-        expect(snapshot.employees.empB.patientSlots).toBe(2);
-        expect(snapshot.totalPatients).toBe(2);
-    });
-
-    test('calculates period workload averages in weekly and monthly scopes', () => {
-        const employees = {
-            empA: { displayName: 'Anna', color: '#10b981' },
-            empB: { displayName: 'Jan', color: '#3b82f6' },
-        };
-
-        const snapshots = [
-            {
-                date: '2026-09-28',
+            const result = calculatePeriodWorkloadAverages(snapshots, 'biweekly', {
+                periodStart: '2025-12-29',
+                periodEnd: '2026-01-09',
                 year: 2026,
-                month: 9,
-                dayOfWeek: 1,
-                weekKey: '2026-W40',
-                isWorkday: true,
-                updatedAt: '2026-09-28T12:00:00Z',
-                totalPatients: 16,
-                activeEmployeesCount: 2,
-                employees: {
-                    empA: { employeeId: 'empA', employeeName: 'Anna', patientSlots: 10, uniquePatients: 10, availableSlots: 15, occupancyPercent: 67, isOnLeave: false },
-                    empB: { employeeId: 'empB', employeeName: 'Jan', patientSlots: 6, uniquePatients: 6, availableSlots: 15, occupancyPercent: 40, isOnLeave: false },
-                },
-            },
-            {
-                date: '2026-09-29',
-                year: 2026,
-                month: 9,
-                dayOfWeek: 2,
-                weekKey: '2026-W40',
-                isWorkday: true,
-                updatedAt: '2026-09-29T12:00:00Z',
-                totalPatients: 8,
-                activeEmployeesCount: 2,
-                employees: {
-                    empA: { employeeId: 'empA', employeeName: 'Anna', patientSlots: 0, uniquePatients: 0, availableSlots: 15, occupancyPercent: 0, isOnLeave: true, leaveType: 'vacation' },
-                    empB: { employeeId: 'empB', employeeName: 'Jan', patientSlots: 8, uniquePatients: 8, availableSlots: 15, occupancyPercent: 53, isOnLeave: false },
-                },
-            },
-        ];
+                employees,
+                referenceDate: new Date('2026-01-05T12:00:00Z'),
+            });
 
-        const weeklyAvg = calculatePeriodWorkloadAverages(snapshots, 'weekly', {
-            weekKey: '2026-W40',
-            year: 2026,
-            employees,
+            expect(result.recordedWorkdaysCount).toBe(4);
+            expect(result.totalActiveSlots).toBe(76); // (10+8)*3 + (12+10) = 54 + 22 = 76
+            expect(result.employees[0].totalActiveSlots).toBe(42); // 10+10+10+12
+            expect(result.employees[1].totalActiveSlots).toBe(34); // 8+8+8+10
         });
 
-        expect(weeklyAvg.workdaysCount).toBe(2);
-        expect(weeklyAvg.totalPatientCount).toBe(24);
+        test('caps expectedWorkdaysCount at referenceDate for an ongoing period and returns 0 for future period without NaN', () => {
+            // Ongoing period 2026-10-19..2026-10-30. On Wednesday 2026-10-21 (workday 3):
+            const refWednesday = new Date('2026-10-21T12:00:00Z');
+            const snapshots = [
+                makeSnapshot('2026-10-19', 10, 10),
+                makeSnapshot('2026-10-20', 10, 10),
+                makeSnapshot('2026-10-21', 10, 10),
+            ];
 
-        const empA = weeklyAvg.employees.find(e => e.employeeId === 'empA');
-        expect(empA).toBeDefined();
-        expect(empA?.daysPresent).toBe(1);
-        expect(empA?.daysOnLeave).toBe(1);
-        expect(empA?.averagePatientsPerPresentDay).toBe(10); // 10 / 1 dzień obecności
-        expect(empA?.averagePatientsPerWorkday).toBe(5); // 10 / 2 dni robocze
+            const ongoingResult = calculatePeriodWorkloadAverages(snapshots, 'biweekly', {
+                periodStart: '2026-10-19',
+                periodEnd: '2026-10-30',
+                year: 2026,
+                employees,
+                referenceDate: refWednesday,
+            });
 
-        const empB = weeklyAvg.employees.find(e => e.employeeId === 'empB');
-        expect(empB?.daysPresent).toBe(2);
-        expect(empB?.averagePatientsPerPresentDay).toBe(7); // (6 + 8) / 2 = 7
+            expect(ongoingResult.recordedWorkdaysCount).toBe(3);
+            expect(ongoingResult.expectedWorkdaysCount).toBe(3); // Capped at Wednesday!
+
+            // Future period starting 2026-11-02 when referenceDate is 2026-10-21
+            const futureResult = calculatePeriodWorkloadAverages([], 'biweekly', {
+                periodStart: '2026-11-02',
+                periodEnd: '2026-11-13',
+                year: 2026,
+                employees,
+                referenceDate: refWednesday,
+            });
+
+            expect(futureResult.recordedWorkdaysCount).toBe(0);
+            expect(futureResult.expectedWorkdaysCount).toBe(0);
+            expect(futureResult.averageDailyPerPresentEmployee).toBe(0);
+            expect(Number.isNaN(futureResult.averageDailyPerPresentEmployee)).toBe(false);
+            expect(futureResult.averagePeriodSumPerPresentEmployee).toBe(0);
+            expect(Number.isNaN(futureResult.averagePeriodSumPerPresentEmployee)).toBe(false);
+        });
+
+        test('divides averagePeriodSumPerPresentEmployee by employeesWithPresenceCount excluding all-period leave', () => {
+            // empA present 2 days with 20 slots total; empB on vacation both days (0 days present)
+            const snapshots = [
+                makeSnapshot('2026-10-19', 10, 0, true),
+                makeSnapshot('2026-10-20', 10, 0, true),
+            ];
+
+            const result = calculatePeriodWorkloadAverages(snapshots, 'biweekly', {
+                periodStart: '2026-10-19',
+                periodEnd: '2026-10-30',
+                year: 2026,
+                employees,
+                referenceDate: new Date('2026-10-20T12:00:00Z'),
+            });
+
+            expect(result.employeesWithPresenceCount).toBe(1);
+            expect(result.totalActiveSlots).toBe(20);
+            // Must divide by 1 present employee (empA), not 2 total employees: 20 / 1 = 20
+            expect(result.averagePeriodSumPerPresentEmployee).toBe(20);
+        });
+
+        test('computes previousPeriodDeltaDaily against the immediately preceding period', () => {
+            // Period 1: 2026-W41, avg = 8.0
+            // Period 2: 2026-W42, avg = 10.0
+            const snapshots = [
+                makeSnapshot('2026-10-05', 8, 8),
+                makeSnapshot('2026-10-12', 10, 10),
+            ];
+
+            const result = calculatePeriodWorkloadAverages(snapshots, 'weekly', {
+                weekKey: '2026-W42',
+                year: 2026,
+                employees,
+                referenceDate: new Date('2026-10-16T12:00:00Z'),
+            });
+
+            expect(result.averageDailyPerPresentEmployee).toBe(10);
+            expect(result.previousPeriodDeltaDaily).toBe(2); // 10 - 8 = +2
+        });
     });
 
-    test('excludes Polish holidays, does not extend an already calculated end date and respects every-other-day visits', () => {
-        const employees = { empA: { displayName: 'Anna', color: '#10b981' } };
-        const scheduleCells = {
-            '8:00': {
-                empA: {
-                    content: 'Pacjent A',
-                    patientId: 'patient-a',
-                    treatmentStartDate: '2026-06-01',
-                    // Ta data już zawiera przedłużenie; nie wolno dodawać go ponownie.
-                    treatmentEndDate: '2026-06-03',
-                    treatmentExtensionDays: 10,
-                },
-            },
-            '8:30': {
-                empA: {
-                    content: 'Pacjent B',
-                    patientId: 'patient-b',
-                    treatmentStartDate: '2026-10-05',
-                    treatmentEndDate: '2026-10-30',
-                    isEveryOtherDay: true,
-                },
-            },
+    describe('calculateColumnHygieneMetrics', () => {
+        const employees = {
+            empA: { displayName: 'Anna Kowalska', color: '#10b981' },
+            empB: { displayName: 'Jan Nowak', color: '#3b82f6' },
         };
 
-        const holiday = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-06-04T12:00:00Z'));
-        expect(holiday.isWorkday).toBe(false); // Boże Ciało
-        expect(holiday.employees.empA.patientSlots).toBe(0);
+        test('mixed split cell reports overdue bell for expired half and active extension for ongoing half', () => {
+            const today = new Date('2026-10-21T10:00:00Z');
+            const scheduleCells = {
+                '8:30': {
+                    empA: {
+                        isSplit: true,
+                        content1: 'Pacjent Przeterminowany',
+                        treatmentData1: { startDate: '2026-09-01', endDate: '2026-09-19', extensionDays: 0 },
+                        content2: 'Pacjent Przedłużony',
+                        treatmentData2: { startDate: '2026-10-12', endDate: '2026-11-03', extensionDays: 3 },
+                    },
+                },
+            };
 
-        const firstVisit = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-05T12:00:00Z'));
-        const secondWorkday = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-06T12:00:00Z'));
-        const thirdWorkday = createDailyWorkloadSnapshot(scheduleCells, employees, {}, new Date('2026-10-07T12:00:00Z'));
-        expect(firstVisit.employees.empA.patientSlots).toBe(1);
-        expect(secondWorkday.employees.empA.patientSlots).toBe(0);
-        expect(thirdWorkday.employees.empA.patientSlots).toBe(1);
+            const report = calculateColumnHygieneMetrics(scheduleCells, employees, today);
+
+            const hygieneA = report.byEmployee.empA;
+            expect(hygieneA.overdueBellsCount).toBe(1);
+            expect(hygieneA.overdueTimes).toEqual(['8:30']);
+            expect(hygieneA.activeExtensionsCount).toBe(1);
+            expect(hygieneA.activeExtensionDaysSum).toBe(3);
+        });
+
+        test('reports undatedEntries when filled non-break/non-hydro cell lacks startDate', () => {
+            const today = new Date('2026-10-21T10:00:00Z');
+            const scheduleCells = {
+                '9:00': {
+                    empA: {
+                        content: 'Pacjent Bez Daty Początku',
+                        // treatmentStartDate missing
+                    },
+                },
+            };
+
+            const report = calculateColumnHygieneMetrics(scheduleCells, employees, today);
+
+            expect(report.undatedEntries).toEqual([
+                { employeeId: 'empA', employeeName: 'Anna Kowalska', time: '9:00' },
+            ]);
+            expect(report.byEmployee.empA.undatedCount).toBe(1);
+        });
+
+        test('computes lastUpdatedIso and lastUpdatedDaysAgo handling late UTC timestamps, clamping future dates, and ignoring malformed strings', () => {
+            const today = new Date('2026-10-30T10:00:00Z');
+            const scheduleCells = {
+                '8:00': {
+                    empA: {
+                        content: 'Pacjent Wczorajszy',
+                        treatmentStartDate: '2026-10-29',
+                        treatmentEndDate: '2026-11-19',
+                        history: [
+                            { timestamp: '2026-10-29T21:30:00.000Z', author: 'Anna' },
+                            { timestamp: 'invalid-date-string' },
+                        ],
+                    },
+                },
+                '8:30': {
+                    empB: {
+                        content: 'Pacjent Przyszły',
+                        treatmentStartDate: '2026-11-05', // In the future relative to 2026-10-30
+                        treatmentEndDate: '2026-11-26',
+                    },
+                },
+            };
+
+            const report = calculateColumnHygieneMetrics(scheduleCells, employees, today);
+
+            // empA: last updated 2026-10-29 -> 1 day ago
+            expect(report.byEmployee.empA.lastUpdatedIso).toBe('2026-10-29');
+            expect(report.byEmployee.empA.lastUpdatedDaysAgo).toBe(1);
+
+            // empB: future date 2026-11-05 clamped to 0 days ago (Dziś)
+            expect(report.byEmployee.empB.lastUpdatedIso).toBe('2026-11-05');
+            expect(report.byEmployee.empB.lastUpdatedDaysAgo).toBe(0);
+        });
     });
 
-    test('aggregates unique patients by stable patient ID, not by displayed name', () => {
-        const employees = { empA: { displayName: 'Anna', color: '#10b981' } };
-        const snapshots = [
-            {
-                date: '2026-10-05', year: 2026, month: 10, dayOfWeek: 1, weekKey: '2026-W41', isWorkday: true,
-                updatedAt: '2026-10-05T12:00:00Z', totalPatients: 1, activeEmployeesCount: 1,
-                employees: {
-                    empA: { employeeId: 'empA', employeeName: 'Anna', patientSlots: 1, uniquePatients: 1, patientIds: ['patient-1'], availableSlots: 15, occupancyPercent: 7, isOnLeave: false },
-                },
-            },
-            {
-                date: '2026-10-06', year: 2026, month: 10, dayOfWeek: 2, weekKey: '2026-W41', isWorkday: true,
-                updatedAt: '2026-10-06T12:00:00Z', totalPatients: 1, activeEmployeesCount: 1,
-                employees: {
-                    empA: { employeeId: 'empA', employeeName: 'Anna', patientSlots: 1, uniquePatients: 1, patientIds: ['patient-1'], availableSlots: 15, occupancyPercent: 7, isOnLeave: false },
-                },
-            },
-        ];
-
-        const result = calculatePeriodWorkloadAverages(snapshots, 'weekly', {
-            weekKey: '2026-W41', year: 2026, employees,
+    describe('normalizeLeavesData', () => {
+        test('normalizes leaves data properly', () => {
+            const raw = {
+                'Anna Kowalska': [
+                    { id: '1', startDate: '2026-10-01', endDate: '2026-10-05', type: 'vacation' },
+                    null,
+                    { invalid: true },
+                ],
+            };
+            const normalized = normalizeLeavesData(raw);
+            expect(normalized['Anna Kowalska']).toHaveLength(1);
+            expect(normalized['Anna Kowalska'][0].startDate).toBe('2026-10-01');
         });
-        expect(result.employees[0].totalPatients).toBe(2);
-        expect(result.employees[0].totalUniquePatients).toBe(1);
-        // Średnia tygodniowa normalizowana do 5 dni roboczych: (2 pacjentów / 2 dni) * 5 = 5
-        expect(result.employees[0].averagePatientsPerWeek).toBe(5);
     });
 
-    test('supports unique patients aggregation for legacy snapshots without UUIDs', () => {
-        const employees = { empA: { displayName: 'Anna', color: '#10b981' } };
-        const snapshots = [
-            {
-                date: '2026-10-05', year: 2026, month: 10, dayOfWeek: 1, weekKey: '2026-W41', isWorkday: true,
-                updatedAt: '2026-10-05T12:00:00Z', totalPatients: 2, activeEmployeesCount: 1,
-                employees: {
-                    empA: { employeeId: 'empA', employeeName: 'Anna', patientSlots: 2, uniquePatients: 2, patientIds: ['legacy:kowalski jan', 'legacy:nowak anna'], availableSlots: 15, occupancyPercent: 13, isOnLeave: false },
-                },
-            },
-            {
-                date: '2026-10-06', year: 2026, month: 10, dayOfWeek: 2, weekKey: '2026-W41', isWorkday: true,
-                updatedAt: '2026-10-06T12:00:00Z', totalPatients: 1, activeEmployeesCount: 1,
-                employees: {
-                    empA: { employeeId: 'empA', employeeName: 'Anna', patientSlots: 1, uniquePatients: 1, patientIds: ['legacy:kowalski jan'], availableSlots: 15, occupancyPercent: 7, isOnLeave: false },
-                },
-            },
-        ];
-
-        const result = calculatePeriodWorkloadAverages(snapshots, 'weekly', {
-            weekKey: '2026-W41', year: 2026, employees,
+    describe('getEmployeeDisplayName', () => {
+        test('falls back safely for numeric and non-numeric employee IDs without name fields', () => {
+            const emptyEmployee = {};
+            // Numeric ID (0-indexed legacy style)
+            expect(getEmployeeDisplayName('0', emptyEmployee)).toBe('Pracownik 1');
+            expect(getEmployeeDisplayName('4', emptyEmployee)).toBe('Pracownik 5');
+            // Non-numeric ID fallback avoids NaN
+            expect(getEmployeeDisplayName('emp_temp_99', emptyEmployee)).toBe('Pracownik emp_temp_99');
+            expect(getEmployeeDisplayName('doctor_ann', emptyEmployee)).toBe('Pracownik doctor_ann');
+            // Prioritizes displayName / name / firstName lastName
+            expect(getEmployeeDisplayName('emp_temp_99', { displayName: 'Katarzyna' })).toBe('Katarzyna');
+            expect(getEmployeeDisplayName('emp_temp_99', { name: 'Piotr' })).toBe('Piotr');
+            expect(getEmployeeDisplayName('emp_temp_99', { firstName: 'Jan', lastName: 'Kot' })).toBe('Jan Kot');
         });
-        expect(result.employees[0].totalPatients).toBe(3);
-        expect(result.employees[0].totalUniquePatients).toBe(2); // Kowalski (2 dni) + Nowak (1 dzień)
-        expect(result.employees[0].averagePatientsPerPresentDay).toBe(1.5);
-        expect(result.employees[0].averagePatientsPerWeek).toBe(7.5);
     });
 });

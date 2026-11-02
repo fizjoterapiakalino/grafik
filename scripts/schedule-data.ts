@@ -1,13 +1,83 @@
 // scripts/schedule-data.ts
-import { db as dbRaw } from './firebase-config.js';
-import { AppConfig, UndoManager } from './common.js';
-import { validateCellState, sanitizeCellState } from './data-validation.js';
+import { db as dbRaw, FieldValue } from './firebase-config.js';
+import { AppConfig } from './common.js';
+import { CELL_CONTENT_KEYS } from './utils.js';
 import { ensureCellPatientIds } from './schedule-helpers.js';
-import { persistTodayWorkloadSnapshot } from './workload-snapshot.js';
+import { ensureTodayWorkloadSnapshot, persistTodayWorkloadSnapshot } from './workload-snapshot.js';
 import type { FirestoreDbWrapper } from './types/firebase';
 import type { CellState, ScheduleHistoryEntry, ScheduleAppState } from './types/index.js';
 
 const db = dbRaw as unknown as FirestoreDbWrapper;
+
+const ALLOWED_CELL_KEYS = [
+    ...CELL_CONTENT_KEYS,
+    'isBreak',
+    'history',
+    'absenceDates',
+    'absenceDates1',
+    'absenceDates2',
+] as const;
+
+const ALLOWED_TREATMENT_KEYS = ['startDate', 'extensionDays', 'endDate', 'additionalInfo', 'absenceDates'] as const;
+
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+export const sanitizeAbsenceDates = (dates: unknown): string[] => {
+    if (!Array.isArray(dates)) return [];
+    const validDates = dates
+        .filter((d): d is string => typeof d === 'string' && ISO_DATE_REGEX.test(d.trim()))
+        .map((d) => d.trim());
+    return Array.from(new Set(validDates)).sort();
+};
+
+const sanitizeTreatmentData = (data: unknown): Record<string, unknown> | null => {
+    if (!data || typeof data !== 'object') return null;
+    const typed = data as Record<string, unknown>;
+    const sanitized: Record<string, unknown> = {};
+    for (const key of ALLOWED_TREATMENT_KEYS) {
+        if (key in typed) {
+            if (key === 'absenceDates') {
+                if (Array.isArray(typed[key])) {
+                    sanitized[key] = sanitizeAbsenceDates(typed[key]);
+                } else if (typed[key] === null) {
+                    sanitized[key] = null;
+                }
+            } else {
+                sanitized[key] = typed[key];
+            }
+        }
+    }
+    return Object.keys(sanitized).length > 0 ? sanitized : null;
+};
+
+export const sanitizeCellState = (cellState: unknown): CellState => {
+    if (!cellState || typeof cellState !== 'object') return {};
+    const state = cellState as Record<string, unknown>;
+    const sanitized: Record<string, unknown> = {};
+    for (const key of ALLOWED_CELL_KEYS) {
+        if (key in state) {
+            const val = state[key];
+            if (key === 'treatmentData1' || key === 'treatmentData2') {
+                if (val && typeof val === 'object') {
+                    sanitized[key] = sanitizeTreatmentData(val);
+                }
+            } else if (key === 'history') {
+                if (Array.isArray(val)) {
+                    sanitized[key] = val.slice(0, 10);
+                }
+            } else if (key === 'absenceDates' || key === 'absenceDates1' || key === 'absenceDates2') {
+                if (Array.isArray(val)) {
+                    sanitized[key] = sanitizeAbsenceDates(val);
+                } else if (val === null) {
+                    sanitized[key] = null;
+                }
+            } else {
+                sanitized[key] = val;
+            }
+        }
+    }
+    return sanitized as CellState;
+};
 
 /**
  * Aktualizacja komórki
@@ -37,31 +107,61 @@ interface ScheduleDataAPI {
 }
 
 /**
+ * Element na stosie undo
+ */
+interface CellUndoItem {
+    time: string;
+    employeeIndex: string;
+    prevCell: CellState;
+}
+type CellUndoBatch = CellUndoItem[];
+
+interface DirtyCellEntry {
+    time: string;
+    employeeIndex: string;
+    value: CellState | null;
+}
+
+/**
  * Moduł danych harmonogramu
  */
 export const ScheduleData: ScheduleDataAPI = (() => {
     let appState: ScheduleAppState = {
         scheduleCells: {},
     };
-    let undoManager: InstanceType<typeof UndoManager>;
+    let cellUndoStack: CellUndoBatch[] = [];
+    let _undoButtonElement: HTMLButtonElement | null = null;
+    const dirtyCells = new Map<string, DirtyCellEntry>();
+
     let unsubscribeSchedule: (() => void) | null = null;
     let isSaving = false;
     let saveQueued = false;
     let currentUserId: string | null = null;
     let isInitialLoad = true;
+    let initialSnapshotEnsured = false;
     let _onDataChange: (() => void) | null = null;
     const PENDING_SAVE_STORAGE_KEY = 'schedulePendingServerSave';
-    const PENDING_SAVE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
     const SAVE_CONFIRM_TIMEOUT_MS = 10000;
-
-    interface PendingScheduleSave {
-        payload: ScheduleAppState;
-        token: string;
-        createdAt: string;
-    }
 
     const getScheduleDocRef = () => {
         return db.collection(AppConfig.firestore.collections.schedules).doc(AppConfig.firestore.docs.mainSchedule);
+    };
+
+    const updateUndoButtonUI = (): void => {
+        if (_undoButtonElement) {
+            const canUndo = cellUndoStack.length > 0;
+            _undoButtonElement.disabled = !canUndo;
+            _undoButtonElement.classList.toggle('active', canUndo);
+        }
+    };
+
+    const pushUndoBatch = (batch: CellUndoBatch): void => {
+        cellUndoStack.push(batch);
+        const maxStates = AppConfig.undoManager?.maxStates ?? 20;
+        if (cellUndoStack.length > maxStates) {
+            cellUndoStack.shift();
+        }
+        updateUndoButtonUI();
     };
 
     const _updateCellHistory = (cellState: CellState, oldContent: string | undefined): void => {
@@ -115,89 +215,77 @@ export const ScheduleData: ScheduleDataAPI = (() => {
         }
     };
 
-    const readPendingSave = (): PendingScheduleSave | null => {
+    const storePendingDirtyCells = (): void => {
         try {
-            const raw = localStorage.getItem(PENDING_SAVE_STORAGE_KEY);
-            if (!raw) return null;
-
-            const pending = JSON.parse(raw) as PendingScheduleSave;
-            const createdAt = new Date(pending.createdAt).getTime();
-            if (!pending.payload?.scheduleCells || !pending.token || Number.isNaN(createdAt)) {
+            const arr = Array.from(dirtyCells.values());
+            if (arr.length === 0) {
                 localStorage.removeItem(PENDING_SAVE_STORAGE_KEY);
-                return null;
+            } else {
+                localStorage.setItem(PENDING_SAVE_STORAGE_KEY, JSON.stringify(arr));
             }
-
-            if (Date.now() - createdAt > PENDING_SAVE_MAX_AGE_MS) {
-                localStorage.removeItem(PENDING_SAVE_STORAGE_KEY);
-                return null;
-            }
-
-            return pending;
-        } catch (error) {
-            console.warn('Nie udało się odczytać lokalnej kopii oczekującego zapisu:', error);
-            localStorage.removeItem(PENDING_SAVE_STORAGE_KEY);
-            return null;
-        }
-    };
-
-    const storePendingSave = (payload: ScheduleAppState, token: string): void => {
-        try {
-            const pending: PendingScheduleSave = {
-                payload,
-                token,
-                createdAt: new Date().toISOString(),
-            };
-            localStorage.setItem(PENDING_SAVE_STORAGE_KEY, JSON.stringify(pending));
         } catch (error) {
             console.warn('Nie udało się zapisać lokalnej kopii oczekującego zapisu:', error);
         }
     };
 
-    const clearPendingSave = (token: string): void => {
-        const pending = readPendingSave();
-        if (!pending || pending.token === token) {
-            localStorage.removeItem(PENDING_SAVE_STORAGE_KEY);
-        }
-    };
-
-    const verifyScheduleSaved = async (token: string): Promise<void> => {
-        const docRef = getScheduleDocRef();
-        const snapshot = docRef.getFromServer ? await docRef.getFromServer() : await docRef.get();
-        const serverData = snapshot.data() as ScheduleAppState | undefined;
-
-        if (!snapshot.exists || serverData?.saveToken !== token) {
-            throw new Error('Nie potwierdzono zapisu harmonogramu na serwerze.');
+    const applyDirtyCellsToLocalState = (): void => {
+        if (dirtyCells.size === 0) return;
+        for (const { time, employeeIndex, value } of dirtyCells.values()) {
+            if (value && Object.keys(value).length > 0) {
+                if (!appState.scheduleCells[time]) appState.scheduleCells[time] = {};
+                appState.scheduleCells[time][employeeIndex] = value;
+            } else if (appState.scheduleCells[time]) {
+                delete appState.scheduleCells[time][employeeIndex];
+            }
         }
     };
 
     const restorePendingSaveIfNeeded = async (): Promise<void> => {
-        const pending = readPendingSave();
-        if (!pending || isSaving) return;
-
         try {
-            await verifyScheduleSaved(pending.token);
-            clearPendingSave(pending.token);
-        } catch {
-            appState.scheduleCells = pending.payload.scheduleCells;
-            notifyChange();
-            window.showToast('Przywrócono niezapisane zmiany i ponawiam zapis...', 5000);
-            await saveSchedule();
+            const raw = localStorage.getItem(PENDING_SAVE_STORAGE_KEY);
+            if (!raw) return;
+
+            let pendingArr: DirtyCellEntry[] = [];
+            try {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    pendingArr = parsed;
+                }
+            } catch {
+                localStorage.removeItem(PENDING_SAVE_STORAGE_KEY);
+                return;
+            }
+
+            if (pendingArr.length === 0) {
+                localStorage.removeItem(PENDING_SAVE_STORAGE_KEY);
+                return;
+            }
+
+            for (const item of pendingArr) {
+                if (item && item.time && item.employeeIndex !== undefined) {
+                    dirtyCells.set(`${item.time}__${item.employeeIndex}`, item);
+                }
+            }
+
+            if (dirtyCells.size > 0) {
+                applyDirtyCellsToLocalState();
+                notifyChange();
+                if (typeof window !== 'undefined' && typeof window.showToast === 'function') {
+                    window.showToast('Przywrócono niezapisane zmiany i ponawiam zapis...', 5000);
+                }
+                await saveSchedule();
+            }
+        } catch (error) {
+            console.warn('Nie udało się odczytać lokalnej kopii oczekującego zapisu:', error);
+            localStorage.removeItem(PENDING_SAVE_STORAGE_KEY);
         }
     };
 
     const init = (onDataChange: (() => void) | null, undoButtonElement: HTMLButtonElement | null): void => {
         _onDataChange = onDataChange;
-
-        undoManager = new UndoManager({
-            maxStates: AppConfig.undoManager.maxStates,
-            onUpdate: (manager: InstanceType<typeof UndoManager>) => {
-                if (undoButtonElement) {
-                    const canUndo = manager.canUndo();
-                    undoButtonElement.disabled = !canUndo;
-                    undoButtonElement.classList.toggle('active', canUndo);
-                }
-            },
-        });
+        _undoButtonElement = undoButtonElement;
+        cellUndoStack = [];
+        updateUndoButtonUI();
     };
 
     const setCurrentUserId = (uid: string | null): void => {
@@ -219,22 +307,23 @@ export const ScheduleData: ScheduleDataAPI = (() => {
                     } else {
                         appState.scheduleCells = {};
                     }
+                    applyDirtyCellsToLocalState();
                 } else {
                     appState.scheduleCells = {};
-                    saveSchedule();
+                    void saveSchedule();
                 }
 
                 if (isInitialLoad) {
-                    undoManager.initialize(getCurrentTableState());
                     isInitialLoad = false;
                     void restorePendingSaveIfNeeded();
                 }
 
                 notifyChange();
-                // Otworzenie grafiku aktualizuje tylko dzisiejszy snapshot.
-                // Nie odtwarzamy historycznych dni z bieżącego układu komórek.
-                void persistTodayWorkloadSnapshot(appState.scheduleCells)
-                    .catch(error => console.warn('Nie udało się odświeżyć dzisiejszego snapshotu obciążenia:', error));
+                if (!initialSnapshotEnsured && Object.keys(appState.scheduleCells).length > 0) {
+                    initialSnapshotEnsured = true;
+                    void ensureTodayWorkloadSnapshot(appState.scheduleCells)
+                        .catch(error => console.warn('Nie udało się upewnić dzisiejszego snapshotu obciążenia:', error));
+                }
             },
             (error) => {
                 console.error('Error listening to schedule changes:', error);
@@ -250,59 +339,102 @@ export const ScheduleData: ScheduleDataAPI = (() => {
         }
 
         isSaving = true;
-        window.setSaveStatus('saving');
+        if (typeof window !== 'undefined' && typeof window.setSaveStatus === 'function') {
+            window.setSaveStatus('saving');
+        }
 
         try {
-            if (AppConfig.debug) {
-                for (const time of Object.keys(appState.scheduleCells)) {
-                    for (const empIdx of Object.keys(appState.scheduleCells[time])) {
-                        const validation = validateCellState(appState.scheduleCells[time][empIdx]);
-                        if (!validation.valid) {
-                            console.warn(`Walidacja komórki [${time}][${empIdx}]:`, validation.errors);
+            const docRef = getScheduleDocRef();
+            const saveToken = createSaveToken();
+            const nowIso = new Date().toISOString();
+
+            if (dirtyCells.size > 0) {
+                const batchToSave = new Map(dirtyCells);
+                const updatePayload: Record<string, unknown> = {
+                    lastSavedAt: nowIso,
+                    lastSavedBy: currentUserId,
+                    saveToken,
+                };
+
+                for (const entry of batchToSave.values()) {
+                    const { time, employeeIndex, value } = entry;
+                    const fieldPath = `scheduleCells.${time}.${employeeIndex}`;
+                    updatePayload[fieldPath] = (value && Object.keys(value).length > 0)
+                        ? value
+                        : (FieldValue as { delete(): unknown }).delete();
+                }
+
+                const performUpdate = async (): Promise<void> => {
+                    try {
+                        await docRef.update(updatePayload);
+                    } catch (err: unknown) {
+                        const error = err as { code?: string; message?: string };
+                        if (error?.code === 'not-found' || error?.message?.includes('No document to update') || error?.message?.includes('NOT_FOUND')) {
+                            await docRef.set({
+                                scheduleCells: appState.scheduleCells,
+                                lastSavedAt: nowIso,
+                                lastSavedBy: currentUserId,
+                                saveToken,
+                            }, { merge: true });
+                        } else {
+                            throw err;
                         }
                     }
+                };
+
+                await withTimeout(
+                    performUpdate(),
+                    SAVE_CONFIRM_TIMEOUT_MS,
+                    'Przekroczono czas zapisu harmonogramu.'
+                );
+
+                for (const [key, entry] of batchToSave) {
+                    if (dirtyCells.get(key) === entry) {
+                        dirtyCells.delete(key);
+                    }
                 }
+                storePendingDirtyCells();
+            } else {
+                const payload: ScheduleAppState = {
+                    ...appState,
+                    lastSavedAt: nowIso,
+                    lastSavedBy: currentUserId,
+                    saveToken,
+                };
+                await withTimeout(
+                    docRef.set(payload, { merge: true }),
+                    SAVE_CONFIRM_TIMEOUT_MS,
+                    'Przekroczono czas zapisu harmonogramu.'
+                );
             }
 
-            const saveToken = createSaveToken();
-            const payload: ScheduleAppState = {
-                ...appState,
-                lastSavedAt: new Date().toISOString(),
-                lastSavedBy: currentUserId,
-                saveToken,
-            };
-
-            storePendingSave(payload, saveToken);
-            await withTimeout(
-                getScheduleDocRef().set(payload, { merge: true }),
-                SAVE_CONFIRM_TIMEOUT_MS,
-                'Przekroczono czas zapisu harmonogramu.'
-            );
-            await withTimeout(
-                verifyScheduleSaved(saveToken),
-                SAVE_CONFIRM_TIMEOUT_MS,
-                'Przekroczono czas potwierdzenia zapisu harmonogramu.'
-            );
-            clearPendingSave(saveToken);
-            window.setSaveStatus('saved');
+            if (typeof window !== 'undefined' && typeof window.setSaveStatus === 'function') {
+                window.setSaveStatus('saved');
+            }
             void persistTodayWorkloadSnapshot(appState.scheduleCells)
                 .catch(snapshotError => console.warn('Nie udało się zapisać dzisiejszego snapshotu obciążenia:', snapshotError));
             isSaving = false;
 
-            if (saveQueued) {
+            if (saveQueued || dirtyCells.size > 0) {
                 saveQueued = false;
                 await saveSchedule();
             }
         } catch (error) {
             console.error('Error saving schedule to Firestore:', error);
-            window.setSaveStatus('error');
-            window.showToast('Nie potwierdzono zapisu na serwerze. Zmiany zapisano lokalnie i zostaną ponowione.', 7000);
+            if (typeof window !== 'undefined' && typeof window.setSaveStatus === 'function') {
+                window.setSaveStatus('error');
+            }
+            if (typeof window !== 'undefined' && typeof window.showToast === 'function') {
+                window.showToast('Nie potwierdzono zapisu na serwerze. Zmiany zapisano lokalnie i zostaną ponowione.', 7000);
+            }
             isSaving = false;
         }
     };
 
     const updateCellState = (time: string, employeeIndex: string, updateFn: (state: CellState) => void): void => {
-        undoManager.pushState(getCurrentTableState());
+        const currentCell = appState.scheduleCells[time]?.[employeeIndex];
+        const prevCell: CellState = currentCell ? JSON.parse(JSON.stringify(currentCell)) : {};
+        pushUndoBatch([{ time, employeeIndex, prevCell }]);
 
         if (!appState.scheduleCells[time]) appState.scheduleCells[time] = {};
         const cellState = appState.scheduleCells[time][employeeIndex] || {};
@@ -315,19 +447,27 @@ export const ScheduleData: ScheduleDataAPI = (() => {
         updateFn(cellState);
         ensureCellPatientIds(cellState);
 
-        const validation = validateCellState(cellState);
-        if (!validation.valid && AppConfig.debug) {
-            console.warn(`Walidacja komórki [${time}][${employeeIndex}]:`, validation.errors);
+        const sanitized = sanitizeCellState(cellState);
+        if (Object.keys(sanitized).length > 0) {
+            appState.scheduleCells[time][employeeIndex] = sanitized;
+            dirtyCells.set(`${time}__${employeeIndex}`, { time, employeeIndex, value: sanitized });
+        } else {
+            delete appState.scheduleCells[time][employeeIndex];
+            dirtyCells.set(`${time}__${employeeIndex}`, { time, employeeIndex, value: null });
         }
-
-        appState.scheduleCells[time][employeeIndex] = sanitizeCellState(cellState) as CellState;
+        storePendingDirtyCells();
 
         notifyChange();
-        saveSchedule();
+        void saveSchedule();
     };
 
     const updateMultipleCells = (updates: CellUpdate[]): void => {
-        undoManager.pushState(getCurrentTableState());
+        const batch: CellUndoBatch = updates.map(({ time, employeeIndex }) => {
+            const currentCell = appState.scheduleCells[time]?.[employeeIndex];
+            const prevCell: CellState = currentCell ? JSON.parse(JSON.stringify(currentCell)) : {};
+            return { time, employeeIndex, prevCell };
+        });
+        pushUndoBatch(batch);
 
         updates.forEach(({ time, employeeIndex, updateFn }) => {
             if (!appState.scheduleCells[time]) appState.scheduleCells[time] = {};
@@ -341,16 +481,19 @@ export const ScheduleData: ScheduleDataAPI = (() => {
             updateFn(cellState);
             ensureCellPatientIds(cellState);
 
-            const validation = validateCellState(cellState);
-            if (!validation.valid && AppConfig.debug) {
-                console.warn(`Walidacja komórki [${time}][${employeeIndex}]:`, validation.errors);
+            const sanitized = sanitizeCellState(cellState);
+            if (Object.keys(sanitized).length > 0) {
+                appState.scheduleCells[time][employeeIndex] = sanitized;
+                dirtyCells.set(`${time}__${employeeIndex}`, { time, employeeIndex, value: sanitized });
+            } else {
+                delete appState.scheduleCells[time][employeeIndex];
+                dirtyCells.set(`${time}__${employeeIndex}`, { time, employeeIndex, value: null });
             }
-
-            appState.scheduleCells[time][employeeIndex] = sanitizeCellState(cellState) as CellState;
         });
+        storePendingDirtyCells();
 
         notifyChange();
-        saveSchedule();
+        void saveSchedule();
     };
 
     const getCurrentTableState = (): ScheduleAppState => JSON.parse(JSON.stringify(appState));
@@ -360,24 +503,44 @@ export const ScheduleData: ScheduleDataAPI = (() => {
     };
 
     const undo = (): void => {
-        const prevState = undoManager.undo() as ScheduleAppState | null;
-        if (prevState) {
-            appState.scheduleCells = prevState.scheduleCells;
+        const lastBatch = cellUndoStack.pop();
+        updateUndoButtonUI();
+        if (lastBatch && lastBatch.length > 0) {
+            for (const { time, employeeIndex, prevCell } of lastBatch) {
+                if (!appState.scheduleCells[time]) {
+                    appState.scheduleCells[time] = {};
+                }
+                const sanitized = sanitizeCellState(prevCell);
+                if (Object.keys(sanitized).length > 0) {
+                    appState.scheduleCells[time][employeeIndex] = sanitized;
+                    dirtyCells.set(`${time}__${employeeIndex}`, { time, employeeIndex, value: sanitized });
+                } else {
+                    delete appState.scheduleCells[time][employeeIndex];
+                    dirtyCells.set(`${time}__${employeeIndex}`, { time, employeeIndex, value: null });
+                }
+            }
+            storePendingDirtyCells();
             notifyChange();
-            saveSchedule();
+            void saveSchedule();
         }
     };
 
     const destroy = (): void => {
         if (unsubscribeSchedule) {
             unsubscribeSchedule();
+            unsubscribeSchedule = null;
         }
+        isInitialLoad = true;
+        initialSnapshotEnsured = false;
+        cellUndoStack = [];
+        updateUndoButtonUI();
+        dirtyCells.clear();
     };
 
     const getAppState = (): ScheduleAppState => appState;
 
     const pushCurrentState = (): void => {
-        undoManager.pushState(getCurrentTableState());
+        // Safe no-op for API compatibility; updateCellState & updateMultipleCells record delta directly
     };
 
     return {
@@ -395,12 +558,3 @@ export const ScheduleData: ScheduleDataAPI = (() => {
         pushCurrentState,
     };
 })();
-
-// Backward compatibility
-declare global {
-    interface Window {
-        ScheduleData: ScheduleDataAPI;
-    }
-}
-
-window.ScheduleData = ScheduleData;

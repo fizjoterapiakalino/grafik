@@ -1,9 +1,8 @@
 // scripts/changes.ts
-import { debugLog } from './common.js';
+import { debugLog, AppConfig } from './common.js';
 import { db as dbRaw } from './firebase-config.js';
-import { AppConfig } from './common.js';
 import { EmployeeManager } from './employee-manager.js';
-import { escapeHTML } from './utils.js';
+import { escapeHTML, toUTCDate } from './utils.js';
 import {
     PdfColors,
     PdfStyles,
@@ -13,6 +12,7 @@ import {
     PdfHeaderColors,
 } from './pdf-config.js';
 import type { FirestoreDbWrapper } from './types/firebase';
+import { generateTwoWeekPeriods, type RotationPeriod as Period } from './changes-rotation.js';
 
 const db = dbRaw as unknown as FirestoreDbWrapper;
 
@@ -34,25 +34,6 @@ interface AppState {
 }
 
 /**
- * Szablon obsady - przechowuje układ pracowników dla wszystkich kolumn
- */
-interface ChangeTemplate {
-    id: string;
-    name: string;
-    /** Mapa kolumn (1-7) do listy ID pracowników */
-    columns: Record<number, string[]>;
-    createdAt: string;
-}
-
-/**
- * Okres dwutygodniowy
- */
-interface Period {
-    start: string;
-    end: string;
-}
-
-/**
  * Wpis urlopu pracownika
  */
 interface LeaveEntry {
@@ -70,7 +51,7 @@ interface ChangesAPI {
 }
 
 /**
- * Moduł harmonogramu zmian
+ * Moduł harmonogramu zmian (przeglądarka i wydruk PDF)
  */
 export const Changes: ChangesAPI = (() => {
     let changesTableBody: HTMLElement | null = null;
@@ -78,46 +59,19 @@ export const Changes: ChangesAPI = (() => {
     let yearSelect: HTMLSelectElement | null = null;
     let printButton: HTMLElement | null = null;
     let appState: AppState = { changesCells: {} };
-
     let currentYear = new Date().getUTCFullYear();
-    // Clipboard: tablica tablic - każdy element to lista pracowników z jednej komórki
-    // Przy kopiowaniu wielu komórek zachowujemy kolejność (pozycje względne)
-    let clipboard: string[][] | null = null;
-    let activeCell: HTMLTableCellElement | null = null;
-    let cachedLeavesData: Record<string, LeaveEntry[]> = {}; // Przechowuje dane o urlopach
-
-    // Stos Undo dla cofania zmian
-    let undoStack: string[] = [];
-    const MAX_UNDO_STACK = 20;
-
-    // Zaznaczenie wielu komórek
-    let multiSelectedCells: Set<HTMLTableCellElement> = new Set();
-
-    // Szablony obsady
-    let templates: ChangeTemplate[] = [];
-    let pendingTemplateRow: HTMLTableRowElement | null = null; // Wiersz dla którego zapisujemy/stosujemy szablon
-
-    // Schowek dla kopiowania całego wiersza
-    let rowClipboard: Record<number, string[]> | null = null;
-
-    const TEMPLATES_STORAGE_KEY = 'changesTemplates';
-    const EDITABLE_COLUMN_COUNT = 7;
-    const COLUMN_NAMES = ['', 'HYDRO', 'MASAŻ', 'FIZYKO', 'SALA', 'MASAŻ', 'FIZYKO', 'SALA'];
-
-    const isWeekend = (date: Date): boolean => {
-        const day = date.getUTCDay();
-        return day === 0 || day === 6;
-    };
+    let cachedLeavesData: Record<string, LeaveEntry[]> = {};
+    let isDestroyed = false;
+    let abortController: AbortController | null = null;
 
     const handleAppSearch = (e: Event): void => {
-        const { searchTerm } = (e as CustomEvent<{ searchTerm: string }>).detail;
-        const lowerCaseSearchTerm = searchTerm.toLowerCase();
+        const searchTerm = ((e as CustomEvent<{ searchTerm?: string }>)?.detail?.searchTerm || '').toLowerCase();
         document.querySelectorAll('#changesTableBody tr').forEach((row) => {
             const hasEmployee = Array.from((row as HTMLTableRowElement).cells).some((cell, index) => {
                 if (index === 0) return false;
-                return cell.textContent?.toLowerCase().includes(lowerCaseSearchTerm) || false;
+                return cell.textContent?.toLowerCase().includes(searchTerm) || false;
             });
-            (row as HTMLElement).style.display = hasEmployee || lowerCaseSearchTerm === '' ? '' : 'none';
+            (row as HTMLElement).style.display = hasEmployee || searchTerm === '' ? '' : 'none';
         });
     };
 
@@ -135,777 +89,15 @@ export const Changes: ChangesAPI = (() => {
         const employeeLeaves = cachedLeavesData[employeeName];
         if (!Array.isArray(employeeLeaves)) return false;
 
-        const start = new Date(periodStart);
-        const end = new Date(periodEnd);
+        const start = toUTCDate(periodStart);
+        const end = toUTCDate(periodEnd);
 
-        return employeeLeaves.some(leave => {
+        return employeeLeaves.some((leave) => {
             if (leave.type !== 'vacation') return false;
-            const leaveStart = new Date(leave.startDate);
-            const leaveEnd = new Date(leave.endDate);
+            const leaveStart = toUTCDate(leave.startDate);
+            const leaveEnd = toUTCDate(leave.endDate);
             return !(leaveEnd < start || leaveStart > end);
         });
-    };
-
-    /**
-     * Kopiuje komórkę lub wiele zaznaczonych komórek do schowka
-     */
-    const copyCell = (cell: HTMLTableCellElement): void => {
-        if (!cell) return;
-
-        // Jeśli są zaznaczone komórki (multi-select), kopiuj wszystkie posortowane wg kolumny
-        if (multiSelectedCells.size > 0) {
-            // Sortuj komórki wg indeksu kolumny
-            const sortedCells = Array.from(multiSelectedCells).sort((a, b) => a.cellIndex - b.cellIndex);
-
-            clipboard = sortedCells.map(c => {
-                const row = c.parentElement as HTMLTableRowElement;
-                const period = row.dataset.startDate || '';
-                const colIdx = c.cellIndex;
-                const cellState = appState.changesCells[period]?.[colIdx];
-                return cellState?.assignedEmployees ? [...cellState.assignedEmployees] : [];
-            });
-
-            window.showToast(`Skopiowano ${clipboard.length} komórek.`);
-            return;
-        }
-
-        // Pojedyncza komórka
-        const period = (cell.parentElement as HTMLTableRowElement).dataset.startDate;
-        if (!period) return;
-        const columnIndex = cell.cellIndex;
-        const cellState = appState.changesCells[period]?.[columnIndex];
-
-        if (cellState?.assignedEmployees) {
-            clipboard = [[...cellState.assignedEmployees]];
-            window.showToast('Skopiowano.');
-        } else {
-            clipboard = [[]];
-            window.showToast('Skopiowano pustą komórkę.');
-        }
-    };
-
-    /**
-     * Wkleja zawartość schowka do komórki (lub sekwencyjnie do kolejnych kolumn przy multi-paste)
-     */
-    const pasteCell = (cell: HTMLTableCellElement): void => {
-        if (!cell || !clipboard || clipboard.length === 0) return;
-
-        const row = cell.parentElement as HTMLTableRowElement;
-        const period = row.dataset.startDate || '';
-        const startColumnIndex = cell.cellIndex;
-        const maxColumn = 7; // Ostatnia edytowalna kolumna (przed urlopami)
-
-        // Zapisz stan przed zmianą
-        pushUndoState();
-
-        // Określ ile komórek możemy wkleić (ograniczenie do końca wiersza)
-        const availableSlots = maxColumn - startColumnIndex + 1;
-        const cellsToPaste = Math.min(clipboard.length, availableSlots);
-
-        let pastedCount = 0;
-
-        for (let i = 0; i < cellsToPaste; i++) {
-            const targetColIndex = startColumnIndex + i;
-            const employeesToPaste = clipboard[i];
-
-            if (!employeesToPaste) continue;
-
-            // Zbierz pracowników już przypisanych w INNYCH komórkach tego wiersza
-            const employeesInOtherCells = new Set<string>();
-            const periodCells = appState.changesCells[period] || {};
-            for (const colIdx in periodCells) {
-                if (Number(colIdx) !== targetColIndex) {
-                    const otherCellEmployees = periodCells[Number(colIdx)]?.assignedEmployees || [];
-                    otherCellEmployees.forEach((empId: string) => employeesInOtherCells.add(empId));
-                }
-            }
-
-            // Filtruj pracowników - wklej tylko tych, którzy nie są w innych komórkach
-            const validEmployees = employeesToPaste.filter(empId => !employeesInOtherCells.has(empId));
-
-            // Zapisz do stanu
-            if (!appState.changesCells[period]) appState.changesCells[period] = {};
-            appState.changesCells[period][targetColIndex] = {
-                assignedEmployees: [...validEmployees]
-            };
-            pastedCount++;
-        }
-
-        renderChangesAndSave();
-
-        if (clipboard.length === 1) {
-            window.showToast('Wklejono.');
-        } else if (pastedCount < clipboard.length) {
-            window.showToast(`Wklejono ${pastedCount}/${clipboard.length} komórek (brak miejsca dla pozostałych).`);
-        } else {
-            window.showToast(`Wklejono ${pastedCount} komórek.`);
-        }
-    };
-
-    const clearCell = (cell: HTMLTableCellElement): void => {
-        if (!cell) return;
-        updateCellState(cell, (state) => {
-            state.assignedEmployees = [];
-        });
-        window.showToast('Wyczyszczono.');
-    };
-
-    /**
-     * Kopiuje cały wiersz do schowka wierszy
-     */
-    const copyRowToClipboard = (row: HTMLTableRowElement): void => {
-        const period = row.dataset.startDate || '';
-        const periodCells = appState.changesCells[period] || {};
-
-        // Sprawdź czy wiersz ma jakieś dane
-        const hasData = Object.keys(periodCells).some(colIdx => {
-            const col = Number(colIdx);
-            const employees = periodCells[col]?.assignedEmployees;
-            return col >= 1 && col <= 7 && employees && employees.length > 0;
-        });
-
-        if (!hasData) {
-            window.showToast('Bieżący okres jest pusty - brak danych do skopiowania.', 2000);
-            return;
-        }
-
-        // Kopiuj tylko kolumny 1-7
-        rowClipboard = {};
-        for (let colIdx = 1; colIdx <= 7; colIdx++) {
-            const employees = periodCells[colIdx]?.assignedEmployees || [];
-            if (employees.length > 0) {
-                rowClipboard[colIdx] = [...employees];
-            }
-        }
-
-        window.showToast('Skopiowano wiersz do schowka.', 2000);
-
-        // Aktualizuj wizualny stan przycisków paste
-        document.querySelectorAll('.paste-row-btn').forEach(btn => {
-            btn.classList.add('has-clipboard');
-        });
-    };
-
-    /**
-     * Wkleja zawartość schowka wierszy do wskazanego wiersza
-     */
-    const pasteRowFromClipboard = (row: HTMLTableRowElement): void => {
-        if (!rowClipboard || Object.keys(rowClipboard).length === 0) {
-            window.showToast('Schowek jest pusty - najpierw skopiuj wiersz.', 2000);
-            return;
-        }
-
-        const period = row.dataset.startDate || '';
-        if (!period) return;
-
-        // Zapisz stan przed zmianą
-        pushUndoState();
-
-        if (!appState.changesCells[period]) appState.changesCells[period] = {};
-
-        for (let colIdx = 1; colIdx <= 7; colIdx++) {
-            const employees = rowClipboard[colIdx];
-            if (employees && employees.length > 0) {
-                appState.changesCells[period][colIdx] = {
-                    assignedEmployees: [...employees],
-                };
-            }
-        }
-
-        renderChangesAndSave();
-        window.showToast('Wklejono wiersz ze schowka.', 2000);
-    };
-
-    // =========================
-    // SZABLONY OBSADY
-    // =========================
-
-    /** Ładuje szablony z localStorage */
-    const loadTemplates = (): void => {
-        try {
-            const stored = localStorage.getItem(TEMPLATES_STORAGE_KEY);
-            templates = stored ? JSON.parse(stored) : [];
-        } catch {
-            templates = [];
-        }
-    };
-
-    /** Zapisuje szablony do localStorage */
-    const saveTemplates = (): void => {
-        localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(templates));
-    };
-
-    /** Generuje unikalny ID dla szablonu */
-    const generateTemplateId = (): string => {
-        return 'tpl_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-    };
-
-    /** Otwiera modal zapisu szablonu */
-    const openSaveTemplateModal = (row: HTMLTableRowElement): void => {
-        const period = row.dataset.startDate || '';
-        const rowData = appState.changesCells[period] || {};
-
-        // Sprawdź czy wiersz ma dane
-        const hasData = Object.keys(rowData).some(colIdx => {
-            const col = Number(colIdx);
-            const employees = rowData[col]?.assignedEmployees;
-            return col >= 1 && col <= 7 && employees && employees.length > 0;
-        });
-
-        if (!hasData) {
-            window.showToast('Wiersz jest pusty - nie ma czego zapisać jako szablon.', 2000);
-            return;
-        }
-
-        pendingTemplateRow = row;
-        const modal = document.getElementById('saveTemplateModal');
-        const input = document.getElementById('templateNameInput') as HTMLInputElement;
-
-        if (modal && input) {
-            input.value = '';
-            modal.style.display = 'flex';
-            input.focus();
-        }
-    };
-
-    /** Zapisuje wiersz jako szablon */
-    const saveRowAsTemplate = (): void => {
-        const input = document.getElementById('templateNameInput') as HTMLInputElement;
-        const modal = document.getElementById('saveTemplateModal');
-
-        if (!input || !pendingTemplateRow) return;
-
-        const name = input.value.trim();
-        if (!name) {
-            window.showToast('Podaj nazwę szablonu.', 2000);
-            return;
-        }
-
-        const period = pendingTemplateRow.dataset.startDate || '';
-        const rowData = appState.changesCells[period] || {};
-
-        // Zbuduj obiekt kolumn
-        const columns: Record<number, string[]> = {};
-        for (let colIdx = 1; colIdx <= 7; colIdx++) {
-            const employees = rowData[colIdx]?.assignedEmployees;
-            if (employees && employees.length > 0) {
-                columns[colIdx] = [...employees];
-            }
-        }
-
-        const template: ChangeTemplate = {
-            id: generateTemplateId(),
-            name,
-            columns,
-            createdAt: new Date().toISOString(),
-        };
-
-        templates.push(template);
-        saveTemplates();
-
-        if (modal) modal.style.display = 'none';
-        pendingTemplateRow = null;
-
-        window.showToast(`Zapisano szablon "${name}".`, 2000);
-    };
-
-    /** Otwiera modal aplikacji szablonu */
-    const openApplyTemplateModal = (row: HTMLTableRowElement): void => {
-        loadTemplates();
-
-        if (templates.length === 0) {
-            window.showToast('Brak szablonów. Uzupełnij jeden okres i kliknij "Zapisz wzór".', 3500);
-            return;
-        }
-
-        pendingTemplateRow = row;
-        const modal = document.getElementById('applyTemplateModal');
-        const select = document.getElementById('templateSelect') as HTMLSelectElement;
-        const preview = document.getElementById('applyTemplatePreview');
-
-        if (modal && select) {
-            // Wypełnij listę szablonów
-            select.innerHTML = '<option value="">-- Wybierz szablon --</option>';
-            templates.forEach(tpl => {
-                const option = document.createElement('option');
-                option.value = tpl.id;
-                option.textContent = tpl.name;
-                select.appendChild(option);
-            });
-
-            // Event na zmianę szablonu - pokaż podgląd
-            select.onchange = () => {
-                const selectedId = select.value;
-                const tpl = templates.find(t => t.id === selectedId);
-
-            if (preview && tpl) {
-                const previewHtml = Object.entries(tpl.columns)
-                    .map(([colIdx, empIds]) => {
-                        const names = (empIds as string[]).map(id => EmployeeManager.getFullNameById(id)).join(', ');
-                        return `<div><strong>${COLUMN_NAMES[Number(colIdx)] || 'Kol. ' + colIdx}:</strong> ${escapeHTML(names)}</div>`;
-                    })
-                    .join('');
-                    preview.innerHTML = previewHtml || '<em>Pusty szablon</em>';
-                } else if (preview) {
-                    preview.innerHTML = '';
-                }
-            };
-
-            if (preview) preview.innerHTML = '';
-            modal.style.display = 'flex';
-        }
-    };
-
-    /** Stosuje wybrany szablon do wiersza */
-    const applyTemplateToRow = (): void => {
-        const select = document.getElementById('templateSelect') as HTMLSelectElement;
-        const modal = document.getElementById('applyTemplateModal');
-
-        if (!select || !pendingTemplateRow) return;
-
-        const selectedId = select.value;
-        const template = templates.find(t => t.id === selectedId);
-
-        if (!template) {
-            window.showToast('Wybierz szablon.', 2000);
-            return;
-        }
-
-        const period = pendingTemplateRow.dataset.startDate || '';
-
-        // Zapisz stan przed zmianą
-        pushUndoState();
-
-        // Zastosuj szablon
-        if (!appState.changesCells[period]) appState.changesCells[period] = {};
-
-        for (let colIdx = 1; colIdx <= 7; colIdx++) {
-            const employees = template.columns[colIdx];
-            if (employees && employees.length > 0) {
-                appState.changesCells[period][colIdx] = {
-                    assignedEmployees: [...employees],
-                };
-            }
-        }
-
-        renderChangesAndSave();
-
-        if (modal) modal.style.display = 'none';
-        pendingTemplateRow = null;
-
-        window.showToast(`Zastosowano szablon "${template.name}".`, 2000);
-    };
-
-    /** Usuwa szablon */
-    const deleteTemplate = (templateId: string): void => {
-        const tpl = templates.find(t => t.id === templateId);
-        if (!tpl) return;
-
-        if (confirm(`Czy na pewno chcesz usunąć szablon "${tpl.name}"?`)) {
-            templates = templates.filter(t => t.id !== templateId);
-            saveTemplates();
-            renderTemplateList();
-            window.showToast('Szablon usunięty.', 2000);
-        }
-    };
-
-    /** Renderuje listę szablonów w modalu zarządzania */
-    const renderTemplateList = (): void => {
-        const list = document.getElementById('templateList');
-        const preview = document.getElementById('templatePreview');
-
-        if (!list) return;
-
-        if (templates.length === 0) {
-            list.innerHTML = `
-                <div class="template-empty">
-                    <i class="fas fa-folder-open"></i>
-                    <p>Brak zapisanych szablonów</p>
-                    <small>Uzupełnij jeden okres i kliknij przy nim "Zapisz wzór".</small>
-                </div>
-            `;
-            return;
-        }
-
-        list.innerHTML = templates.map(tpl => `
-            <div class="template-item" data-template-id="${tpl.id}">
-                <span class="template-item-name">${escapeHTML(tpl.name)}</span>
-                <div class="template-item-actions">
-                    <button class="template-item-btn delete-btn" data-action="delete" title="Usuń"><i class="fas fa-trash"></i></button>
-                </div>
-            </div>
-        `).join('');
-
-        // Event listenery
-        list.querySelectorAll('.template-item').forEach(item => {
-            const itemEl = item as HTMLElement;
-
-            // Kliknięcie na element - pokaż podgląd
-            itemEl.addEventListener('click', (e) => {
-                const target = e.target as HTMLElement;
-                if (target.closest('.template-item-btn')) return; // Ignoruj kliknięcia na przyciski
-
-                const templateId = itemEl.dataset.templateId;
-                const tpl = templates.find(t => t.id === templateId);
-
-                // Oznacz jako wybrany
-                list.querySelectorAll('.template-item').forEach(el => el.classList.remove('selected'));
-                itemEl.classList.add('selected');
-
-                // Pokaż podgląd
-                if (preview && tpl) {
-                    const previewGrid = Object.entries(tpl.columns)
-                        .map(([colIdx, empIds]) => {
-                            const names = (empIds as string[]).map(id => escapeHTML(EmployeeManager.getFullNameById(id))).join('<br>');
-                            return `
-                                <div class="template-preview-cell">
-                                    <div class="template-preview-cell-header">${COLUMN_NAMES[Number(colIdx)] || 'Kol. ' + colIdx}</div>
-                                    <div class="template-preview-cell-content">${names || '—'}</div>
-                                </div>
-                            `;
-                        })
-                        .join('');
-                    preview.innerHTML = `<div class="template-preview-grid">${previewGrid}</div>`;
-                }
-            });
-
-            // Przycisk usuń
-            itemEl.querySelector('.delete-btn')?.addEventListener('click', () => {
-                const templateId = itemEl.dataset.templateId;
-                if (templateId) deleteTemplate(templateId);
-            });
-        });
-    };
-
-    /** Otwiera modal zarządzania szablonami */
-    const openTemplateManagerModal = (): void => {
-        loadTemplates();
-        renderTemplateList();
-
-        const modal = document.getElementById('templateModal');
-        const preview = document.getElementById('templatePreview');
-
-        if (preview) {
-            preview.innerHTML = '<p class="template-placeholder">Wybierz szablon, aby zobaczyć podgląd</p>';
-        }
-
-        if (modal) {
-            modal.style.display = 'flex';
-        }
-    };
-
-    /** Inicjalizuje UI szablonów */
-    const initTemplateUI = (): void => {
-        loadTemplates();
-
-        // Modal zarządzania szablonami - przycisk zamknij
-        document.getElementById('closeTemplateModal')?.addEventListener('click', () => {
-            const modal = document.getElementById('templateModal');
-            if (modal) modal.style.display = 'none';
-        });
-
-        // Modal zapisu szablonu
-        document.getElementById('confirmSaveTemplate')?.addEventListener('click', saveRowAsTemplate);
-        document.getElementById('cancelSaveTemplate')?.addEventListener('click', () => {
-            const modal = document.getElementById('saveTemplateModal');
-            if (modal) modal.style.display = 'none';
-            pendingTemplateRow = null;
-        });
-
-        // Modal aplikacji szablonu
-        document.getElementById('confirmApplyTemplate')?.addEventListener('click', applyTemplateToRow);
-        document.getElementById('cancelApplyTemplate')?.addEventListener('click', () => {
-            const modal = document.getElementById('applyTemplateModal');
-            if (modal) modal.style.display = 'none';
-            pendingTemplateRow = null;
-        });
-
-        // Przycisk "Zaplanuj obsadę" prowadzi do testowego generatora rotacji.
-        document.getElementById('quickPlanningBtn')?.addEventListener('click', () => {
-            window.location.hash = 'changes-rotation';
-        });
-    };
-
-    const getCurrentPeriods = (): { value: string; label: string }[] => {
-        const periods = generateTwoWeekPeriods(currentYear);
-        return periods.map(p => ({
-            value: p.start,
-            label: `${formatDate(new Date(p.start))} - ${formatDate(new Date(p.end))}`,
-        }));
-    };
-
-    const formatDate = (date: Date): string => {
-        const day = date.getUTCDate().toString().padStart(2, '0');
-        const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
-        return `${day}.${month}`;
-    };
-
-    const periodHasAssignments = (periodKey: string): boolean => {
-        const periodCells = appState.changesCells[periodKey] || {};
-        for (let colIdx = 1; colIdx <= EDITABLE_COLUMN_COUNT; colIdx++) {
-            if ((periodCells[colIdx]?.assignedEmployees || []).length > 0) {
-                return true;
-            }
-        }
-        return false;
-    };
-
-    const getCurrentPeriodIndex = (periods: { value: string; label: string }[]): number => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const fullPeriods = generateTwoWeekPeriods(currentYear);
-
-        const currentIndex = periods.findIndex((period) => {
-            const sourcePeriod = fullPeriods.find((item) => item.start === period.value);
-            if (!sourcePeriod) return false;
-            const start = new Date(sourcePeriod.start);
-            const end = new Date(sourcePeriod.end);
-            return today >= start && today <= end;
-        });
-
-        if (currentIndex >= 0) return currentIndex;
-
-        const nextIndex = periods.findIndex((period) => new Date(period.value) >= today);
-        return nextIndex >= 0 ? nextIndex : Math.max(periods.length - 1, 0);
-    };
-
-    const openMultiPeriodModal = (): void => {
-        loadTemplates();
-
-        if (templates.length === 0) {
-            window.showToast('Brak zapisanych szablonów. Najpierw zapisz szablon z istniejącego wiersza.', 3000);
-            return;
-        }
-
-        const modal = document.getElementById('multiPeriodTemplateModal');
-        const templateSelect = document.getElementById('multiTemplateSelect') as HTMLSelectElement;
-        const periodFromSelect = document.getElementById('periodFromSelect') as HTMLSelectElement;
-        const periodToSelect = document.getElementById('periodToSelect') as HTMLSelectElement;
-        const overwriteModeSelect = document.getElementById('overwriteModeSelect') as HTMLSelectElement | null;
-        const preview = document.getElementById('multiTemplatePreview');
-
-        if (!modal || !templateSelect || !periodFromSelect || !periodToSelect) return;
-
-        // Wypełnij listę szablonów
-        templateSelect.innerHTML = '<option value="">-- Wybierz szablon --</option>';
-        templates.forEach(tpl => {
-            const option = document.createElement('option');
-            option.value = tpl.id;
-            option.textContent = tpl.name;
-            templateSelect.appendChild(option);
-        });
-
-        // Wypełnij listę okresów
-        const periods = getCurrentPeriods();
-        const periodOptionsHtml = '<option value="">-- Wybierz --</option>' +
-            periods.map(p => `<option value="${p.value}">${p.label}</option>`).join('');
-
-        periodFromSelect.innerHTML = periodOptionsHtml;
-        periodToSelect.innerHTML = periodOptionsHtml;
-
-        const renderTemplatePreview = (): void => {
-            const selectedId = templateSelect.value;
-            const tpl = templates.find(t => t.id === selectedId);
-
-            if (preview && tpl) {
-                const previewHtml = Object.entries(tpl.columns)
-                    .map(([colIdx, empIds]) => {
-                        const names = (empIds as string[]).map(id => EmployeeManager.getFullNameById(id)).join(', ');
-                        return `<div><strong>${COLUMN_NAMES[Number(colIdx)] || 'Kol. ' + colIdx}:</strong> ${escapeHTML(names)}</div>`;
-                    })
-                    .join('');
-                preview.innerHTML = previewHtml || '<em>Pusty szablon</em>';
-            } else if (preview) {
-                preview.innerHTML = '';
-            }
-        };
-
-        // Event na zmianę szablonu - pokaż podgląd
-        templateSelect.onchange = renderTemplatePreview;
-
-        // Eventy na zmianę okresów - aktualizuj licznik
-        const updatePeriodsCount = (): void => {
-            const fromValue = periodFromSelect.value;
-            const toValue = periodToSelect.value;
-            const countSpan = document.getElementById('selectedPeriodsCount');
-
-            if (!fromValue || !toValue || !countSpan) {
-                if (countSpan) countSpan.textContent = 'Wybrano: 0 okresów';
-                return;
-            }
-
-            const periods = getCurrentPeriods();
-            const fromIndex = periods.findIndex(p => p.value === fromValue);
-            const toIndex = periods.findIndex(p => p.value === toValue);
-
-            if (fromIndex === -1 || toIndex === -1 || fromIndex > toIndex) {
-                countSpan.textContent = 'Wybrano: 0 okresów';
-                return;
-            }
-
-            const count = toIndex - fromIndex + 1;
-            const occupiedCount = periods
-                .slice(fromIndex, toIndex + 1)
-                .filter((period) => periodHasAssignments(period.value)).length;
-            const occupiedText = occupiedCount > 0 ? `, ${occupiedCount} z obsadą` : '';
-            countSpan.textContent = `Wybrano: ${count} ${count === 1 ? 'okres' : count < 5 ? 'okresy' : 'okresów'}${occupiedText}`;
-        };
-
-        periodFromSelect.onchange = updatePeriodsCount;
-        periodToSelect.onchange = updatePeriodsCount;
-
-        const setQuickRange = (range: string): void => {
-            const startIndex = getCurrentPeriodIndex(periods);
-            let endIndex = startIndex;
-
-            if (range === 'next3') {
-                endIndex = Math.min(startIndex + 2, periods.length - 1);
-            } else if (range === 'yearEnd') {
-                endIndex = periods.length - 1;
-            }
-
-            periodFromSelect.value = periods[startIndex]?.value || '';
-            periodToSelect.value = periods[endIndex]?.value || '';
-            updatePeriodsCount();
-        };
-
-        document.querySelectorAll<HTMLButtonElement>('.quick-range-btn').forEach((button) => {
-            button.onclick = () => setQuickRange(button.dataset.range || 'current');
-        });
-
-        // Reset
-        templateSelect.value = templates[0]?.id || '';
-        if (overwriteModeSelect) overwriteModeSelect.value = 'replace';
-        setQuickRange('current');
-        renderTemplatePreview();
-        document.getElementById('selectedPeriodsCount')!.textContent = 'Wybrano: 0 okresów';
-        updatePeriodsCount();
-
-        modal.style.display = 'flex';
-    };
-
-    /** Stosuje szablon do wielu okresów */
-    const applyTemplateToMultiplePeriods = (): void => {
-        const templateSelect = document.getElementById('multiTemplateSelect') as HTMLSelectElement;
-        const periodFromSelect = document.getElementById('periodFromSelect') as HTMLSelectElement;
-        const periodToSelect = document.getElementById('periodToSelect') as HTMLSelectElement;
-        const overwriteModeSelect = document.getElementById('overwriteModeSelect') as HTMLSelectElement | null;
-        const modal = document.getElementById('multiPeriodTemplateModal');
-
-        if (!templateSelect || !periodFromSelect || !periodToSelect) return;
-
-        const selectedTemplateId = templateSelect.value;
-        const template = templates.find(t => t.id === selectedTemplateId);
-
-        if (!template) {
-            window.showToast('Wybierz szablon.', 2000);
-            return;
-        }
-
-        const fromValue = periodFromSelect.value;
-        const toValue = periodToSelect.value;
-
-        if (!fromValue || !toValue) {
-            window.showToast('Wybierz zakres okresów.', 2000);
-            return;
-        }
-
-        const periods = getCurrentPeriods();
-        const fromIndex = periods.findIndex(p => p.value === fromValue);
-        const toIndex = periods.findIndex(p => p.value === toValue);
-
-        if (fromIndex === -1 || toIndex === -1 || fromIndex > toIndex) {
-            window.showToast('Nieprawidłowy zakres okresów.', 2000);
-            return;
-        }
-
-        const selectedPeriods = periods.slice(fromIndex, toIndex + 1);
-        const occupiedPeriods = selectedPeriods.filter((period) => periodHasAssignments(period.value));
-        const overwriteMode = overwriteModeSelect?.value || 'replace';
-
-        if (occupiedPeriods.length > 0 && overwriteMode === 'replace') {
-            const shouldContinue = confirm(`${occupiedPeriods.length} okresów ma już obsadę. Nadpisać je wybranym szablonem?`);
-            if (!shouldContinue) return;
-        }
-
-        // Zapisz stan przed zmianą
-        pushUndoState();
-
-        // Zastosuj szablon do każdego okresu w zakresie
-        let appliedCount = 0;
-        let skippedCount = 0;
-        for (const selectedPeriod of selectedPeriods) {
-            const periodKey = selectedPeriod.value;
-
-            if (overwriteMode === 'skip' && periodHasAssignments(periodKey)) {
-                skippedCount++;
-                continue;
-            }
-
-            if (!appState.changesCells[periodKey]) {
-                appState.changesCells[periodKey] = {};
-            }
-
-            for (let colIdx = 1; colIdx <= EDITABLE_COLUMN_COUNT; colIdx++) {
-                const employees = template.columns[colIdx];
-                if (employees && employees.length > 0) {
-                    appState.changesCells[periodKey][colIdx] = {
-                        assignedEmployees: [...employees],
-                    };
-                }
-            }
-            appliedCount++;
-        }
-
-        renderChangesAndSave();
-
-        if (modal) modal.style.display = 'none';
-
-        const skippedText = skippedCount > 0 ? ` Pominięto ${skippedCount}.` : '';
-        window.showToast(`Zastosowano szablon "${template.name}" do ${appliedCount} ${appliedCount === 1 ? 'okresu' : 'okresów'}.${skippedText}`, 3500);
-    };
-
-    void openMultiPeriodModal;
-    void applyTemplateToMultiplePeriods;
-    void copyRowToClipboard;
-    void pasteRowFromClipboard;
-    void openSaveTemplateModal;
-    void openApplyTemplateModal;
-    void openTemplateManagerModal;
-    const generateTwoWeekPeriods = (year: number): Period[] => {
-        const periods: Period[] = [];
-        let currentDate = new Date(Date.UTC(year, 0, 1));
-
-        while (currentDate.getUTCDay() !== 1) {
-            currentDate.setUTCDate(currentDate.getUTCDate() - 1);
-        }
-
-        while (currentDate.getUTCFullYear() <= year) {
-            const startDate = new Date(currentDate);
-            let endDate = new Date(startDate);
-            let workDaysCount = 0;
-
-            while (workDaysCount < 10) {
-                if (!isWeekend(endDate)) {
-                    workDaysCount++;
-                }
-                if (workDaysCount < 10) {
-                    endDate.setUTCDate(endDate.getUTCDate() + 1);
-                }
-            }
-
-            periods.push({
-                start: startDate.toISOString().split('T')[0],
-                end: endDate.toISOString().split('T')[0],
-            });
-
-            currentDate = new Date(endDate);
-            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
-            while (isWeekend(currentDate)) {
-                currentDate.setUTCDate(currentDate.getUTCDate() + 1);
-            }
-        }
-        return periods;
     };
 
     const renderTable = (periods: Period[]): void => {
@@ -928,8 +120,8 @@ export const Changes: ChangesAPI = (() => {
             tr.dataset.startDate = period.start;
             tr.dataset.endDate = period.end;
             tr.dataset.periodIndex = String(index);
-            const start = new Date(period.start);
-            const end = new Date(period.end);
+            const start = toUTCDate(period.start);
+            const end = toUTCDate(period.end);
 
             tr.innerHTML = `
                 <td class="period-cell">
@@ -941,8 +133,6 @@ export const Changes: ChangesAPI = (() => {
             `;
             changesTableBody!.appendChild(tr);
         });
-
-        setActiveCell(null);
     };
 
     const getAllLeavesData = async (): Promise<Record<string, unknown>> => {
@@ -958,13 +148,13 @@ export const Changes: ChangesAPI = (() => {
     };
 
     const populateLeavesColumn = (allLeavesData: Record<string, unknown>): void => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const now = new Date();
+        const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
 
         document.querySelectorAll('#changesTableBody tr').forEach((row) => {
             const tr = row as HTMLTableRowElement;
-            const periodStart = new Date(tr.dataset.startDate || '');
-            const periodEnd = new Date(tr.dataset.endDate || '');
+            const periodStart = toUTCDate(tr.dataset.startDate || '');
+            const periodEnd = toUTCDate(tr.dataset.endDate || '');
             const leavesCell = tr.querySelector('.leaves-cell');
             if (!leavesCell) return;
 
@@ -981,38 +171,30 @@ export const Changes: ChangesAPI = (() => {
 
                 if (Array.isArray(employeeLeaves)) {
                     employeeLeaves.forEach((leave) => {
-                        const leaveStart = new Date(leave.startDate);
-                        const leaveEnd = new Date(leave.endDate);
+                        const leaveStart = toUTCDate(leave.startDate);
+                        const leaveEnd = toUTCDate(leave.endDate);
 
-                        // Sprawdź czy urlop pokrywa się z tym okresem
                         if (leave.type === 'vacation' && !(leaveEnd < periodStart || leaveStart > periodEnd)) {
                             const lastName = EmployeeManager.getLastNameById(employeeId);
-
-                            // Formatuj datę końca urlopu
-                            const endDay = leaveEnd.getDate().toString().padStart(2, '0');
-                            const endMonth = (leaveEnd.getMonth() + 1).toString().padStart(2, '0');
+                            const endDay = leaveEnd.getUTCDate().toString().padStart(2, '0');
+                            const endMonth = (leaveEnd.getUTCMonth() + 1).toString().padStart(2, '0');
 
                             let dateRange = '';
-                            let tooltipText = `Urlop: ${leave.startDate} - ${leave.endDate}`;
+                            const tooltipText = `Urlop: ${leave.startDate} - ${leave.endDate}`;
 
-                            // Sprawdź czy urlop zaczął się PRZED początkiem tego okresu
                             if (leaveStart < periodStart) {
-                                // Urlop zaczął się wcześniej - pokazuj "do XX.XX"
                                 dateRange = `do ${endDay}.${endMonth}`;
                             } else {
-                                // Urlop zaczyna się w tym okresie - pokazuj pełny zakres
-                                const startDay = leaveStart.getDate().toString().padStart(2, '0');
-                                const startMonth = (leaveStart.getMonth() + 1).toString().padStart(2, '0');
+                                const startDay = leaveStart.getUTCDate().toString().padStart(2, '0');
+                                const startMonth = (leaveStart.getUTCMonth() + 1).toString().padStart(2, '0');
 
                                 if (startMonth === endMonth) {
-                                    // Ten sam miesiąc
                                     if (startDay === endDay) {
                                         dateRange = `${startDay}.${startMonth}`;
                                     } else {
                                         dateRange = `${startDay}-${endDay}.${startMonth}`;
                                     }
                                 } else {
-                                    // Różne miesiące
                                     dateRange = `${startDay}.${startMonth}-${endDay}.${endMonth}`;
                                 }
                             }
@@ -1026,8 +208,7 @@ export const Changes: ChangesAPI = (() => {
             leavesCell.innerHTML = leavesHtml;
 
             if (periodEnd < today) {
-                tr.classList.add('past-period');
-                tr.classList.add('collapsed');
+                tr.classList.add('past-period', 'collapsed');
                 tr.classList.remove('expanded');
             } else {
                 tr.classList.add('expanded');
@@ -1036,470 +217,20 @@ export const Changes: ChangesAPI = (() => {
         });
     };
 
-    /**
-     * Ustawia aktywną (zaznaczoną) komórkę
-     */
-    const setActiveCell = (cell: HTMLTableCellElement | null): void => {
-        // Usuń zaznaczenie z poprzedniej komórki i wiersza
-        if (activeCell) {
-            activeCell.classList.remove('active-cell');
-            const prevRow = activeCell.closest('tr');
-            if (prevRow) prevRow.classList.remove('has-active-cell');
-        }
-
-        activeCell = cell;
-
-        // Dodaj zaznaczenie do nowej komórki i wiersza
-        if (activeCell) {
-            activeCell.classList.add('active-cell');
-            activeCell.focus();
-            const newRow = activeCell.closest('tr');
-            if (newRow) newRow.classList.add('has-active-cell');
-        }
-    };
-
-    /**
-     * Obsługuje klawisze na zaznaczonej komórce
-     */
-    const handleKeyDown = (event: KeyboardEvent): void => {
-        // Ctrl+S - Szybki zapis
-        if ((event.ctrlKey || event.metaKey) && event.key === 's') {
-            event.preventDefault();
-            saveChanges();
-            window.showToast('Zapisano zmiany.', 2000);
-            return;
-        }
-
-        // Ctrl+Z - Cofnij
-        if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
-            event.preventDefault();
-            undoLastChange();
-            return;
-        }
-
-        // Ctrl+C - Kopiuj
-        if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
-            if (activeCell && activeCell.cellIndex !== 0) {
-                copyCell(activeCell);
-            }
-            return;
-        }
-
-        // Ctrl+V - Wklej
-        if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
-            event.preventDefault();
-            if (!clipboard) {
-                window.showToast('Brak skopiowanej komórki.', 2000);
-                return;
-            }
-
-            if (activeCell && activeCell.cellIndex !== 0) {
-                pasteCell(activeCell);
-            }
-            return;
-        }
-
-        if (!activeCell) return;
-
-        // Tab - Następna komórka
-        if (event.key === 'Tab') {
-            event.preventDefault();
-            navigateWithArrows(event.shiftKey ? 'ArrowLeft' : 'ArrowRight');
-            return;
-        }
-
-        // Delete/Backspace - Wyczyść komórkę
-        if (event.key === 'Delete' || event.key === 'Backspace') {
-            event.preventDefault();
-            if (activeCell.cellIndex !== 0) {
-                clearCell(activeCell);
-            }
-            return;
-        }
-
-        // Escape - Odznacz komórkę i wyczyść multi-select
-        if (event.key === 'Escape') {
-            setActiveCell(null);
-            clearMultiSelection();
-            return;
-        }
-
-        // Nawigacja strzałkami
-        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
-            event.preventDefault();
-            navigateWithArrows(event.key);
-        }
-    };
-
-    /**
-     * Nawigacja strzałkami między komórkami
-     */
-    const navigateWithArrows = (key: string): void => {
-        if (!activeCell) return;
-
-        const row = activeCell.parentElement as HTMLTableRowElement;
-        const cellIndex = activeCell.cellIndex;
-        let newCell: HTMLTableCellElement | null = null;
-
-        switch (key) {
-            case 'ArrowUp': {
-                const prevRow = row.previousElementSibling as HTMLTableRowElement | null;
-                if (prevRow) {
-                    newCell = prevRow.cells[cellIndex] || null;
-                }
-                break;
-            }
-            case 'ArrowDown': {
-                const nextRow = row.nextElementSibling as HTMLTableRowElement | null;
-                if (nextRow) {
-                    newCell = nextRow.cells[cellIndex] || null;
-                }
-                break;
-            }
-            case 'ArrowLeft': {
-                if (cellIndex > 1) { // Pomijamy kolumnę dat (index 0)
-                    newCell = row.cells[cellIndex - 1] || null;
-                }
-                break;
-            }
-            case 'ArrowRight': {
-                if (cellIndex < row.cells.length - 1 && cellIndex < 8) { // Pomijamy kolumnę urlopów (index 8)
-                    newCell = row.cells[cellIndex + 1] || null;
-                }
-                break;
-            }
-        }
-
-        if (newCell && !newCell.classList.contains('leaves-cell') && newCell.cellIndex !== 0) {
-            setActiveCell(newCell);
-        }
-    };
-
-    const openEmployeeSelectionModal = (cell: HTMLTableCellElement): void => {
-        const modal = document.getElementById('employeeSelectionModal');
-        const employeeListDiv = document.getElementById('employeeList');
-        const saveBtn = document.getElementById('saveEmployeeSelection');
-        const cancelBtn = document.getElementById('cancelEmployeeSelection');
-        const searchInput = document.getElementById('employeeSearchInput') as HTMLInputElement | null;
-        const selectedSummary = document.getElementById('selectedEmployeeSummary');
-
-        if (!modal || !employeeListDiv || !saveBtn || !cancelBtn || !searchInput) return;
-
-        employeeListDiv.innerHTML = '';
-        searchInput.value = '';
-
-        const allEmployees = EmployeeManager.getAll();
-        if (Object.keys(allEmployees).length === 0) {
-            employeeListDiv.innerHTML = '<p style="text-align: center; color: var(--color-gray-500); padding: 20px;">Brak pracowników do wyświetlenia.</p>';
-            modal.style.display = 'flex';
-            cancelBtn.onclick = () => { modal.style.display = 'none'; };
-            return;
-        }
-        const visibleEmployeesIds = Object.keys(allEmployees).filter((id) => {
-            const emp = allEmployees[id];
-            return !emp.isHidden && !emp.isScheduleOnly;
-        });
-
-        const row = cell.parentElement as HTMLTableRowElement;
-        const period = row.dataset.startDate || '';
-        const columnIndex = cell.cellIndex;
-        const cellState = appState.changesCells[period]?.[columnIndex] || {};
-        const assignedEmployees = new Set(cellState.assignedEmployees || []);
-
-        // Zbierz wszystkich pracowników już przypisanych w innych komórkach tego wiersza
-        const employeesInOtherCells = new Set<string>();
-        const periodCells = appState.changesCells[period] || {};
-        for (const colIdx in periodCells) {
-            if (Number(colIdx) !== columnIndex) {
-                const otherCellEmployees = periodCells[Number(colIdx)]?.assignedEmployees || [];
-                otherCellEmployees.forEach((empId: string) => employeesInOtherCells.add(empId));
-            }
-        }
-
-        // Grupowanie
-        const groups: Record<string, string[]> = {
-            first: [],
-            second: [],
-            other: [],
-        };
-
-        // Sortowanie alfabetyczne
-        visibleEmployeesIds.sort((a, b) => EmployeeManager.compareEmployees(allEmployees[a], allEmployees[b]));
-
-        visibleEmployeesIds.forEach((id) => {
-            const group = allEmployees[id].shiftGroup || 'other';
-            if (groups[group]) groups[group].push(id);
-            else groups.other.push(id);
-        });
-
-        // Tymczasowe przechowywanie zastępstw (przed zapisem)
-        const tempSubstitutes: Record<string, string> = { ...(cellState.substitutes || {}) };
-        const periodEnd = row.dataset.endDate || '';
-
-        const updateSelectedSummary = (): void => {
-            if (!selectedSummary) return;
-            const selectedNames = Array.from(employeeListDiv.querySelectorAll('.selected-employee'))
-                .map((el) => (el as HTMLElement).dataset.employeeId)
-                .filter((id): id is string => !!id)
-                .map((id) => EmployeeManager.getLastNameById(id) || EmployeeManager.getFullNameById(id));
-
-            selectedSummary.textContent = selectedNames.length > 0
-                ? `Wybrano: ${selectedNames.length} - ${selectedNames.join(', ')}`
-                : 'Wybrano: 0 pracowników';
-        };
-
-        const renderGroup = (title: string, ids: string[]) => {
-            if (ids.length === 0) return;
-            const header = document.createElement('div');
-            header.className = 'employee-group-header';
-            header.textContent = title;
-            employeeListDiv.appendChild(header);
-
-            ids.forEach((id) => {
-                const employeeEl = document.createElement('div');
-                employeeEl.classList.add('employee-list-item');
-
-                const nameSpan = document.createElement('span');
-                nameSpan.textContent = EmployeeManager.getFullNameById(id);
-                employeeEl.appendChild(nameSpan);
-                employeeEl.dataset.employeeId = id;
-
-                const isOnLeave = isEmployeeOnLeave(id, period, periodEnd);
-
-                if (assignedEmployees.has(id)) {
-                    employeeEl.classList.add('selected-employee');
-
-                    // Jeśli pracownik jest na urlopie, dodaj UI do wyboru zastępcy
-                    if (isOnLeave) {
-                        employeeEl.classList.add('on-leave');
-                        nameSpan.innerHTML = `⚠ ${EmployeeManager.getFullNameById(id)} <small>(urlop)</small>`;
-
-                        const substituteContainer = document.createElement('div');
-                        substituteContainer.className = 'substitute-selector';
-
-                        const substituteSelect = document.createElement('select');
-                        substituteSelect.className = 'substitute-select';
-                        substituteSelect.innerHTML = '<option value="">-- Wybierz zastępcę --</option>';
-
-                        // Dodaj dostępnych pracowników do selecta
-                        visibleEmployeesIds
-                            .filter(empId => empId !== id && !assignedEmployees.has(empId))
-                            .forEach(empId => {
-                                const opt = document.createElement('option');
-                                opt.value = empId;
-                                opt.textContent = EmployeeManager.getFullNameById(empId);
-                                if (tempSubstitutes[id] === empId) {
-                                    opt.selected = true;
-                                }
-                                substituteSelect.appendChild(opt);
-                            });
-
-                        substituteSelect.addEventListener('change', (e) => {
-                            const value = (e.target as HTMLSelectElement).value;
-                            if (value) {
-                                tempSubstitutes[id] = value;
-                            } else {
-                                delete tempSubstitutes[id];
-                            }
-                        });
-
-                        substituteContainer.appendChild(substituteSelect);
-                        employeeEl.appendChild(substituteContainer);
-                    }
-                } else if (employeesInOtherCells.has(id)) {
-                    employeeEl.classList.add('disabled-employee');
-                    employeeEl.setAttribute('title', 'Pracownik jest już przypisany do innej kolumny w tym okresie');
-                } else if (isOnLeave) {
-                    // Nieprzypisany pracownik na urlopie - oznacz ale pozwól kliknąć
-                    nameSpan.innerHTML = `<span style="color: var(--color-warning);">⚠</span> ${EmployeeManager.getFullNameById(id)} <small style="color: var(--color-gray-400);">(urlop)</small>`;
-                }
-
-                employeeEl.addEventListener('click', (e) => {
-                    // Nie pozwól kliknąć na wyszarzonych
-                    if (employeeEl.classList.contains('disabled-employee')) return;
-                    // Nie przełączaj jeśli kliknięto w select
-                    if ((e.target as HTMLElement).tagName === 'SELECT' || (e.target as HTMLElement).tagName === 'OPTION') return;
-                    employeeEl.classList.toggle('selected-employee');
-                    updateSelectedSummary();
-                });
-
-                employeeListDiv.appendChild(employeeEl);
-            });
-        };
-
-        renderGroup('Pierwsza zmiana', groups.first);
-        renderGroup('Druga zmiana', groups.second);
-        renderGroup('Pozostali', groups.other);
-        updateSelectedSummary();
-
-        const filterEmployees = (): void => {
-            const searchTerm = searchInput.value.toLowerCase();
-
-            // 1. Filtruj elementy
-            employeeListDiv.querySelectorAll('.employee-list-item').forEach((item) => {
-                const el = item as HTMLElement;
-                const matches = !!el.textContent?.toLowerCase().includes(searchTerm);
-                el.style.display = matches ? '' : 'none';
-                el.dataset.visible = matches ? 'true' : 'false';
-            });
-
-            // 2. Obsłuż nagłówki
-            let currentHeader: HTMLElement | null = null;
-            let hasVisibleItems = false;
-
-            Array.from(employeeListDiv.children).forEach(child => {
-                if (child.classList.contains('employee-group-header')) {
-                    if (currentHeader) {
-                        currentHeader.style.display = hasVisibleItems ? '' : 'none';
-                    }
-                    currentHeader = child as HTMLElement;
-                    hasVisibleItems = false;
-                } else if (child.classList.contains('employee-list-item')) {
-                    if ((child as HTMLElement).dataset.visible === 'true') {
-                        hasVisibleItems = true;
-                    }
-                }
-            });
-            // Ostatni nagłówek
-            if (currentHeader) {
-                (currentHeader as HTMLElement).style.display = hasVisibleItems ? '' : 'none';
-            }
-        };
-
-        searchInput.addEventListener('input', filterEmployees);
-        modal.style.display = 'flex';
-
-        const closeModal = (): void => {
-            modal.style.display = 'none';
-            saveBtn.onclick = null;
-            cancelBtn.onclick = null;
-            searchInput.removeEventListener('input', filterEmployees);
-        };
-
-        saveBtn.onclick = (): void => {
-            const selectedEmployees: string[] = [];
-            employeeListDiv.querySelectorAll('.selected-employee').forEach((el) => {
-                const empEl = el as HTMLElement;
-                if (empEl.dataset.employeeId) {
-                    selectedEmployees.push(empEl.dataset.employeeId);
-                }
-            });
-
-            // Usuń zastępstwa dla pracowników, którzy nie są już przypisani
-            const validSubstitutes: Record<string, string> = {};
-            for (const empId of selectedEmployees) {
-                if (tempSubstitutes[empId]) {
-                    validSubstitutes[empId] = tempSubstitutes[empId];
-                }
-            }
-
-            updateCellState(cell, (state) => {
-                state.assignedEmployees = selectedEmployees;
-                // Firestore nie akceptuje undefined - usuwamy pole jeśli puste
-                if (Object.keys(validSubstitutes).length > 0) {
-                    state.substitutes = validSubstitutes;
-                } else {
-                    delete state.substitutes;
-                }
-            });
-            window.showToast('Zapisano zmiany.');
-            closeModal();
-        };
-
-        cancelBtn.onclick = closeModal;
-    };
-
-    /**
-     * Zapisuje aktualny stan do stosu Undo
-     */
-    const pushUndoState = (): void => {
-        const stateSnapshot = JSON.stringify(appState.changesCells);
-        undoStack.push(stateSnapshot);
-        if (undoStack.length > MAX_UNDO_STACK) {
-            undoStack.shift();
-        }
-    };
-
-    /**
-     * Cofa ostatnią zmianę
-     */
-    const undoLastChange = (): void => {
-        if (undoStack.length === 0) {
-            window.showToast('Brak zmian do cofnięcia.', 2000);
-            return;
-        }
-        const previousState = undoStack.pop();
-        if (previousState) {
-            appState.changesCells = JSON.parse(previousState);
-            renderChangesContent();
-            saveChanges();
-            window.showToast('Cofnięto zmianę.', 2000);
-        }
-    };
-
-    /**
-     * Czyści zaznaczenie wielu komórek
-     */
-    const clearMultiSelection = (): void => {
-        multiSelectedCells.forEach(cell => cell.classList.remove('multi-selected'));
-        multiSelectedCells.clear();
-    };
-
-    /**
-     * Dodaje/usuwa komórkę z zaznaczenia wielokrotnego
-     */
-    const toggleMultiSelection = (cell: HTMLTableCellElement): void => {
-        if (multiSelectedCells.has(cell)) {
-            multiSelectedCells.delete(cell);
-            cell.classList.remove('multi-selected');
-        } else {
-            multiSelectedCells.add(cell);
-            cell.classList.add('multi-selected');
-        }
-    };
-    void openEmployeeSelectionModal;
-    void toggleMultiSelection;
-
-    const updateCellState = (cell: HTMLTableCellElement, updateFn: (state: ChangesCellState) => void): void => {
-        if (!cell) return;
-        const period = (cell.parentElement as HTMLTableRowElement).dataset.startDate;
-        if (!period) return;
-
-        // Zapisz stan przed zmianą dla możliwości cofnięcia
-        pushUndoState();
-
-        const columnIndex = cell.cellIndex;
-        if (!appState.changesCells[period]) appState.changesCells[period] = {};
-        let cellState = appState.changesCells[period][columnIndex] || {};
-
-        updateFn(cellState);
-
-        appState.changesCells[period][columnIndex] = cellState;
-        renderChangesAndSave();
-    };
-
-    const saveChanges = async (): Promise<void> => {
-        try {
-            await db.collection(AppConfig.firestore.collections.schedules)
-                .doc(`changesSchedule_${currentYear}`)
-                .set(appState, { merge: true });
-            window.setSaveStatus('saved');
-        } catch (error) {
-            console.error('Error saving changes to Firestore:', error);
-            window.setSaveStatus('error');
-        }
-    };
-
     const loadChanges = async (): Promise<void> => {
         try {
             const docRef = db.collection(AppConfig.firestore.collections.schedules).doc(`changesSchedule_${currentYear}`);
-            const docSnap = await docRef.get();
-            if (docSnap.exists) {
-                const savedData = docSnap.data() as AppState | undefined;
-                appState.changesCells = savedData?.changesCells || {};
-            } else {
-                appState.changesCells = {};
-            }
+            const prevDocRef = db.collection(AppConfig.firestore.collections.schedules).doc(`changesSchedule_${currentYear - 1}`);
+            const [docSnap, prevDocSnap] = await Promise.all([docRef.get(), prevDocRef.get()]);
+
+            const savedData = docSnap.exists ? (docSnap.data() as AppState | undefined) : undefined;
+            const prevSavedData = prevDocSnap.exists ? (prevDocSnap.data() as AppState | undefined) : undefined;
+
+            const mergedCells: Record<string, Record<number, ChangesCellState>> = {
+                ...(prevSavedData?.changesCells || {}),
+                ...(savedData?.changesCells || {}),
+            };
+            appState.changesCells = mergedCells;
         } catch (error) {
             console.error('Error loading changes from Firestore:', error);
         }
@@ -1509,8 +240,8 @@ export const Changes: ChangesAPI = (() => {
      * Pobiera listę pracowników na urlopie w danym okresie
      */
     const getEmployeesOnLeaveForPeriod = (periodStart: string, periodEnd: string): string[] => {
-        const start = new Date(periodStart);
-        const end = new Date(periodEnd);
+        const start = toUTCDate(periodStart);
+        const end = toUTCDate(periodEnd);
         const employeesOnLeave: string[] = [];
         const employees = EmployeeManager.getAll();
 
@@ -1524,18 +255,16 @@ export const Changes: ChangesAPI = (() => {
             const employeeLeaves = cachedLeavesData[employeeName];
             if (!Array.isArray(employeeLeaves)) continue;
 
-            // Sprawdź czy pracownik ma urlop pokrywający się z tym okresem
             for (const leave of employeeLeaves) {
                 if (leave.type !== 'vacation') continue;
 
-                const leaveStart = new Date(leave.startDate);
-                const leaveEnd = new Date(leave.endDate);
+                const leaveStart = toUTCDate(leave.startDate);
+                const leaveEnd = toUTCDate(leave.endDate);
 
-                // Sprawdź czy urlop pokrywa się z okresem
                 if (!(leaveEnd < start || leaveStart > end)) {
                     const lastName = EmployeeManager.getLastNameById(employeeId);
                     employeesOnLeave.push(lastName || employeeName);
-                    break; // Pracownik już dodany, przejdź do następnego
+                    break;
                 }
             }
         }
@@ -1548,11 +277,9 @@ export const Changes: ChangesAPI = (() => {
             const period = tr.dataset.startDate || '';
             const periodEnd = tr.dataset.endDate || '';
 
-            // Pobierz pracowników na urlopie dla tego okresu
             const employeesOnLeave = getEmployeesOnLeaveForPeriod(period, periodEnd);
 
             Array.from(tr.cells).forEach((cell, index) => {
-                // Ignoruj pierwszą kolumnę (daty), urlopy i akcje
                 if (index === 0 || cell.classList.contains('leaves-cell')) return;
 
                 const hasAssignedEmployees =
@@ -1560,7 +287,6 @@ export const Changes: ChangesAPI = (() => {
                     appState.changesCells[period][index].assignedEmployees!.length > 0;
 
                 if (hasAssignedEmployees) {
-                    // Komórka ma przypisanych pracowników - wyświetl ich
                     const cellState = appState.changesCells[period][index];
                     const assignedIds = cellState.assignedEmployees!;
                     const substitutes = cellState.substitutes || {};
@@ -1571,27 +297,22 @@ export const Changes: ChangesAPI = (() => {
                         const substituteId = substitutes[id];
 
                         if (isOnLeave && substituteId) {
-                            // Pracownik na urlopie z zastępcą
                             const substituteName = escapeHTML(EmployeeManager.getFullNameById(substituteId));
                             return `<span class="employee-on-leave">${name}</span> <span class="substitute-separator">/</span> <span class="substitute-name">${substituteName}</span>`;
                         } else if (isOnLeave) {
-                            // Pracownik na urlopie bez zastępcy
-                            return `<span class="employee-on-leave" title="Na urlopie - kliknij dwukrotnie aby dodać zastępcę">${name} <span class="leave-warning-icon">⚠</span></span>`;
+                            return `<span class="employee-on-leave" title="Na urlopie">${name} <span class="leave-warning-icon">⚠</span></span>`;
                         }
                         return name;
                     }).join('<br>');
 
-                    // Dodaj licznik pracowników
                     const countBadge = `<div class="employee-count-badge">${assignedIds.length} os.</div>`;
                     cell.innerHTML = employeeNames + countBadge;
                     cell.classList.remove('has-leave-placeholder', 'empty-cell');
                 } else {
-                    // Komórka jest pusta - oznacz jako nieobsadzoną
                     cell.classList.add('empty-cell');
 
                     if (employeesOnLeave.length > 0) {
-                        const placeholder = `<span class="leave-placeholder">${employeesOnLeave.join(', ')}</span>`;
-                        cell.innerHTML = placeholder;
+                        cell.innerHTML = `<span class="leave-placeholder">${employeesOnLeave.map((name) => escapeHTML(name)).join(', ')}</span>`;
                         cell.classList.add('has-leave-placeholder');
                     } else {
                         cell.innerHTML = '';
@@ -1602,16 +323,10 @@ export const Changes: ChangesAPI = (() => {
         });
     };
 
-    const renderChangesAndSave = (): void => {
-        renderChangesContent();
-        saveChanges();
-    };
-
     const printChangesTableToPdf = (): void => {
         const table = document.getElementById('changesTable');
         if (!table) return;
 
-        // Pobierz nagłówki tabeli.
         const tableHeaders = Array.from(table.querySelectorAll('thead th'))
             .map((th, index) => ({
                 text: th.textContent || '',
@@ -1620,7 +335,6 @@ export const Changes: ChangesAPI = (() => {
                 color: PdfHeaderColors.text,
             }));
 
-        // Pobierz wiersze tabeli.
         const tableBody = Array.from(table.querySelectorAll('tbody tr')).map((row) => {
             const tr = row as HTMLTableRowElement;
             const cells = Array.from(tr.cells);
@@ -1629,14 +343,12 @@ export const Changes: ChangesAPI = (() => {
                 let textContent = '';
 
                 if (cellIndex === 0) {
-                    // Kolumna okresu
                     textContent = cell.textContent || '';
                 } else if (cellIndex === 8) {
-                    // Kolumna urlopów
                     const leaveEntries = cell.querySelectorAll('.leave-entry');
                     if (leaveEntries.length > 0) {
                         textContent = Array.from(leaveEntries)
-                            .map(entry => entry.textContent?.trim() || '')
+                            .map((entry) => entry.textContent?.trim() || '')
                             .join('\n');
                     } else {
                         textContent = cell.textContent || '';
@@ -1665,7 +377,6 @@ export const Changes: ChangesAPI = (() => {
                     style: 'tableExample',
                     table: {
                         headerRows: 1,
-                        // 9 kolumn: Okres + 7 danych + Urlopy
                         widths: ['auto', '*', '*', '*', '*', '*', '*', '*', '*'],
                         body: [tableHeaders, ...tableBody],
                     },
@@ -1708,7 +419,8 @@ export const Changes: ChangesAPI = (() => {
             }
             yearSelect.appendChild(option);
         }
-        yearSelect.addEventListener('change', handleYearChange);
+        const signal = abortController?.signal;
+        yearSelect.addEventListener('change', (e) => { void handleYearChange(e); }, signal ? { signal } : undefined);
     };
 
     const handleYearChange = async (e: Event): Promise<void> => {
@@ -1717,16 +429,23 @@ export const Changes: ChangesAPI = (() => {
     };
 
     const refreshView = async (): Promise<void> => {
+        if (isDestroyed) return;
         const periods = generateTwoWeekPeriods(currentYear);
         renderTable(periods);
         await loadChanges();
+        if (isDestroyed) return;
         const allLeaves = await getAllLeavesData();
+        if (isDestroyed) return;
         cachedLeavesData = allLeaves as Record<string, LeaveEntry[]>;
         renderChangesContent();
         populateLeavesColumn(allLeaves);
     };
 
     const init = async (): Promise<void> => {
+        isDestroyed = false;
+        abortController = new AbortController();
+        const { signal } = abortController;
+
         const getElements = (): boolean => {
             changesTableBody = document.getElementById('changesTableBody');
             changesHeaderRow = document.getElementById('changesHeaderRow');
@@ -1736,8 +455,10 @@ export const Changes: ChangesAPI = (() => {
 
         if (!getElements()) {
             await new Promise((resolve) => setTimeout(resolve, 50));
+            if (isDestroyed) return;
             if (!getElements()) {
                 await new Promise((resolve) => setTimeout(resolve, 100));
+                if (isDestroyed) return;
                 if (!getElements()) {
                     console.error('Changes module: Required elements not found. Aborting initialization.');
                     return;
@@ -1747,32 +468,30 @@ export const Changes: ChangesAPI = (() => {
 
         printButton = document.getElementById('printChangesTable');
         if (printButton) {
-            printButton.addEventListener('click', printChangesTableToPdf);
+            printButton.addEventListener('click', printChangesTableToPdf, { signal });
         }
 
-        document.addEventListener('app:search', handleAppSearch);
-        document.addEventListener('keydown', handleKeyDown);
+        document.getElementById('quickPlanningBtn')?.addEventListener('click', () => {
+            window.location.hash = 'changes-rotation';
+        }, { signal });
+
+        document.addEventListener('app:search', handleAppSearch, { signal });
 
         populateYearSelect();
         await refreshView();
+        if (isDestroyed) return;
         await EmployeeManager.load();
+        if (isDestroyed) return;
 
-        // Setup accordion (expand/collapse)
         setupAccordion();
-
-        // Inicjalizacja szablonów
-        initTemplateUI();
-
     };
 
-    /**
-     * Inicjalizuje funkcjonalność zwijania i rozwijania wierszy
-     */
     const setupAccordion = (): void => {
         const tableBody = document.getElementById('changesTableBody');
         if (!tableBody) return;
 
-        // Obsługa kliknięcia na pierwszą kolumnę (przełączanie zwijania)
+        const signal = abortController?.signal;
+
         tableBody.addEventListener('click', (event: Event) => {
             const target = event.target as HTMLElement;
             const firstCell = target.closest('td:first-child');
@@ -1791,11 +510,10 @@ export const Changes: ChangesAPI = (() => {
                 }
                 event.stopPropagation();
             }
-        }, true);
+        }, signal ? { capture: true, signal } : true);
 
-        // Znajdź i rozwiń bieżący okres
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const now = new Date();
+        const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
 
         const rows = tableBody.querySelectorAll('tr');
         rows.forEach((row) => {
@@ -1804,17 +522,17 @@ export const Changes: ChangesAPI = (() => {
             const endDateStr = tr.dataset.endDate;
 
             if (startDateStr && endDateStr) {
-                const periodStart = new Date(startDateStr);
-                const periodEnd = new Date(endDateStr);
+                const periodStart = toUTCDate(startDateStr);
+                const periodEnd = toUTCDate(endDateStr);
 
-                // Sprawdź czy dzisiaj wypada w tym okresie
                 if (today >= periodStart && today <= periodEnd) {
                     tr.classList.add('expanded', 'current-period');
                     tr.classList.remove('collapsed');
 
-                    // Przewiń do bieżącego okresu tylko jeśli to ładowanie początkowe
                     setTimeout(() => {
-                        tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        if (!isDestroyed) {
+                            tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
                     }, 100);
                 }
             }
@@ -1822,24 +540,13 @@ export const Changes: ChangesAPI = (() => {
     };
 
     const destroy = (): void => {
-        const printButton = document.getElementById('printChangesTable');
-        document.removeEventListener('app:search', handleAppSearch);
-        document.removeEventListener('keydown', handleKeyDown);
-        if (printButton) {
-            printButton.removeEventListener('click', printChangesTableToPdf);
+        isDestroyed = true;
+        if (abortController) {
+            abortController.abort();
+            abortController = null;
         }
-        setActiveCell(null);
         debugLog('Changes module destroyed');
     };
 
     return { init, destroy };
 })();
-
-// Backward compatibility
-declare global {
-    interface Window {
-        Changes: ChangesAPI;
-    }
-}
-
-window.Changes = Changes;

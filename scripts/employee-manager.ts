@@ -30,6 +30,7 @@ interface EmployeeManagerAPI {
     isUserAdmin(uid: string): boolean;
     isMassageAccessUser(uid: string): boolean;
     updateEmployee(id: string, data: Partial<Employee>): Promise<void>;
+    hasLoadError(): boolean;
 }
 
 /**
@@ -39,6 +40,7 @@ interface EmployeeManagerAPI {
 export const EmployeeManager: EmployeeManagerAPI = (() => {
     /** Prywatna mapa pracowników */
     let _employees: EmployeesMap = {};
+    let _loadError = false;
 
     /**
      * Interfejs dokumentu schedule z Firestore
@@ -62,10 +64,14 @@ export const EmployeeManager: EmployeeManagerAPI = (() => {
                 _employees = {};
                 console.warn("Brak obiektu 'employees' w Firestore. Inicjalizacja pustego stanu.");
             }
+            _loadError = false;
         } catch (error) {
             console.error('Błąd krytyczny podczas pobierania danych pracowników z Firestore:', error);
-            window.showToast('Wystąpił błąd podczas pobierania listy pracowników. Spróbuj odświeżyć stronę.', 5000);
-            _employees = {};
+            window.showToast?.('Wystąpił błąd podczas pobierania listy pracowników. Spróbuj odświeżyć stronę.', 5000);
+            if (Object.keys(_employees).length === 0) {
+                _employees = {};
+            }
+            _loadError = true;
         }
     };
 
@@ -230,14 +236,7 @@ export const EmployeeManager: EmployeeManagerAPI = (() => {
                 window.showToast('Nie udało się zapisać zmian.', 5000);
             }
         },
+
+        hasLoadError: (): boolean => _loadError,
     };
 })();
-
-// Backward compatibility - przypisanie do window
-declare global {
-    interface Window {
-        EmployeeManager: EmployeeManagerAPI;
-    }
-}
-
-window.EmployeeManager = EmployeeManager;

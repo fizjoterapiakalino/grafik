@@ -3,21 +3,9 @@ import { debugLog } from './common.js';
 import { auth } from './firebase-config.js';
 import type { FirebaseAuthWrapper } from './types/firebase';
 
-// Type assertion dla auth
 const typedAuth = auth as unknown as FirebaseAuthWrapper;
 
-/**
- * Interfejs publicznego API Login
- */
-interface LoginAPI {
-    init(): void;
-    destroy(): void;
-}
-
-/**
- * Moduł logowania
- */
-export const Login: LoginAPI = (() => {
+export const Login = (() => {
     let loginForm: HTMLFormElement | null = null;
 
     const handleSubmit = async (e: Event): Promise<void> => {
@@ -63,12 +51,3 @@ export const Login: LoginAPI = (() => {
 
     return { init, destroy };
 })();
-
-// Backward compatibility
-declare global {
-    interface Window {
-        Login: LoginAPI;
-    }
-}
-
-(globalThis as unknown as { Login: LoginAPI }).Login = Login;

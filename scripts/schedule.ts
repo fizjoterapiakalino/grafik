@@ -8,7 +8,6 @@ import { ScheduleEvents } from './schedule-events.js';
 import { ScheduleData } from './schedule-data.js';
 import { ScheduleModals } from './schedule-modals.js';
 import { UXEnhancements } from './ux-enhancements.js';
-import { TestDataGenerator } from './test-data-generator.js';
 import { safeCopy } from './utils.js';
 import {
     getTargetPart,
@@ -21,6 +20,7 @@ import {
 import type { FirebaseAuthWrapper, FirebaseUser } from './types/firebase';
 import type { CellState, TreatmentData } from './types/index.js';
 import { Stations } from './stations.js';
+import { TestDataGenerator } from './test-data-generator.js';
 
 const auth = authRaw as unknown as FirebaseAuthWrapper;
 
@@ -46,6 +46,7 @@ export const Schedule: ScheduleAPI = (() => {
     let undoButton: HTMLButtonElement | null = null;
     let splitViewActive = false;
     let splitViewHandler: (() => void) | null = null;
+    let unsubscribeAuth: (() => void) | null = null;
 
     const render = (): void => {
         ScheduleUI.render();
@@ -54,9 +55,11 @@ export const Schedule: ScheduleAPI = (() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateCellState = (cell: HTMLElement | null, updateFn: (state: any) => void): void => {
         if (!cell) return;
-        const cellData = cell as HTMLElement & { dataset: { time?: string; employeeIndex?: string } };
-        const time = cellData.dataset.time;
-        const employeeIndex = cellData.dataset.employeeIndex;
+        const targetElement = (cell.dataset?.time && cell.dataset?.employeeIndex)
+            ? cell
+            : (cell.closest?.('[data-time][data-employee-index]') as HTMLElement | null) || cell;
+        const time = targetElement.dataset?.time;
+        const employeeIndex = targetElement.dataset?.employeeIndex;
         if (time && employeeIndex) {
             ScheduleData.updateCellState(time, employeeIndex, updateFn);
         }
@@ -285,13 +288,23 @@ export const Schedule: ScheduleAPI = (() => {
             if (duplicate) {
                 ScheduleModals.showDuplicateConfirmationDialog(
                     duplicate,
-                    () => updateSchedule(true),
-                    () => updateSchedule(false),
-                    () => ScheduleUI.render(),
+                    () => {
+                        updateSchedule(true);
+                        ScheduleUI.flushPendingRenderIfIdle();
+                    },
+                    () => {
+                        updateSchedule(false);
+                        ScheduleUI.flushPendingRenderIfIdle();
+                    },
+                    () => {
+                        ScheduleUI.render();
+                        ScheduleUI.flushPendingRenderIfIdle();
+                    },
                     createSharedPatient
                 );
             } else {
                 updateSchedule(false);
+                ScheduleUI.flushPendingRenderIfIdle();
             }
         },
 
@@ -303,6 +316,7 @@ export const Schedule: ScheduleAPI = (() => {
                 window.showToast('Wprowadzony tekst jest za długi (maks. 35 znaków).', 3000);
                 element.setAttribute('contenteditable', 'false');
                 ScheduleUI.render();
+                ScheduleUI.flushPendingRenderIfIdle();
                 return;
             }
 
@@ -315,6 +329,7 @@ export const Schedule: ScheduleAPI = (() => {
                     () => {
                         element.setAttribute('contenteditable', 'false');
                         ScheduleUI.render();
+                        ScheduleUI.flushPendingRenderIfIdle();
                     }
                 );
                 return;
@@ -483,6 +498,18 @@ export const Schedule: ScheduleAPI = (() => {
             });
         },
 
+        openPatientAbsenceModal(element: HTMLElement): void {
+            const parentCell = element.closest('[data-time][data-employee-index]') as HTMLElement | null;
+            if (!parentCell) return;
+            const time = parentCell.dataset.time || '';
+            const employeeIndex = parentCell.dataset.employeeIndex || '';
+            const realCellState = ScheduleData.getCellState(time, employeeIndex) || ({} as CellState);
+
+            ScheduleModals.openPatientAbsenceModal(element, realCellState, (updateFn) => {
+                updateCellState(parentCell, updateFn);
+            });
+        },
+
         showHistoryModal(cell: HTMLElement): void {
             const time = (cell as HTMLElement).dataset.time || '';
             const employeeIndex = (cell as HTMLElement).dataset.employeeIndex || '';
@@ -493,19 +520,24 @@ export const Schedule: ScheduleAPI = (() => {
             });
         },
 
-        openEmployeeSelectionModal(_cell: HTMLElement): void {
-            ScheduleModals.openEmployeeSelectionModal();
-        },
-
         toggleSpecialStyle(cell: HTMLElement, dataAttribute: string): void {
+            const targetPart = getTargetPart(cell);
             updateCellState(cell, (state) => {
-                if (state.isSplit) {
+                if (targetPart) {
+                    state[`${dataAttribute}${targetPart}`] = !state[`${dataAttribute}${targetPart}`];
+                } else if (state.isSplit) {
                     state[`${dataAttribute}1`] = !state[`${dataAttribute}1`];
                     state[`${dataAttribute}2`] = !state[`${dataAttribute}2`];
                 } else {
                     state[dataAttribute] = !state[dataAttribute];
                 }
-                window.showToast('Zmieniono styl');
+                const isNowSet = Boolean(
+                    targetPart
+                        ? state[`${dataAttribute}${targetPart}`]
+                        : (state.isSplit ? state[`${dataAttribute}1`] : state[dataAttribute])
+                );
+                const label = dataAttribute === 'isEveryOtherDay' ? 'Co drugi dzień' : 'styl';
+                window.showToast(isNowSet ? `Oznaczono: ${label}` : `Usunięto oznaczenie: ${label}`);
             });
         },
 
@@ -543,6 +575,12 @@ export const Schedule: ScheduleAPI = (() => {
                 state.treatmentExtensionDays = safeCopy(treatmentData.extensionDays);
                 state.treatmentEndDate = safeCopy(treatmentData.endDate);
                 state.additionalInfo = safeCopy(treatmentData.additionalInfo);
+                const activeAbsence = Array.isArray(treatmentData.absenceDates)
+                    ? [...treatmentData.absenceDates]
+                    : (Array.isArray(state[`absenceDates${activePart}`])
+                        ? [...(state[`absenceDates${activePart}`] as string[])]
+                        : (treatmentData.absenceDates === null ? null : undefined));
+                state.absenceDates = activeAbsence !== undefined ? activeAbsence : null;
 
                 state.isSplit = null;
                 state.content1 = null;
@@ -559,9 +597,10 @@ export const Schedule: ScheduleAPI = (() => {
                 state.isSharedPatient2 = null;
                 state.isHydrotherapy1 = null;
                 state.isHydrotherapy2 = null;
-                state.isHydrotherapy = null;
                 state.treatmentData1 = null;
                 state.treatmentData2 = null;
+                state.absenceDates1 = null;
+                state.absenceDates2 = null;
 
                 state.content = mergedContent;
                 window.showToast('Scalono komórkę.');
@@ -586,6 +625,7 @@ export const Schedule: ScheduleAPI = (() => {
                     'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2',
                     'isEveryOtherDay1', 'isEveryOtherDay2', 'isSharedPatient1', 'isSharedPatient2',
                     'isHydrotherapy', 'isHydrotherapy1', 'isHydrotherapy2',
+                    'absenceDates', 'absenceDates1', 'absenceDates2',
                 ];
                 for (const key of contentKeys) {
                     if (Object.prototype.hasOwnProperty.call(state, key)) {
@@ -689,6 +729,7 @@ export const Schedule: ScheduleAPI = (() => {
                 exitEditMode: mainController.exitEditMode.bind(mainController),
                 enterEditMode: mainController.enterEditMode.bind(mainController),
                 openPatientInfoModal: mainController.openPatientInfoModal.bind(mainController),
+                openPatientAbsenceModal: mainController.openPatientAbsenceModal.bind(mainController),
                 showHistoryModal: mainController.showHistoryModal.bind(mainController),
                 toggleSpecialStyle: mainController.toggleSpecialStyle.bind(mainController),
                 mergeSplitCell: mainController.mergeSplitCell.bind(mainController),
@@ -696,7 +737,12 @@ export const Schedule: ScheduleAPI = (() => {
                 clearCell: mainController.clearCell.bind(mainController),
             });
 
-            auth.onAuthStateChanged((user: FirebaseUser | null) => {
+            if (unsubscribeAuth) {
+                unsubscribeAuth();
+                unsubscribeAuth = null;
+            }
+
+            unsubscribeAuth = auth.onAuthStateChanged((user: FirebaseUser | null) => {
                 if (user) {
                     ScheduleData.setCurrentUserId(user.uid);
                 } else {
@@ -727,6 +773,11 @@ export const Schedule: ScheduleAPI = (() => {
     };
 
     const destroy = (): void => {
+        if (unsubscribeAuth) {
+            unsubscribeAuth();
+            unsubscribeAuth = null;
+        }
+
         // Clean up split-view
         const btnSplitView = document.getElementById('btnSplitView');
         if (btnSplitView && splitViewHandler) {
@@ -741,6 +792,7 @@ export const Schedule: ScheduleAPI = (() => {
         ScheduleEvents.destroy();
         ScheduleData.destroy();
         ScheduleUI.destroy();
+        UXEnhancements.destroy();
         TestDataGenerator.destroy();
         debugLog('Schedule module destroyed');
     };

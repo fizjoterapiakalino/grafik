@@ -2,6 +2,7 @@
 // Moduł obsługi Drag & Drop dla harmonogramu
 
 import { safeCopy, safeBool } from './utils.js';
+import { ensureActiveTreatmentDates } from './schedule-helpers.js';
 import type { CellState } from './types/index.js';
 
 /**
@@ -34,6 +35,8 @@ export interface DragDropAPI {
     getDraggedCell(): HTMLElement | null;
 }
 
+const STYLE_FLAGS = ['isMassage', 'isPnf', 'isEveryOtherDay', 'isSharedPatient', 'isHydrotherapy'] as const;
+
 /**
  * Klucze zawartości komórki używane przy kopiowaniu/czyszczeniu
  */
@@ -42,7 +45,8 @@ const CONTENT_KEYS = [
     'treatmentStartDate', 'treatmentExtensionDays', 'treatmentEndDate', 'additionalInfo',
     'treatmentData1', 'treatmentData2', 'isMassage1', 'isMassage2', 'isPnf1', 'isPnf2',
     'isEveryOtherDay1', 'isEveryOtherDay2', 'isSharedPatient1', 'isSharedPatient2', 'isHydrotherapy',
-    'isHydrotherapy1', 'isHydrotherapy2'
+    'isHydrotherapy1', 'isHydrotherapy2',
+    'absenceDates', 'absenceDates1', 'absenceDates2'
 ] as const;
 
 /**
@@ -179,6 +183,12 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
 
     const extractDataToMove = (sourceState: CellState, sourcePart: number | null) => {
         if (sourcePart && sourceState.isSplit) {
+            const td = (sourceState[`treatmentData${sourcePart}`] as { startDate?: string | null; extensionDays?: number | null; endDate?: string | null; additionalInfo?: string | null; absenceDates?: string[] | null } | null | undefined) || {};
+            const absence = Array.isArray(td.absenceDates)
+                ? [...td.absenceDates]
+                : (Array.isArray(sourceState[`absenceDates${sourcePart}`])
+                    ? [...(sourceState[`absenceDates${sourcePart}`] as string[])]
+                    : (td.absenceDates === null ? null : undefined));
             return {
                 content: sourceState[`content${sourcePart}`] as string | null | undefined,
                 patientId: sourceState[`patientId${sourcePart}`] as string | null | undefined,
@@ -186,9 +196,20 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
                 isPnf: sourceState[`isPnf${sourcePart}`] as boolean | null | undefined,
                 isEveryOtherDay: sourceState[`isEveryOtherDay${sourcePart}`] as boolean | null | undefined,
                 isSharedPatient: sourceState[`isSharedPatient${sourcePart}`] as boolean | null | undefined,
-                treatmentData: (sourceState[`treatmentData${sourcePart}`] as { startDate?: string | null; extensionDays?: number | null; endDate?: string | null; additionalInfo?: string | null } | null | undefined) || {}
+                isHydrotherapy: sourceState[`isHydrotherapy${sourcePart}`] as boolean | null | undefined,
+                treatmentData: {
+                    startDate: safeCopy(td.startDate),
+                    extensionDays: safeCopy(td.extensionDays),
+                    endDate: safeCopy(td.endDate),
+                    additionalInfo: safeCopy(td.additionalInfo),
+                    absenceDates: absence !== undefined ? absence : null,
+                },
+                absenceDates: absence !== undefined ? absence : null,
             };
         }
+        const absence = Array.isArray(sourceState.absenceDates)
+            ? [...sourceState.absenceDates]
+            : (sourceState.absenceDates === null ? null : undefined);
         return {
             content: sourceState.content,
             patientId: sourceState.patientId,
@@ -196,68 +217,65 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
             isPnf: sourceState.isPnf,
             isEveryOtherDay: sourceState.isEveryOtherDay,
             isSharedPatient: sourceState.isSharedPatient,
+            isHydrotherapy: sourceState.isHydrotherapy,
             treatmentData: {
                 startDate: sourceState.treatmentStartDate,
                 extensionDays: sourceState.treatmentExtensionDays,
                 endDate: sourceState.treatmentEndDate,
                 additionalInfo: sourceState.additionalInfo,
-            }
+                absenceDates: absence !== undefined ? absence : null,
+            },
+            absenceDates: absence !== undefined ? absence : null,
         };
     };
 
     const applyTargetAutoSplit = (targetState: CellState, dataToMove: ReturnType<typeof extractDataToMove>) => {
         targetState.content1 = safeCopy(targetState.content);
         targetState.patientId1 = safeCopy(targetState.patientId);
-        targetState.isMassage1 = safeBool(targetState.isMassage);
-        targetState.isPnf1 = safeBool(targetState.isPnf);
-        targetState.isEveryOtherDay1 = safeBool(targetState.isEveryOtherDay);
-        targetState.isSharedPatient1 = safeBool(targetState.isSharedPatient);
+        STYLE_FLAGS.forEach((f) => { targetState[`${f}1`] = safeBool(targetState[f]); });
         targetState.treatmentData1 = {
             startDate: safeCopy(targetState.treatmentStartDate),
             extensionDays: safeCopy(targetState.treatmentExtensionDays),
             endDate: safeCopy(targetState.treatmentEndDate),
             additionalInfo: safeCopy(targetState.additionalInfo),
+            absenceDates: Array.isArray(targetState.absenceDates) ? [...targetState.absenceDates] : null,
         };
 
         targetState.content2 = safeCopy(dataToMove.content);
         targetState.patientId2 = safeCopy(dataToMove.patientId);
-        targetState.isMassage2 = safeBool(dataToMove.isMassage);
-        targetState.isPnf2 = safeBool(dataToMove.isPnf);
-        targetState.isEveryOtherDay2 = safeBool(dataToMove.isEveryOtherDay);
-        targetState.isSharedPatient2 = safeBool(dataToMove.isSharedPatient);
+        STYLE_FLAGS.forEach((f) => { targetState[`${f}2`] = safeBool(dataToMove[f]); });
         targetState.treatmentData2 = {
             startDate: safeCopy(dataToMove.treatmentData.startDate),
             extensionDays: safeCopy(dataToMove.treatmentData.extensionDays),
             endDate: safeCopy(dataToMove.treatmentData.endDate),
             additionalInfo: safeCopy(dataToMove.treatmentData.additionalInfo),
+            absenceDates: Array.isArray(dataToMove.treatmentData.absenceDates) ? [...dataToMove.treatmentData.absenceDates] : null,
         };
 
         targetState.isSplit = true;
         targetState.content = null;
         targetState.patientId = null;
-        targetState.isMassage = null;
-        targetState.isPnf = null;
-        targetState.isEveryOtherDay = null;
-        targetState.isSharedPatient = null;
+        STYLE_FLAGS.forEach((f) => { targetState[f] = null; });
         targetState.treatmentStartDate = null;
         targetState.treatmentExtensionDays = null;
         targetState.treatmentEndDate = null;
         targetState.additionalInfo = null;
+        targetState.absenceDates = null;
+        ensureActiveTreatmentDates(targetState, { resetIfExpired: false });
     };
 
     const applyTargetPartUpdate = (targetState: CellState, targetPart: number, dataToMove: ReturnType<typeof extractDataToMove>) => {
         targetState[`content${targetPart}`] = safeCopy(dataToMove.content);
         targetState[`patientId${targetPart}`] = safeCopy(dataToMove.patientId);
-        targetState[`isMassage${targetPart}`] = safeBool(dataToMove.isMassage);
-        targetState[`isPnf${targetPart}`] = safeBool(dataToMove.isPnf);
-        targetState[`isEveryOtherDay${targetPart}`] = safeBool(dataToMove.isEveryOtherDay);
-        targetState[`isSharedPatient${targetPart}`] = safeBool(dataToMove.isSharedPatient);
+        STYLE_FLAGS.forEach((f) => { targetState[`${f}${targetPart}`] = safeBool(dataToMove[f]); });
         targetState[`treatmentData${targetPart}`] = {
             startDate: safeCopy(dataToMove.treatmentData.startDate),
             extensionDays: safeCopy(dataToMove.treatmentData.extensionDays),
             endDate: safeCopy(dataToMove.treatmentData.endDate),
             additionalInfo: safeCopy(dataToMove.treatmentData.additionalInfo),
+            absenceDates: Array.isArray(dataToMove.treatmentData.absenceDates) ? [...dataToMove.treatmentData.absenceDates] : null,
         };
+        ensureActiveTreatmentDates(targetState, { resetIfExpired: false });
     };
 
     const applyTargetNormalUpdate = (targetState: CellState, dataToMove: ReturnType<typeof extractDataToMove>) => {
@@ -266,48 +284,41 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
         }
         targetState.content = safeCopy(dataToMove.content);
         targetState.patientId = safeCopy(dataToMove.patientId);
-        targetState.isMassage = safeBool(dataToMove.isMassage);
-        targetState.isPnf = safeBool(dataToMove.isPnf);
-        targetState.isEveryOtherDay = safeBool(dataToMove.isEveryOtherDay);
-        targetState.isSharedPatient = safeBool(dataToMove.isSharedPatient);
+        STYLE_FLAGS.forEach((f) => { targetState[f] = safeBool(dataToMove[f]); });
         targetState.treatmentStartDate = safeCopy(dataToMove.treatmentData.startDate);
         targetState.treatmentExtensionDays = safeCopy(dataToMove.treatmentData.extensionDays);
         targetState.treatmentEndDate = safeCopy(dataToMove.treatmentData.endDate);
         targetState.additionalInfo = safeCopy(dataToMove.treatmentData.additionalInfo);
+        targetState.absenceDates = Array.isArray(dataToMove.treatmentData.absenceDates) ? [...dataToMove.treatmentData.absenceDates] : null;
+        ensureActiveTreatmentDates(targetState, { resetIfExpired: false });
     };
 
     const applySourceClear = (sourceState: CellState, sourcePart: number | null) => {
         if (sourcePart && sourceState.isSplit) {
             sourceState[`content${sourcePart}`] = null;
             sourceState[`patientId${sourcePart}`] = null;
-            sourceState[`isMassage${sourcePart}`] = null;
-            sourceState[`isPnf${sourcePart}`] = null;
-            sourceState[`isEveryOtherDay${sourcePart}`] = null;
-            sourceState[`isSharedPatient${sourcePart}`] = null;
+            STYLE_FLAGS.forEach((f) => { sourceState[`${f}${sourcePart}`] = null; });
             sourceState[`treatmentData${sourcePart}`] = null;
+            sourceState[`absenceDates${sourcePart}`] = null;
 
             const otherPart = sourcePart === 1 ? 2 : 1;
             const otherContent = sourceState[`content${otherPart}`];
             const otherHasContent = otherContent && String(otherContent).trim() !== '';
 
             if (otherHasContent) {
-                const otherMassage = sourceState[`isMassage${otherPart}`];
-                const otherPnf = sourceState[`isPnf${otherPart}`];
-                const otherEveryOtherDay = sourceState[`isEveryOtherDay${otherPart}`];
-                const otherSharedPatient = sourceState[`isSharedPatient${otherPart}`];
-                const otherTreatmentData = sourceState[`treatmentData${otherPart}`] as { startDate?: string | null; extensionDays?: number | null; endDate?: string | null; additionalInfo?: string | null } | null | undefined;
+                const otherTreatmentData = sourceState[`treatmentData${otherPart}`] as { startDate?: string | null; extensionDays?: number | null; endDate?: string | null; additionalInfo?: string | null; absenceDates?: string[] | null } | null | undefined;
 
                 sourceState.content = safeCopy(otherContent as string | null | undefined);
                 sourceState.patientId = safeCopy(sourceState[`patientId${otherPart}`] as string | null | undefined);
-                sourceState.isMassage = safeBool(otherMassage as any);
-                sourceState.isPnf = safeBool(otherPnf as any);
-                sourceState.isEveryOtherDay = safeBool(otherEveryOtherDay as any);
-                sourceState.isSharedPatient = safeBool(otherSharedPatient as any);
+                STYLE_FLAGS.forEach((f) => {
+                    sourceState[f] = safeBool(sourceState[`${f}${otherPart}`]);
+                });
                 if (otherTreatmentData) {
                     sourceState.treatmentStartDate = safeCopy(otherTreatmentData.startDate);
                     sourceState.treatmentExtensionDays = safeCopy(otherTreatmentData.extensionDays);
                     sourceState.treatmentEndDate = safeCopy(otherTreatmentData.endDate);
                     sourceState.additionalInfo = safeCopy(otherTreatmentData.additionalInfo);
+                    sourceState.absenceDates = Array.isArray(otherTreatmentData.absenceDates) ? [...otherTreatmentData.absenceDates] : null;
                 }
             }
 
@@ -316,16 +327,14 @@ export const ScheduleDragDrop: DragDropAPI = (() => {
             sourceState.content2 = null;
             sourceState.patientId1 = null;
             sourceState.patientId2 = null;
-            sourceState.isMassage1 = null;
-            sourceState.isMassage2 = null;
-            sourceState.isPnf1 = null;
-            sourceState.isPnf2 = null;
-            sourceState.isEveryOtherDay1 = null;
-            sourceState.isEveryOtherDay2 = null;
-            sourceState.isSharedPatient1 = null;
-            sourceState.isSharedPatient2 = null;
+            STYLE_FLAGS.forEach((f) => {
+                sourceState[`${f}1`] = null;
+                sourceState[`${f}2`] = null;
+            });
             sourceState.treatmentData1 = null;
             sourceState.treatmentData2 = null;
+            sourceState.absenceDates1 = null;
+            sourceState.absenceDates2 = null;
         } else {
             for (const key of CONTENT_KEYS) {
                 sourceState[key] = null;

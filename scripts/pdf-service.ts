@@ -39,32 +39,29 @@ interface CachedPdfData {
  */
 interface PdfServiceAPI {
     fetchAndCachePdfLinks(forceScrape?: boolean, runServerScrape?: boolean): Promise<PdfDocument[]>;
-    initRealtimeUpdates(): void;
     destroy(): void;
     markAsSeen(): void;
     checkForNewDocuments(docs: PdfDocument[]): void;
     getCachedData(): PdfDocument[] | null;
+    getCachedPdfs(): PdfDocument[] | null;
+    hasUnseenUpdates(): boolean;
     getServerStatus(): Promise<ServerStatus | null>;
+    triggerScraping(): Promise<boolean>;
 }
 
 export const PdfService: PdfServiceAPI = (() => {
-    const SCRAPED_PDFS_CACHE_KEY = 'scrapedPdfLinksV2'; // Nowa wersja cache z TTL
-    const SEEN_DOCS_COUNT_KEY = 'seenPdfDocsCount';
+    const SCRAPED_PDFS_CACHE_KEY = 'scrapedPdfLinksV2';
     const SEEN_DOC_IDS_KEY = 'seenPdfDocIdsV2';
     const RENDER_API_BASE_URL = 'https://pdf-scraper-api-5qqr.onrender.com';
 
     const MAX_RETRIES = 3;
-    const RETRY_DELAY_MS = 3000; // Zwiększone dla cold start
-    const SSE_RECONNECT_DELAY_MS = 5000;
+    const RETRY_DELAY_MS = 3000;
 
     // Cache TTL - 30 minut (dane są odświeżane w tle po tym czasie)
     const CACHE_TTL_MS = 30 * 60 * 1000;
     // Stale cache - użyj jeśli API niedostępne (max 24h)
     const STALE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
-    let sse: EventSource | null = null;
-    let sseReconnectTimeout: ReturnType<typeof setTimeout> | null = null;
-    let isDestroyed = false;
     let isBackgroundRefreshInProgress = false;
 
     const getDocumentIdentity = (doc: PdfDocument): string => {
@@ -90,7 +87,6 @@ export const PdfService: PdfServiceAPI = (() => {
 
     const saveSeenDocIds = (docs: PdfDocument[]): void => {
         localStorage.setItem(SEEN_DOC_IDS_KEY, JSON.stringify(getDocumentIds(docs)));
-        localStorage.setItem(SEEN_DOCS_COUNT_KEY, docs.length.toString());
     };
 
     const checkForNewDocuments = (docs: PdfDocument[]): void => {
@@ -108,27 +104,19 @@ export const PdfService: PdfServiceAPI = (() => {
             return;
         }
 
-        const seenCount = parseInt(localStorage.getItem(SEEN_DOCS_COUNT_KEY) || '0', 10);
-        if (seenCount > 0 && docs.length > seenCount) {
-            const newCount = docs.length - seenCount;
-            const seenLegacyDocs = docs.slice(newCount);
-            saveSeenDocIds(seenLegacyDocs);
-            localStorage.setItem(SEEN_DOCS_COUNT_KEY, seenLegacyDocs.length.toString());
-            window.dispatchEvent(new CustomEvent('iso-updates-available', { detail: { count: newCount } }));
-            debugLog(`${newCount} nowych dokumentów ISO od ostatniej wizyty.`);
-            return;
-        }
-
-        if (seenCount > 0 && docs.length <= seenCount) {
-            saveSeenDocIds(docs);
-            window.dispatchEvent(new CustomEvent('iso-updates-cleared'));
-            return;
-        }
-
         if (docs.length > 0) {
             saveSeenDocIds(docs);
         }
         window.dispatchEvent(new CustomEvent('iso-updates-cleared'));
+    };
+
+    const hasUnseenUpdates = (): boolean => {
+        const cached = getCachedData();
+        if (!cached || cached.length === 0) return false;
+        const seenIds = getSeenDocIds();
+        if (!seenIds) return false;
+        const currentIds = getDocumentIds(cached);
+        return currentIds.some((id) => !seenIds.has(id));
     };
 
     const markAsSeen = (): void => {
@@ -148,9 +136,7 @@ export const PdfService: PdfServiceAPI = (() => {
             if (!cached) return null;
 
             const parsed = JSON.parse(cached);
-            // Sprawdź czy to nowy format (z timestamp) czy stary (tablica)
             if (Array.isArray(parsed)) {
-                // Stary format - migruj do nowego
                 return { data: parsed, timestamp: 0 };
             }
             return parsed as CachedPdfData;
@@ -173,7 +159,7 @@ export const PdfService: PdfServiceAPI = (() => {
      */
     const isCacheUsable = (cached: CachedPdfData | null): boolean => {
         if (!cached || cached.data.length === 0) return false;
-        if (!cached.timestamp) return true; // Stary format - użyj
+        if (!cached.timestamp) return true;
         return Date.now() - cached.timestamp < STALE_CACHE_TTL_MS;
     };
 
@@ -182,13 +168,15 @@ export const PdfService: PdfServiceAPI = (() => {
         return cached ? cached.data : null;
     };
 
+    const getCachedPdfs = (): PdfDocument[] | null => getCachedData();
+
     /**
      * Zapisuje dane do cache z timestampem
      */
     const saveToCache = (data: PdfDocument[]): void => {
         const cacheData: CachedPdfData = {
             data,
-            timestamp: Date.now()
+            timestamp: Date.now(),
         };
         localStorage.setItem(SCRAPED_PDFS_CACHE_KEY, JSON.stringify(cacheData));
     };
@@ -283,7 +271,6 @@ export const PdfService: PdfServiceAPI = (() => {
 
         const cachedWithMeta = getCachedDataWithMeta();
 
-        // Jeśli nie wymuszamy odświeżenia i cache jest świeży - użyj go
         if (!forceScrape && isCacheFresh(cachedWithMeta)) {
             debugLog('Używam świeżego cache (TTL ok)');
             checkForNewDocuments(cachedWithMeta!.data);
@@ -291,13 +278,11 @@ export const PdfService: PdfServiceAPI = (() => {
             return cachedWithMeta!.data;
         }
 
-        // Jeśli cache jest przestarzały ale użyteczny - pokaż go od razu, odśwież w tle
         if (!forceScrape && isCacheUsable(cachedWithMeta) && !isBackgroundRefreshInProgress) {
             debugLog('Używam przestarzałego cache, odświeżam w tle...');
             checkForNewDocuments(cachedWithMeta!.data);
             Shared.setIsoLinkActive(true);
 
-            // Odśwież w tle (stale-while-revalidate)
             isBackgroundRefreshInProgress = true;
             fetchFromApi().finally(() => {
                 isBackgroundRefreshInProgress = false;
@@ -306,7 +291,6 @@ export const PdfService: PdfServiceAPI = (() => {
             return cachedWithMeta!.data;
         }
 
-        // Brak cache lub wymuszony refresh - pobierz synchronicznie
         if (forceScrape && runServerScrape) {
             window.showToast?.('Odświeżanie linków ISO...', 3000);
             await triggerServerScrape();
@@ -317,7 +301,6 @@ export const PdfService: PdfServiceAPI = (() => {
             return data;
         }
 
-        // Fallback do przestarzałego cache jeśli API niedostępne
         if (isCacheUsable(cachedWithMeta)) {
             debugLog('API niedostępne, używam przestarzałego cache jako fallback');
             Shared.setIsoLinkActive(true);
@@ -327,49 +310,6 @@ export const PdfService: PdfServiceAPI = (() => {
         window.showToast?.('Nie można pobrać linków ISO.', 5000);
         Shared.setIsoLinkActive(false);
         return [];
-    };
-
-    const initRealtimeUpdates = (): void => {
-        if (isDestroyed) return;
-
-        if (sse) {
-            sse.close();
-            sse = null;
-        }
-
-        if (sseReconnectTimeout) {
-            clearTimeout(sseReconnectTimeout);
-            sseReconnectTimeout = null;
-        }
-
-        try {
-            sse = new EventSource(`${RENDER_API_BASE_URL}/api/events`);
-
-            sse.addEventListener('connected', () => {
-                debugLog('Połączono z PDF Scraper SSE');
-            });
-
-            sse.addEventListener('scrapingComplete', (event) => {
-                debugLog('Otrzymano zdarzenie scrapingComplete:', event.data);
-                window.showToast?.('Nowe dokumenty ISO dostępne!', 5000);
-                fetchAndCachePdfLinks(true, false);
-            });
-
-            sse.onerror = () => {
-                console.warn('Błąd połączenia SSE z PDF Scraper API');
-                sse?.close();
-                sse = null;
-
-                if (!isDestroyed) {
-                    sseReconnectTimeout = setTimeout(() => {
-                        debugLog('Próba ponownego połączenia SSE...');
-                        initRealtimeUpdates();
-                    }, SSE_RECONNECT_DELAY_MS);
-                }
-            };
-        } catch (error) {
-            console.warn('Nie można zainicjalizować SSE:', error);
-        }
     };
 
     const getServerStatus = async (): Promise<ServerStatus | null> => {
@@ -385,26 +325,18 @@ export const PdfService: PdfServiceAPI = (() => {
     };
 
     const destroy = (): void => {
-        isDestroyed = true;
-
-        if (sseReconnectTimeout) {
-            clearTimeout(sseReconnectTimeout);
-            sseReconnectTimeout = null;
-        }
-
-        if (sse) {
-            sse.close();
-            sse = null;
-        }
+        // cleanup
     };
 
     return {
         fetchAndCachePdfLinks,
-        initRealtimeUpdates,
         destroy,
         markAsSeen,
         checkForNewDocuments,
         getCachedData,
+        getCachedPdfs,
+        hasUnseenUpdates,
         getServerStatus,
+        triggerScraping: triggerServerScrape,
     };
 })();

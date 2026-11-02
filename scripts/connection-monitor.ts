@@ -1,63 +1,26 @@
 // scripts/connection-monitor.ts
-/**
- * Connection Monitor
- * 
- * Monitoruje stan połączenia z Firebase i zarządza synchronizacją offline.
- * Wyświetla użytkownikowi informacje o stanie połączenia.
- */
-
 import { debugLog } from './common.js';
 
-interface ConnectionState {
-    isOnline: boolean;
-    lastOnline: Date | null;
-    pendingWrites: number;
-    syncStatus: 'synced' | 'syncing' | 'offline' | 'error';
-}
+type SyncStatus = 'synced' | 'syncing' | 'offline' | 'error';
 
 interface ConnectionMonitorAPI {
     init(): void;
     destroy(): void;
-    getState(): ConnectionState;
-    isOnline(): boolean;
-    onStateChange(callback: (state: ConnectionState) => void): () => void;
 }
 
 export const ConnectionMonitor: ConnectionMonitorAPI = (() => {
-    let state: ConnectionState = {
-        isOnline: navigator.onLine,
-        lastOnline: navigator.onLine ? new Date() : null,
-        pendingWrites: 0,
-        syncStatus: navigator.onLine ? 'synced' : 'offline'
-    };
-
-    const listeners: Set<(state: ConnectionState) => void> = new Set();
+    let syncStatus: SyncStatus = navigator.onLine ? 'synced' : 'offline';
     let statusIndicator: HTMLElement | null = null;
 
-    const notifyListeners = (): void => {
-        listeners.forEach(callback => callback({ ...state }));
-    };
-
-    const updateState = (updates: Partial<ConnectionState>): void => {
-        state = { ...state, ...updates };
-        updateUI();
-        notifyListeners();
-    };
-
     const createStatusIndicator = (): void => {
-        // Sprawdź czy już istnieje
         if (document.getElementById('connectionStatus')) return;
 
         statusIndicator = document.createElement('div');
         statusIndicator.id = 'connectionStatus';
         statusIndicator.className = 'connection-status';
-        statusIndicator.innerHTML = `
-            <span class="connection-icon"></span>
-            <span class="connection-text"></span>
-        `;
+        statusIndicator.innerHTML = '<span class="connection-icon"></span><span class="connection-text"></span>';
         document.body.appendChild(statusIndicator);
 
-        // Dodaj style jeśli jeszcze nie istnieją
         if (!document.getElementById('connectionStatusStyles')) {
             const styles = document.createElement('style');
             styles.id = 'connectionStatusStyles';
@@ -124,31 +87,24 @@ export const ConnectionMonitor: ConnectionMonitorAPI = (() => {
 
     const updateUI = (): void => {
         if (!statusIndicator) return;
-
         const textEl = statusIndicator.querySelector('.connection-text');
+        statusIndicator.className = `connection-status ${syncStatus}`;
 
-        statusIndicator.className = `connection-status ${state.syncStatus}`;
-
-        const messages: Record<ConnectionState['syncStatus'], string> = {
+        const messages: Record<SyncStatus, string> = {
             synced: 'Zsynchronizowano',
             syncing: 'Synchronizacja...',
             offline: 'Tryb offline - zmiany zostaną zapisane lokalnie',
-            error: 'Błąd synchronizacji'
+            error: 'Błąd synchronizacji',
         };
 
         if (textEl) {
-            textEl.textContent = messages[state.syncStatus];
+            textEl.textContent = messages[syncStatus];
         }
 
-        // Pokaż status i ukryj po chwili (chyba że offline)
-        if (state.syncStatus === 'offline' || state.syncStatus === 'error') {
-            statusIndicator.classList.add('visible');
-        } else if (state.syncStatus === 'syncing') {
-            statusIndicator.classList.add('visible');
-        } else {
-            statusIndicator.classList.add('visible');
+        statusIndicator.classList.add('visible');
+        if (syncStatus === 'synced') {
             setTimeout(() => {
-                if (state.syncStatus === 'synced') {
+                if (syncStatus === 'synced') {
                     statusIndicator?.classList.remove('visible');
                 }
             }, 2000);
@@ -157,96 +113,43 @@ export const ConnectionMonitor: ConnectionMonitorAPI = (() => {
 
     const handleOnline = (): void => {
         debugLog('Connection restored - online');
-        updateState({
-            isOnline: true,
-            lastOnline: new Date(),
-            syncStatus: 'syncing'
-        });
-
-        // Firestore automatycznie zsynchronizuje pending writes
-        // Po chwili zmień status na synced
+        syncStatus = 'syncing';
+        updateUI();
         setTimeout(() => {
-            if (state.isOnline) {
-                updateState({ syncStatus: 'synced' });
+            if (navigator.onLine) {
+                syncStatus = 'synced';
+                updateUI();
             }
         }, 2000);
     };
 
     const handleOffline = (): void => {
         debugLog('Connection lost - offline');
-        updateState({
-            isOnline: false,
-            syncStatus: 'offline'
-        });
-    };
-
-    const setupFirestoreSync = (): void => {
-        // Monitor synchronizacji oparty na navigator.onLine jest już włączony.
-        // Firestore z włączoną persistencją automatycznie cache'uje dane offline
-        // i synchronizuje je po powrocie połączenia.
-        // 
-        // Opcjonalnie: Można dodać bardziej zaawansowane monitorowanie przy użyciu
-        // natywnego API Firestore (db._native) z onSnapshotsInSync(), ale
-        // dla większości przypadków użycia navigator.onLine jest wystarczający.
-        debugLog('Firestore offline sync is handled by persistence layer');
+        syncStatus = 'offline';
+        updateUI();
     };
 
     const init = (): void => {
         createStatusIndicator();
-
-        // Nasłuchuj zdarzeń online/offline
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
-
-        // Ustaw początkowy stan
         if (navigator.onLine) {
-            updateState({ isOnline: true, syncStatus: 'synced' });
+            syncStatus = 'synced';
+            updateUI();
         } else {
             handleOffline();
         }
-
-        // Monitoruj synchronizację Firestore
-        setupFirestoreSync();
-
         debugLog('ConnectionMonitor initialized');
     };
 
     const destroy = (): void => {
         window.removeEventListener('online', handleOnline);
         window.removeEventListener('offline', handleOffline);
-
         if (statusIndicator) {
             statusIndicator.remove();
             statusIndicator = null;
         }
-
-        listeners.clear();
-        debugLog('ConnectionMonitor destroyed');
     };
 
-    const getState = (): ConnectionState => ({ ...state });
-
-    const isOnline = (): boolean => state.isOnline;
-
-    const onStateChange = (callback: (state: ConnectionState) => void): (() => void) => {
-        listeners.add(callback);
-        return () => listeners.delete(callback);
-    };
-
-    return {
-        init,
-        destroy,
-        getState,
-        isOnline,
-        onStateChange
-    };
+    return { init, destroy };
 })();
-
-// Backward compatibility
-declare global {
-    interface Window {
-        ConnectionMonitor: ConnectionMonitorAPI;
-    }
-}
-
-window.ConnectionMonitor = ConnectionMonitor;

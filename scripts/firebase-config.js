@@ -21,8 +21,6 @@ import {
     getDocs,
     query,
     where,
-    orderBy,
-    limit,
     writeBatch,
     runTransaction,
     deleteField,
@@ -38,7 +36,6 @@ import {
     signInWithEmailAndPassword,
     signOut,
     onAuthStateChanged,
-    createUserWithEmailAndPassword,
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 // Produkcyjna Baza Danych (dla GitHub Pages)
@@ -201,24 +198,25 @@ const createCollectionWrapper = (collectionName) => {
 const createBatchWrapper = () => {
     const batch = writeBatch(firestoreDb);
 
-    return {
-        set: (docWrapper, data, options) => {
+    const wrapper = {
+        set(docWrapper, data, options) {
             const docRef = docWrapper._ref || doc(firestoreDb, docWrapper._collectionName, docWrapper._docId);
             batch.set(docRef, data, options || {});
-            return this;
+            return wrapper;
         },
-        update: (docWrapper, data) => {
+        update(docWrapper, data) {
             const docRef = docWrapper._ref || doc(firestoreDb, docWrapper._collectionName, docWrapper._docId);
             batch.update(docRef, data);
-            return this;
+            return wrapper;
         },
-        delete: (docWrapper) => {
+        delete(docWrapper) {
             const docRef = docWrapper._ref || doc(firestoreDb, docWrapper._collectionName, docWrapper._docId);
             batch.delete(docRef);
-            return this;
+            return wrapper;
         },
         commit: () => batch.commit(),
     };
+    return wrapper;
 };
 
 /**
@@ -309,15 +307,13 @@ export {
     getDocs,
     query,
     where,
-    orderBy,
-    limit,
     writeBatch,
     runTransaction,
     deleteField,
     serverTimestamp,
 };
 
-export { signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword };
+export { signInWithEmailAndPassword, signOut, onAuthStateChanged };
 
 // Backward compatibility dla window.db, window.auth i firebase.firestore.FieldValue
 if (typeof window !== 'undefined') {

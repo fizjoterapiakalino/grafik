@@ -42,7 +42,9 @@ interface AppState {
 interface ScheduleUIAPI {
     initialize(appState: AppState): void;
     render(): void;
+    flushPendingRenderIfIdle(): void;
     getElementText(element: HTMLElement | null): string;
+    applyCellDataToDom(cell: HTMLTableCellElement, cellObj: CellData): void;
     updatePatientCount(): void;
     destroy(): void;
 }
@@ -58,6 +60,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
     let _leavesLoaded = false;
     let _stationsUnsubscribe: (() => void) | null = null;
     let _stationOverlayInterval: ReturnType<typeof setInterval> | null = null;
+    let _pendingRenderAfterEdit = false;
 
     interface StationRealtimeState {
         status?: string;
@@ -571,6 +574,15 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                 renderTable();
             }
         });
+
+        const mainTable = document.getElementById('mainScheduleTable');
+        if (mainTable) {
+            mainTable.addEventListener('focusout', () => {
+                setTimeout(() => {
+                    flushPendingRenderIfIdle();
+                }, 50);
+            });
+        }
     };
 
     const getElementText = (element: HTMLElement | null): string => {
@@ -590,18 +602,13 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         return text.trim();
     };
 
-    const parseScheduleTimeToMinutes = (timeString: string): number | null => {
-        const [hourRaw, minuteRaw] = timeString.split(':');
-        const hour = Number(hourRaw);
-        const minute = Number(minuteRaw);
-        if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
-        return hour * 60 + minute;
+    const timeToMinutes = (timeString: string): number => {
+        const [hour, minute] = timeString.split(':').map(Number);
+        return (hour || 0) * 60 + (minute || 0);
     };
 
     const isPastScheduleSlot = (timeString: string, now = new Date()): boolean => {
-        const slotMinutes = parseScheduleTimeToMinutes(timeString);
-        if (slotMinutes === null) return false;
-        return now.getHours() * 60 + now.getMinutes() > slotMinutes;
+        return now.getHours() * 60 + now.getMinutes() > timeToMinutes(timeString);
     };
 
     const hasFullPatientContent = (cellObj: CellData): boolean => {
@@ -706,6 +713,16 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                     div.title = tooltipText;
                 }
 
+                if (part.isAbsentToday) {
+                    const absenceTooltip = '⚠️ Zgłoszona nieobecność w dniu dzisiejszym';
+                    div.title = div.title ? `${div.title}\n${absenceTooltip}` : absenceTooltip;
+                    const badge = document.createElement('span');
+                    badge.className = 'cell-icon patient-absence-badge';
+                    badge.setAttribute('title', 'Zgłoszona nieobecność w dniu dzisiejszym');
+                    badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                    div.appendChild(badge);
+                }
+
                 wrapper.appendChild(div);
             });
             cell.appendChild(wrapper);
@@ -737,6 +754,16 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
                 }
                 cell.title = tooltipText;
             }
+
+            if (displayData.isAbsentToday) {
+                const absenceTooltip = '⚠️ Zgłoszona nieobecność w dniu dzisiejszym';
+                cell.title = cell.title ? `${cell.title}\n${absenceTooltip}` : absenceTooltip;
+                const badge = document.createElement('span');
+                badge.className = 'cell-icon patient-absence-badge';
+                badge.setAttribute('title', 'Zgłoszona nieobecność w dniu dzisiejszym');
+                badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                cell.appendChild(badge);
+            }
         }
     };
 
@@ -761,54 +788,12 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         return `${currentHour}:${currentMinute.toString().padStart(2, '0')}`;
     };
 
-    const timeToMinutes = (time: string): number => {
-        const [hour, minute] = time.split(':').map(Number);
-        return hour * 60 + minute;
-    };
-
     const appendMobileTag = (container: HTMLElement, label: string, className = ''): void => {
         const tag = document.createElement('span');
         tag.className = `mobile-schedule-tag${className ? ` ${className}` : ''}`;
         tag.textContent = label;
         container.appendChild(tag);
     };
-
-    const appendMobileTreatmentTags = (container: HTMLElement, displayData: ReturnType<typeof ScheduleLogic.getCellDisplayData>): void => {
-        if (displayData.isBreak) {
-            appendMobileTag(container, 'Przerwa', 'break');
-            return;
-        }
-
-        const parts = displayData.isSplit ? displayData.parts : [{
-            isMassage: displayData.classes.includes('massage-text'),
-            isPnf: displayData.classes.includes('pnf-text'),
-            isEveryOtherDay: displayData.classes.includes('every-other-day-text'),
-            isHydrotherapy: displayData.classes.includes('hydrotherapy-cell'),
-            treatmentEndDate: displayData.treatmentEndDate,
-        }];
-
-        if (displayData.isSplit) {
-            parts.forEach((part, index) => {
-                const prefix = `${index + 1}: `;
-                if (part.isMassage) appendMobileTag(container, `${prefix}Masaż`, 'massage');
-                if (part.isPnf) appendMobileTag(container, `${prefix}PNF`, 'pnf');
-                if (part.isEveryOtherDay) appendMobileTag(container, `${prefix}Co 2 dni`);
-                if (part.isHydrotherapy) appendMobileTag(container, `${prefix}Hydroterapia`, 'hydro');
-                if (part.treatmentEndDate) appendMobileTag(container, `${prefix}Koniec ${formatDatePolish(part.treatmentEndDate)}`);
-            });
-            if (!container.children.length) appendMobileTag(container, 'Podzielona');
-            return;
-        }
-
-        const part = parts[0];
-        if (part.isMassage) appendMobileTag(container, 'Masaż', 'massage');
-        if (part.isPnf) appendMobileTag(container, 'PNF', 'pnf');
-        if (part.isEveryOtherDay) appendMobileTag(container, 'Co 2 dni');
-        if (part.isHydrotherapy) appendMobileTag(container, 'Hydroterapia', 'hydro');
-        if (part.treatmentEndDate) appendMobileTag(container, `Koniec ${formatDatePolish(part.treatmentEndDate)}`);
-        if (!container.children.length) appendMobileTag(container, '30 min');
-    };
-    void appendMobileTreatmentTags;
 
     type MobileTreatmentTagSource = {
         isBreak?: boolean;
@@ -818,6 +803,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         isSharedPatient?: boolean;
         isHydrotherapy?: boolean;
         treatmentEndDate?: string | null;
+        isAbsentToday?: boolean;
     };
 
     const appendMobileTreatmentTagsInline = (
@@ -830,6 +816,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             return;
         }
 
+        if (tagSource.isAbsentToday) appendMobileTag(container, '⚠️ Nieobecny', 'absence');
         if (tagSource.isMassage) appendMobileTag(container, 'Masaż', 'massage');
         if (tagSource.isPnf) appendMobileTag(container, 'PNF', 'pnf');
         if (tagSource.isEveryOtherDay) appendMobileTag(container, 'Co 2 dni');
@@ -849,6 +836,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         isSharedPatient: displayData.classes.includes('shared-patient-cell'),
         isHydrotherapy: displayData.classes.includes('hydrotherapy-cell'),
         treatmentEndDate: displayData.treatmentEndDate,
+        isAbsentToday: displayData.isAbsentToday,
     });
 
     const appendMobileInlineMeta = (
@@ -1095,6 +1083,12 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         const mainTable = document.getElementById('mainScheduleTable') as HTMLTableElement | null;
         if (!mainTable || !_appState) return;
 
+        const isEditing = Boolean(document.querySelector('#mainScheduleTable [contenteditable="true"], .mobile-schedule-container [contenteditable="true"]'));
+        if (isEditing) {
+            _pendingRenderAfterEdit = true;
+            return;
+        }
+
         const isMobile = window.innerWidth <= 1024;
 
         let employeeIndices: string[] = [];
@@ -1277,6 +1271,15 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         patientCountElement.textContent = `Terapie: ${therapyCount}`;
     };
 
+    const flushPendingRenderIfIdle = (): void => {
+        if (!_pendingRenderAfterEdit) return;
+        const isEditing = Boolean(document.querySelector('#mainScheduleTable [contenteditable="true"], .mobile-schedule-container [contenteditable="true"]'));
+        if (!isEditing) {
+            _pendingRenderAfterEdit = false;
+            renderTable();
+        }
+    };
+
     const destroy = (): void => {
         if (_currentTimeInterval) {
             clearInterval(_currentTimeInterval);
@@ -1291,22 +1294,23 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             _stationsUnsubscribe = null;
         }
         _employeeStationOverlays = {};
+        if (_employeeTooltip) {
+            _employeeTooltip.remove();
+            _employeeTooltip = null;
+        }
+        _leavesLoaded = false;
+        _pendingRenderAfterEdit = false;
     };
 
     return {
         initialize,
         render: renderTable,
+        flushPendingRenderIfIdle,
         getElementText,
+        applyCellDataToDom,
         updatePatientCount,
         destroy,
     };
 })();
 
-// Backward compatibility
-declare global {
-    interface Window {
-        ScheduleUI: ScheduleUIAPI;
-    }
-}
-
-window.ScheduleUI = ScheduleUI;
+export const applyCellDataToDom = ScheduleUI.applyCellDataToDom;

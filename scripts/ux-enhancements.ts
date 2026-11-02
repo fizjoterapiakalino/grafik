@@ -167,6 +167,11 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
         const hoursElapsed = Math.floor(Math.max(0, minutesSinceStart) / 60);
         const minsElapsed = Math.max(0, minutesSinceStart) % 60;
 
+        // Czas do rozpoczęcia (dla godzin przed startem)
+        const minsToStart = (startHour - currentHour) * 60 - currentMinute;
+        const hToStart = Math.max(0, Math.floor(minsToStart / 60));
+        const mToStart = Math.max(0, minsToStart % 60);
+
         // Aktualizuj UI
         progressFill.style.width = `${progress}%`;
         progressMarker.style.left = `${progress}%`;
@@ -179,9 +184,6 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
                 `Do końca zmiany: ${hoursRemaining}h ${minsRemaining}min\nMinęło: ${hoursElapsed}h ${minsElapsed}min`
             );
         } else if (currentHour < startHour) {
-            const minsToStart = (startHour - currentHour) * 60 - currentMinute;
-            const hToStart = Math.floor(minsToStart / 60);
-            const mToStart = minsToStart % 60;
             progressMarker.setAttribute('title', `Do rozpoczęcia: ${hToStart}h ${mToStart}min`);
         } else {
             progressMarker.setAttribute('title', 'Zmiana zakończona');
@@ -195,9 +197,6 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
                 elapsedText = `Minęło: ${hoursElapsed}h ${minsElapsed}min`;
                 remainingText = `Pozostało: ${hoursRemaining}h ${minsRemaining}min`;
             } else if (currentHour < startHour) {
-                const minsToStart = (startHour - currentHour) * 60 - currentMinute;
-                const hToStart = Math.floor(minsToStart / 60);
-                const mToStart = minsToStart % 60;
                 elapsedText = 'Przed rozpoczęciem';
                 remainingText = `Start za: ${hToStart}h ${mToStart}min`;
             } else {
@@ -216,9 +215,6 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
             if (currentHour >= startHour && currentHour < endHour) {
                 progressRemaining.innerHTML = `<small>Pozostało: <strong>${hoursRemaining}h ${minsRemaining}min</strong></small>`;
             } else if (currentHour < startHour) {
-                const minsToStart = (startHour - currentHour) * 60 - currentMinute;
-                const hToStart = Math.floor(minsToStart / 60);
-                const mToStart = minsToStart % 60;
                 progressRemaining.innerHTML = `<small>Start za: ${hToStart}h ${mToStart}min</small>`;
             } else {
                 progressRemaining.innerHTML = `<small>Do jutra 7:00</small>`;
@@ -267,41 +263,6 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
     };
 
     /**
-     * Dodaje animacje przejść do strony
-     */
-    const initPageTransitions = (): void => {
-        // Dodaj klasę animacji do kontenera strony
-        const pageContent = document.getElementById('page-content');
-        if (pageContent) {
-            pageContent.classList.add('page-transition');
-        }
-
-        // Obserwuj zmiany w kontenerze strony
-        const observer = new MutationObserver((mutations: MutationRecord[]) => {
-            mutations.forEach((mutation) => {
-                if (mutation.type === 'childList' && mutation.addedNodes.length > 0 && pageContent) {
-                    // Dodaj animację wejścia
-                    pageContent.classList.add('page-enter');
-                    requestAnimationFrame(() => {
-                        pageContent.classList.add('page-enter-active');
-                    });
-
-                    // Usuń klasy po animacji
-                    setTimeout(() => {
-                        pageContent.classList.remove('page-enter', 'page-enter-active');
-                    }, 300);
-                }
-            });
-        });
-
-        if (pageContent) {
-            observer.observe(pageContent, { childList: true });
-        }
-
-        debugLog('UXEnhancements: Animacje przejść zainicjowane');
-    };
-
-    /**
      * Inicjalizuje wyróżnik środowiska deweloperskiego (lokalnego)
      */
     const initDevEnvironmentBadge = (): void => {
@@ -325,7 +286,6 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
      */
     const init = (): void => {
         initKeyboardShortcuts();
-        initPageTransitions();
         initDevEnvironmentBadge();
         debugLog('UXEnhancements: Moduł zainicjowany');
     };
@@ -355,14 +315,3 @@ export const UXEnhancements: UXEnhancementsAPI = (() => {
         updateDayProgress,
     };
 })();
-
-// Backward compatibility - przypisanie do window
-declare global {
-    interface Window {
-        UXEnhancements: UXEnhancementsAPI;
-    }
-}
-
-if (typeof window !== 'undefined') {
-    window.UXEnhancements = UXEnhancements;
-}

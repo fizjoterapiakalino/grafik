@@ -3,6 +3,7 @@ import { UIShell } from './ui-shell.js';
 import { EmployeeManager } from './employee-manager.js';
 import { auth as authRaw } from './firebase-config.js';
 import { PdfService } from './pdf-service.js';
+import { resolveAllowedNavigationKeys } from './navigation-access.js';
 import type { FirebaseAuthWrapper, FirebaseUser } from './types/firebase';
 
 import { Schedule } from './schedule.js';
@@ -15,7 +16,6 @@ import { Login } from './login.js';
 import { Statistics } from './statistics.js';
 import { Stations } from './stations.js';
 import { Appointments } from './appointments.js';
-import { ScheduleMobileTest } from './schedule-mobile-test.js';
 import { Interview } from './interview.js';
 
 const auth = authRaw as unknown as FirebaseAuthWrapper;
@@ -33,8 +33,7 @@ interface PageModule {
  */
 interface Route {
     page: string;
-    init(): void | Promise<void>;
-    getModule(): PageModule;
+    module: PageModule;
 }
 
 /**
@@ -49,94 +48,47 @@ interface RouterAPI {
  */
 export const Router: RouterAPI = (() => {
     const routes: Record<string, Route> = {
-        schedule: {
-            page: 'schedule',
-            init: () => Schedule.init(),
-            getModule: () => Schedule,
-        },
-        'schedule-mobile-test': {
-            page: 'schedule-mobile-test',
-            init: () => ScheduleMobileTest.init(),
-            getModule: () => ScheduleMobileTest,
-        },
-        leaves: {
-            page: 'leaves',
-            init: () => Leaves.init(),
-            getModule: () => Leaves,
-        },
-        changes: {
-            page: 'changes',
-            init: () => Changes.init(),
-            getModule: () => Changes,
-        },
-        'changes-rotation': {
-            page: 'changes-rotation',
-            init: () => ChangesRotation.init(),
-            getModule: () => ChangesRotation,
-        },
-        'scrapped-pdfs': {
-            page: 'scrapped-pdfs',
-            init: () => ScrappedPdfs.init(),
-            getModule: () => ScrappedPdfs,
-        },
-        options: {
-            page: 'options',
-            init: () => Options.init(),
-            getModule: () => Options,
-        },
-        statistics: {
-            page: 'statistics',
-            init: () => Statistics.init(),
-            getModule: () => Statistics,
-        },
-        stations: {
-            page: 'stations',
-            init: () => Stations.init(),
-            getModule: () => Stations,
-        },
-        'massage-stations': {
-            page: 'massage-stations',
-            init: () => Stations.init(),
-            getModule: () => Stations,
-        },
-        appointments: {
-            page: 'appointments',
-            init: () => Appointments.init(),
-            getModule: () => Appointments,
-        },
-        interview: {
-            page: 'interview',
-            init: () => Interview.init(),
-            getModule: () => Interview,
-        },
-        login: {
-            page: 'login',
-            init: () => Login.init(),
-            getModule: () => Login,
-        },
+        schedule: { page: 'schedule', module: Schedule },
+        leaves: { page: 'leaves', module: Leaves },
+        changes: { page: 'changes', module: Changes },
+        'changes-rotation': { page: 'changes-rotation', module: ChangesRotation },
+        'scrapped-pdfs': { page: 'scrapped-pdfs', module: ScrappedPdfs },
+        options: { page: 'options', module: Options },
+        statistics: { page: 'statistics', module: Statistics },
+        stations: { page: 'stations', module: Stations },
+        'massage-stations': { page: 'massage-stations', module: Stations },
+        appointments: { page: 'appointments', module: Appointments },
+        interview: { page: 'interview', module: Interview },
+        login: { page: 'login', module: Login },
     };
 
     let activeModule: PageModule | null = null;
     let currentUser: FirebaseUser | null = null;
     let isNavigating = false;
+    let navigationQueued = false;
+    let isAuthReady = false;
+    let pendingPostLoginPage: string | null = null;
     let lastUserUid: string | null = null;
     let pdfServicesStarted = false;
 
     const init = (): void => {
         UIShell.render();
-        window.addEventListener('hashchange', navigate);
+        window.addEventListener('hashchange', () => {
+            if (!isAuthReady) return;
+            void navigate();
+        });
         document.addEventListener('app:access-mode-updated', () => {
-            navigate();
+            if (!isAuthReady) return;
+            void navigate();
         });
 
-        let isInitialAuthCheck = true;
         auth.onAuthStateChanged((user) => {
             const currentUid = user ? user.uid : null;
-            if (isInitialAuthCheck || currentUid !== lastUserUid) {
+            if (!isAuthReady || currentUid !== lastUserUid) {
+                isAuthReady = true;
                 currentUser = user;
                 lastUserUid = currentUid;
-                navigate();
-                isInitialAuthCheck = false;
+                void navigate();
             }
         });
     };
@@ -145,11 +97,11 @@ export const Router: RouterAPI = (() => {
         if (pdfServicesStarted) return;
         pdfServicesStarted = true;
         PdfService.fetchAndCachePdfLinks();
-        PdfService.initRealtimeUpdates();
     };
 
     const navigate = async (): Promise<void> => {
         if (isNavigating) {
+            navigationQueued = true;
             return;
         }
         isNavigating = true;
@@ -169,19 +121,52 @@ export const Router: RouterAPI = (() => {
             let targetPage: string;
 
             if (currentUser) {
-                targetPage = pageName === 'login' || !pageName ? 'schedule' : pageName;
+                if (pendingPostLoginPage) {
+                    targetPage = pendingPostLoginPage;
+                    pendingPostLoginPage = null;
+                } else {
+                    targetPage = pageName === 'login' || !pageName ? 'schedule' : pageName;
+                }
             } else {
+                if (pageName && pageName !== 'login') {
+                    pendingPostLoginPage = pageName;
+                }
                 targetPage = 'login';
             }
 
+            let isMassageAccess = false;
             if (currentUser) {
                 await EmployeeManager.load();
-            }
+                const employee = EmployeeManager.getEmployeeByUid(currentUser.uid);
+                const isAdmin = EmployeeManager.isUserAdmin(currentUser.uid);
+                isMassageAccess = EmployeeManager.isMassageAccessUser(currentUser.uid);
 
-            const isMassageAccess = currentUser ? EmployeeManager.isMassageAccessUser(currentUser.uid) : false;
-            if (currentUser && isMassageAccess) {
-                const allowedMassagePages = new Set(['massage-stations', 'options']);
-                targetPage = allowedMassagePages.has(targetPage) ? targetPage : 'massage-stations';
+                if (EmployeeManager.hasLoadError() && !employee) {
+                    targetPage = 'schedule';
+                } else if (isMassageAccess) {
+                    const allowedMassagePages = new Set(['massage-stations', 'options']);
+                    if (!allowedMassagePages.has(targetPage)) {
+                        targetPage = 'massage-stations';
+                    }
+                } else {
+                    const allowedKeys = resolveAllowedNavigationKeys(employee);
+                    if (isAdmin) {
+                        allowedKeys.add('options');
+                        if (allowedKeys.has('changes')) {
+                            allowedKeys.add('changes-rotation');
+                        }
+                    }
+
+                    const effectiveKey = targetPage === 'changes-rotation' ? 'changes' : targetPage;
+                    const isTargetAllowed = allowedKeys.has(effectiveKey);
+
+                    if (!isTargetAllowed) {
+                        const fallback = allowedKeys.has('schedule')
+                            ? 'schedule'
+                            : (allowedKeys.values().next().value || 'schedule');
+                        targetPage = fallback;
+                    }
+                }
             }
 
             if (pageName !== targetPage) {
@@ -208,15 +193,19 @@ export const Router: RouterAPI = (() => {
 
             await UIShell.loadPage(route.page);
 
-            const printButton = document.getElementById('printChangesTable');
-            if (printButton) {
-                printButton.style.display = targetPage === 'changes' ? 'block' : 'none';
+            activeModule = route.module;
+            try {
+                await route.module.init();
+            } catch (initErr) {
+                console.error(`Error initializing module for ${targetPage}:`, initErr);
+                try {
+                    activeModule?.destroy?.();
+                } catch (destroyErr) {
+                    console.error('Error destroying failed module:', destroyErr);
+                }
+                activeModule = null;
+                throw initErr;
             }
-
-            if (route.init) {
-                await route.init();
-            }
-            activeModule = route.getModule ? route.getModule() : null;
 
             if (targetPage === 'scrapped-pdfs') {
                 PdfService.markAsSeen();
@@ -226,6 +215,10 @@ export const Router: RouterAPI = (() => {
         } finally {
             UIShell.hideLoading();
             isNavigating = false;
+            if (navigationQueued) {
+                navigationQueued = false;
+                void navigate();
+            }
         }
     };
 

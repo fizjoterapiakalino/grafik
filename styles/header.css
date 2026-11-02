@@ -92,6 +92,12 @@
 .action-icon-btn.active {
     color: white;
     border-color: rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+}
+
+.action-icon-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
 }
 
 .action-icon-btn.active:hover {
@@ -113,6 +119,98 @@
     border-color: rgba(59, 130, 246, 0.5);
     background: rgba(59, 130, 246, 0.1);
 }
+
+.action-icon-btn.btn-absence,
+.action-icon-btn#btnReportAbsence {
+    width: auto;
+    min-width: 40px;
+    height: 40px;
+    padding: 0 10px;
+    gap: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+}
+
+.action-icon-btn.btn-absence i,
+.action-icon-btn#btnReportAbsence i {
+    color: #f59e0b;
+    font-size: 0.95rem;
+    transition: color var(--transition-normal);
+}
+
+.action-icon-btn.btn-absence .absence-btn-label,
+.action-icon-btn#btnReportAbsence .absence-btn-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #fbbf24;
+    white-space: nowrap;
+    line-height: 1;
+    transition: color var(--transition-normal);
+}
+
+.action-icon-btn.btn-absence:disabled,
+.action-icon-btn#btnReportAbsence:disabled {
+    opacity: 0.45;
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.action-icon-btn.btn-absence:disabled i,
+.action-icon-btn#btnReportAbsence:disabled i,
+.action-icon-btn.btn-absence:disabled .absence-btn-label,
+.action-icon-btn#btnReportAbsence:disabled .absence-btn-label {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.action-icon-btn.btn-absence.active,
+.action-icon-btn#btnReportAbsence.active {
+    border-color: rgba(245, 158, 11, 0.8);
+    background: rgba(245, 158, 11, 0.2);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.35);
+    cursor: pointer;
+}
+
+.action-icon-btn.btn-absence.active i,
+.action-icon-btn#btnReportAbsence.active i,
+.action-icon-btn.btn-absence.active .absence-btn-label,
+.action-icon-btn#btnReportAbsence.active .absence-btn-label {
+    color: #fbbf24;
+}
+
+.action-icon-btn.btn-absence.active:hover,
+.action-icon-btn#btnReportAbsence.active:hover {
+    background: #f59e0b;
+    border-color: #f59e0b;
+    color: white;
+}
+
+.action-icon-btn.btn-absence.active:hover i,
+.action-icon-btn#btnReportAbsence.active:hover i,
+.action-icon-btn.btn-absence.active:hover .absence-btn-label,
+.action-icon-btn#btnReportAbsence.active:hover .absence-btn-label {
+    color: white;
+}
+
+@media (max-width: 900px) {
+    .action-icon-btn.btn-absence,
+    .action-icon-btn#btnReportAbsence {
+        width: 40px;
+        min-width: 40px;
+        padding: 0;
+    }
+
+    .action-icon-btn.btn-absence .absence-btn-label,
+    .action-icon-btn#btnReportAbsence .absence-btn-label {
+        display: none;
+    }
+}
+
 
 /* Header action buttons - always visible and slightly larger */
 .header-action-btn {

@@ -26,10 +26,12 @@ describe('common helpers', () => {
         expect(getEasterDate(2025).toISOString().slice(0, 10)).toBe('2025-04-20');
     });
 
-    test('recognizes fixed and movable Polish holidays', () => {
+    test('recognizes fixed and movable Polish holidays including Wigilia from 2025+', () => {
         expect(isHoliday(new Date(Date.UTC(2026, 0, 1)))).toBe(true);
         expect(isHoliday(new Date(Date.UTC(2026, 5, 4)))).toBe(true); // Boze Cialo 2026
         expect(isHoliday(new Date(Date.UTC(2026, 4, 4)))).toBe(false);
+        expect(isHoliday(new Date(Date.UTC(2024, 11, 24)))).toBe(false); // Wigilia 2024 - workday
+        expect(isHoliday(new Date(Date.UTC(2025, 11, 24)))).toBe(true);  // Wigilia 2025 - holiday
     });
 
     test('counts workdays excluding weekends and holidays', () => {

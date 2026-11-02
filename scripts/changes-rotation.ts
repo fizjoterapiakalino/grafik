@@ -29,10 +29,16 @@ interface RotationStation {
     role: StationRole;
 }
 
-interface RotationPeriod {
-    start: string;
-    end: string;
-}
+import { isWeekend, generateTwoWeekPeriods } from './rotation-periods.js';
+import type { RotationPeriod } from './rotation-periods.js';
+export { isWeekend, generateTwoWeekPeriods };
+export type { RotationPeriod };
+
+export const formatDate = (date: Date): string => {
+    const day = date.getUTCDate().toString().padStart(2, '0');
+    const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+    return `${day}.${month}`;
+};
 
 interface RotationPlanRow {
     period: RotationPeriod;
@@ -95,17 +101,6 @@ export const ChangesRotation: ChangesRotationAPI = (() => {
     let leavesData: Record<string, LeaveEntry[]> = {};
     let editingRowIndex: number | null = null;
 
-    const isWeekend = (date: Date): boolean => {
-        const day = date.getUTCDay();
-        return day === 0 || day === 6;
-    };
-
-    const formatDate = (date: Date): string => {
-        const day = date.getUTCDate().toString().padStart(2, '0');
-        const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
-        return `${day}.${month}`;
-    };
-
     const formatPeriod = (period: RotationPeriod): string => {
         return `${formatDate(new Date(period.start))} - ${formatDate(new Date(period.end))}`;
     };
@@ -120,43 +115,6 @@ export const ChangesRotation: ChangesRotationAPI = (() => {
     };
 
     const isRowReadOnly = (row: RotationPlanRow): boolean => Boolean(row.readOnly || isPastPeriod(row.period));
-
-    const generateTwoWeekPeriods = (year: number): RotationPeriod[] => {
-        const periods: RotationPeriod[] = [];
-        let currentDate = new Date(Date.UTC(year, 0, 1));
-
-        while (currentDate.getUTCDay() !== 1) {
-            currentDate.setUTCDate(currentDate.getUTCDate() - 1);
-        }
-
-        while (currentDate.getUTCFullYear() <= year) {
-            const startDate = new Date(currentDate);
-            let endDate = new Date(startDate);
-            let workDaysCount = 0;
-
-            while (workDaysCount < 10) {
-                if (!isWeekend(endDate)) {
-                    workDaysCount++;
-                }
-                if (workDaysCount < 10) {
-                    endDate.setUTCDate(endDate.getUTCDate() + 1);
-                }
-            }
-
-            periods.push({
-                start: startDate.toISOString().split('T')[0],
-                end: endDate.toISOString().split('T')[0],
-            });
-
-            currentDate = new Date(endDate);
-            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
-            while (isWeekend(currentDate)) {
-                currentDate.setUTCDate(currentDate.getUTCDate() + 1);
-            }
-        }
-
-        return periods;
-    };
 
     const getVisibleEmployeeIds = (): string[] => {
         const employees = EmployeeManager.getAll();
@@ -1250,46 +1208,49 @@ export const ChangesRotation: ChangesRotationAPI = (() => {
 
         try {
             window.setSaveStatus?.('saving');
-            const publishedRowsCount = draft.rows.length;
+            const activeDraft = draft;
+            const publishedRowsCount = activeDraft.rows.length;
             const targetYears = new Set<number>([
-                ...draft.rows.map((row) => row.sourceYear || draft!.year),
-                ...Object.values(draft.deletedPeriods || {}),
+                ...activeDraft.rows.map((row) => row.sourceYear || activeDraft.year),
+                ...Object.values(activeDraft.deletedPeriods || {}),
             ]);
 
             for (const targetYear of targetYears) {
                 const docRef = db.collection(AppConfig.firestore.collections.schedules).doc(`changesSchedule_${targetYear}`);
-                const docSnap = await docRef.get();
-                const currentState = docSnap.exists ? (docSnap.data() as PublishedChangesState | undefined) : undefined;
-                const changesCells: Record<string, Record<number, ChangesCellState>> = {
-                    ...(currentState?.changesCells || {}),
-                };
+                await db.runTransaction(async (transaction) => {
+                    const docSnap = await transaction.get(docRef);
+                    const currentState = docSnap.exists ? (docSnap.data() as PublishedChangesState | undefined) : undefined;
+                    const changesCells: Record<string, Record<number, ChangesCellState>> = {
+                        ...(currentState?.changesCells || {}),
+                    };
 
-                Object.entries(draft.deletedPeriods || {}).forEach(([periodStart, sourceYear]) => {
-                    if (sourceYear === targetYear) {
-                        delete changesCells[periodStart];
-                    }
-                });
-
-                draft.rows
-                    .filter((row) => (row.sourceYear || draft!.year) === targetYear)
-                    .forEach((row) => {
-                        const periodCells: Record<number, ChangesCellState> = {};
-
-                        STATIONS.forEach((station) => {
-                            const assignedEmployees = [...(row.cells[station.id] || [])];
-                            const substitutes = Object.fromEntries(
-                                Object.entries(row.substitutes || {}).filter(([employeeId]) => assignedEmployees.includes(employeeId)),
-                            );
-
-                            periodCells[station.id] = Object.keys(substitutes).length > 0
-                                ? { assignedEmployees, substitutes }
-                                : { assignedEmployees };
-                        });
-
-                        changesCells[row.period.start] = periodCells;
+                    Object.entries(activeDraft.deletedPeriods || {}).forEach(([periodStart, sourceYear]) => {
+                        if (sourceYear === targetYear) {
+                            delete changesCells[periodStart];
+                        }
                     });
 
-                await docRef.set({ changesCells }, { merge: true });
+                    activeDraft.rows
+                        .filter((row) => (row.sourceYear || activeDraft.year) === targetYear)
+                        .forEach((row) => {
+                            const periodCells: Record<number, ChangesCellState> = {};
+
+                            STATIONS.forEach((station) => {
+                                const assignedEmployees = [...(row.cells[station.id] || [])];
+                                const substitutes = Object.fromEntries(
+                                    Object.entries(row.substitutes || {}).filter(([employeeId]) => assignedEmployees.includes(employeeId)),
+                                );
+
+                                periodCells[station.id] = Object.keys(substitutes).length > 0
+                                    ? { assignedEmployees, substitutes }
+                                    : { assignedEmployees };
+                            });
+
+                            changesCells[row.period.start] = periodCells;
+                        });
+
+                    transaction.set(docRef, { changesCells }, { merge: true });
+                });
             }
 
             const publishedYear = draft.year;
@@ -1550,11 +1511,3 @@ export const ChangesRotation: ChangesRotationAPI = (() => {
 
     return { init, destroy };
 })();
-
-declare global {
-    interface Window {
-        ChangesRotation: ChangesRotationAPI;
-    }
-}
-
-window.ChangesRotation = ChangesRotation;

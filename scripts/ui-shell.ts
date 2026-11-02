@@ -41,6 +41,7 @@ export const UIShell: UIShellAPI = (() => {
                 <div class="header-right-menu">
                     <div id="saveStatus" class="save-status"></div>
                     <div id="scheduleActionButtons" class="schedule-action-buttons">
+                        <button id="btnReportAbsence" class="action-icon-btn btn-absence" title="Zgłoś nieobecność pacjenta" aria-label="Zgłoś nieobecność pacjenta"><i class="fas fa-calendar-times"></i><span class="absence-btn-label">Nieobecność</span></button>
                         <button id="btnPatientInfo" class="action-icon-btn" title="Informacje o pacjencie"><i class="fas fa-user-circle"></i></button>
                         <button id="btnAddBreak" class="action-icon-btn" title="Dodaj przerwę"><i class="fas fa-coffee"></i></button>
                         <button id="btnHydrotherapy" class="action-icon-btn" title="Hydroterapia">
@@ -160,33 +161,15 @@ export const UIShell: UIShellAPI = (() => {
 
     const loadPage = async (pageName: string): Promise<void> => {
         const pageContent = document.getElementById('page-content');
-        const DYNAMIC_CSS_ID = 'page-specific-css';
 
         if (!pageContent) {
             console.error('Fatal error: #page-content element not found.');
             return Promise.reject('Page content container not found');
         }
 
-        // Remove old page-specific CSS
-        const oldStylesheet = document.getElementById(DYNAMIC_CSS_ID);
-        if (oldStylesheet) {
-            oldStylesheet.remove();
-        }
-
         try {
-            // Load new CSS if it exists
-            const cssPath = `styles/${pageName}.css?v=${Date.now()}`;
-            const cssResponse = await fetch(cssPath);
-            if (cssResponse.ok) {
-                const newStylesheet = document.createElement('link');
-                newStylesheet.id = DYNAMIC_CSS_ID;
-                newStylesheet.rel = 'stylesheet';
-                newStylesheet.href = cssPath;
-                document.head.appendChild(newStylesheet);
-            }
-
-            // Load new HTML with cache buster
-            const response = await fetch(`pages/${pageName}.html?v=${Date.now()}`);
+            // Load new HTML
+            const response = await fetch(`pages/${pageName}.html`);
             if (!response.ok) {
                 throw new Error(`Could not load page: ${pageName}`);
             }
@@ -310,12 +293,3 @@ export const UIShell: UIShellAPI = (() => {
         hideLoading,
     };
 })();
-
-// Backward compatibility
-declare global {
-    interface Window {
-        UIShell: UIShellAPI;
-    }
-}
-
-window.UIShell = UIShell;

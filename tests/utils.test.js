@@ -3,6 +3,8 @@ import {
     copyTreatmentData,
     deepClone,
     formatDatePL,
+    formatLocalIsoDate,
+    isSafeHttpUrl,
     isWorkday,
     safeBool,
     safeCopy,
@@ -40,6 +42,8 @@ describe('utils', () => {
         const state = {
             content: 'Pacjent',
             isMassage: true,
+            isHydrotherapy: true,
+            isHydrotherapy1: true,
             treatmentData1: { startDate: '2026-01-02' },
             untouched: 'keep',
         };
@@ -48,6 +52,8 @@ describe('utils', () => {
 
         expect(state.content).toBeNull();
         expect(state.isMassage).toBeNull();
+        expect(state.isHydrotherapy).toBeNull();
+        expect(state.isHydrotherapy1).toBeNull();
         expect(state.treatmentData1).toBeNull();
         expect(state.untouched).toBe('keep');
     });
@@ -117,5 +123,19 @@ describe('utils', () => {
         expect(escapeHTML('John Doe')).toBe('John Doe');
         expect(escapeHTML('<script>alert("xss")</script>')).toBe('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
         expect(escapeHTML('M&M\'s')).toBe('M&amp;M&#039;s');
+    });
+
+    test('formatLocalIsoDate uses local calendar components instead of UTC', () => {
+        const localMidnight = new Date(2026, 9, 29, 0, 30, 0);
+        expect(formatLocalIsoDate(localMidnight)).toBe('2026-10-29');
+    });
+
+    test('isSafeHttpUrl allows http/https and rejects javascript/data protocols', () => {
+        expect(isSafeHttpUrl('https://example.com/doc.pdf')).toBe(true);
+        expect(isSafeHttpUrl('http://localhost:3000/doc.pdf')).toBe(true);
+        expect(isSafeHttpUrl('javascript:alert(1)')).toBe(false);
+        expect(isSafeHttpUrl('  javascript:alert(1)')).toBe(false);
+        expect(isSafeHttpUrl('data:text/html,<script>alert(1)</script>')).toBe(false);
+        expect(isSafeHttpUrl('')).toBe(false);
     });
 });

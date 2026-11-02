@@ -194,10 +194,7 @@
 
 /* PDF Viewer Drawer Styles */
 #pdfModal.modal-overlay {
-    position: fixed;
-    inset: 0;
     z-index: 5000;
-    display: none;
     align-items: stretch;
     justify-content: flex-end;
     padding: 0;

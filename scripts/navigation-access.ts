@@ -20,3 +20,25 @@ export const NAVIGATION_ACCESS_ITEMS: NavigationAccessItem[] = [
 ];
 
 export const getDefaultNavigationAccess = (): string[] => NAVIGATION_ACCESS_ITEMS.map((item) => item.key);
+
+export const resolveAllowedNavigationKeys = (
+    employee: { role?: string; accessMode?: string; menuAccess?: string[] } | null | undefined
+): Set<string> => {
+    if (employee?.accessMode === 'massage') {
+        return new Set(['massage-stations', 'options']);
+    }
+
+    const allowedKeys = Array.isArray(employee?.menuAccess)
+        ? employee.menuAccess
+        : getDefaultNavigationAccess();
+    const allowed = new Set(allowedKeys);
+
+    const legacyStandardKeys = getDefaultNavigationAccess().filter(
+        (key) => key !== 'interview' && key !== 'massage-stations'
+    );
+    if (legacyStandardKeys.every((key) => allowed.has(key))) {
+        allowed.add('interview');
+    }
+
+    return allowed;
+};
