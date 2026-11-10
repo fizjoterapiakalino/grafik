@@ -110,7 +110,7 @@ const getWeeksForMonth = (year: number, month: number): number[] => {
 const DAY_WIDTH = 32; // pixels per day (increased for better visibility)
 const COLLAPSED_MONTH_WIDTH = 100; // base width for collapsed month (now flexes)
 
-// Track which months are expanded (by default current month and next are expanded)
+// Track which months are expanded (by default only current month is expanded)
 let expandedMonths: Set<number> = new Set();
 
 // Module-level state for current view data (needed for limit validation in popups)
@@ -133,16 +133,11 @@ export const setCurrentViewData = (
 
 
 /**
- * Initialize expanded months - expand current month and its neighbors
+ * Initialize expanded months - expand only current month
  */
 export const initExpandedMonths = (year: number): void => {
     const currentMonth = new Date().getMonth();
-    expandedMonths = new Set([currentMonth]);
-    // Also expand previous and next month if in current year
-    if (year === new Date().getFullYear()) {
-        if (currentMonth > 0) expandedMonths.add(currentMonth - 1);
-        if (currentMonth < 11) expandedMonths.add(currentMonth + 1);
-    }
+    expandedMonths = new Set(year === new Date().getFullYear() ? [currentMonth] : []);
 };
 
 /**

@@ -1,4 +1,5 @@
 import { Shared } from '../scripts/shared.js';
+import { APP_VERSION } from '../scripts/common.js';
 import { resolveAllowedNavigationKeys, getDefaultNavigationAccess } from '../scripts/navigation-access.js';
 
 const renderNav = () => {
@@ -81,5 +82,16 @@ describe('Shared navigation access', () => {
         expect(document.querySelector('[data-nav-access-key="schedule"]').style.display).toBe('none');
         expect(document.querySelector('[data-nav-access-key="appointments"]').style.display).toBe('none');
         expect(document.querySelector('[data-nav-access-key="options"]').style.display).toBe('');
+    });
+
+    test('initializes hamburger menu footer with app version and copyright', () => {
+        document.body.innerHTML = '<div id="appHeader"><div class="header-right-menu"></div></div><div id="dateTimeText"></div>';
+        Shared.initialize();
+
+        const footer = document.querySelector('.nav-panel .footer-info');
+        expect(footer).not.toBeNull();
+        expect(footer.querySelector('.app-version').textContent).toBe(`v${APP_VERSION}`);
+        expect(footer.querySelector('.footer-copyright').textContent).toContain('Fizjoterapia Kalinowa');
+        expect(footer.querySelector('.footer-copyright').textContent).toContain(String(new Date().getFullYear()));
     });
 });

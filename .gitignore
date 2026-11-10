@@ -30,3 +30,6 @@ Thumbs.db
 # Local dev helpers
 start-dev.sh
 graphify-out/
+_temp_debug/
+_temp_skills/
+

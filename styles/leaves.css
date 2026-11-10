@@ -34,11 +34,17 @@
     border-bottom: 2px solid var(--color-secondary);
 }
 
+#monthlyViewContainer {
+    max-height: calc(100vh - 200px);
+    overflow: auto;
+}
+
 /* Tabela urlopów i podsumowania */
 .leaves-table,
 .summary-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     margin-top: var(--spacing-lg);
     box-shadow: var(--shadow-sm);
     background-color: var(--glass-bg);
@@ -63,6 +69,21 @@
     background-color: var(--color-gray-800);
     z-index: 2;
     /* Ensure it stays above sticky columns if any */
+}
+
+.leaves-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background-color: var(--color-primary-600);
+}
+
+.leaves-table thead th:first-child {
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 4;
+    background-color: var(--color-gray-800);
 }
 
 .current-month-column {
@@ -1189,6 +1210,11 @@ table.summary-table tbody tr td.editable-carried-over:focus {
         background-color: white;
     }
 
+    #monthlyViewContainer {
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
     .leaves-table {
         box-shadow: none;
         width: 100%;
@@ -1201,6 +1227,10 @@ table.summary-table tbody tr td.editable-carried-over:focus {
         border: 1px solid #000;
         padding: 4px;
         font-size: 0.8em;
+    }
+
+    .leaves-table thead th {
+        position: static !important;
     }
 
     .employee-name-cell {

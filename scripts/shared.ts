@@ -1,5 +1,5 @@
 // scripts/shared.ts
-import { debounce, showToast } from './common.js';
+import { debounce, showToast, APP_VERSION } from './common.js';
 import { NAVIGATION_ACCESS_ITEMS, resolveAllowedNavigationKeys } from './navigation-access.js';
 import type { Employee } from './types';
 
@@ -119,7 +119,11 @@ export const Shared: SharedAPI = (() => {
 
             const footerInfo = document.createElement('div');
             footerInfo.className = 'footer-info';
-            footerInfo.innerHTML = '<p>&copy; 2025 Fizjoterapia Kalinowa. Wszelkie prawa zastrzeżone.</p>';
+            const currentYear = new Date().getFullYear();
+            footerInfo.innerHTML = `
+                <div class="app-version">v${APP_VERSION}</div>
+                <p class="footer-copyright">&copy; ${currentYear} Fizjoterapia Kalinowa.<br>Wszelkie prawa zastrzeżone.</p>
+            `;
             navPanel.appendChild(footerInfo);
 
             if (headerRightMenu) {

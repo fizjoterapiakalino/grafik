@@ -2,6 +2,17 @@
 
 Wszystkie istotne zmiany w projekcie będą dokumentowane w tym pliku.
 
+## [2.2.0] - 2026-11-10
+
+### Dodano (Added)
+- **Wersjonowanie w menu**: Dodano badge z wersją aplikacji i zaktualizowano stopkę w hamburger menu panelu nawigacyjnego.
+- **Legenda harmonogramu**: Dodano opisy ikon dzwoneczka (zakończony zabieg) oraz wykrzyknika (zgłoszona nieobecność pacjenta).
+- **Zgłaszanie nieobecności pacjentów**: Dodano modal zgłaszania nieobecności pacjentów z podglądem w grafiku.
+
+### Zmieniono (Changed)
+- **Przypięty nagłówek tabeli urlopów (Sticky Header)**: Widok miesięczny urlopów ma teraz zablokowany nagłówek kolumn i nagłówek pracownika podczas przewijania.
+- **Domyślny zakres widoku Gantt**: Ograniczono automatyczne rozwijanie miesięcy wyłącznie do bieżącego miesiąca.
+
 ## [2.1.0] - 2025-12-31
 
 ### Dodano (Added)

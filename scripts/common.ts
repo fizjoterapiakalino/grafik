@@ -51,6 +51,7 @@ interface UndoConfig {
 }
 
 export interface AppConfigType {
+    version: string;
     schedule: ScheduleConfig;
     changes: ChangesConfig;
     leaves: LeavesConfig;
@@ -59,7 +60,10 @@ export interface AppConfigType {
     debug?: boolean;
 }
 
+export const APP_VERSION = '2.2.0';
+
 export const AppConfig: AppConfigType = {
+    version: APP_VERSION,
     schedule: {
         startHour: 7,
         endHour: 17,

@@ -1544,6 +1544,19 @@ td.current-time-highlight {
     transform: none;
 }
 
+.legend-icon-item {
+    gap: 6px;
+    cursor: default;
+}
+
+.legend-icon-item i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
 .legend-dot {
     width: 8px;
     height: 8px;
@@ -1757,6 +1770,14 @@ td.current-time-highlight {
         font-size: 0.66rem;
         letter-spacing: 0.02em;
         overflow-wrap: anywhere;
+    }
+
+    .legend-icon-item {
+        gap: 5px;
+    }
+
+    .legend-icon-item i {
+        font-size: 0.75rem !important;
     }
 
     .patient-count-badge {
