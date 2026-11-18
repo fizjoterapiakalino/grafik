@@ -325,4 +325,88 @@ describe('ScheduleLogic', () => {
             expect(ScheduleLogic.calculateEndDate('2024-01-01', 0)).toBe('2024-01-22');
         });
     });
+
+    describe('formatLeavePeriod', () => {
+        test('should format single day in reference year concisely', () => {
+            expect(ScheduleLogic.formatLeavePeriod('2026-11-25', '2026-11-25', 2026)).toBe('25.11');
+        });
+
+        test('should include year for dates outside reference year or spanning years', () => {
+            expect(ScheduleLogic.formatLeavePeriod('2027-01-05', '2027-01-05', 2026)).toBe('05.01.2027');
+            expect(ScheduleLogic.formatLeavePeriod('2027-01-04', '2027-01-12', 2026)).toBe('04.01 – 12.01.2027');
+            expect(ScheduleLogic.formatLeavePeriod('2026-12-28', '2027-01-04', 2026)).toBe('28.12.2026 – 04.01.2027');
+        });
+
+        test('should format same-year range without repeating year', () => {
+            expect(ScheduleLogic.formatLeavePeriod('2026-11-20', '2026-11-27', 2026)).toBe('20.11 – 27.11');
+        });
+    });
+
+    describe('getUpcomingLeaves', () => {
+        const employees = {
+            0: { firstName: 'Jan', lastName: 'kowalski', displayName: 'Jan K.', color: '#14b8a6' },
+            1: { firstName: 'Anna', lastName: 'Nowak', displayName: 'Anna N.', color: '#3b82f6' },
+            2: { displayName: 'Zieliński', color: '#f59e0b' },
+            3: { lastName: 'Ukryty', displayName: 'Ukryty', isHidden: true },
+            4: { lastName: 'TylkoGrafik', displayName: 'TylkoGrafik', isScheduleOnly: true },
+        };
+
+        test('should filter out past leaves, keep ongoing and future leaves, and sort chronologically', () => {
+            const leavesData = {
+                'Jan K.': [
+                    { id: '1', type: 'vacation', startDate: '2026-11-01', endDate: '2026-11-10' }, // past
+                    { id: '2', type: 'vacation', startDate: '2026-11-25', endDate: '2026-11-29' }, // future
+                ],
+                'Anna N.': [
+                    { id: '3', type: 'vacation', startDate: '2026-11-16', endDate: '2026-11-20' }, // ongoing
+                ],
+                'Zieliński': [
+                    { id: '4', type: 'schedule_pickup', startDate: '2026-11-18', endDate: '2026-11-18' }, // today
+                ],
+                Ukryty: [{ id: '5', startDate: '2026-11-21', endDate: '2026-11-22' }],
+                TylkoGrafik: [{ id: '6', startDate: '2026-11-21', endDate: '2026-11-22' }],
+            };
+
+            const result = ScheduleLogic.getUpcomingLeaves(employees, leavesData, '2026-11-18');
+
+            expect(result).toHaveLength(3);
+            expect(result.map((item) => ({
+                surname: item.surname,
+                period: item.periodLabel,
+                isOngoing: item.isOngoing,
+                color: item.color,
+            }))).toEqual([
+                { surname: 'Nowak', period: '16.11 – 20.11', isOngoing: true, color: AppConfig.leaves.leaveTypeColors.vacation },
+                { surname: 'Zieliński', period: '18.11', isOngoing: true, color: AppConfig.leaves.leaveTypeColors.schedule_pickup },
+                { surname: 'Kowalski', period: '25.11 – 29.11', isOngoing: false, color: AppConfig.leaves.leaveTypeColors.vacation },
+            ]);
+            expect(result[2].fullName).toBe('Jan kowalski');
+        });
+
+        test('should assign leave/care type colors from AppConfig including care types', () => {
+            const leavesData = {
+                'Jan K.': [
+                    { id: '1', type: 'child_care_art_188', startDate: '2026-11-20', endDate: '2026-11-21' },
+                    { id: '2', type: 'sick_child_care', startDate: '2026-11-22', endDate: '2026-11-23' },
+                    { id: '3', type: 'family_member_care', startDate: '2026-11-24', endDate: '2026-11-25' },
+                    { id: '4', startDate: '2026-11-26', endDate: '2026-11-27' }, // default -> vacation
+                ],
+            };
+
+            const result = ScheduleLogic.getUpcomingLeaves(employees, leavesData, '2026-11-18');
+            expect(result.map((item) => item.color)).toEqual([
+                AppConfig.leaves.leaveTypeColors.child_care_art_188,
+                AppConfig.leaves.leaveTypeColors.sick_child_care,
+                AppConfig.leaves.leaveTypeColors.family_member_care,
+                AppConfig.leaves.leaveTypeColors.vacation,
+            ]);
+        });
+
+        test('should return empty array for missing inputs or invalid dates', () => {
+            expect(ScheduleLogic.getUpcomingLeaves(null, {})).toEqual([]);
+            expect(ScheduleLogic.getUpcomingLeaves(employees, {
+                'Jan K.': [{ startDate: 'invalid', endDate: '2026-11-20' }],
+            }, '2026-11-18')).toEqual([]);
+        });
+    });
 });

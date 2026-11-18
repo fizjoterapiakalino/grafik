@@ -46,6 +46,7 @@ interface ScheduleUIAPI {
     getElementText(element: HTMLElement | null): string;
     applyCellDataToDom(cell: HTMLTableCellElement, cellObj: CellData): void;
     updatePatientCount(): void;
+    syncUpcomingLeavesMarquee(): void;
     destroy(): void;
 }
 
@@ -58,9 +59,14 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
     let _currentTimeInterval: ReturnType<typeof setInterval> | null = null;
     let _leavesData: Record<string, LeaveEntry[]> = {};
     let _leavesLoaded = false;
+    let _leavesUnsubscribe: (() => void) | null = null;
     let _stationsUnsubscribe: (() => void) | null = null;
     let _stationOverlayInterval: ReturnType<typeof setInterval> | null = null;
     let _pendingRenderAfterEdit = false;
+    let _upcomingLeavesResizeObserver: ResizeObserver | null = null;
+    let _upcomingLeavesRafId: number | null = null;
+    let _resizeHandler: (() => void) | null = null;
+    let _lastUpcomingLeavesSignature = '';
 
     interface StationRealtimeState {
         status?: string;
@@ -392,6 +398,8 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         _stationsUnsubscribe = null;
 
         const stationDocRef = db.collection('stations').doc('state');
+        if (typeof stationDocRef?.onSnapshot !== 'function') return;
+
         _stationsUnsubscribe = stationDocRef.onSnapshot(
             (snapshot) => {
                 const data = snapshot.exists ? (snapshot.data() as Record<string, unknown>) : {};
@@ -411,12 +419,204 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         try {
             const docRef = db.collection(AppConfig.firestore.collections.leaves).doc(AppConfig.firestore.docs.mainLeaves);
             const docSnap = await docRef.get();
-            _leavesData = docSnap.exists ? (docSnap.data() as Record<string, LeaveEntry[]>) || {} : {};
+            _leavesData = docSnap?.exists ? (docSnap.data() as Record<string, LeaveEntry[]>) || {} : {};
             _leavesLoaded = true;
         } catch (error) {
             console.error('Błąd podczas ładowania danych o urlopach:', error);
             _leavesData = {};
         }
+    };
+
+    const _subscribeToLeavesData = (): void => {
+        if (_leavesUnsubscribe) return;
+        try {
+            const docRef = db.collection(AppConfig.firestore.collections.leaves).doc(AppConfig.firestore.docs.mainLeaves);
+            if (typeof docRef?.onSnapshot !== 'function') return;
+
+            _leavesUnsubscribe = docRef.onSnapshot(
+                (docSnap) => {
+                    const nextLeaves = docSnap?.exists ? (docSnap.data() as Record<string, LeaveEntry[]>) || {} : {};
+                    const prevJson = JSON.stringify(_leavesData);
+                    const nextJson = JSON.stringify(nextLeaves);
+                    if (_leavesLoaded && prevJson === nextJson) return;
+
+                    _leavesData = nextLeaves;
+                    _leavesLoaded = true;
+                    if (document.getElementById('mainScheduleTable')) {
+                        renderTable();
+                    }
+                },
+                (error) => {
+                    console.error('Błąd subskrypcji urlopów w schedule:', error);
+                }
+            );
+        } catch (error) {
+            console.error('Błąd inicjalizacji subskrypcji urlopów:', error);
+        }
+    };
+
+    const LEAVE_TYPE_LABELS: Record<string, string> = {
+        vacation: 'Urlop wypoczynkowy',
+        child_care_art_188: 'Opieka nad zdrowym dzieckiem (art. 188)',
+        sick_child_care: 'Opieka nad chorym dzieckiem',
+        family_member_care: 'Opieka nad chorym członkiem rodziny',
+        schedule_pickup: 'Wybicie za święto',
+    };
+
+    const syncUpcomingLeavesMarquee = (): void => {
+        const bar = document.getElementById('upcomingLeavesBar');
+        const viewport = document.getElementById('upcomingLeavesViewport');
+        const track = document.getElementById('upcomingLeavesTrack');
+        if (!bar || !viewport || !track) return;
+
+        const primaryGroup = track.querySelector<HTMLElement>('.upcoming-leaves-group:not(.upcoming-leaves-group-clone)');
+        if (!primaryGroup) {
+            track.querySelectorAll('.upcoming-leaves-group-clone').forEach((clone) => clone.remove());
+            bar.classList.remove('is-scrolling');
+            track.style.removeProperty('--upcoming-leaves-duration');
+            return;
+        }
+
+        const viewportWidth = Math.floor(viewport.clientWidth);
+        const appliedPaddingRight = typeof window.getComputedStyle === 'function'
+            ? parseFloat(window.getComputedStyle(primaryGroup).paddingRight) || 0
+            : 0;
+        const contentWidth = Math.ceil(primaryGroup.scrollWidth - appliedPaddingRight);
+        const shouldScroll = viewportWidth > 0 && contentWidth > viewportWidth;
+        const isCurrentlyScrolling = bar.classList.contains('is-scrolling');
+        const hasClone = Boolean(track.querySelector('.upcoming-leaves-group-clone'));
+
+        if (!shouldScroll) {
+            if (isCurrentlyScrolling || hasClone) {
+                track.querySelectorAll('.upcoming-leaves-group-clone').forEach((clone) => clone.remove());
+                bar.classList.remove('is-scrolling');
+                track.style.removeProperty('--upcoming-leaves-duration');
+            }
+            return;
+        }
+
+        const seamGapPx = 28;
+        const speedPxPerSec = 42;
+        const durationSec = Math.max(8, Number(((contentWidth + seamGapPx) / speedPxPerSec).toFixed(2)));
+        const nextDuration = `${durationSec}s`;
+
+        if (isCurrentlyScrolling && hasClone) {
+            const currentDuration = parseFloat(track.style.getPropertyValue('--upcoming-leaves-duration')) || 0;
+            if (Math.abs(currentDuration - durationSec) > 0.5) {
+                track.style.setProperty('--upcoming-leaves-duration', nextDuration);
+            }
+            return;
+        }
+
+        track.querySelectorAll('.upcoming-leaves-group-clone').forEach((clone) => clone.remove());
+        const clone = primaryGroup.cloneNode(true) as HTMLElement;
+        clone.classList.add('upcoming-leaves-group-clone');
+        clone.setAttribute('aria-hidden', 'true');
+        track.appendChild(clone);
+        track.style.setProperty('--upcoming-leaves-duration', nextDuration);
+        bar.classList.add('is-scrolling');
+    };
+
+    const _scheduleUpcomingLeavesMarqueeSync = (): void => {
+        syncUpcomingLeavesMarquee();
+        if (_upcomingLeavesRafId !== null && typeof cancelAnimationFrame === 'function') {
+            cancelAnimationFrame(_upcomingLeavesRafId);
+            _upcomingLeavesRafId = null;
+        }
+        if (typeof requestAnimationFrame === 'function') {
+            _upcomingLeavesRafId = requestAnimationFrame(() => {
+                _upcomingLeavesRafId = null;
+                syncUpcomingLeavesMarquee();
+            });
+        }
+    };
+
+    const _renderUpcomingLeavesBar = (): void => {
+        const bar = document.getElementById('upcomingLeavesBar');
+        const track = document.getElementById('upcomingLeavesTrack');
+        if (!bar || !track) return;
+
+        if (!_leavesLoaded) return;
+
+        const items = ScheduleLogic.getUpcomingLeaves(EmployeeManager.getAll(), _leavesData);
+        const signature = JSON.stringify(
+            items.map((item) => [item.employeeId, item.surname, item.startDate, item.endDate, item.isOngoing, item.type || 'vacation', item.color || ''])
+        );
+
+        if (signature === _lastUpcomingLeavesSignature && track.childElementCount > 0) {
+            _scheduleUpcomingLeavesMarqueeSync();
+            return;
+        }
+
+        _lastUpcomingLeavesSignature = signature;
+        track.innerHTML = '';
+        bar.classList.remove('is-scrolling');
+        track.style.removeProperty('--upcoming-leaves-duration');
+
+        if (items.length === 0) {
+            const emptySpan = document.createElement('span');
+            emptySpan.className = 'upcoming-leaves-empty';
+            emptySpan.textContent = 'Brak nadchodzących zaplanowanych urlopów';
+            track.appendChild(emptySpan);
+            return;
+        }
+
+        const primaryGroup = document.createElement('div');
+        primaryGroup.className = 'upcoming-leaves-group';
+
+        const leaveColors = AppConfig.leaves.leaveTypeColors as unknown as Record<string, string>;
+
+        items.forEach((item) => {
+            const chip = document.createElement('span');
+            chip.className = `upcoming-leave-chip${item.isOngoing ? ' is-ongoing' : ''}`;
+
+            const leaveType = item.type || 'vacation';
+            const typeLabel = LEAVE_TYPE_LABELS[leaveType] || 'Urlop';
+            const statusPrefix = item.isOngoing ? 'Trwa: ' : '';
+            chip.title = `${item.fullName} — ${typeLabel}: ${statusPrefix}${item.fullPeriodLabel}`;
+
+            const dot = document.createElement('span');
+            dot.className = 'upcoming-leave-dot';
+            const leaveColor = item.color || leaveColors[leaveType] || leaveColors.default || '#3498db';
+            dot.style.backgroundColor = leaveColor;
+            chip.appendChild(dot);
+
+            if (item.isOngoing) {
+                const statusBadge = document.createElement('span');
+                statusBadge.className = 'upcoming-leave-status';
+                statusBadge.textContent = 'Trwa';
+                chip.appendChild(statusBadge);
+            }
+
+            const surnameEl = document.createElement('span');
+            surnameEl.className = 'upcoming-leave-surname';
+            surnameEl.textContent = item.surname;
+            chip.appendChild(surnameEl);
+
+            const periodEl = document.createElement('span');
+            periodEl.className = 'upcoming-leave-period';
+            periodEl.textContent = item.periodLabel;
+            chip.appendChild(periodEl);
+
+            primaryGroup.appendChild(chip);
+        });
+
+        track.appendChild(primaryGroup);
+        _scheduleUpcomingLeavesMarqueeSync();
+    };
+
+    const _initUpcomingLeavesObserver = (): void => {
+        if (_upcomingLeavesResizeObserver) {
+            _upcomingLeavesResizeObserver.disconnect();
+            _upcomingLeavesResizeObserver = null;
+        }
+        const viewport = document.getElementById('upcomingLeavesViewport');
+        if (!viewport || typeof ResizeObserver === 'undefined') return;
+
+        _upcomingLeavesResizeObserver = new ResizeObserver(() => {
+            syncUpcomingLeavesMarquee();
+        });
+        _upcomingLeavesResizeObserver.observe(viewport);
     };
 
     /**
@@ -471,7 +671,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             const currentYear = new Date().getFullYear();
             const docRef = db.collection(AppConfig.firestore.collections.schedules).doc(`changesSchedule_${currentYear}`);
             const docSnap = await docRef.get();
-            const data = docSnap.exists ? (docSnap.data() as { changesCells?: ChangesData }) : null;
+            const data = docSnap?.exists ? (docSnap.data() as { changesCells?: ChangesData }) : null;
             _changesData = data?.changesCells || {};
             _changesLoaded = true;
         } catch (error) {
@@ -552,6 +752,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         _appState = appState;
         _createEmployeeTooltip();
         _subscribeToStationState();
+        _initUpcomingLeavesObserver();
 
         if (_stationOverlayInterval) {
             clearInterval(_stationOverlayInterval);
@@ -562,18 +763,25 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
 
         // Załaduj dane o urlopach i harmonogramie zmian w tle
         Promise.all([_loadLeavesData(), _loadChangesData()]).then(() => {
-            // Po załadowaniu danych, odśwież tabelę żeby wyświetlić badge'y i workload
+            // Po załadowaniu danych, odśwież tabelę żeby wyświetlić badge'y, pasek urlopów i workload
             renderTable();
+            _subscribeToLeavesData();
         });
 
         let lastWidth = window.innerWidth;
 
-        window.addEventListener('resize', () => {
+        if (_resizeHandler) {
+            window.removeEventListener('resize', _resizeHandler);
+        }
+        _resizeHandler = () => {
             if (window.innerWidth !== lastWidth) {
                 lastWidth = window.innerWidth;
                 renderTable();
+            } else {
+                syncUpcomingLeavesMarquee();
             }
-        });
+        };
+        window.addEventListener('resize', _resizeHandler);
 
         const mainTable = document.getElementById('mainScheduleTable');
         if (mainTable) {
@@ -1119,6 +1327,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
 
         if (isMobile) {
             renderMobileView(employeeIndices);
+            _renderUpcomingLeavesBar();
             return;
         }
 
@@ -1131,6 +1340,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
 
         if (!tableHeaderRow || !tbody) {
             console.error('Table header row or tbody not found, cannot render schedule.');
+            _renderUpcomingLeavesBar();
             return;
         }
 
@@ -1252,8 +1462,10 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             }
 
             refreshPastTreatmentStates();
+            _renderUpcomingLeavesBar();
         }, 60000);
 
+        _renderUpcomingLeavesBar();
         updatePatientCount();
     };
 
@@ -1293,12 +1505,30 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
             _stationsUnsubscribe();
             _stationsUnsubscribe = null;
         }
+        if (_leavesUnsubscribe) {
+            _leavesUnsubscribe();
+            _leavesUnsubscribe = null;
+        }
+        if (_upcomingLeavesResizeObserver) {
+            _upcomingLeavesResizeObserver.disconnect();
+            _upcomingLeavesResizeObserver = null;
+        }
+        if (_upcomingLeavesRafId !== null && typeof cancelAnimationFrame === 'function') {
+            cancelAnimationFrame(_upcomingLeavesRafId);
+            _upcomingLeavesRafId = null;
+        }
+        if (_resizeHandler) {
+            window.removeEventListener('resize', _resizeHandler);
+            _resizeHandler = null;
+        }
         _employeeStationOverlays = {};
         if (_employeeTooltip) {
             _employeeTooltip.remove();
             _employeeTooltip = null;
         }
+        _leavesData = {};
         _leavesLoaded = false;
+        _lastUpcomingLeavesSignature = '';
         _pendingRenderAfterEdit = false;
     };
 
@@ -1309,6 +1539,7 @@ export const ScheduleUI: ScheduleUIAPI = (() => {
         getElementText,
         applyCellDataToDom,
         updatePatientCount,
+        syncUpcomingLeavesMarquee,
         destroy,
     };
 })();
