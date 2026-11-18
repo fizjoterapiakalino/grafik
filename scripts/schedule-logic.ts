@@ -92,6 +92,36 @@ interface WorkloadData {
     percentage: number;
 }
 
+export interface UpcomingLeaveEmployee {
+    firstName?: string;
+    lastName?: string;
+    displayName?: string;
+    name?: string;
+    color?: string;
+    isHidden?: boolean;
+    isScheduleOnly?: boolean;
+}
+
+export interface UpcomingLeaveEntryInput {
+    id?: string;
+    type?: string;
+    startDate?: string;
+    endDate?: string;
+}
+
+export interface UpcomingLeaveItem {
+    employeeId: string;
+    surname: string;
+    fullName: string;
+    startDate: string;
+    endDate: string;
+    periodLabel: string;
+    fullPeriodLabel: string;
+    isOngoing: boolean;
+    type?: string;
+    color?: string;
+}
+
 /**
  * Interfejs publicznego API ScheduleLogic
  */
@@ -100,6 +130,12 @@ interface ScheduleLogicAPI {
     calculatePatientCount(scheduleCells: ScheduleCells | null | undefined): number;
     calculateEmployeeWorkload(scheduleCells: ScheduleCells | null | undefined, employeeIndex: string, shiftType?: ShiftType): WorkloadData;
     calculateEndDate(startDate: string | undefined, extensionDays?: number): string;
+    formatLeavePeriod(startDate: string, endDate: string, referenceYear?: number): string;
+    getUpcomingLeaves(
+        employees: Record<string, UpcomingLeaveEmployee> | null | undefined,
+        leavesData: Record<string, UpcomingLeaveEntryInput[]> | null | undefined,
+        todayStr?: string
+    ): UpcomingLeaveItem[];
 }
 
 /**
@@ -387,10 +423,138 @@ export const ScheduleLogic: ScheduleLogicAPI = (() => {
         return endDate.toISOString().split('T')[0];
     };
 
+    const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+    const getLocalTodayIso = (): string => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    };
+
+    const formatFullPolishDate = (isoDate: string): string => {
+        const [year, month, day] = isoDate.split('-');
+        return `${day}.${month}.${year}`;
+    };
+
+    const formatLeavePeriod = (startDate: string, endDate: string, referenceYear?: number): string => {
+        if (!ISO_DATE_RE.test(startDate) || !ISO_DATE_RE.test(endDate)) return '';
+
+        const [normStart, normEnd] = startDate <= endDate ? [startDate, endDate] : [endDate, startDate];
+        const [sY, sM, sD] = normStart.split('-');
+        const [eY, eM, eD] = normEnd.split('-');
+        const refYearStr = String(referenceYear ?? new Date().getFullYear());
+
+        if (normStart === normEnd) {
+            return sY === refYearStr ? `${sD}.${sM}` : `${sD}.${sM}.${sY}`;
+        }
+
+        if (sY === eY) {
+            return sY === refYearStr
+                ? `${sD}.${sM} – ${eD}.${eM}`
+                : `${sD}.${sM} – ${eD}.${eM}.${eY}`;
+        }
+
+        return `${sD}.${sM}.${sY} – ${eD}.${eM}.${eY}`;
+    };
+
+    const resolveEmployeeSurname = (employeeId: string, employee: UpcomingLeaveEmployee): string => {
+        const lastName = employee.lastName?.trim();
+        if (lastName) return capitalizeFirstLetter(lastName);
+
+        const displayName = employee.displayName?.trim() || employee.name?.trim();
+        if (displayName) return capitalizeFirstLetter(displayName);
+
+        return `Pracownik ${employeeId}`;
+    };
+
+    const resolveEmployeeFullName = (employee: UpcomingLeaveEmployee, fallbackSurname: string): string => {
+        const composed = `${employee.firstName || ''} ${employee.lastName || ''}`.trim();
+        if (composed) return capitalizeFirstLetter(composed);
+
+        const displayName = employee.displayName?.trim() || employee.name?.trim();
+        if (displayName) return capitalizeFirstLetter(displayName);
+
+        return fallbackSurname;
+    };
+
+    const getUpcomingLeaves = (
+        employees: Record<string, UpcomingLeaveEmployee> | null | undefined,
+        leavesData: Record<string, UpcomingLeaveEntryInput[]> | null | undefined,
+        todayStr?: string
+    ): UpcomingLeaveItem[] => {
+        if (!employees || !leavesData) return [];
+
+        const effectiveToday = todayStr && ISO_DATE_RE.test(todayStr) ? todayStr : getLocalTodayIso();
+        const referenceYear = Number(effectiveToday.slice(0, 4));
+        const leaveColors = AppConfig.leaves.leaveTypeColors as unknown as Record<string, string>;
+        const seen = new Set<string>();
+        const items: UpcomingLeaveItem[] = [];
+
+        Object.entries(employees).forEach(([employeeId, employee]) => {
+            if (!employee || employee.isHidden || employee.isScheduleOnly) return;
+
+            const candidateKeys = Array.from(
+                new Set([employee.displayName, employee.name, employeeId].filter((key): key is string => Boolean(key && key.trim())))
+            );
+            const matchedKey = candidateKeys.find((key) => Array.isArray(leavesData[key]));
+            if (!matchedKey) return;
+
+            const employeeLeaves = leavesData[matchedKey];
+            const surname = resolveEmployeeSurname(employeeId, employee);
+            const fullName = resolveEmployeeFullName(employee, surname);
+
+            employeeLeaves.forEach((leave) => {
+                if (!leave || !leave.startDate || !leave.endDate) return;
+                if (!ISO_DATE_RE.test(leave.startDate) || !ISO_DATE_RE.test(leave.endDate)) return;
+
+                const [startDate, endDate] = leave.startDate <= leave.endDate
+                    ? [leave.startDate, leave.endDate]
+                    : [leave.endDate, leave.startDate];
+
+                if (endDate < effectiveToday) return;
+
+                const leaveType = leave.type || 'vacation';
+                const dedupeKey = `${employeeId}|${startDate}|${endDate}|${leaveType}`;
+                if (seen.has(dedupeKey)) return;
+                seen.add(dedupeKey);
+
+                const fullPeriodLabel = startDate === endDate
+                    ? formatFullPolishDate(startDate)
+                    : `${formatFullPolishDate(startDate)} – ${formatFullPolishDate(endDate)}`;
+
+                const leaveColor = leaveColors[leaveType] || leaveColors.default || '#3498db';
+
+                items.push({
+                    employeeId,
+                    surname,
+                    fullName,
+                    startDate,
+                    endDate,
+                    periodLabel: formatLeavePeriod(startDate, endDate, referenceYear),
+                    fullPeriodLabel,
+                    isOngoing: startDate <= effectiveToday,
+                    type: leaveType,
+                    color: leaveColor,
+                });
+            });
+        });
+
+        items.sort((a, b) => {
+            const startCmp = a.startDate.localeCompare(b.startDate);
+            if (startCmp !== 0) return startCmp;
+            const endCmp = a.endDate.localeCompare(b.endDate);
+            if (endCmp !== 0) return endCmp;
+            return a.surname.localeCompare(b.surname, 'pl');
+        });
+
+        return items;
+    };
+
     return {
         getCellDisplayData,
         calculatePatientCount,
         calculateEmployeeWorkload,
         calculateEndDate,
+        formatLeavePeriod,
+        getUpcomingLeaves,
     };
 })();

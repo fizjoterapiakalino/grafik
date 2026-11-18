@@ -2836,3 +2836,183 @@ td.current-time-highlight {
         font-size: 0.78rem;
     }
 }
+
+/* ==========================================================================
+   Upcoming Leaves Ticker Bar (Pasek nadchodzących urlopów pod tabelą)
+   ========================================================================== */
+
+.upcoming-leaves-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    position: sticky;
+    left: 0;
+    margin-top: 0;
+    padding: 7px 14px;
+    background: linear-gradient(90deg, var(--color-primary-100) 0%, var(--color-primary-50) 45%, var(--color-gray-50) 100%);
+    border: 1px solid var(--color-primary-200);
+    border-top: 2px solid var(--color-primary-500);
+    border-bottom: none;
+    color: var(--color-gray-800);
+    font-family: var(--font-body);
+    font-size: 0.82rem;
+    line-height: 1.25;
+}
+
+.upcoming-leaves-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border-radius: var(--border-radius-sm);
+    background-color: var(--color-primary-600);
+    color: var(--color-white);
+    font-family: var(--font-heading);
+    font-size: 0.73rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.upcoming-leaves-viewport {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.upcoming-leaves-bar.is-scrolling .upcoming-leaves-viewport {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+}
+
+.upcoming-leaves-track {
+    display: flex;
+    align-items: center;
+    width: max-content;
+    will-change: transform;
+}
+
+.upcoming-leaves-group {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 10px;
+}
+
+.upcoming-leaves-bar.is-scrolling .upcoming-leaves-group {
+    padding-right: 28px;
+}
+
+.upcoming-leaves-bar.is-scrolling .upcoming-leaves-track {
+    animation: upcomingLeavesMarquee var(--upcoming-leaves-duration, 24s) linear infinite;
+}
+
+.upcoming-leaves-bar.is-scrolling:hover .upcoming-leaves-track,
+.upcoming-leaves-bar.is-scrolling:focus-within .upcoming-leaves-track {
+    animation-play-state: paused;
+}
+
+@keyframes upcomingLeavesMarquee {
+    0% {
+        transform: translate3d(0, 0, 0);
+    }
+
+    100% {
+        transform: translate3d(-50%, 0, 0);
+    }
+}
+
+.upcoming-leave-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background-color: var(--color-white);
+    border: 1px solid var(--color-gray-300);
+    box-shadow: var(--shadow-sm);
+    white-space: nowrap;
+    cursor: default;
+    transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.upcoming-leave-chip:hover {
+    border-color: var(--color-primary-500);
+    background-color: var(--color-primary-50);
+}
+
+.upcoming-leave-chip.is-ongoing {
+    border-color: var(--color-warning);
+    background-color: var(--color-warning-50);
+}
+
+.upcoming-leave-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background-color: #3498db;
+}
+
+.upcoming-leave-surname {
+    font-weight: 700;
+    color: var(--color-gray-900);
+}
+
+.upcoming-leave-period {
+    color: var(--color-gray-600);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.upcoming-leave-status {
+    padding: 1px 5px;
+    border-radius: var(--border-radius-sm);
+    background-color: var(--color-warning-light);
+    color: var(--color-warning-dark);
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.upcoming-leaves-empty {
+    color: var(--color-gray-500);
+    font-style: italic;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+    .upcoming-leaves-bar {
+        padding: 6px 10px;
+        gap: 8px;
+        font-size: 0.76rem;
+    }
+
+    .upcoming-leaves-label {
+        padding: 3px 7px;
+        font-size: 0.66rem;
+    }
+
+    .upcoming-leaves-label-text {
+        display: none;
+    }
+
+    .upcoming-leaves-label::after {
+        content: 'Urlopy';
+    }
+
+    .upcoming-leave-chip {
+        padding: 2px 8px;
+        gap: 5px;
+    }
+}
